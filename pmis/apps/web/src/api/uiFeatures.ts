@@ -11,6 +11,10 @@ export type UiFeaturesPatch = components['schemas']['UiFeaturesPatch'];
 export const UI_FEATURES_SEED: UiFeatures = {
   avatars: { style: 'gradient', shape: 'circle', palette: 'varied', in_lists: true },
   new_badge: { enabled: true, days: 14 },
+  data_hub: {
+    widgets: { quick_bar: true, batches: true, template_changes: true, recent: true, health: true, admin: true }, badge: true,
+    default_view: { templates: 'cards', uploads: 'table', exports: 'table', master_import: 'table' },
+  },
   inbox: { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] },
   panel: { mode: 'popover', width: 'medium', show_tabs: true },
   unsaved_guard: { enabled: true, settings: true, dialogs: true, drawers: true, inline: true, composers: true, navigation: true },

@@ -1,0 +1,14 @@
+# Every change needs a review from the repository owner.
+# Narrower rules below name the areas the project treats as contract or database changes.
+# The last matching pattern wins.
+*                              @scupecenter
+/pmis/contracts/               @scupecenter
+/pmis/apps/api/                @scupecenter
+/pmis/apps/api/prisma/         @scupecenter
+/pmis/db/                      @scupecenter
+/pmis/apps/web/                @scupecenter
+/pmis/infra/                   @scupecenter
+/.github/                      @scupecenter
+/pmis/tools/                  @scupecenter
+/pmis/docs/ops/                @scupecenter
+/pmis/THIRD_PARTY_NOTICES.md   @scupecenter

@@ -10,6 +10,7 @@ import { PeoplePicker } from '@/components/PeoplePicker';
 import { PersonTag } from '@/components/PersonTag';
 import { ScopePicker } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
+import { DateInput } from '@/components/DateInput';
 
 export const RIGHTS: DelegableRight[] = ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit', 'users.two_factor', 'views.share', 'views.manage'];
 const TONE: Record<string, string> = { active: 'bg-doneBg text-doneInk', scheduled: 'bg-openBg text-openInk', expired: 'bg-lockBg text-lockInk', revoked: 'bg-lateBg text-lateInk' };
@@ -59,8 +60,8 @@ function GrantDialog({ onClose }: { onClose: () => void }) {
       <p className="text-xs text-mute" data-testid="deleg-modules-note">{t('deleg.modules_unsupported')}</p>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="deleg-redelegate" checked={redeleg} onChange={(e) => setRedeleg(e.target.checked)} />{t('deleg.allow_redelegate')}</label>
       <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm font-semibold">{t('deleg.from')}<input type="date" className="input mt-1 font-normal" data-testid="deleg-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label className="text-sm font-semibold">{t('deleg.until')}<input type="date" className="input mt-1 font-normal" data-testid="deleg-until" value={until} onChange={(e) => setUntil(e.target.value)} /><span className="text-xs font-normal text-mute">{t('deleg.until_hint')}</span></label>
+        <label className="text-sm font-semibold">{t('deleg.from')}<DateInput className="input mt-1 font-normal" data-testid="deleg-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="text-sm font-semibold">{t('deleg.until')}<DateInput className="input mt-1 font-normal" data-testid="deleg-until" value={until} onChange={(e) => setUntil(e.target.value)} /><span className="text-xs font-normal text-mute">{t('deleg.until_hint')}</span></label>
       </div>
     </FormDialog>
   );

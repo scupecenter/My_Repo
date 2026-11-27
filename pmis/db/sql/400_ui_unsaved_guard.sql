@@ -1,6 +1,6 @@
 -- 0401_ui_unsaved_guard: Decision 11 (the unsaved-changes guard for the whole system) joins the guarded ui.features setting as the section
 -- "unsaved_guard". Mirror: db/sql/400_ui_unsaved_guard.sql (kept byte-identical). Additive: only ui_features_seed() and ui_features_validate() are replaced,
--- with the bodies of 0282 plus the new section (nothing of an earlier section is dropped). No table, no new function, no permission change, nothing public.
+-- with the bodies of 0400 (the Data hub) plus the new section (nothing of an earlier section is dropped). No table, no new function, no permission change, nothing public.
 -- A stored value without the section takes the seed, so nothing has to be backfilled.
 --
 --   unsaved_guard  {enabled, settings, dialogs, drawers, inline, composers, navigation: boolean}
@@ -17,19 +17,22 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
            "inbox": {"tabs_enabled": true, "default_tab": "all",
                      "priority_kinds": ["mention", "approval_due", "task_returned", "task_rejected", "idle_task_alert", "no_holder", "absence_alert"]},
            "panel": {"mode": "popover", "width": "medium", "show_tabs": true},
+           "data_hub": {"widgets": {"quick_bar": true, "batches": true, "template_changes": true, "recent": true, "health": true, "admin": true},
+                        "badge": true,
+                        "default_view": {"templates": "cards", "uploads": "table", "exports": "table", "master_import": "table"}},
            "unsaved_guard": {"enabled": true, "settings": true, "dialogs": true, "drawers": true, "inline": true, "composers": true, "navigation": true}}'::jsonb
 $$;
 
--- Checks every section object; appends field errors to errs. This is the validator of 0282 with the "unsaved_guard" branch added.
+-- Checks every section object; appends field errors to errs. This is the validator of 0400 (data_hub) with the "unsaved_guard" branch added.
 CREATE OR REPLACE FUNCTION ui_features_validate(p_sections jsonb) RETURNS jsonb
 LANGUAGE plpgsql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE errs jsonb := '[]'::jsonb; k text; s jsonb; kk text; n integer; el jsonb;
+DECLARE errs jsonb := '[]'::jsonb; k text; s jsonb; kk text; n integer; el jsonb; w jsonb; v jsonb;
 BEGIN
   IF p_sections IS NULL OR jsonb_typeof(p_sections) <> 'object' THEN
     RETURN public.reg_err_item('/sections', 'required', 'An object of sections.') || '[]'::jsonb;
   END IF;
   FOR k IN SELECT jsonb_object_keys(p_sections) LOOP
-    IF k NOT IN ('avatars', 'new_badge', 'inbox', 'panel', 'unsaved_guard') THEN errs := errs || public.reg_err_item('/sections/' || k, 'unknown_key', 'Unknown section.'); END IF;
+    IF k NOT IN ('avatars', 'new_badge', 'inbox', 'panel', 'data_hub', 'unsaved_guard') THEN errs := errs || public.reg_err_item('/sections/' || k, 'unknown_key', 'Unknown section.'); END IF;
   END LOOP;
 
   s := p_sections -> 'avatars';
@@ -109,6 +112,37 @@ BEGIN
         errs := errs || public.reg_err_item('/sections/panel/width', 'invalid', 'narrow, medium or wide.'); END IF;
       IF jsonb_typeof(s -> 'show_tabs') IS DISTINCT FROM 'boolean' THEN
         errs := errs || public.reg_err_item('/sections/panel/show_tabs', 'invalid', 'true or false.'); END IF;
+    END IF;
+  END IF;
+
+  s := p_sections -> 'data_hub';
+  IF s IS NOT NULL THEN
+    IF jsonb_typeof(s) <> 'object' THEN
+      errs := errs || public.reg_err_item('/sections/data_hub', 'invalid', 'An object.');
+    ELSE
+      FOR kk IN SELECT jsonb_object_keys(s) LOOP
+        IF kk NOT IN ('widgets', 'badge', 'default_view') THEN errs := errs || public.reg_err_item('/sections/data_hub/' || kk, 'unknown_key', 'Unknown key.'); END IF;
+      END LOOP;
+      IF jsonb_typeof(s -> 'badge') IS DISTINCT FROM 'boolean' THEN
+        errs := errs || public.reg_err_item('/sections/data_hub/badge', 'invalid', 'true or false.'); END IF;
+      w := s -> 'widgets';
+      IF jsonb_typeof(w) IS DISTINCT FROM 'object' THEN
+        errs := errs || public.reg_err_item('/sections/data_hub/widgets', 'invalid', 'An object of widgets.');
+      ELSE
+        FOR kk IN SELECT jsonb_object_keys(w) LOOP
+          IF kk NOT IN ('quick_bar', 'batches', 'template_changes', 'recent', 'health', 'admin') THEN errs := errs || public.reg_err_item('/sections/data_hub/widgets/' || kk, 'unknown_key', 'Unknown widget.');
+          ELSIF jsonb_typeof(w -> kk) IS DISTINCT FROM 'boolean' THEN errs := errs || public.reg_err_item('/sections/data_hub/widgets/' || kk, 'invalid', 'true or false.'); END IF;
+        END LOOP;
+      END IF;
+      v := s -> 'default_view';
+      IF jsonb_typeof(v) IS DISTINCT FROM 'object' THEN
+        errs := errs || public.reg_err_item('/sections/data_hub/default_view', 'invalid', 'An object of screens.');
+      ELSE
+        FOR kk IN SELECT jsonb_object_keys(v) LOOP
+          IF kk NOT IN ('templates', 'uploads', 'exports', 'master_import') THEN errs := errs || public.reg_err_item('/sections/data_hub/default_view/' || kk, 'unknown_key', 'Unknown screen.');
+          ELSIF jsonb_typeof(v -> kk) IS DISTINCT FROM 'string' OR (v ->> kk) NOT IN ('cards', 'rows', 'table', 'compact') THEN errs := errs || public.reg_err_item('/sections/data_hub/default_view/' || kk, 'invalid', 'cards, rows, table or compact.'); END IF;
+        END LOOP;
+      END IF;
     END IF;
   END IF;
   s := p_sections -> 'unsaved_guard';

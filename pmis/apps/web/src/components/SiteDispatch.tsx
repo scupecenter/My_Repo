@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { SiteDispatch as Dispatch } from '@/api/types';
 import { useSiteDispatch } from '@/api/warehouse';
+import { StandardTable, type StdCol } from './StandardTable';
 
 /** D6 (migration 0053): the two values are shown side by side and never merged. */
 export const NEED_TONE: Record<string, string> = {
@@ -37,28 +38,22 @@ export function SiteDispatchPanel({ siteId }: { siteId: string }) {
   if (q.isError || !q.data) return <p role="alert" className="text-lateInk">{t('errors.generic')}</p>;
   const d = q.data;
   const num = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString(i18n.language));
+  type Line = NonNullable<Dispatch['lines']>[number];
+  const cols: StdCol<Line>[] = [
+    { id: 'need_unit', label: t('wh.need_unit'), w: 160, pinned: true, text: (l) => l.need_unit, cell: (l) => l.need_unit },
+    { id: 'items', label: t('wh.items'), w: 220, text: (l) => l.items.map((x) => x.item_code).join(' / '), cell: (l) => <span className="mono">{l.items.map((x) => x.item_code).join(' / ')}</span> },
+    { id: 'need', label: t('wh.need'), w: 100, text: (l) => num(l.need), cell: (l) => num(l.need) },
+    { id: 'delivered', label: t('wh.delivered'), w: 110, text: (l) => num(l.delivered), cell: (l) => num(l.delivered) },
+    { id: 'short', label: t('wh.short'), w: 100, text: (l) => num(l.short), cell: (l) => num(l.short) },
+    { id: 'status', label: t('wh.status'), w: 240, multi: true, text: (l) => t(`wh.ns_${l.line_status}`) + (l.missing ? ` ${t(`wh.miss_${l.missing}`)}` : ''),
+      cell: (l) => <><span className={`chip ${NEED_TONE[l.line_status]}`}>{t(`wh.ns_${l.line_status}`)}</span>{l.missing && <span className="ms-2 text-xs text-mute" data-testid={`dispatch-missing-${l.need_group}`}>{t(`wh.miss_${l.missing}`)}</span>}</> },
+  ];
   return (
     <div data-testid="site-dispatch">
       <DispatchSummary d={d} />
       {!d.te_applies ? <p className="card mt-3 p-6 text-mute" data-testid="dispatch-no-te">{t('wh.no_te')}</p> : (
-        <div className="card mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-line bg-card2 text-mute">{['need_unit', 'items', 'need', 'delivered', 'short', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}</tr></thead>
-            <tbody>
-              {(d.lines ?? []).map((l) => (
-                <tr key={`${l.need_unit}|${l.need_group}`} className="border-b border-line" data-testid={`dispatch-line-${l.need_group}`} data-status={l.line_status}>
-                  <td className="px-3 py-2">{l.need_unit}</td>
-                  <td className="px-3 py-2"><span className="mono">{l.items.map((x) => x.item_code).join(' / ')}</span></td>
-                  <td className="px-3 py-2">{num(l.need)}</td>
-                  <td className="px-3 py-2">{num(l.delivered)}</td>
-                  <td className="px-3 py-2">{num(l.short)}</td>
-                  <td className="px-3 py-2"><span className={`chip ${NEED_TONE[l.line_status]}`}>{t(`wh.ns_${l.line_status}`)}</span>
-                    {l.missing && <span className="ms-2 text-xs text-mute" data-testid={`dispatch-missing-${l.need_group}`}>{t(`wh.miss_${l.missing}`)}</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <div className="mt-3"><StandardTable screen="site-dispatch" testid="site-dispatch-table" cols={cols} rows={d.lines ?? []} rowId={(l) => `${l.need_unit}|${l.need_group}`}
+          rowTestId={(l) => `dispatch-line-${l.need_group}`} rowAttrs={(l) => ({ 'data-status': l.line_status })} exportName="site-dispatch-lines" noun="items" /></div>
       )}
     </div>
   );

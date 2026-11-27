@@ -9,6 +9,7 @@ import { InlineCell } from '@/components/InlineCell';
 import { InlinePanel } from '@/components/InlinePanel';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { DateInput } from '@/components/DateInput';
 
 export const FieldErr = ({ errs, path }: { errs: Record<string, string>; path: string }) => {
   const { t } = useTranslation();
@@ -30,7 +31,7 @@ function HolidayDialog({ h, onClose }: { h: Holiday | null; onClose: () => void 
         const body = { date: f.date, name_en: f.name_en, ...(f.name_ar ? { name_ar: f.name_ar } : {}), kind: f.kind, reason };
         if (h) change.mutate({ h, patch: body }, done); else create.mutate({ ...body, tentative: f.tentative }, done);
       }}>
-      <label className="block text-sm font-semibold">{t('cal.date')}<input type="date" className="input mt-1 font-normal" data-testid="holiday-date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
+      <label className="block text-sm font-semibold">{t('cal.date')}<DateInput className="input mt-1 font-normal" data-testid="holiday-date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
       <FieldErr errs={errs} path="/date" />
       <label className="block text-sm font-semibold">{t('cal.name_en')}<input className="input mt-1 font-normal" data-testid="holiday-name-en" value={f.name_en} onChange={(e) => setF({ ...f, name_en: e.target.value })} /></label>
       <FieldErr errs={errs} path="/name_en" />
@@ -121,7 +122,7 @@ export function Calendar() {
       {dlg?.kind === 'confirm' && (
         <InlinePanel onClose={() => setDlg(null)} testid="holiday-confirm-dialog" title={t('cal.confirm_title', { date: dlg.h.date })} busy={change.isPending} error={change.isError ? errText(change.error, t) : null}
           onSubmit={(reason) => change.mutate({ h: dlg.h, patch: { reason, confirm: true, ...(confirmDate ? { date: confirmDate } : {}) } }, { onSuccess: () => { toast(t('settings.audited')); setDlg(null); } })}>
-          <label className="block text-sm font-semibold">{t('cal.announced_date')}<input type="date" className="input mt-1 font-normal" data-testid="holiday-confirm-date" value={confirmDate} onChange={(e) => setConfirmDate(e.target.value)} /><span className="text-xs font-normal text-mute">{t('cal.announced_hint')}</span></label>
+          <label className="block text-sm font-semibold">{t('cal.announced_date')}<DateInput className="input mt-1 font-normal" data-testid="holiday-confirm-date" value={confirmDate} onChange={(e) => setConfirmDate(e.target.value)} /><span className="text-xs font-normal text-mute">{t('cal.announced_hint')}</span></label>
         </InlinePanel>
       )}
     </>

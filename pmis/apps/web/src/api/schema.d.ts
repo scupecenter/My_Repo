@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/admin/document-search-index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status of the document contents search index (System Admin)
+         * @description 0.15.155. Counts of the files whose text is searchable. Indexing runs in the background every few minutes. 403 for anyone but a System Admin.
+         */
+        get: operations["getDocumentSearchIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -288,6 +308,46 @@ export interface paths {
          *     is set. Rate limited (429). Failures are written to the security log.
          */
         post: operations["localDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/passkey/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The passkey challenge for the pending two-step sign-in (0.15.194)
+         * @description Needs the pending sign-in cookie `pmis_2fa` (`next` = `two_factor`). Answers `available` false and `options` null when passkeys are off or the account has none: the page then shows only the code. Otherwise `options` is the WebAuthn request (challenge valid 5 minutes, single use, user verification required). Rate limited (429).
+         */
+        post: operations["localPasskeyOptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second step with a passkey instead of the authenticator code (0.15.194)
+         * @description Needs the pending sign-in cookie. `response` is the browser's WebAuthn assertion. Checked: single-use challenge, origin, relying party, user verification, signature, and a sign counter that moves forward (a replayed or cloned credential is refused). Failure is 401 `invalid_code` and is written to the security log (`two_factor_failed`, `via` passkey). The pending sign-in is single use. On success the session cookie is set, same as the code path.
+         */
+        post: operations["localPasskeySignIn"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4128,6 +4188,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/data-hub/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Data hub landing page, in one call (0.15.311)
+         * @description 0.15.311. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
+         */
+        get: operations["getDataHubSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules": {
         parameters: {
             query?: never;
@@ -6322,6 +6402,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The passkey setting (0.15.194)
+         * @description Every signed-in user reads `enabled` and `ready` (`ready` is false when `APP_BASE_URL` is not an https address, so passkeys cannot be turned on). `updated_by` is shown to a System Admin only. `enabled` is `false` until a System Admin turns it on.
+         */
+        get: operations["getPasskeys"];
+        /**
+         * Turn passkeys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.194)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Turning it on needs `ready` (409 `invalid_transition` otherwise). Saving the value already in force is 409. Turning it off stops the passkey option at sign-in and keeps every passkey row; the authenticator code is never affected. Audited `passkeys_update`.
+         */
+        put: operations["setPasskeys"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My passkeys (0.15.194)
+         * @description The caller's own active passkeys (never the key material). `can_add` is true only when the account has two-step verification on and enrolled.
+         */
+        get: operations["listMyPasskeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/register/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start adding a passkey (step-up) (0.15.194)
+         * @description A step-up is required (401 `step_up_required`). 409 `invalid_transition` when passkeys are off, not ready, or the account has no two-step verification. The answer is the WebAuthn creation options (attestation none, user verification required); the challenge is valid 5 minutes and single use. Rate limited (429).
+         */
+        post: operations["startPasskeyRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/register/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish adding a passkey (step-up) (0.15.194)
+         * @description A step-up is required. `response` is the browser's WebAuthn attestation, `label` names the passkey (1 to 80 characters). At most 10 active passkeys per account. Audited `passkey_added`. A response that does not verify, or whose challenge was used or expired, is 400 `validation_failed`.
+         */
+        post: operations["finishPasskeyRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove one of my passkeys (step-up) (0.15.194)
+         * @description The caller's own passkey only (404 otherwise). The row is kept and marked revoked. Works even when passkeys are off. Audited `passkey_revoked`.
+         */
+        delete: operations["removeMyPasskey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/passkeys/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke every passkey of one account (System Admin, reason, step-up) (0.15.194)
+         * @description The recovery for a lost device. The authenticator code keeps working. Audited `passkeys_revoked_by_admin`. Returns how many were revoked.
+         */
+        post: operations["revokeUserPasskeys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/new-device-code": {
         parameters: {
             query?: never;
@@ -7209,6 +7413,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/mail-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail policy (0.15.261)
+         * @description 0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+         *     override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+         *     lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+         */
+        get: operations["getMailPolicy"];
+        /**
+         * Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+         * @description 0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+         */
+        put: operations["setMailPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/mail-notification-kinds": {
         parameters: {
             query?: never;
@@ -7824,6 +8054,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * One intake-triage decision on a record (Issue Log, Change Control) (0.15.240)
+         * @description 0.15.240. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
+         *     Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval; 403
+         *     `action_forbidden` / `not_eligible_holder` otherwise). `If-Match` is the record's version. The decision (`TriageRequest`):
+         *     `accept` lets the record proceed to its normal flow, `defer` keeps it in the queue (a note may say why), `reject` and `merge` void
+         *     the record (409 `invalid_transition` when already decided, or when the record is already approved) and need a note and step-up
+         *     (401 `step_up_required`); `merge` also names the surviving record `duplicate_of` (422 `validation_failed`, `/duplicate_of`, when it
+         *     is missing, the record itself, or not another live record of the same register the caller can see), links it in
+         *     `triage.duplicate_of` and notes the merge on the surviving record's comment thread. A record of a register without triage answers
+         *     404. Audited as `register_record_triage` with before and after; the creator is notified (`triage_decision`).
+         */
+        post: operations["triageRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/columns/{field_code}/lock": {
         parameters: {
             query?: never;
@@ -8219,6 +8482,31 @@ export interface paths {
         };
         /** Preview: rows with action, diff and errors */
         get: operations["listImportBatchRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import-batches/{batch_id}/error-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)
+         * @description The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+         *     corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+         *     sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+         */
+        get: operations["downloadImportBatchErrorReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11678,6 +11966,18 @@ export interface components {
             /** @description The app route to open (a relative path). */
             href: string;
             match_ranges: number[][];
+            /** @description 0.15.155. Documents group: the text around the match inside the file contents (normalised), null when the file matched by name. */
+            snippet?: string | null;
+        };
+        DocumentSearchIndex: {
+            indexed: number;
+            empty: number;
+            unsupported: number;
+            too_large: number;
+            failed: number;
+            pending: number;
+            /** Format: date-time */
+            last_extracted_at: string | null;
         };
         SearchGroup: {
             type: components["schemas"]["SearchType"];
@@ -14899,6 +15199,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
+                duplicate?: number;
             };
             /** @description Always null (a big upload reports its progress in `progress`, 0.15.3). */
             job_id?: string | null;
@@ -15842,6 +16144,80 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
+        /** @description 0.15.311. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen. */
+        UiDataHub: {
+            widgets: {
+                quick_bar: boolean;
+                batches: boolean;
+                template_changes: boolean;
+                recent: boolean;
+                health: boolean;
+                admin: boolean;
+            };
+            badge: boolean;
+            default_view: {
+                /** @enum {string} */
+                templates: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                uploads: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                exports: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                master_import: "cards" | "rows" | "table" | "compact";
+            };
+        };
+        DataHubBatch: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            /**
+             * @description send: the caller uploaded it and has not sent it; review_l2: the caller may approve it; returned: it came back to the caller; checking: still being staged (listed, not counted).
+             * @enum {string}
+             */
+            action: "send" | "review_l2" | "returned" | "checking";
+            status: string;
+            template_id: string;
+            template_version: number;
+            register_key?: string | null;
+            stream?: string | null;
+            counts: {
+                valid: number;
+                invalid: number;
+            };
+            /** Format: date-time */
+            uploaded_at?: string | null;
+            progress_pct?: number | null;
+        };
+        DataHubTemplateChange: {
+            template_id: string;
+            name_en: string;
+            name_ar?: string | null;
+            version: number;
+            /** Format: date-time */
+            issued_at: string;
+            reason?: string | null;
+            added: string[];
+            removed: string[];
+            renamed: string[];
+            /** @description The version of the caller last download of this template (null when never downloaded). */
+            my_version?: number | null;
+            mine_is_old: boolean;
+        };
+        DataHubDownload: {
+            template_id: string;
+            version?: number | null;
+            prefill: boolean;
+            /** Format: date-time */
+            at: string;
+        };
+        DataHubSummary: {
+            batches: {
+                count: number;
+                items: components["schemas"]["DataHubBatch"][];
+            };
+            template_changes: components["schemas"]["DataHubTemplateChange"][];
+            my_downloads: components["schemas"]["DataHubDownload"][];
+        };
         /** @description 0.15.251. How the bell opens the notifications. */
         UiPanel: {
             /** @enum {string} */
@@ -15865,6 +16241,7 @@ export interface components {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
+            data_hub: components["schemas"]["UiDataHub"];
             panel: components["schemas"]["UiPanel"];
             unsaved_guard: components["schemas"]["UiUnsavedGuard"];
         };
@@ -15872,6 +16249,7 @@ export interface components {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
+            data_hub?: components["schemas"]["UiDataHub"];
             panel?: components["schemas"]["UiPanel"];
             unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
         };
@@ -16815,6 +17193,8 @@ export interface components {
              * @constant
              */
             approval_levels: 2;
+            /** @description 0.15.240. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision. */
+            triage_enabled?: boolean;
             /** @description Base fields plus active custom fields visible to the caller. */
             fields: components["schemas"]["RegisterField"][];
             record_count?: number;
@@ -16882,7 +17262,20 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag" | "triage")[];
+            /** @description 0.15.240. The intake triage of a record of a triage-enabled register (absent while the record was never queued). */
+            triage?: {
+                state: components["schemas"]["TriageState"];
+                note: string | null;
+                by?: components["schemas"]["UserRef"];
+                /** Format: date-time */
+                at: string | null;
+                /**
+                 * Format: uuid
+                 * @description For a record merged as a duplicate: the surviving record.
+                 */
+                duplicate_of: string | null;
+            };
             /**
              * Format: uuid
              * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
@@ -17488,6 +17881,48 @@ export interface components {
             /** @description Omitted = default_hours. */
             hours?: number;
         };
+        /** @description 0.15.194. The passkey setting (`security.passkeys`, migration 0294). */
+        PasskeySetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            /** @description Whether the workspace address (APP_BASE_URL, https) is set, so a relying party exists. */
+            ready: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        PasskeySettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+        };
+        PasskeyItem: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_used_at: string | null;
+            /** @enum {string} */
+            device_type: "singleDevice" | "multiDevice";
+            backed_up: boolean;
+        };
+        MyPasskeys: {
+            enabled: boolean;
+            ready: boolean;
+            /** @description True only when the account has two-step verification on and enrolled. */
+            can_add: boolean;
+            items: components["schemas"]["PasskeyItem"][];
+        };
+        PasskeySignInOptions: {
+            available: boolean;
+            /** @description The WebAuthn request options, or null. */
+            options: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** @description 0.15.192. The new-device email code setting (`security.new_device_code`, migration 0292). */
         NewDeviceCodeSetting: {
             /** @description false until a System Admin turns it on. */
@@ -17565,6 +18000,32 @@ export interface components {
         MailNotificationKindsInput: components["schemas"]["WithReason"] & {
             /** @description Notification kinds that are also mailed to the person. An empty list keeps every notification in-app. */
             kinds: string[];
+        };
+        MailPolicyInput: {
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "internal_only" | "internal_external";
+            internal_domains: string[];
+            kinds: {
+                [key: string]: {
+                    enabled: boolean;
+                    /** @enum {string} */
+                    mode: "inherit" | "internal_only" | "internal_external";
+                };
+            };
+        };
+        /** @description 0.15.261. The setting `mail.policy`. */
+        MailPolicy: components["schemas"]["MailPolicyInput"] & {
+            version: number;
+            /** @description The security lock; while on, no external mail is sent. */
+            block_public_sharing: boolean;
+            catalogue: {
+                kind: string;
+                recommended: boolean;
+            }[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
         };
         /** @description 0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name. */
         MailNotificationKinds: {
@@ -17939,7 +18400,7 @@ export interface components {
             id: string;
             level: number;
             /** @enum {string} */
-            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void" | "transfer";
+            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void" | "transfer" | "triage_accept" | "triage_reject" | "triage_merge" | "triage_defer";
             acted_by?: components["schemas"]["UserRef"];
             note?: string | null;
             before_state?: components["schemas"]["RegisterRecordState"];
@@ -17964,6 +18425,23 @@ export interface components {
                 type: string;
                 scopes: string[] | null;
             }[];
+        };
+        /**
+         * @description 0.15.240. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).
+         * @enum {string}
+         */
+        TriageState: "pending" | "accepted" | "deferred" | "rejected" | "merged";
+        /** @description 0.15.240: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record. */
+        TriageRequest: {
+            /** @enum {string} */
+            action: "accept" | "reject" | "merge" | "defer";
+            note?: string;
+            /**
+             * Format: uuid
+             * @description With `merge`: the surviving record of the same register.
+             */
+            duplicate_of?: string;
+            via?: components["schemas"]["WorkflowVia"];
         };
         RegisterRecordInput: {
             /**
@@ -19726,7 +20204,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "alert_rule";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "triage_decision" | "alert_rule";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -21523,6 +22001,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getDocumentSearchIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSearchIndex"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     authLogin: {
         parameters: {
             query?: {
@@ -21857,6 +22357,64 @@ export interface operations {
             content: {
                 "application/json": {
                     code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localPasskeyOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description The options, or none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySignInOptions"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localPasskeySignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    response: {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -28510,6 +29068,27 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getDataHubSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataHubSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listExportSchedules: {
         parameters: {
             query?: never;
@@ -32541,6 +33120,194 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setPasskeys: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeySettingInput"];
+            };
+        };
+        responses: {
+            /** @description The setting now in force. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listMyPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The passkeys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPasskeys"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    startPasskeyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The WebAuthn creation options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    finishPasskeyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    label: string;
+                    response: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The new passkey. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyItem"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    removeMyPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeUserPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revoked: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getNewDeviceCode: {
         parameters: {
             query?: never;
@@ -33905,6 +34672,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getMailPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMailPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["MailPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getMailNotificationKinds: {
         parameters: {
             query?: never;
@@ -34535,6 +35358,8 @@ export interface operations {
                 region_id?: components["schemas"]["RegionId"];
                 state?: components["schemas"]["RegisterRecordState"];
                 record_type?: string;
+                /** @description 0.15.240: only records whose intake triage is in this state (triage-enabled registers). */
+                triage?: components["schemas"]["TriageState"];
                 /** @description All versions of one logical record. */
                 entity_id?: string;
                 /** @description Default false = the latest version of each logical record. */
@@ -35114,6 +35939,46 @@ export interface operations {
         };
         responses: {
             /** @description Unlocked. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    triageRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriageRequest"];
+            };
+        };
+        responses: {
+            /** @description The decided record. */
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];
@@ -35909,6 +36774,32 @@ export interface operations {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ImportRow"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadImportBatchErrorReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
