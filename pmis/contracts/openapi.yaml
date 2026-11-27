@@ -12833,6 +12833,26 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /import-batches/{batch_id}/error-report:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    get:
+      tags: [templates]
+      operationId: downloadImportBatchErrorReport
+      summary: 'The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)'
+      description: |
+        The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+        corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+        sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+      responses:
+        '200':
+          description: The workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /import-batches/{batch_id}/submit:
     parameters:
     - {$ref: '#/components/parameters/BatchId'}
@@ -21121,6 +21141,7 @@ components:
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
             admin_approved: { type: integer, description: '0087: rows approved by a System Admin as is (flagged `admin_override`).' }
             incomplete: { type: integer, description: '0087: of those, the rows approved with missing data (flagged `incomplete`).' }
+            duplicate: { type: integer, description: '0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own.' }
         job_id: { type: [string, 'null'], description: 'Always null (a big upload reports its progress in `progress`, 0.15.3).' }
         upload_id: { type: string, format: uuid, description: '0.15.3: the upload staged in the background that produced this batch (or that this answer is, while `parsing`).' }
         upload: { $ref: '#/components/schemas/ImportUploadInfo' }

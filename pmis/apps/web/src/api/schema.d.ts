@@ -8253,6 +8253,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/import-batches/{batch_id}/error-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)
+         * @description The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+         *     corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+         *     sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+         */
+        get: operations["downloadImportBatchErrorReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/import-batches/{batch_id}/submit": {
         parameters: {
             query?: never;
@@ -14925,6 +14950,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
+                duplicate?: number;
             };
             /** @description Always null (a big upload reports its progress in `progress`, 0.15.3). */
             job_id?: string | null;
@@ -36005,6 +36032,32 @@ export interface operations {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ImportRow"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadImportBatchErrorReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
