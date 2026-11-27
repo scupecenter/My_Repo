@@ -257,7 +257,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, views, l
     <div data-testid="task-grid-wrap">
       {/* W8 item 3: the shared table toolbar of the site-data screens; the quick filters of the loaded tasks stay in the row below */}
       <TableToolbar testid="task-grid-toolbar"
-        views={<SavedViews screen="site-tasks" value={{ tq, tf: qkey, tb: holder, ts: sortKey, ...(advTree ? { advanced: advTree } : {}) }} empty={TASK_VIEW_EMPTY} table={api2}
+        views={<SavedViews screen="site-tasks" sharedScreen value={{ tq, tf: qkey, tb: holder, ts: sortKey, ...(advTree ? { advanced: advTree } : {}) }} empty={TASK_VIEW_EMPTY} table={api2}
           onApply={(x) => { const r = x as Record<string, unknown>; setSp((p) => { const n = new URLSearchParams(p); for (const k of ['tq', 'tf', 'tb', 'ts'] as const) { const val = String(r[k] ?? ''); if (val) n.set(k, val); else n.delete(k); } const enc = encodeFilter(r.advanced as FilterTree | undefined); if (enc) n.set('tadv', enc); else n.delete('tadv'); return n; }, { replace: true }); }} />}
         search={<SearchBox testid="task-grid-search" value={tq} onChange={(x) => setParam('tq', x)} placeholder={t('tstd.search_tasks')} />}
         filter={<UnifiedFilter screen="site-tasks" value={advTree} onChange={(tree) => setParam('tadv', encodeFilter(tree))} onClearAll={clearAll} />}

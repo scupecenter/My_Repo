@@ -344,7 +344,7 @@ export function Sites() {
       {/* W8: the shared table toolbar, in the same order on every site-data screen */}
       <TableToolbar testid="sites-toolbar"
         views={/* a menu keeps its own saved views (contract 0.15.49): the tree, the quick filters, the layout and the column order of the list */
-        <SavedViews screen={savedScreen}
+        <SavedViews screen={savedScreen} sharedScreen={savedScreen.startsWith('site360-')}
           value={siteMenu
             ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: asWide ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
             : { ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }}

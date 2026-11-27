@@ -12,7 +12,23 @@ import { PeoplePicker } from './PeoplePicker';
 import { useToast } from './Toast';
 
 /** The column control of the screen, when it has one (TableKit `useTablePrefs`). */
-export type ViewTable = { prefs: Prefs; apply: (c: SavedViewColumns) => void };
+export type ViewTable = { prefs: Prefs; apply: (c: SavedViewColumns) => void; screen?: string };
+
+/**
+ * Column isolation: a view stores the columns of the table it was saved from, and stamps that table's key in its filters
+ * (`_columns_for`). When one view screen serves two tables (Site tasks: grid and timeline; Library archive: set and seed;
+ * Daily Plan: its tabs; Site Master menus), a view applies its columns only to the table that saved it, so hiding, ordering or
+ * sizing a column in one list never changes another. The filters still apply everywhere. A view saved before the stamp existed
+ * has none: on a `sharedScreen` its columns are skipped, elsewhere they apply as before.
+ */
+export const COLUMNS_FOR = '_columns_for';
+export const columnsApply = (v: { filters?: Record<string, unknown>; columns?: unknown }, table: { screen?: string } | undefined, sharedScreen: boolean): boolean => {
+  if (!table || !Object.keys((v.columns ?? {}) as object).length) return false;
+  const stamp = v.filters?.[COLUMNS_FOR];
+  if (typeof stamp === 'string') return !table.screen || stamp === table.screen;
+  return !sharedScreen;
+};
+const withoutStamp = (f: Record<string, unknown> | undefined) => { const { [COLUMNS_FOR]: _drop, ...rest } = f ?? {}; void _drop; return rest; };
 
 /** The browser key of the old local views (before P10); they are imported to the server on first use and then removed. */
 export const legacyKey = (screen: string) => `pmis.logviews.${screen}`;
@@ -22,8 +38,10 @@ export const legacyKey = (screen: string) => `pmis.logviews.${screen}`;
  * and its sort, kept on the server per user. The owner may share it with roles, groups, people or everyone when they hold views.share; the server
  * strips columns a reader may not see and never shows another user's private view. Views are versioned and deactivated, never deleted.
  */
-export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSort }: {
+export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSort, sharedScreen = false }: {
   screen: string; value: F; onApply: (f: F) => void; empty: F; table?: ViewTable; sort?: SavedViewSort[]; onSort?: (s: SavedViewSort[]) => void;
+  /** another table uses this view screen too (see COLUMNS_FOR) */
+  sharedScreen?: boolean;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -53,13 +71,13 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
   }, [q.isSuccess, screen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const content = () => ({
-    filters: value as unknown as Record<string, unknown>,
+    filters: { ...(value as unknown as Record<string, unknown>), ...(table?.screen ? { [COLUMNS_FOR]: table.screen } : {}) },
     ...(table ? { columns: { order: table.prefs.order, hidden: table.prefs.hidden, width: table.prefs.width, density: table.prefs.density, ...(table.prefs.display ? { display: table.prefs.display } : {}) } } : {}),
     ...(sort ? { sort } : {}),
   });
   const apply = (v: SavedView | undefined) => {
-    onApply(v ? ({ ...(empty as object), ...v.filters } as F) : empty);
-    if (v && table && Object.keys(v.columns ?? {}).length) table.apply(v.columns);
+    onApply(v ? ({ ...(empty as object), ...withoutStamp(v.filters) } as F) : empty);
+    if (v && table && columnsApply(v, table, sharedScreen)) table.apply(v.columns);
     if (onSort) onSort(v?.sort ?? []);
   };
   const save = () => {

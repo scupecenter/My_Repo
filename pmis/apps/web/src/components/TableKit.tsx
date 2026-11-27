@@ -68,6 +68,8 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
     storePrefs(screen, user, n);
   };
   return {
+    /** the storage key of this table's column prefs: a saved view stamps it so its columns only apply to this table */
+    screen,
     prefs,
     defs: eff,
     cols: visibleCols(prefs, eff, autoNow),
