@@ -2,7 +2,7 @@ import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { superDb } from './helpers';
 
-/** Migration 0365: the new saved-view screens know their module (the region scope of shared views); the older screens keep theirs. */
+/** Migration 0366: the new saved-view screens know their module (the region scope of shared views); the older screens keep theirs. */
 let db: PgClient;
 beforeAll(async () => { db = await superDb(); });
 afterAll(async () => { await db.end(); });

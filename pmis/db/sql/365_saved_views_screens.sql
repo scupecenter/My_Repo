@@ -1,4 +1,4 @@
--- 0365: the saved-views bar reaches the Warehouse lists, the Library forms list, the Inbox and Messages (owner decision 35, review item 6).
+-- 0366: the saved-views bar reaches the Warehouse lists, the Library forms list, the Inbox and Messages (owner decision 35, review item 6).
 --
 -- WHAT. Saved views keep any screen key; sv_screen_module(screen) tells which module's regions bound a SHARED view that filters on regions. The new screen keys:
 --   warehouse-items, warehouse-movements, warehouse-stock, warehouse-dispatch -> module warehouse; library-forms -> sites.documents (like library-archive).
