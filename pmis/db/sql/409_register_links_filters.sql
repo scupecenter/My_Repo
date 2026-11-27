@@ -23,9 +23,9 @@ UPDATE public.register_links SET label_fields = ARRAY['procurement_record_id>po_
 
 CREATE OR REPLACE FUNCTION register_link_filter_ok(p_data jsonb, p_in jsonb, p_not_like jsonb) RETURNS boolean
 LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
-  SELECT (p_in IS NULL OR NOT EXISTS (SELECT 1 FROM jsonb_each(p_in) e
+  SELECT (p_in IS NULL OR jsonb_typeof(p_in) <> 'object' OR NOT EXISTS (SELECT 1 FROM jsonb_each(p_in) e
             WHERE NOT coalesce((p_data ->> e.key) = ANY (ARRAY(SELECT jsonb_array_elements_text(e.value))), false)))
-     AND (p_not_like IS NULL OR NOT EXISTS (SELECT 1 FROM jsonb_each(p_not_like) e, jsonb_array_elements_text(e.value) pat
+     AND (p_not_like IS NULL OR jsonb_typeof(p_not_like) <> 'object' OR NOT EXISTS (SELECT 1 FROM jsonb_each(p_not_like) e, jsonb_array_elements_text(e.value) pat
             WHERE coalesce(p_data ->> e.key, '') ILIKE pat))
 $$;
 
