@@ -3616,6 +3616,18 @@
       }
     }
   },
+  "nav_side": {
+    "title": "Sidebar",
+    "subtitle": "Choose what your menu shows, the order of its screens and the badge style. The pinned shortcuts are managed on the menu itself (the star).",
+    "badges": "Badges",
+    "badge_full": "Full count",
+    "badge_dot": "Dot only",
+    "badge_none": "No badge",
+    "show": "Show",
+    "hide": "Hide",
+    "reset": "Back to the organization menu",
+    "note": "Changes preview in the menu at once. Apply saves them to your profile, on every device."
+  },
   "emailChange": {
     "tab": "Email changes",
     "old": "Current email",
