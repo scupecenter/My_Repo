@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw, Share2 } from "lucide-react";
 import { loadPref, savePref } from "@/lib/localPref";
+import { useDashboardViewDefaults } from "@/api/settings";
 import { useDownloadGate } from '@/lib/downloadGate';
 import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
@@ -580,11 +581,16 @@ export function Dashboard() {
   const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [format, setFormat] = useState<ExportFormat>(() => (loadPref<string>("dash.exportFormat", "xlsx") === "csv" ? "csv" : "xlsx"));
+  const viewDefaults = useDashboardViewDefaults();
+  // the user's own remembered choice overrides the server-wide default (Settings, Dashboard, view defaults)
+  const [ownFormat, setOwnFormat] = useState<ExportFormat | null>(() => { const v = loadPref<string | null>("dash.exportFormat", null); return v === "csv" || v === "xlsx" ? v : null; });
+  const format: ExportFormat = ownFormat ?? (viewDefaults.data?.export_format === "csv" ? "csv" : "xlsx");
+  const setFormat = (f: ExportFormat) => setOwnFormat(f);
   const [shareOpen, setShareOpen] = useState(false);
   const shownBlocks = useRef<string[]>([]);
-  const [collapsed, setCollapsed] = useState<string[]>(() => loadPref<string[]>(collapsedKey(userId), []));
-  useEffect(() => { setCollapsed(loadPref<string[]>(collapsedKey(userId), [])); }, [userId]);
+  // null = the user has not chosen yet: the server-wide default applies (open or collapsed)
+  const [collapsed, setCollapsed] = useState<string[] | null>(() => loadPref<string[] | null>(collapsedKey(userId), null));
+  useEffect(() => { setCollapsed(loadPref<string[] | null>(collapsedKey(userId), null)); }, [userId]);
   const setCollapsedSaved = (next: string[]) => { setCollapsed(next); savePref(collapsedKey(userId), next); };
   const blockLabel = (code: string) => {
     const c = dashSettings.data?.catalogue.cards.find((x) => x.code === code);
@@ -2681,7 +2687,7 @@ export function Dashboard() {
               region_health: <RegionHealthCard />,
             },
             (code, node) => {
-              const closed = collapsed.includes(code);
+              const closed = collapsed === null ? viewDefaults.data?.collapse === "closed" : collapsed.includes(code);
               if (!shownBlocks.current.includes(code)) shownBlocks.current.push(code);
               return (
                 <section
@@ -2694,7 +2700,7 @@ export function Dashboard() {
                       className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-start text-sm font-semibold"
                       data-testid={`dash-block-toggle-${code}`}
                       aria-expanded={!closed}
-                      onClick={() => setCollapsedSaved(closed ? collapsed.filter((c) => c !== code) : [...collapsed, code])}
+                      onClick={() => setCollapsedSaved(closed ? (collapsed ?? [...shownBlocks.current]).filter((c) => c !== code) : [...(collapsed ?? []), code])}
                     >
                       <ChevronDown size={16} aria-hidden className={closed ? "-rotate-90 rtl:rotate-90" : ""} />
                       {blockLabel(code)}

@@ -81,6 +81,9 @@ const isAdmin = () => viewer()?.key === 'pm';
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 const reasonErr = (r?: string) => ((r ?? '').trim().length < 3 || (r ?? '').length > 1000 ? fields({ path: '/reason', code: 'required' }) : null);
+const viewDefaults: { export_format: 'xlsx' | 'csv'; collapse: 'open' | 'closed'; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { export_format: 'xlsx', collapse: 'open', version: 1, updated_at: null, updated_by: null };
+const viewDefaultsView = () => ({ ...viewDefaults, can_edit: isAdmin() });
 const tag = (n: number) => ({ headers: { ETag: `"${n}"` } });
 const ver = (req: Request, v: number) => { const h = req.headers.get('If-Match'); return h && Number(h.replace(/"/g, '')) !== v ? problem(412, 'precondition_failed', 'Changed by someone else; reload') : null; };
 const ref = (e: string) => ({ id: uid(e), display_name: byId(e).name_en, employee_id: e });
@@ -517,6 +520,27 @@ export const settingsHandlers = [
     return HttpResponse.json({ record_id: x.last_record_id, register_key: x.register_key, next_due: x.next_due }, { status: 201 });
   }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
+  // ------------------------------------------------------------------ 0.15.208: the server-wide dashboard view defaults
+  http.get(`${B}/settings/dashboard-view-defaults`, () => { const g = guard(); if (g) return g; const j = viewDefaultsView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/dashboard-view-defaults`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ export_format?: unknown; collapse?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['export_format', 'collapse', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (b.export_format !== 'xlsx' && b.export_format !== 'csv') errs.push({ path: '/export_format', code: 'invalid' });
+    if (b.collapse !== 'open' && b.collapse !== 'closed') errs.push({ path: '/collapse', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, viewDefaults.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (viewDefaults.export_format === b.export_format && viewDefaults.collapse === b.collapse) return problem(409, 'invalid_transition', 'These are already the dashboard view defaults.');
+    const v = viewer()!;
+    Object.assign(viewDefaults, { export_format: b.export_format as 'xlsx' | 'csv', collapse: b.collapse as 'open' | 'closed', version: viewDefaults.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = viewDefaultsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;

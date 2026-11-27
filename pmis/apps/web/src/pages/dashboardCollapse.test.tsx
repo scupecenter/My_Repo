@@ -1,7 +1,10 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '@/App';
 import { renderApp, signIn } from '@/test/utils';
+
+// the charts are not under test here; a canvas chart in jsdom redraws on every size change and has no 2d context
+vi.mock('@/components/EChart', () => ({ EChart: () => null }));
 
 /** Decision 36 item 5: collapsible dashboard sections, remembered per user, with collapse all and expand all. */
 describe('Dashboard collapsible sections', () => {

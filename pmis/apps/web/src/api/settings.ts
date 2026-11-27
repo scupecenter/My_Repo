@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+import type { DashboardViewDefaults, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
   ActiveSession, ActOnBehalfRequest, DownloadLocks, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
@@ -535,5 +535,14 @@ export const useUpdateAlertRule = () => {
   return useMutation<AlertRuleSaved, ApiError, { id: string; version: number; body: AlertRuleInput & { reason: string } }>({
     mutationFn: ({ id, version, body }) => api.put(`/settings/alert-rules/${id}`, { version, body }),
     onSettled: () => refresh(qc, 'alertRules'),
+  });
+};
+
+/** 0.15.208 (migration 0510): the server-wide dashboard view defaults (export format, collapse state); a user's own choice overrides them. */
+export const useDashboardViewDefaults = () => useQuery({ queryKey: ['dash-view-defaults'], queryFn: () => api.get<DashboardViewDefaults>('/settings/dashboard-view-defaults') });
+export const useSetDashboardViewDefaults = () => {
+  const qc = useQueryClient();
+  return useMutation<DashboardViewDefaults, ApiError, { version: number; export_format: 'xlsx' | 'csv'; collapse: 'open' | 'closed'; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/dashboard-view-defaults', { version, body }), onSettled: () => refresh(qc, 'dash-view-defaults'),
   });
 };

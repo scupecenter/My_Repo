@@ -231,6 +231,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.208 (2026-11-27): server-wide dashboard view defaults (migration 0510). Additive. `GET` and `PUT /settings/dashboard-view-defaults` (`DashboardViewDefaults`): the default export format (xlsx or csv) of the dashboard Share / Export menu and the default collapse state (open or closed) of the dashboard sections. Every signed-in user reads it; a user's own remembered choice in the browser overrides it. Changing it needs settings edit for all regions, a reason, a step-up and If-Match, and is audited.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -10530,6 +10531,53 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /settings/dashboard-view-defaults:
+    get:
+      tags: [settings]
+      operationId: getDashboardViewDefaults
+      summary: The server-wide dashboard view defaults, export format and collapse state (0.15.208)
+      description: Every signed-in user may read it. A user's own remembered choice in the browser overrides it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+      x-db-path: dashboard_view_defaults_state
+      responses:
+        '200':
+          description: The view defaults.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardViewDefaults'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setDashboardViewDefaults
+      summary: Set the default export format and collapse state of the dashboard (reason, step-up, If-Match, audited)
+      description: |
+        A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason of 3 to 1000 characters, a recent step-up (403
+        `step_up_required`) and `If-Match` (428 / 412) are required. Values outside the lists answer 422 `invalid`; saving the current values answers 409
+        `invalid_transition`. Audited `dashboard_view_defaults_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_dashboard_view_defaults
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DashboardViewDefaultsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardViewDefaults'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/historical-waiver:
     get:
       tags: [settings]
@@ -24994,6 +25042,25 @@ components:
                     count: {type: integer}
           description: "One entry per ball-in-court role, most waiting tasks first."
         unassigned: {type: [integer, 'null'], description: "The waiting tasks with no ball-in-court role (a group holds them, or nobody yet)."}
+    DashboardViewDefaults:
+      type: object
+      description: '0.15.208. The server-wide dashboard view defaults (setting `dashboard.view_defaults`, migration 0510).'
+      required: [export_format, collapse, version, can_edit]
+      properties:
+        export_format: {type: string, enum: [xlsx, csv], description: The default format of Export view.}
+        collapse: {type: string, enum: [open, closed], description: Whether the dashboard sections start open or collapsed.}
+        updated_at: {type: [string, 'null'], format: date-time}
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: {type: integer, description: The ETag value.}
+        can_edit: {type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.'}
+    DashboardViewDefaultsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [export_format, collapse]
+          properties:
+            export_format: {type: string, enum: [xlsx, csv]}
+            collapse: {type: string, enum: [open, closed]}
     DashboardOpsQuality:
       type: object
       description: "0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate."

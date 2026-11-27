@@ -5027,6 +5027,15 @@
     }
   },
   "dashSettings": {
+    "vd_title": "Dashboard view defaults",
+    "vd_note": "The default export format and whether the dashboard sections start open or collapsed. Each user's own choice on the dashboard overrides it.",
+    "vd_format": "Default export format",
+    "vd_collapse": "Sections start",
+    "vd_collapse_open": "Open",
+    "vd_collapse_closed": "Collapsed",
+    "vd_save": "Save the view defaults",
+    "vd_readonly": "Only a System Admin (or a delegate of settings edit for all regions) can change these defaults.",
+    "vd_confirm": "Save these view defaults for everyone. It is audited.",
     "title": "Dashboard",
     "note": "Global settings of the dashboard: targets, KPI thresholds, and the cards each tab shows and their order. Every save needs a reason, is audited and is versioned. Each user's own layout and saved filters stay in the browser.",
     "targets": "Targets",

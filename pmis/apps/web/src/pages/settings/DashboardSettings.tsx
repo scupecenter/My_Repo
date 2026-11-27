@@ -12,6 +12,7 @@ import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
+import { ViewDefaultsPanel } from "./ViewDefaultsPanel";
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -278,6 +279,7 @@ export function DashboardSettings() {
         );
       })}
 
+      <ViewDefaultsPanel />
       {invalid && (
         <p
           role="alert"
