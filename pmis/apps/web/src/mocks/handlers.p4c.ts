@@ -26,6 +26,17 @@ const gecolJson = () => {
     fields: gecolDates().map((f) => ({ code: f.code, label_en: f.label_en, label_ar: f.label_ar ?? null })) };
 };
 
+const deriveSeed = () => ({ version: 1, rules: [
+  { key: 'gecol_procurement_contractor', enabled: true, target_register: 'gecol', output: 'procurement_contractor', source_register: 'procurement', source: 'external_party', link_field: null },
+  { key: 'hlc_procurement_contractor', enabled: true, target_register: 'hlc', output: 'procurement_contractor', source_register: 'procurement', source: 'external_party', link_field: 'procurement_record_id', site_fallback: true },
+] as Record<string, unknown>[] });
+const deriveCfg = () => ((db().cfg as { deriveRules?: ReturnType<typeof deriveSeed> }).deriveRules ??= deriveSeed());
+const deriveJson = () => {
+  const c = deriveCfg();
+  return { rules: c.rules, version: c.version, updated_at: null, updated_by: null,
+    registers: REGISTER_DEFS.map((d) => ({ register_key: d.register_key, fields: d.fields.map((f) => ({ code: f.code, label_en: f.label_en, label_ar: f.label_ar ?? null })) })) };
+};
+
 export const p4cHandlers = [
   http.put(`${B}/registers/hlc/records/:id/purchase-requests`, async ({ params, request }) => {
     const g = guard(); if (g) return g;
@@ -151,6 +162,30 @@ export const p4cHandlers = [
     Object.assign(c, { enabled: b.enabled as boolean, chains: b.chains as string[][], billing_after: (b.billing_after as string | null) ?? null, version: c.version + 1 });
     save();
     const j = gecolJson();
+    return HttpResponse.json(j, { headers: { ETag: `"${j.version}"` } });
+  }),
+  http.get(`${B}/settings/derive-rules`, () => { const g = guard(); if (g) return g; const j = deriveJson(); return HttpResponse.json(j, { headers: { ETag: `"${j.version}"` } }); }),
+  http.put(`${B}/settings/derive-rules`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'Administrators only');
+    const m = ifMatch(request, deriveCfg().version); if (m) return m;
+    const b = await body<{ reason?: string; rules?: Record<string, unknown>[] } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = [];
+    for (const k of Object.keys(b)) if (!['reason', 'rules'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    const keys: string[] = REGISTER_DEFS.map((d) => d.register_key);
+    if (!Array.isArray(b.rules) || b.rules.length > 60) errs.push({ path: '/rules', code: 'invalid' });
+    else b.rules.forEach((r, i) => {
+      if (!keys.includes(String(r.target_register))) errs.push({ path: `/rules/${i}/target_register`, code: 'unknown_register' });
+      if (!keys.includes(String(r.source_register))) errs.push({ path: `/rules/${i}/source_register`, code: 'unknown_register' });
+      else if (r.source_register === r.target_register) errs.push({ path: `/rules/${i}/source_register`, code: 'same_register' });
+      if (b.rules!.findIndex((x) => x.key === r.key) !== i) errs.push({ path: `/rules/${i}/key`, code: 'duplicate' });
+    });
+    if (errs.length) return fields(...errs);
+    const c = deriveCfg();
+    Object.assign(c, { rules: b.rules as Record<string, unknown>[], version: c.version + 1 });
+    save();
+    const j = deriveJson();
     return HttpResponse.json(j, { headers: { ETag: `"${j.version}"` } });
   }),
 ];

@@ -80,6 +80,7 @@ export const MAIL_KIND_CATALOGUE = [
   'email_change_decided', 'email_change_requested', 'followed_change', 'gate_closed_again', 'holiday_tentative', 'import_batch', 'levels_converted', 'mention',
   'no_eligible_holder', 'order_team_mismatch', 'party_type_review', 'permit_transferred', 'phone_change_decided', 'phone_change_requested', 'site_draft_approved',
   'site_draft_assigned', 'site_draft_returned', 'site_region_moved', 'sla_negative_duration', 'snag_closed', 'snag_raised', 'team_safety_cert',
+  'expiry_radar', 'approval_digest', 'weekly_digest',
 ].map((kind, i) => ({ kind, recommended: i < 6 }));
 
 export function initCfg() {
@@ -89,6 +90,8 @@ export function initCfg() {
     calConfirm: { confirmed: false, at: null as string | null, by: null as string | null, version: 1 },
     // 0.14.2 (Q441): mail.notification_kinds (empty during development) and a value the code does not write, to show the warning
     mailKinds: { kinds: [] as string[], unknown: [] as string[], version: 1, updated_at: null as string | null, updated_by: null as string | null },
+    // 0.15.261: mail.policy (today's behaviour: on, internal only, no domain)
+    mailPolicy: { enabled: true, mode: 'internal_only' as string, internal_domains: [] as string[], kinds: {} as Record<string, { enabled: boolean; mode: string }>, version: 0, updated_at: null as string | null, updated_by: null as string | null },
     // 0.14.6: imports.async_rows, the background threshold of batches (default 50, never changed in the seed)
     imports: { async_rows: 50, version: 1, updated_at: null as string | null, updated_by: null as string | null },
     // 0.15.1: nav.layout, the shared order of the side menu (null: the default of the code)

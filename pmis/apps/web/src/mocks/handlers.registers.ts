@@ -563,6 +563,12 @@ export const registerHandlers = [
     if (b.run?.state === 'running') { advanceRun(b); save(); }   // 0.14.4: the background run moves by one chunk per read
     return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
   }),
+  http.get(`${B}/import-batches/:id/error-report`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const b = R().batches.find((x) => x.id === params.id);
+    if (!b) return problem(404, 'not_found', 'Batch not found');
+    return new HttpResponse(new Uint8Array([0x50, 0x4b, 3, 4]), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="errors-${b.id}.xlsx"` } });
+  }),
   http.get(`${B}/import-batches/:id/rows`, ({ params, request }) => {
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
