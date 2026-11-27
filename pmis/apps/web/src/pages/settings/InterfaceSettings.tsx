@@ -4,6 +4,7 @@ import { useMe } from '@/api/hooks';
 import { UI_FEATURES_SEED, useSaveUiFeatures, useUiFeaturesSetting, type UiFeatures } from '@/api/uiFeatures';
 import { Avatar } from '@/components/Avatar';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { canEditDisplayDefaults } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
@@ -117,6 +118,20 @@ export function InterfaceSettings() {
         </label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can || v.panel.mode !== 'side_panel'} data-testid="ui-panel-tabs" checked={v.panel.show_tabs} onChange={(e) => set('panel', { show_tabs: e.target.checked })} />{t('ui.panel_tabs')}</label>
       </section>
+      <section className="card space-y-3 p-4" data-testid="ui-guard">
+        <div>
+          <h2 className="font-bold">{t('ui.guard_title')}</h2>
+          <p className="text-sm text-mute">{t('ui.guard_note')}</p>
+        </div>
+        <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" disabled={!can} data-testid="ui-guard-enabled" checked={v.unsaved_guard.enabled} onChange={(e) => set('unsaved_guard', { enabled: e.target.checked })} />{t('ui.guard_enabled')}</label>
+        <div className="grid gap-1 sm:grid-cols-2">
+          {(['settings', 'dialogs', 'drawers', 'inline', 'composers', 'navigation'] as const).map((k) => (
+            <label key={k} className="flex items-center gap-2 text-sm" title={t(`ui.guard_${k}_hint`)}><input type="checkbox" disabled={!can || !v.unsaved_guard.enabled} data-testid={`ui-guard-${k}`} checked={v.unsaved_guard[k]} onChange={(e) => set('unsaved_guard', { [k]: e.target.checked })} />{t(`ui.guard_${k}`)}</label>
+          ))}
+        </div>
+        <FieldErr errs={errs} path="/sections/unsaved_guard" />
+      </section>
+      <UnsavedGuard scope="settings" dirty={!!f && can} needsReason label={t('ui.settings_title')} onSave={(reason) => new Promise<boolean>((res) => save.mutate({ sections: v, reason, version: q.data.version }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {q.data.updated_by && <p className="text-xs text-mute" data-testid="ui-updated">{t('tstd.settings_updated', { name: q.data.updated_by.display_name, at: q.data.updated_at ?? '' })}</p>}
       {can ? (
         <div className="flex gap-2">

@@ -113,6 +113,26 @@ describe('GET /search tasks and warehouse_items', () => {
     expect(hit?.href).toBe(`/sites/${mine.id}?task=${taskId}`);
   });
 
+  it('finds a QC snag by its description and a warehouse item by its type (group), and leaves snags out without the rights', async () => {
+    const site = await makeSite(db, R, { prefix: 'SNG' });
+    const word = `crackprobe${Date.now()}`;
+    const type = (await db.query('SELECT id FROM snag_types WHERE is_active ORDER BY code LIMIT 1')).rows[0].id as string;
+    const sg = await db.query(`INSERT INTO snags (site_id, region_id, snag_type_id, scope, description, raised_by) VALUES ($1, $2, $3, 'TE', $4, $5) RETURNING id`, [site.id, R, type, `A ${word} on the mast`, admin.user.id]);
+    const res = await admin.api.call('get', `/search?q=${word}&types=snags`);
+    expect(res.status).toBe(200);
+    const g = res.body.groups[0];
+    expect(g.type).toBe('snags');
+    const hit = (g.items as { id: string; href: string; subtitle: string }[]).find((i) => i.id === sg.rows[0].id);
+    expect(hit?.href).toBe(`/sites/${site.id}?tab=snags`);
+    expect(hit?.subtitle.startsWith(site.code)).toBe(true);
+    const group = `TYPEGRP${Date.now()}`;
+    const code = `GRP-${Date.now()}`;
+    await db.query("INSERT INTO warehouse_items (item_code, item_group, name) VALUES ($1, $2, 'Group probe')", [code, group]);
+    const byType = await admin.api.call('get', `/search?q=${group}&types=warehouse_items`);
+    expect((byType.body.groups[0].items as { title: string }[]).some((i) => i.title.startsWith(code))).toBe(true);
+    expect((await nothing.api.call('get', `/search?q=${word}&types=snags`)).body.groups).toEqual([]);
+  });
+
   it('leaves the tasks group out for a caller who may read no site, and warehouse_items without the warehouse right', async () => {
     const res = await nothing.api.call('get', '/search?q=item&types=tasks,warehouse_items');
     expect(res.status).toBe(200);

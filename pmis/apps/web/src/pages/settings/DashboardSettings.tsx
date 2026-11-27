@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -289,6 +290,7 @@ export function DashboardSettings() {
           {t("dashSettings.invalid")}
         </p>
       )}
+      <UnsavedGuard scope="settings" dirty={!!draft && !invalid} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: s.version, body: { ...toInput(cur), reason } }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }))} />
       <button
         className="btn btn-accent"
         data-testid="dsettings-save"

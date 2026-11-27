@@ -230,6 +230,16 @@ export const useSetImportsSettings = () => {
   });
 };
 
+/** 0.15.322 (D49 part 3): the upload policy of the imports (imports.upload_policy): enforce (default) or accept_incomplete. Read by everyone; changed like the threshold. */
+export type ImportsUploadPolicy = import('./schema').components['schemas']['ImportsUploadPolicy'];
+export const useImportsUploadPolicy = () => useQuery({ queryKey: ['imports-upload-policy'], queryFn: () => api.get<ImportsUploadPolicy>('/settings/imports/upload-policy') });
+export const useSetImportsUploadPolicy = () => {
+  const qc = useQueryClient();
+  return useMutation<ImportsUploadPolicy, ApiError, { version: number; policy: ImportsUploadPolicy['policy']; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/imports/upload-policy', { version, body }), onSettled: () => refresh(qc, 'imports-upload-policy'),
+  });
+};
+
 /** 0.15.203 (P3): the notice of a new template version (templates.change_notice). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
 export const useTemplateNoticeSettings = () => useQuery({ queryKey: ['template-notice-settings'], queryFn: () => api.get<TemplateChangeNotice>('/settings/template-change-notice') });
 export const useSetTemplateNoticeSettings = () => {
