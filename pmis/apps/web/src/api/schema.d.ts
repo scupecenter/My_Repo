@@ -17364,6 +17364,7 @@ export interface components {
             permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
             gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
             contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
+            quality: components["schemas"]["DashboardOpsQuality"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17472,6 +17473,31 @@ export interface components {
             civil_ready_no_power: number | null;
             /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
             installed_not_in_service: number | null;
+        };
+        /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
+        DashboardOpsQuality: {
+            /** @description False when the caller lacks the quality view; every figure is then null. */
+            available: boolean;
+            snags: {
+                /** @description Snags of the active, not cancelled sites whose status is open, fix_uploaded or in_review. */
+                open: number;
+                /** @description Snags of those sites whose status is closed. */
+                closed: number;
+                /** @description The mean days from raised_at to closed_at over the closed snags, one decimal; null when none closed. */
+                avg_close_days: number | null;
+                /** @description The open snags returned at least once (return_count over 0). */
+                returned_open: number;
+            } | null;
+            ncrs: {
+                /** @description Quality records of record type ncr with no closed_date. */
+                open: number;
+                /** @description Quality records of record type ncr with a closed_date. */
+                closed: number;
+                /** @description The mean days from raised_date to closed_date over the closed NCRs, one decimal; null when none closed. */
+                avg_close_days: number | null;
+            } | null;
+            /** @description The share of the decided inspections (result Pass or Fail) whose result is Pass, one decimal; null when no inspection is decided. The data keeps no re-inspection marker, so this is the acceptance rate of all decided inspections. */
+            first_pass_pct: number | null;
         };
         /** @description 0.15.202: the contractor and supplier scorecard (dashboard proposals item 5), the aggregate of the contractor performance report. No amounts. */
         DashboardOpsScorecard: {

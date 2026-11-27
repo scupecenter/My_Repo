@@ -171,3 +171,19 @@ export function scorecardSummary(items: ScorecardItem[]): ScorecardSummary {
     })),
   };
 }
+
+// ---------------------------------------------------------------- item 6 (0.15.203): quality, snags and NCR
+
+/** The mean of a list of day counts, one decimal; null when the list is empty. */
+export function meanDays(days: number[]): number | null {
+  if (days.length === 0) return null;
+  const sum = days.reduce((x, y) => x + y, 0);
+  return Math.round((sum / days.length) * 10) / 10;
+}
+
+/** The first-time acceptance rate: pass against pass + fail, one decimal; null when nothing is decided. */
+export function firstPassPct(pass: number, fail: number): number | null {
+  const decided = pass + fail;
+  if (!(decided > 0)) return null;
+  return Math.round((pass * 1000) / decided) / 10;
+}
