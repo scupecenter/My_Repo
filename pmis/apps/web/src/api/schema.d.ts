@@ -6177,6 +6177,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/download-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The download lock categories, templates, uploaded files, generated documents (0.15.193)
+         * @description Every signed-in user may read it (the UI disables what is locked). `can_edit` is true for a System Admin only. All three are `false` until a System Admin turns one on.
+         */
+        get: operations["getDownloadLocks"];
+        /**
+         * Turn the download locks on or off (System Admin, reason, step-up, If-Match, audited) (0.15.193)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `download_locks_update`.
+         *     While a category is on, its route answers 403 `action_forbidden` with `errors[0].code` `download_locked`: `templates` (`GET /templates/{templateId}/download`),
+         *     `uploaded_files` (`GET /files/{id}/download`, which also feeds the on-screen preview and finished export files, and `GET /master-import/runs/{id}/file`), `generated_documents` (`GET /library/generated/{id}/download`, except
+         *     `purpose=view`). Reading and changing the locks is never locked.
+         */
+        put: operations["setDownloadLocks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/security-locks": {
         parameters: {
             query?: never;
@@ -7070,6 +7098,32 @@ export interface paths {
          *     field; `billing_after` cannot be the billing conversion itself), `duplicate`, `invalid`, `too_many`.
          */
         put: operations["setGecolOrderWarnings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/derive-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The cross-register derive rules (0.15.260)
+         * @description 0.15.260. Each rule says which value of a source register a target register shows (the source record's external party, or one field), found by a link field of the target
+         *     record, else by the same site. Reading needs the Settings screen. `registers` lists the registers and fields a rule may name.
+         */
+        get: operations["getDeriveRules"];
+        /**
+         * Save the cross-register derive rules (reason, If-Match, audited)
+         * @description 0.15.260. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_register`, `same_register`, `unknown_field`,
+         *     `duplicate`, `invalid`, `too_many`, `required`.
+         */
+        put: operations["setDeriveRules"];
         post?: never;
         delete?: never;
         options?: never;
@@ -15848,16 +15902,26 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
+        /** @description 0.15.251. How the bell opens the notifications. */
+        UiPanel: {
+            /** @enum {string} */
+            mode: "popover" | "side_panel";
+            /** @enum {string} */
+            width: "narrow" | "medium" | "wide";
+            show_tabs: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
+            panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
+            panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -16823,6 +16887,10 @@ export interface components {
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
         RegisterRecord: {
+            /** @description 0.15.260. Values this record shows from another register by the rules of `derive.rules`, keyed by the rule output. Only the configured value, never the source record. */
+            derived?: {
+                [key: string]: unknown;
+            };
             /** @description 0.15.90. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for). */
             procurement_contractor?: components["schemas"]["ExternalPartyRef"];
             /** @description 0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document. */
@@ -17402,6 +17470,27 @@ export interface components {
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
         };
+        /** @description 0.15.193. The download lock categories (setting `security.download_locks`, migration 0293). */
+        DownloadLocks: {
+            /** @description true: the blank template download answers 403 `download_locked`. */
+            templates: boolean;
+            /** @description true: the single uploaded file download answers 403 `download_locked` (the on-screen preview uses the same route). */
+            uploaded_files: boolean;
+            /** @description true: a generated library document download or print answers 403 `download_locked` (`purpose=view` stays open). */
+            generated_documents: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        DownloadLocksInput: components["schemas"]["WithReason"] & {
+            templates: boolean;
+            uploaded_files: boolean;
+            generated_documents: boolean;
+        };
         /** @description 0.15.190. The admin lock keys (setting `security.locks`, migration 0290). */
         SecurityLocks: {
             /** @description true: no feature may create a public link (checked by `SecurityLocksService.assertSharingAllowed`). */
@@ -17839,6 +17928,40 @@ export interface components {
                     label_ar: string;
                 }[];
             };
+        };
+        DeriveRule: {
+            key: string;
+            enabled: boolean;
+            /** @description The register that shows the value. */
+            target_register: string;
+            /** @description The name of the value in `RegisterRecord.derived`. */
+            output: string;
+            /** @description Another register. */
+            source_register: string;
+            /** @description `external_party` (the company of the source record) or a field code of the source register. */
+            source: string;
+            /** @description A field of the target register that holds the record id or entity id of the source record; null = match by site only. */
+            link_field: string | null;
+            /** @description With a link field: when the link is empty, fall back to the latest approved source record of the same site (default false; HLC keeps it). */
+            site_fallback?: boolean;
+        };
+        DeriveRulesInput: {
+            rules: components["schemas"]["DeriveRule"][];
+        };
+        /** @description 0.15.260. Seed: the GECOL and HLC contractor from Procurement (the rules that were hard-coded). */
+        DeriveRules: components["schemas"]["DeriveRulesInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            registers: {
+                register_key: string;
+                fields: {
+                    code: string;
+                    label_en: string;
+                    label_ar?: string | null;
+                }[];
+            }[];
         };
         GecolOrderWarningsInput: {
             enabled: boolean;
@@ -32197,6 +32320,62 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getDownloadLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The download locks. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDownloadLocks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadLocksInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getSecurityLocks: {
         parameters: {
             query?: never;
@@ -33586,6 +33765,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDeriveRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDeriveRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DeriveRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
                 };
             };
             401: components["responses"]["Unauthorized"];

@@ -54,7 +54,7 @@ export function ReconciliationPage() {
 
   return (
     <div data-testid="page-reconciliation">
-      <PageHeader title={t('mi.title')} subtitle={t('mi.subtitle')} />
+      <PageHeader title={t('mi.title')} subtitle={t('mi.subtitle')} settings="master_import" />
       {forbidden ? <EmptyState testid="mi-forbidden" title={t('mi.forbidden')} /> : (
         <>
           <section className="card mb-4 space-y-2 p-4" aria-labelledby="mi-up">

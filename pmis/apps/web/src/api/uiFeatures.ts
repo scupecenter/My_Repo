@@ -12,6 +12,7 @@ export const UI_FEATURES_SEED: UiFeatures = {
   avatars: { style: 'gradient', shape: 'circle', palette: 'varied', in_lists: true },
   new_badge: { enabled: true, days: 14 },
   inbox: { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] },
+  panel: { mode: 'popover', width: 'medium', show_tabs: true },
 };
 
 export const useUiFeaturesSetting = (enabled = true) =>

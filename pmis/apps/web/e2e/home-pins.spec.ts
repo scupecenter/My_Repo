@@ -6,6 +6,7 @@ for (const c of [{ locale: 'en', theme: 'light', suffix: 'en' }, { locale: 'ar',
   test(`pinned views card (${c.suffix})`, async ({ page }) => {
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [c.locale, c.theme]);
     await login(page, 'pm');
+    await expect(page.getByTestId('nav-dashboard')).toBeVisible();
     // Create a view and pin it through the mock API (in-browser fetch is intercepted by MSW); a full page load would reset the mock state,
     // so the pin happens before the dashboard is opened and every navigation below is in-app.
     const id = await page.evaluate(async () => {
