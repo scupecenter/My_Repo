@@ -18469,7 +18469,7 @@ export interface components {
             badge_style?: "full" | "dot" | "none";
             pins?: string[];
             /**
-             * @description 0.15.527 (0527): pinned (the menu stays open, the default) or autohide (a rail that opens on hover, focus or Ctrl+B).
+             * @description 0.15.370 (0527): pinned (the menu stays open, the default) or autohide (a rail that opens on hover, focus or Ctrl+B).
              * @enum {string}
              */
             mode?: "pinned" | "autohide";
