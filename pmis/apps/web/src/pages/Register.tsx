@@ -17,7 +17,7 @@ import {
   Ruler,
   FileSpreadsheet,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Link,
@@ -164,6 +164,9 @@ export function RegisterSoon({ name }: { name: string }) {
     </div>
   );
 }
+
+/** The time (ms) the undo of an edit ends: now plus the toast's 8 seconds (0 = now). */
+const undoDeadline = (ms = 8000) => Date.now() + ms;
 
 function RegisterList({ def }: { def: RegisterDefinition }) {
   const { t, i18n } = useTranslation();
@@ -443,6 +446,41 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       toast(t("registers.bulk_refused", { list: notDone.join(", ") }), "err");
     setBulk(null);
   };
+  // The 8-second undo of the last saved edit (inline, bulk-free cell edit or board drag): the toast button and Ctrl+Z (outside text fields) run the same function once.
+  const lastUndo = useRef<{ run: () => void; until: number; used: boolean } | null>(null);
+  const savedToast = (text: string, saved: RegisterRecord, code: string, before: unknown) => {
+    const entry = {
+      used: false,
+      until: undoDeadline(),
+      run: () => {
+        if (entry.used) return;
+        entry.used = true;
+        save.mutate(
+          { record: saved, patch: { data: { [code]: before ?? null } } },
+          {
+            onSuccess: () => toast(t("registers.inline_undone")),
+            onError: (e) => toast(registerErrorMessage(t, e), "err"),
+          },
+        );
+      },
+    };
+    lastUndo.current = entry;
+    toast(text, "ok", { ms: 8000, action: { label: t("common.undo"), onClick: entry.run } });
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "z" || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      // a text field keeps its own Ctrl+Z
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      const u = lastUndo.current;
+      if (!u || u.used || undoDeadline(0) > u.until) return;
+      e.preventDefault();
+      u.run();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
   // a card dragged to another board column: the status field is saved through the normal edit path (If-Match); the server may still refuse; undo for 8 seconds
   const moveCard = (r: RegisterRecord, code: string, value: string | null) => {
     const before = r.data[code];
@@ -450,21 +488,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       { record: r, patch: { data: { [code]: value } } },
       {
         onError: (e) => toast(registerErrorMessage(t, e), "err"),
-        onSuccess: (saved) =>
-          toast(t("regviews.moved"), "ok", {
-            ms: 8000,
-            action: {
-              label: t("common.undo"),
-              onClick: () =>
-                save.mutate(
-                  { record: saved, patch: { data: { [code]: before ?? null } } },
-                  {
-                    onSuccess: () => toast(t("registers.inline_undone")),
-                    onError: (e) => toast(registerErrorMessage(t, e), "err"),
-                  },
-                ),
-            },
-          }),
+        onSuccess: (saved) => savedToast(t("regviews.moved"), saved, code, before),
       },
     );
   };
@@ -998,22 +1022,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                     { record: r, patch: { data: { [fc.code]: v } } },
                     {
                       onError: (e) => toast(registerErrorMessage(t, e), "err"),
-                      // undo for 8 seconds: the same edit path puts the old value back (same permissions and rules; the server may refuse it)
-                      onSuccess: (saved) =>
-                        toast(t("registers.inline_saved"), "ok", {
-                          ms: 8000,
-                          action: {
-                            label: t("common.undo"),
-                            onClick: () =>
-                              save.mutate(
-                                { record: saved, patch: { data: { [fc.code]: before ?? null } } },
-                                {
-                                  onSuccess: () => toast(t("registers.inline_undone")),
-                                  onError: (e) => toast(registerErrorMessage(t, e), "err"),
-                                },
-                              ),
-                          },
-                        }),
+                      onSuccess: (saved) => savedToast(t("registers.inline_saved"), saved, fc.code, before),
                     },
                   );
                 }}
@@ -1058,21 +1067,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                   return null;
                 }
                 const saved = await save.mutateAsync({ record: r, patch: { data: { [code]: value } } });
-                // undo for 8 seconds: the same edit path puts the old value back (the server may refuse it)
-                toast(t("registers.inline_saved"), "ok", {
-                  ms: 8000,
-                  action: {
-                    label: t("common.undo"),
-                    onClick: () =>
-                      save.mutate(
-                        { record: saved, patch: { data: { [code]: before ?? null } } },
-                        {
-                          onSuccess: () => toast(t("registers.inline_undone")),
-                          onError: (e) => toast(registerErrorMessage(t, e), "err"),
-                        },
-                      ),
-                  },
-                });
+                savedToast(t("registers.inline_saved"), saved, code, before);
                 return saved;
               }}
               errorText={(e) => registerErrorMessage(t, e)}
