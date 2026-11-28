@@ -8553,5 +8553,26 @@
     "stop": "Stop",
     "use_video": "Upload video",
     "annotate": "Annotate"
+  },
+  "history": {
+    "empty": "No changes recorded yet.",
+    "restore": "Restore",
+    "title_item": "History of {{code}}",
+    "title_plan": "History of the plan, {{region}}, {{date}}",
+    "open": "History",
+    "restored": "Restored the earlier values."
+  },
+  "dpTriage": {
+    "pending": "Waiting for review",
+    "accepted": "Accepted",
+    "deferred": "Deferred",
+    "claim": "Claim",
+    "release": "Release",
+    "accept": "Accept",
+    "defer": "Defer",
+    "claimed_by": "Claimed by {{name}}",
+    "note": "Note",
+    "title": "Review of the plan, {{region}}, {{date}}",
+    "done": "Saved."
   }
 }

@@ -8621,5 +8621,26 @@
     "stop": "إيقاف",
     "use_video": "رفع الفيديو",
     "annotate": "تعليم على صورة"
+  },
+  "history": {
+    "empty": "لا توجد تغييرات مسجلة بعد.",
+    "restore": "استرجاع",
+    "title_item": "سجل التغييرات: {{code}}",
+    "title_plan": "سجل تغييرات الخطة، {{region}}، {{date}}",
+    "open": "السجل",
+    "restored": "تم استرجاع القيم السابقة."
+  },
+  "dpTriage": {
+    "pending": "بانتظار المراجعة",
+    "accepted": "مقبولة",
+    "deferred": "مؤجلة",
+    "claim": "استلام",
+    "release": "تحرير",
+    "accept": "قبول",
+    "defer": "تأجيل",
+    "claimed_by": "استلمها {{name}}",
+    "note": "ملاحظة",
+    "title": "مراجعة الخطة، {{region}}، {{date}}",
+    "done": "تم الحفظ."
   }
 }

@@ -272,6 +272,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.410 (2026-11-27): hardening layer 1c, History and Restore for the Warehouse item master and the Daily Plan, and Claim and Triage of a Daily Plan day (migration 0567). Additive. `GET /warehouse/items/{id}/history` and `GET /daily-plans/{date}/regions/{region_id}/history` return the audit trail with the field changes; Restore of an item is a PATCH of the old values through the normal item writer. A plan day (region and date) can be claimed and released (`POST` and `DELETE` on `/daily-plans/{date}/regions/{region_id}/claim`) and accepted or deferred with a note (`POST /daily-plans/{date}/regions/{region_id}/triage`, `GET` for the state), by the L2 holder of the Daily Plan in the region or a System Admin, as for the registers (0340). New plan days start `pending`; existing days stay untriaged. Reject and merge do not apply to a plan day. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
 
@@ -8704,6 +8705,115 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/history:
+    get:
+      tags: [daily-plan]
+      operationId: getDailyPlanHistory
+      summary: History of one plan day (0.15.410)
+      description: The audit trail of the plan day (rows changed, added, removed, locked, unlocked, claimed, triaged), newest first, with the field changes. Needs view on the Daily Plan in the region.
+      x-db-path: dp_plan_history
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The trail.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoryEntries'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /daily-plans/{date}/regions/{region_id}/triage:
+    get:
+      tags: [daily-plan]
+      operationId: getDailyPlanTriage
+      summary: Claim and triage state of a plan day (0.15.410)
+      x-db-path: dp_plan_triage_get
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [daily-plan]
+      operationId: triageDailyPlan
+      summary: Accept or defer a plan day, with a note (0.15.410)
+      description: The L2 holder of the Daily Plan in the region or a System Admin. States `accepted` and `deferred`; reject and merge do not apply to a plan day. Never blocks editing or the lock of the day. Audited.
+      x-db-path: dp_plan_triage
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [state, note]
+              properties:
+                state: {type: string, enum: [accepted, deferred]}
+                note: {type: string, minLength: 3}
+      responses:
+        '200':
+          description: The state after the decision.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /daily-plans/{date}/regions/{region_id}/claim:
+    post:
+      tags: [daily-plan]
+      operationId: claimDailyPlan
+      summary: Claim the review of a plan day (0.15.410)
+      description: The L2 holder of the Daily Plan in the region or a System Admin. A day claimed by someone else is taken over only by a System Admin.
+      x-db-path: dp_plan_claim
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The state after the claim.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [daily-plan]
+      operationId: releaseDailyPlan
+      summary: Release a claimed plan day (0.15.410)
+      description: The person who claimed it, or a System Admin.
+      x-db-path: dp_plan_claim
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The state after the release.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /daily-plans/{date}/regions/{region_id}/lock:
     post:
       tags: [daily-plan]
@@ -16784,6 +16894,24 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/items/{item_id}/history:
+    get:
+      tags: [warehouse]
+      operationId: getWarehouseItemHistory
+      summary: History of one item (0.15.410)
+      description: The audit trail of the item, newest first, with the field changes. System Admin or a warehouse_items delegate. Restore is a PATCH of the old values through `PATCH /warehouse/items/{item_id}` (rights, locks, reason and audit as for any edit).
+      x-db-path: wh_item_history
+      parameters:
+      - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The trail.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoryEntries'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /warehouse/items/{item_id}:
     parameters:
     - {$ref: '#/components/parameters/WarehouseItemId'}
@@ -23356,6 +23484,42 @@ components:
         flagged_at: { type: string, format: date-time }
         missing_documents: { type: array, items: { type: string }, description: The document codes that were missing when the check was skipped. }
         reason: { type: [string, 'null'] }
+    HistoryEntries:
+      type: array
+      items:
+        type: object
+        required: [id, at, action, changes]
+        properties:
+          id: {type: string}
+          at: {type: string}
+          action: {type: string}
+          actor: {type: [object, 'null'], additionalProperties: true}
+          reason: {type: [string, 'null']}
+          site_id: {type: [string, 'null']}
+          before: {}
+          after: {}
+          changes:
+            type: array
+            items:
+              type: object
+              required: [field]
+              properties:
+                field: {type: string}
+                from: {}
+                to: {}
+    DailyPlanTriage:
+      type: object
+      required: [region_id, plan_date, triage_state, can_triage]
+      properties:
+        region_id: {type: integer}
+        plan_date: {type: string, format: date}
+        triage_state: {type: [string, 'null'], enum: [pending, accepted, deferred, null]}
+        triage_note: {type: [string, 'null']}
+        triage_by: {type: [object, 'null'], additionalProperties: true}
+        triage_at: {type: [string, 'null']}
+        claimed_by: {type: [object, 'null'], additionalProperties: true}
+        claimed_at: {type: [string, 'null']}
+        can_triage: {type: boolean}
     WithReason:
       type: object
       required: [reason]
