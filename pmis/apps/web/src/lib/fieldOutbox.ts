@@ -4,7 +4,7 @@
  * the fix" they pressed. Nothing here is a permission: the server checks the rights again when an action is sent.
  */
 
-export type FieldActionKind = 'snag_photo' | 'snag_submit';
+export type FieldActionKind = 'snag_photo' | 'snag_submit' | 'form_submit';
 /** waiting: queued, sent on the next sync; attention: the server refused or the world changed, the person decides; done: sent (kept briefly for the list). */
 export type FieldActionState = 'waiting' | 'attention' | 'done';
 
@@ -30,6 +30,12 @@ export interface FieldAction {
   lat?: number | null;
   lon?: number | null;
   inAppCamera?: boolean;
+  // field form (0.15.596): the site, the kind, the answers and the signature drawn on the device (a PNG data URL)
+  siteId?: string;
+  formCode?: string;
+  answers?: Record<string, unknown>;
+  signature?: string | null;
+  signerName?: string | null;
 }
 
 /** Client side reasons of an action that needs attention. */

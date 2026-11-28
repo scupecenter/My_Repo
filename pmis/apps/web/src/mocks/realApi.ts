@@ -446,6 +446,12 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.41 (migration 0130; apps/api: settings): the organization default UI design (Settings, Identity & themes).
   ['get', '/settings/identity'],
   ['put', '/settings/identity'],
+  // Contract 0.15.596 (migration 0667; apps/api: field-forms): field forms (kinds, fill, list, signature).
+  ['get', '/settings/field-forms'],
+  ['put', '/settings/field-forms'],
+  ['post', '/sites/:id/field-forms'],
+  ['get', '/sites/:id/field-forms'],
+  ['get', '/field-forms/:id/signature'],
   // Contract 0.15.97 (migration 0197; apps/api: settings): the sign-in page settings and its public read (Settings, Screens, Login page).
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],

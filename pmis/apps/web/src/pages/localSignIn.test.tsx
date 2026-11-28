@@ -365,6 +365,8 @@ describe('hybrid mode list', () => {
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
       // contract 0.15.41: Settings, Identity & themes
       'GET /settings/identity', 'PUT /settings/identity',
+      // contract 0.15.596: field forms
+      'GET /settings/field-forms', 'PUT /settings/field-forms', 'POST /sites/:id/field-forms', 'GET /sites/:id/field-forms', 'GET /field-forms/:id/signature',
       // contract 0.15.97: Settings, Screens, Login page and its public read
       'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/ops-limits', 'PUT /settings/ops-limits', 'GET /settings/login-page/public',
       // contract 0.15.292: the media gallery

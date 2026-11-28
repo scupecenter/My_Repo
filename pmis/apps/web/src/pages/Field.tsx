@@ -8,9 +8,10 @@ import { useMe } from '@/api/hooks';
 import { api } from '@/api/client';
 import type { Snag } from '@/api/qc';
 import type { TaskSummary } from '@/api/types';
+import { FieldFormsPanel, type FormDraft } from '@/components/FieldFormsPanel';
 import { PageHeader } from '@/components/PageHeader';
 import { useToast } from '@/components/Toast';
-import { enqueue, indexedDbStore, memoryStore, snapshotFresh, type FieldAction, type FieldStore } from '@/lib/fieldOutbox';
+import { enqueue, indexedDbStore, memoryStore, newActionId, snapshotFresh, type FieldAction, type FieldStore } from '@/lib/fieldOutbox';
 import { apiSender, syncOutbox } from '@/lib/fieldSync';
 
 /**
@@ -111,6 +112,17 @@ export function Field() {
     toast(t('field.queued'));
     if (online) void sync();
   }
+  /** A filled form (0.15.596): queued like a photo, with the site, the answers and the signature; each form is its own group so one refusal never blocks another. */
+  async function addForm(d: FormDraft): Promise<boolean> {
+    if (!store || !siteId) return false;
+    const code = sites.find((s) => s.id === siteId)?.code ?? '';
+    const r = await enqueue(store, { kind: 'form_submit', snagId: `form:${newActionId()}`, snagLabel: `${d.formLabel} ${code}`.trim(), siteId, formCode: d.formCode, answers: d.answers, signature: d.signature, signerName: d.signerName, capturedAt: new Date().toISOString() }, cfg);
+    if (!r.ok) { toast(t(r.reason === 'queue_full' ? 'field.queue_full' : 'field.too_large', { max: cfg.max_photo_mb })); return false; }
+    await reload();
+    toast(t('field.queued'));
+    if (online) void sync();
+    return true;
+  }
   async function discard(a: FieldAction) { await store?.remove(a.id); await reload(); }
 
   if (!cfg.enabled) {
@@ -137,7 +149,7 @@ export function Field() {
         {queue.filter((a) => a.state !== 'done').length === 0 && <p className="text-sm text-mute">{t('field.queue_empty')}</p>}
         {queue.filter((a) => a.state !== 'done').map((a) => (
           <div key={a.id} className="flex flex-wrap items-center gap-2 border-t border-line pt-2 text-sm" data-testid={`field-action-${a.state}`}>
-            <span>{t(a.kind === 'snag_photo' ? 'field.k_photo' : 'field.k_submit')}</span>
+            <span>{t(a.kind === 'snag_photo' ? 'field.k_photo' : a.kind === 'form_submit' ? 'field.k_form' : 'field.k_submit')}</span>
             <span className="text-mute">{a.snagLabel}</span>
             <span className={`chip ${a.state === 'attention' ? 'bg-lateBg text-lateInk' : 'bg-waitBg text-waitInk'}`}>{t(`field.s_${a.state}`)}</span>
             {a.state === 'attention' && <span className="text-lateInk" data-testid="field-reason">{t(`field.r_${a.reason}`, { defaultValue: a.message || a.reason || '' })}{a.message && a.reason && !['earlier_failed', 'retries_exhausted'].includes(a.reason) ? `: ${a.message}` : ''}</span>}
@@ -192,6 +204,7 @@ export function Field() {
         })}
         {snags.data && snags.data.data.filter((s) => s.state === 'open' || s.state === 'fix_submitted').length === 0 && <p className="text-sm text-mute">{t('field.snags_none')}</p>}
       </section>
+      <FieldFormsPanel siteId={siteId ?? null} online={online} onQueue={addForm} />
     </div>
   );
 }

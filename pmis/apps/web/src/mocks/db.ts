@@ -109,6 +109,8 @@ const fresh = () => ({
   identity: initIdentity(),
   /** 0.15.97 (migration 0242): Settings, Screens, Login page (setting ui.login_page). */
   loginPage: initLoginPage(),
+  fieldForms: initFieldForms(),
+  fieldFormRows: [] as FieldFormRow[],
   emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
     /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
     code?: string | null; attempts?: number; verify_sent_at?: string | null; verify_expires_at?: string | null; verified_at?: string | null; verified_via?: 'code' | 'admin_check' | null; identity_check?: string | null }[],
@@ -185,6 +187,14 @@ function initLoginPage() {
     version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
   };
 }
+type FieldFormKindRec = { code: string; name_en: string; name_ar: string; enabled: boolean; signature: boolean; fields: { key: string; label_en: string; label_ar: string; type: 'text' | 'longtext' | 'number' | 'yesno' | 'choice'; required: boolean; options: string[] }[] };
+export type FieldFormRow = { id: string; client_id: string; site_id: string; form_code: string; answers: Record<string, unknown>; signature: string | null; signer_name: string | null; captured_at: string; submitted_at: string; submitted_by: { id: string; display_name: string; employee_id: string | null } | null };
+function initFieldForms() {
+  return { forms: [] as FieldFormKindRec[], version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
+}
+/** 0.15.596: the field form kinds and the filled forms (older saved mock states have none). */
+export const fieldForms = () => (db().fieldForms ??= initFieldForms());
+export const fieldFormRows = () => (db().fieldFormRows ??= []);
 /** 0.15.97: the login page settings (older saved mock states have none). */
 export const loginPage = () => (db().loginPage ??= initLoginPage());
 /** 0.15.97: the public door answers only what the signed-out pages render (login_page_public). */
