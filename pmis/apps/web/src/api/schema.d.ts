@@ -31987,6 +31987,10 @@ export interface operations {
                             rules: {
                                 [key: string]: unknown;
                             };
+                            /** @description 0.15.572 (migration 0643). The rules keys that are not in the catalogue: shown read only. */
+                            other?: {
+                                [key: string]: unknown;
+                            };
                             version: number;
                         }[];
                     };
