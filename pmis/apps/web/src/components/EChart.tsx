@@ -1,4 +1,9 @@
+import { Download } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { chartFileName, chartToPng, saveBlob } from '@/lib/chartPng';
 import { motionReduced } from '@/lib/motion';
+import { useExtra } from '@/lib/uiExtras';
+import { Tip } from './Tip';
 import { useEffect, useRef, useState } from 'react';
 import type { ChartHandle } from '@/lib/echarts';
 
@@ -38,6 +43,9 @@ export function EChart({ build, height = 220, label, testid, renderer = 'svg', o
   /** a click on a mark: ECharts' event parameters (the site map opens the site card from `data`) */
   onClick?: (params: { data?: unknown; seriesId?: string }) => void;
 }) {
+  const { t } = useTranslation();
+  const showPng = useExtra('chart_png');
+  const [pngFailed, setPngFailed] = useState(false);
   const el = useRef<HTMLDivElement>(null);
   const chart = useRef<ChartHandle | null>(null);
   const latest = useRef(build);
@@ -70,5 +78,22 @@ export function EChart({ build, height = 220, label, testid, renderer = 'svg', o
     chart.current?.setOption(Object.assign({}, build(readPalette(), document.documentElement.dir === 'rtl'), motionReduced() ? { animation: false } : {}), true);
   }, [build, env]);
 
-  return <div ref={el} role="img" aria-label={label} data-testid={testid} style={{ height, width: '100%', direction: 'ltr' }} />;
+  const download = async () => {
+    if (!el.current) return;
+    const blob = await chartToPng(el.current, readPalette().card);
+    if (blob) { setPngFailed(false); saveBlob(blob, chartFileName(label)); } else setPngFailed(true);
+  };
+  const chartDiv = <div ref={el} role="img" aria-label={label} data-testid={testid} style={{ height: '100%', width: '100%', direction: 'ltr' }} />;
+  return (
+    <div className="group relative" style={{ height, width: '100%' }}>
+      {chartDiv}
+      {showPng && (
+        <Tip text={pngFailed ? t('chart.png_failed') : t('chart.png')}>
+          <button type="button" className="btn absolute end-1 top-1 px-1.5 py-1 opacity-60 hover:opacity-100 focus-visible:opacity-100" aria-label={t('chart.png')} data-testid={testid ? `${testid}-png` : 'chart-png'} onClick={() => void download()}>
+            <Download size={13} aria-hidden />
+          </button>
+        </Tip>
+      )}
+    </div>
+  );
 }

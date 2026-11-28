@@ -8250,12 +8250,14 @@
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   },
+  "chart": {"png": "Download chart as PNG", "png_failed": "Could not make the image"},
   "ui": {
     "extras_title": "On this device",
     "extras_note": "These switches affect only this browser. Nothing is saved on the server.",
     "extra_copy_link": "Copy-link button in drawers",
     "extra_copy_link_hint": "Shows a button in a task or record drawer that copies the address of that record.",
-    "guard_title": "Unsaved changes",
+    "extra_chart_png": "Chart download button",
+    "extra_chart_png_hint": "Shows a small download button on each chart that saves it as a PNG picture.",    "guard_title": "Unsaved changes",
     "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
     "guard_enabled": "Ask before leaving unsaved changes",
     "guard_comment": "A comment you typed",
