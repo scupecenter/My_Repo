@@ -1,7 +1,7 @@
 # Custom registers
 
 Review item 11. An administrator creates a register without code and without a migration per register. It runs on the same register framework as every other register:
-columns, sections, lists, templates, upload and download, approval in two levels, search, export, the Matrix row and the permission module.
+columns, sections, lists, templates, upload and download, approval in two levels, search, export, the Matrix and the permission module.
 
 ## How an administrator uses it
 
@@ -9,7 +9,7 @@ columns, sections, lists, templates, upload and download, approval in two levels
    name, whether each record belongs to a site and whether a site may have more than one record. The register starts **disabled**.
 2. Add its columns on Settings > Registers > Columns (the **Columns** button of the row opens that screen on the new register). At least one column must be required and in the
    template: it identifies a record when a file is uploaded.
-3. **Enable**. The register gets its upload and download template, its permission module (same key as the register) and the Matrix row. The side menu has one entry,
+3. **Enable**. The register gets its upload and download template, its permission module (same key as the register); the Matrix takes rows for it like any register. The side menu has one entry,
    **Custom registers**, that opens a hub listing the enabled registers the person may view.
 4. Grant the module in the permission grid or the Matrix like any other module. Creating or enabling a register grants nothing to anyone.
 5. **Hide** removes the register from the hub, the register list and the grid editor. Nothing is deleted: records, columns and grants stay, and **Show again** brings it back.
