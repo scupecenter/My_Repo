@@ -89,6 +89,9 @@ function planOf(requested: string[] | null, narrow: Narrow | null = null): DataR
     scope, tables, files: sel.has('documents') ? 31 : 0,
     delete_rows: tables.reduce((n, t) => n + (t.table === 'users' ? 0 : t.delete), 0), keep_rows: tables.reduce((n, t) => n + t.keep, 0),
     accounts_to_deactivate: sel.has('users') ? 23 : 0, error: null,
+    dangling_links: sel.has('procurement') && !sel.has('issues')
+      ? [{ source_part: 'issues', target_part: 'procurement', links: 2, source_label_en: 'Issue Log', source_label_ar: 'سجل المشاكل', target_label_en: 'Procurement (PR / PO / WO, assignments)', target_label_ar: 'المشتريات (PR / PO / WO والتكليفات)' }]
+      : [],
     parts: CATALOGUE.map(([code, group, label_en, label_ar, deps, rows]) => ({
       code, group, narrowable: NARROWABLE.includes(code), kind: group === 'identity' ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
       dependents: CATALOGUE.filter((c) => c[4].includes(code)).map((c) => c[0]), rows, tables: {}, requested: req.has(code), selected: sel.has(code),

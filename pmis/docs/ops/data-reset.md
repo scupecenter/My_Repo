@@ -613,3 +613,12 @@ The approval does not open the run at once. Settings > Data > Data reset has a s
 - Either System Admin can cancel while the request waits (the cancel door is open to any System Admin in `requested` and `approved`).
 - Both admins (the requester and the approver) get an in-app notice at the approval and another shortly before the wait ends (an hour before, or half way for a short wait). `data_reset_cooloff_notify()` sends it; the API calls it with the state of the page and from a one-minute timer when jobs are on. It is safe to call by hand.
 - The setting can be changed only while no request is open, as the other two.
+
+## Links that would dangle (contract 0.15.540, migration 0641)
+
+The preview of a chosen scope lists `dangling_links`: records of a part that is NOT in the scope and that point at records of a part that is (today the Procurement link,
+`data ->> 'procurement_record_id'`). The closure of the parts already takes the parts that depend on a chosen part (invoices, advances and car bookings after a procurement
+reset), so what is listed here is what the closure leaves outside (for example an Issue Log record that names an order). `data_reset_dangling_links(parts)` is read only
+(`SECURITY DEFINER`, same grants as the other read doors) and is called by `data_reset_plan_json`, patched in place. It never blocks and changes neither the closure nor the
+`scope_hash`; the screen offers "Add this part to the scope", which only changes the chosen parts, and counts again. With a narrowing the number is an upper bound (it counts the
+links to any record of the part, not only the selected ones). Everything and the identity parts list nothing.

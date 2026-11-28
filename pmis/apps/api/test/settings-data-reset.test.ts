@@ -252,6 +252,9 @@ describe('the scope of a request (0.15.71)', () => {
     const parts = new Map<string, any>(res.body.parts.map((p: { code: string }) => [p.code, p]));
     expect(parts.get('car_dispatcher')).toMatchObject({ selected: true, added: true, requested: false });
     expect(parts.get('sites')).toMatchObject({ selected: false });
+    // 0641: links of records outside the scope that point inside it are listed (information only; none in this data set, a list always)
+    expect(Array.isArray(res.body.dangling_links)).toBe(true);
+    for (const d of res.body.dangling_links) expect(res.body.scope.parts).not.toContain(d.source_part);
     const ids = await admin1.api.call('get', '/settings/data-reset/plan?parts=users');
     expect(ids.body.accounts_to_deactivate).toBeGreaterThan(0);
     expect(ids.body.delete_rows).toBe(0);

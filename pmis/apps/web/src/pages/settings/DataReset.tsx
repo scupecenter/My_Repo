@@ -122,6 +122,21 @@ export function DataReset() {
               <PlanTable testid="dr-plan-keep-table" title="" rows={kept} col={(r) => String(r.keep)} />
             </details>
           </div>
+          {mode === 'custom' && !req && (shown.dangling_links ?? []).length > 0 && (
+            <div className="space-y-2 rounded-md border border-lateInk/40 p-3" data-testid="dr-dangling">
+              <h4 className="text-sm font-semibold">{t('dr.dangling_title')}</h4>
+              <p className="text-sm text-mute">{t('dr.dangling_hint')}{shown.narrow ? ` ${t('dr.dangling_upper')}` : ''}</p>
+              <ul className="space-y-1">
+                {(shown.dangling_links ?? []).map((d) => (
+                  <li key={`${d.source_part}:${d.target_part}`} className="flex flex-wrap items-center gap-2 text-sm" data-testid={`dr-dangling-${d.source_part}`}>
+                    <span><bdi>{i18n.language === 'ar' ? d.source_label_ar : d.source_label_en}</bdi> → <bdi>{i18n.language === 'ar' ? d.target_label_ar : d.target_label_en}</bdi>: {t('dr.dangling_count', { count: d.links })}</span>
+                    <button type="button" className="btn" data-testid={`dr-dangling-add-${d.source_part}`} disabled={!s.can.request || chosen.includes(d.source_part)}
+                      onClick={() => setChosen([...chosen, d.source_part])}>{t('dr.dangling_add')}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
 
