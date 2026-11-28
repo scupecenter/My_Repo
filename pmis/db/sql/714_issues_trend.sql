@@ -16,7 +16,7 @@ DECLARE n integer := least(greatest(coalesce(p_weeks, 12), 4), 52); today date :
 BEGIN
   first_w := date_trunc('week', today::timestamp)::date - 7 * (n - 1);
   WITH w AS (
-    SELECT g::date AS ws, least((g + 6)::date, today) AS we FROM generate_series(first_w::timestamp, date_trunc('week', today::timestamp), interval '7 days') g
+    SELECT g::date AS ws, least(g::date + 6, today) AS we FROM generate_series(first_w::timestamp, date_trunc('week', today::timestamp), interval '7 days') g
   ), i AS (
     SELECT nullif(r.data ->> 'raised_date', '')::date AS raised, nullif(r.data ->> 'resolution_date', '')::date AS resolved
     FROM public.register_records r JOIN public.sites s ON s.id = r.site_id AND s.status::text <> 'cancelled'
