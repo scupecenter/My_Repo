@@ -33,11 +33,14 @@ describe('Register locks (F16, contract 0.15.22)', () => {
     await signIn('pm');
     await api.post('/__mock/step-up');
     renderApp(<Routed />, { route: '/registers/procurement' });
-    const sel = await screen.findByTestId('register-column-lock-select');
     const u = userEvent.setup();
+    expect(screen.queryByTestId('register-column-locks')).toBeNull(); // P8: no loose row above the table
+    await u.click(await screen.findByTestId('more-menu'));
+    await u.click(await screen.findByTestId('register-column-lock'));
+    const sel = await screen.findByTestId('register-column-lock-select');
     const choice = within(sel).getAllByRole('option').find((o) => (o as HTMLOptionElement).value !== '') as HTMLOptionElement;
     await u.selectOptions(sel, choice.value);
-    await u.click(screen.getByTestId('register-column-lock'));
+    await u.click(screen.getByTestId('register-column-lock-continue'));
     await u.click(await screen.findByTestId('reject-submit'));
     expect(await screen.findByTestId('reject-error')).toBeInTheDocument();
     await u.type(screen.getByTestId('reject-note'), 'Frozen after approval');

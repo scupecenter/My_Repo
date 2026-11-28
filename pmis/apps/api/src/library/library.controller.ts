@@ -106,6 +106,16 @@ export class LibraryMenuController {
     return this.lib.retireTemplate(auth, id, body);
   }
 
+  @Get('settings/document-marks')
+  marks() {
+    return this.lib.marksSetting();
+  }
+
+  @Put('settings/document-marks/:code')
+  setMarks(@Auth() auth: AuthContext, @Param('code') code: string, @Body() body: unknown) {
+    return this.lib.setMarks(auth, code, body);
+  }
+
   @Get('settings/library-archive')
   async setting(@Res({ passthrough: true }) res: Response) {
     const r = await this.lib.archiveSetting();
