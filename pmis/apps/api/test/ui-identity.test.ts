@@ -380,7 +380,7 @@ describe('the appearance profile: PATCH /me/profile ui_prefs and the identity de
     expect((await patchPrefs(api, { inbox_panel: 'sideways' })).status).toBe(422);
   });
 
-  // 0565: the More menu (list or icon grid) is one more appearance dimension of the same framework.
+  // 0581: the More menu (list or icon grid) is one more appearance dimension of the same framework.
   it('more_menu: in the options, chosen personally, validated', async () => {
     const u = await makeUser(db, { assigned: true });
     const api = await loggedIn(app, u);

@@ -14,7 +14,7 @@ export const UI_PREF_OPTIONS = {
   accent: ['default', 'teal', 'blue', 'violet', 'green', 'orange', 'red', 'amber'],
   contrast: ['standard', 'high'], // 0347 (item 19): the high-contrast mode
   inbox_panel: ['overlay', 'floating', 'docked'], // 0526: the notification panel as an overlay, a floating window or docked
-  more_menu: ['list', 'grid'], // 0565: the More menu of the table screens as a list or an icon grid with search
+  more_menu: ['list', 'grid'], // 0581: the More menu of the table screens as a list or an icon grid with search
   inbox_anchor: ['end-top', 'end-bottom', 'start-top', 'start-bottom'], // 0526: the corner of the floating panel
 } as const;
 

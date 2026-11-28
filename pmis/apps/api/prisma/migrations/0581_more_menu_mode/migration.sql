@@ -1,5 +1,5 @@
--- 0565: the appearance dimensions gain `more_menu` (the More menu of the table screens as a list or an icon grid with search; proposal item 10).
--- Mirror of this file: apps/api/prisma/migrations/0565_more_menu_mode/migration.sql (kept byte-identical).
+-- 0581: the appearance dimensions gain `more_menu` (the More menu of the table screens as a list or an icon grid with search; proposal item 10).
+-- Mirror of this file: apps/api/prisma/migrations/0581_more_menu_mode/migration.sql (kept byte-identical).
 --
 -- WHY. Every table screen has a "..." menu for its secondary tools. The personal appearance framework of 0241 already carries each per-user
 -- appearance choice (users.ui_prefs, organization defaults, the admin personal-choice lock, the audited idm_update_own_profile door, the

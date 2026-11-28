@@ -18858,7 +18858,7 @@ export interface components {
              */
             inbox_anchor?: "end-top" | "end-bottom" | "start-top" | "start-bottom";
             /**
-             * @description 0.15.408 (0565): the More menu of the table screens as a list (default) or an icon grid with search.
+             * @description 0.15.530 (0581): the More menu of the table screens as a list (default) or an icon grid with search.
              * @enum {string}
              */
             more_menu?: "list" | "grid";
