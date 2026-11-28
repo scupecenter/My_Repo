@@ -297,6 +297,7 @@ info:
     - 0.15.206 (2026-11-27): the dashboard follow-up sections, restricted financial summary (owner approval 2026-11-26, dashboard proposals item 9; migration 0307). Additive. `GET /dashboard/ops` gains the section `finance` (`DashboardOpsFinance`): the advances (counts, amounts of the records whose amounts are not hidden, age of the open ones since disbursement) and the disbursed amount against the completion of the assignments the advances belong to. It is OFF by default and only a holder of a role listed by the new setting `dashboard.finance_readers` (default Project Manager and Finance Officer) who also has the financial advances view receives figures; everyone else gets `available: false` with null figures, and the card stays hidden. It is never part of a share link or an export. New `GET/PUT /settings/dashboard-finance-readers` (`getDashboardFinanceReaders`, `setDashboardFinanceReaders`) to switch it on and choose the roles (System Admin or an all-regions delegate of settings edit, reason, step-up, If-Match, audited). Invoice ages are not part of the summary: the system holds no invoice data yet.
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
     - 0.15.368 (2026-11-27): the dashboard phase quick filter and the Project Status group-by phase (owner decision 2026-11-27, phase scope item 1; spec `docs/spec/dashboard-phase-filter-group-by.md`). Additive and read only. (1) `GET /dashboard`, `GET /dashboard/ops`, `GET /dashboard/extras`, `GET /dashboard/export` and `GET /project-status` accept `project_phase`, a comma-separated list of 1 to 24 values of `sites.project_phase` (each 1 to 60 characters, 422 otherwise): it keeps only the sites of those phases, narrowing like the filter tree and `region_id` and never widening anyone's data; a section row that belongs to no site (a global change request or meeting action) counts only when no phase filter is given. `DashboardFilters` gains `phases`, the distinct phase values of the sites the caller can see. (2) `GET /project-status` `group_by` gains `phase`: `rows` holds one entry per phase (`key` and `label` the phase value), computed by the same engine run once per phase site set; sites without a phase are in no row. No migration, no grant, role or permission change.
+    - 0.15.648 (2026-11-28): the fill rules of the register links can be read and edited in Settings (GET and PUT /settings/link-fills, reason, If-Match, audited, migration 0772): when a record gets its final approval, a field of it is copied into a field of the record it links to. Only a linked record still in entry, only an empty field, each fill audited. Seeded empty.
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
     - **Staff registry** (`staff-registry`): search, hover card with visibility applied, create, update, deactivate, reactivate, template import, field-visibility settings.
@@ -7255,6 +7256,51 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Setting' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/link-fills:
+    get:
+      tags: [settings]
+      operationId: getLinkFills
+      summary: The fill rules of the register links, with the declared links and the fields to pick from
+      description: 0.15.648 (migration 0772, automation item 9). Needs the Settings screen (`admin.settings` view). The ETag is the version of the whole set.
+      responses:
+        '200':
+          description: The rules.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LinkFills'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setLinkFills
+      summary: Save link fill rules (reason, If-Match, audited)
+      description: |
+        0.15.648. System Admin, or a delegation of `admin.settings` edit for all regions. A rule is added or changed, hidden with `is_active` false, never deleted. A rule says
+        "when a record of this register gets its final approval, copy this field of it into that field of the record it links to". Only a linked record still in entry is filled,
+        only an empty field, never over a value a person typed, and each fill is audited (`register_link_fill`). Seeded empty.
+        Field errors: `unknown_link`, `unknown_field`, `type_mismatch`, `duplicate`, `invalid`.
+      x-db-path: admin_save_register_link_fills
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LinkFillsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LinkFills'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/register-links:
     get:
       tags: [settings]
@@ -20407,6 +20453,60 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    LinkFillField:
+      type: object
+      required: [code, label_en, field_type]
+      properties:
+        code: {type: string}
+        label_en: {type: string}
+        label_ar: {type: [string, 'null']}
+        field_type: {type: string}
+    LinkFill:
+      type: object
+      required: [register_key, link_field, target_field, source_field, sort_order, is_active]
+      properties:
+        register_key: {type: string}
+        link_field: {type: string}
+        target_field: {type: string}
+        source_field: {type: string}
+        sort_order: {type: integer}
+        is_active: {type: boolean}
+    LinkFills:
+      type: object
+      required: [rows, links, version, can_edit]
+      properties:
+        rows: {type: array, items: {$ref: '#/components/schemas/LinkFill'}}
+        links:
+          type: array
+          items:
+            type: object
+            required: [register_key, link_field, target_register, source_fields, target_fields]
+            properties:
+              register_key: {type: string}
+              link_field: {type: string}
+              target_register: {type: string}
+              source_fields: {type: array, items: {$ref: '#/components/schemas/LinkFillField'}}
+              target_fields: {type: array, items: {$ref: '#/components/schemas/LinkFillField'}}
+        version: {type: integer}
+        can_edit: {type: boolean}
+    LinkFillsInput:
+      type: object
+      required: [rows, reason]
+      properties:
+        reason: {type: string, minLength: 3, maxLength: 1000}
+        rows:
+          type: array
+          maxItems: 60
+          items:
+            type: object
+            required: [register_key, link_field, target_field, source_field]
+            properties:
+              register_key: {type: string}
+              link_field: {type: string}
+              target_field: {type: string}
+              source_field: {type: string}
+              sort_order: {type: integer}
+              is_active: {type: boolean}
     StructurePolicy:
       type: object
       description: 'The setting `registers.structure_change` (0.15.403).'

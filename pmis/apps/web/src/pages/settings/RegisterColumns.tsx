@@ -14,6 +14,7 @@ import { useStructureProposals } from '@/api/structureProposals';
 import { ItemColumns } from './ItemColumns';
 import { StructureChangesTab } from './StructureByTemplate';
 import { RegisterStatePanel } from './RegisterStatePanel';
+import { LinkFills } from './LinkFills';
 import { RegisterLinksPanel } from './RegisterLinksPanel';
 import { RegisterRulesPanel } from './RegisterRulesPanel';
 import { isStreamKey, STREAM_MENUS, STREAM_PREFIX, StreamColumns, type StreamMenu } from './StreamColumns';
@@ -85,6 +86,7 @@ function ItemsPage() {
       <RegisterStatePanel />
       <RegisterRulesPanel />
       <RegisterLinksPanel />
+      <LinkFills />
       <div className="card space-y-3 p-4">
         <h2 className="font-bold">{t('regcols.title')}</h2>
         <ColumnsPicker value={ITEMS_KEY} onChange={(k) => setSp({ register: k }, { replace: true })} />

@@ -34,6 +34,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 | Design | `design/tokens.*`, `design/GSDN_Workspace_Prototype_v2.html`, `design/screens/` | Clickable prototype, 120 Playwright checks passing |
 | CW forms | `design/forms/` | DN, RN, PAC, FAC as HTML templates rendered to A4 PDF |
 | Agents | `../.claude/agents/*.md`, `ORCHESTRATION.md` | 9 agents with their models and folders |
+| Approval fills linked record | `db/sql/771_register_link_fills.sql`, `apps/web/src/pages/settings/LinkFills.tsx`, spec `docs/plans/specs/auto-9-link-fills.md` | Settings > Registers rules: the final approval of a record copies a field into the empty field of its linked record (audited, seeded empty) |
 | References | `docs/reference/` | Blueprint v1.1, decisions D1–D88, the Master user manual, and the previous standalone dashboard (`legacy-dashboard/`, read-only, the KPI reference for P3) |
 
 **Not verified in this refresh:** the number of operations in the contract, the current model count, and the state of every web screen. Check them in the code before quoting them. No server URL is recorded here: ask the owner or IT for the deployment address.
