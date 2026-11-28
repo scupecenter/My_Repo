@@ -4,6 +4,114 @@
  */
 
 export interface paths {
+    "/me/notification-prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's notification choices, do-not-disturb and snooze
+         * @description 0.15.531. Lists every notification type of the catalogue with the caller's bell and e-mail choice (default on; a mandatory type is always on). The ETag is the version.
+         */
+        get: operations["getMyNotificationPrefs"];
+        /**
+         * Save the caller's type choices and do-not-disturb
+         * @description 0.15.531. Send `If-Match`. `types` replaces the whole set of choices (a type left out is on). A mandatory type is ignored. `dnd.start` and `dnd.end` are minutes of the day; a window that ends before it starts crosses midnight. 403 when the administrator switched personal settings off.
+         */
+        put: operations["setMyNotificationPrefs"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notification-prefs/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hold the caller's e-mail and push until a time
+         * @description 0.15.531. `until` is within 14 days from now; null clears the snooze. The bell still receives notices.
+         */
+        post: operations["snoozeMyNotifications"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notification-prefs/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send the caller a test notice
+         * @description 0.15.531. Writes one notice of kind `system` to the caller's bell. 429 when another test was sent in the last 30 seconds.
+         */
+        post: operations["testMyNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notification-prefs/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notices the caller's own settings stopped or held (newest first, up to 50)
+         * @description 0.15.531. Reasons are `type_off` (the caller turned the type off), `duplicate` (the same unread notice inside the dedupe window) and `quiet_mail` (an e-mail not sent in quiet time).
+         */
+        get: operations["listMyNotificationDecisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/notification-personal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Org switches of the personal notification layer (System Admin)
+         * @description 0.15.531. Whether people may choose their own types, do-not-disturb and snooze, the dedupe window and how long decisions are kept. The ETag is the version.
+         */
+        get: operations["getNotificationPersonalSettings"];
+        /**
+         * Change the org switches (audited, reason required)
+         * @description 0.15.531. Send `If-Match`. `dedupe_minutes` 0 turns the cross-transaction dedupe off.
+         */
+        put: operations["setNotificationPersonalSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/push": {
         parameters: {
             query?: never;
@@ -12419,6 +12527,40 @@ export interface components {
             applied_at?: string | null;
             version: number;
         };
+        NotificationPrefs: {
+            version: number;
+            types: {
+                code: string;
+                kind: string;
+                category: string;
+                mandatory: boolean;
+                in_app: boolean;
+                email: boolean;
+            }[];
+            dnd: {
+                enabled: boolean;
+                start: number;
+                end: number;
+                days: number[];
+                timezone?: string | null;
+                effective_timezone: string;
+            };
+            /** Format: date-time */
+            snooze_until: string | null;
+            quiet_now: boolean;
+            org: {
+                allow_personal?: boolean;
+                allow_dnd?: boolean;
+                dedupe_minutes?: number;
+            };
+        };
+        NotificationPersonalSettings: {
+            allow_personal: boolean;
+            allow_dnd: boolean;
+            dedupe_minutes: number;
+            decision_retention_days: number;
+            version: number;
+        };
         MyPush: {
             enabled: boolean;
             /** @description The VAPID public key (public by design); null while push is off. */
@@ -23956,6 +24098,222 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getMyNotificationPrefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The choices. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPrefs"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setMyNotificationPrefs: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    types?: {
+                        [key: string]: {
+                            in_app?: boolean;
+                            email?: boolean;
+                        };
+                    };
+                    dnd?: {
+                        enabled?: boolean;
+                        start?: number;
+                        end?: number;
+                        days?: number[];
+                        timezone?: string | null;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPrefs"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    snoozeMyNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date-time */
+                    until: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPrefs"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    testMyNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        notification_id: string;
+                        quiet_now: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listMyNotificationDecisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The decisions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: number;
+                            kind: string;
+                            channel: string;
+                            /** @enum {string} */
+                            reason: "type_off" | "duplicate" | "quiet_mail";
+                            title?: string | null;
+                            link?: string | null;
+                            /** Format: date-time */
+                            created_at: string;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getNotificationPersonalSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPersonalSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setNotificationPersonalSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    allow_personal?: boolean;
+                    allow_dnd?: boolean;
+                    dedupe_minutes?: number;
+                    decision_retention_days?: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPersonalSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getMyPush: {
         parameters: {
             query?: {
