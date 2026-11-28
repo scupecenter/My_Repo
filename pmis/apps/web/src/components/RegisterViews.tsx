@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/States';
 import { buildTimeline, posPct } from '@/lib/timeline';
 import { fmtDate } from '@/lib/time';
 import { StatusChip } from '@/components/TableKit';
+import { EmptyState } from '@/components/States';
 import { WideTable, type WideCell, type WideColumn, type WideInput, type WideTableRow } from '@/components/WideTable';
 import { isHidden, sectionIdOf, typeHides } from '@/lib/registerForms';
 import { measureBreakdown } from '@/lib/viewAnalytics';
@@ -25,8 +26,8 @@ import type { Display } from '@/lib/tablePrefs';
  * the board and the map are the same shared components as Site Master (WideTable, BoardGrid, SiteMap), fed by the register's own list
  * (GET /registers/{key}/records with the same filters, so every layout shows the same records, with the caller's rights and field rules).
  */
-export type RegisterLayout = 'list' | 'wide' | 'board' | 'map' | 'calendar' | 'timeline' | 'chart';
-export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'map', 'calendar', 'timeline', 'chart'];
+export type RegisterLayout = 'list' | 'wide' | 'board' | 'feed' | 'map' | 'calendar' | 'timeline' | 'chart';
+export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'feed', 'map', 'calendar', 'timeline', 'chart'];
 
 /** The board's grouping on the approval state of the records (entry, in review, in approval, approved, voided), which every register has. */
 export const BY_STATE = 'state';
@@ -61,7 +62,7 @@ export const dateFields = (def: RegisterDefinition): RegisterField[] => def.fiel
 /** The layouts a register offers: list, wide table, board and chart on every register; the map only where the records carry a site (and its coordinates);
     the calendar (decision V2) and the timeline (decision V3) where the definition has at least one date field. */
 export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => [
-  'list', 'wide', 'board',
+  'list', 'wide', 'board', 'feed',
   ...(def.site_scoped ? (['map'] as const) : []),
   ...(dateFields(def).length ? (['calendar', 'timeline'] as const) : []),
   'chart',
@@ -396,5 +397,71 @@ export function RegisterTimeline({ def, records, onOpen, partial }: {
       )}
       <p className="mt-2 text-xs text-mute" data-testid="register-timeline-note">{t('timeline.note_records', { shown: model?.rows.length ?? 0, total: records.length })}</p>
     </div>
+  );
+}
+
+/** The moment a feed entry carries: the last update, else the creation. */
+function feedTime(r: RegisterRecord): string {
+  return r.updated_at ?? r.created_at ?? '';
+}
+
+/** "3 hours ago" in the caller's language; empty when the record carries no time. */
+function relTime(iso: string, lang: string): string {
+  if (!iso) return '';
+  const sec = Math.round((Date.parse(iso) - Date.now()) / 1000);
+  if (Number.isNaN(sec)) return '';
+  const abs = Math.abs(sec);
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+  if (abs < 60) return rtf.format(sec, 'second');
+  if (abs < 3600) return rtf.format(Math.round(sec / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(sec / 3600), 'hour');
+  if (abs < 86400 * 30) return rtf.format(Math.round(sec / 86400), 'day');
+  if (abs < 86400 * 365) return rtf.format(Math.round(sec / (86400 * 30)), 'month');
+  return rtf.format(Math.round(sec / (86400 * 365)), 'year');
+}
+
+/**
+ * Decision V10 (2026-11-28, 0.15.577): the feed, the records of the current filters latest-first (by the last update, else the creation),
+ * one line each, on every register, up to ALL_CAP like the board and the map. A line shows the title (the first listed field with a value),
+ * the site code, the state, the region, the record type and the time in the caller's language. Read only: a line opens its record (drawer or
+ * page, per V5).
+ */
+export function RegisterFeed({ def, records, regionName, onOpen, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; regionName: (id: number | null | undefined) => string;
+  onOpen: (id: string) => void; partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const sorted = [...records].sort((a, b) => feedTime(b).localeCompare(feedTime(a)));
+  const titleOf = (r: RegisterRecord) => {
+    const f = def.fields.find((y) => y.in_list && r.data[y.code] !== undefined && r.data[y.code] !== null && r.data[y.code] !== '');
+    return f ? valueText(f, r.data[f.code], lang, t) : '';
+  };
+  return (
+    <section className="space-y-2" data-testid="register-feed" aria-label={t('view.feed')}>
+      <div className="flex flex-wrap items-center gap-2">
+        {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-feed-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
+        <span className="ms-auto text-xs text-mute">{t('regviews.board_read_only')}</span>
+      </div>
+      {!sorted.length ? <EmptyState testid="register-feed-empty" title={t('registers.empty')} /> : (
+        <ol className="divide-y divide-line rounded-md border border-line bg-card" data-testid="register-feed-list">
+          {sorted.map((r) => (
+            <li key={r.id}>
+              <button type="button" onClick={() => onOpen(r.id)} data-testid={`register-feed-item-${r.id}`} data-state={r.state}
+                className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3 py-2 text-start text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label={t('regviews.card', { code: r.site_code ?? '', title: titleOf(r) })}>
+                {r.site_code && <b className="mono" dir="ltr">{r.site_code}</b>}
+                <span className="font-medium" data-testid={`register-feed-title-${r.id}`}>{titleOf(r)}</span>
+                <span className={`chip ${STATE_TONE[r.state] ?? ''}`} data-testid={`register-feed-value-${r.id}-state`}>{t(`regState.${r.state}`)}</span>
+                {r.region_id ? <span className="text-xs text-mute" data-testid={`register-feed-value-${r.id}-site`}>{regionName(r.region_id as number)}</span> : null}
+                {r.record_type && <span className="chip border border-line">{r.record_type.toUpperCase()}</span>}
+                {r.locked && <span className="chip bg-hover" data-testid={`register-feed-locked-${r.id}`}>{t('registers.locked_badge')}</span>}
+                <span className="ms-auto text-xs text-mute" data-testid={`register-feed-time-${r.id}`}>{relTime(feedTime(r), lang)}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
