@@ -123,7 +123,7 @@ export function DailyPlan() {
       {isWeek ? <WeekCycle date={date} regions={scope(progress.data)} onDate={(d) => setParams({ date: d })} /> : <>
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2" data-testid="daily-plan-toolbar">
-        <SavedViews screen={SCREEN} value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
+        <SavedViews screen={SCREEN} sharedScreen value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
           onApply={(v) => setParams({ region: v.region || 'all', contractor: v.contractor, aat_se: v.aat_se, sow: v.sow, q: v.q })} />
         <UnifiedFilter screen={SCREEN} value={null} onChange={() => undefined} onClearAll={() => setParams({ region: 'all', contractor: '', aat_se: '', sow: '', q: '' })}
           extras={[
