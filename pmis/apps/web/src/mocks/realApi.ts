@@ -531,6 +531,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/invoices/supplier-options'],
   ['get', '/settings/register-rules'],
   ['put', '/settings/register-rules/:key'],
+  // Contract 0.15.646 (migration 0770, automation item 4): the task source rules of the registers.
+  ['get', '/settings/task-source-rules'],
+  ['put', '/settings/task-source-rules'],
   ['get', '/settings/register-links'],
   ['put', '/settings/register-links'],
   ['get', '/settings/register-state'],

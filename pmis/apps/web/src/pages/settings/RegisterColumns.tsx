@@ -16,6 +16,7 @@ import { StructureChangesTab } from './StructureByTemplate';
 import { RegisterStatePanel } from './RegisterStatePanel';
 import { RegisterLinksPanel } from './RegisterLinksPanel';
 import { RegisterRulesPanel } from './RegisterRulesPanel';
+import { TaskSourceRules } from './TaskSourceRules';
 import { isStreamKey, STREAM_MENUS, STREAM_PREFIX, StreamColumns, type StreamMenu } from './StreamColumns';
 
 type Dlg =
@@ -85,6 +86,7 @@ function ItemsPage() {
       <RegisterStatePanel />
       <RegisterRulesPanel />
       <RegisterLinksPanel />
+      <TaskSourceRules />
       <div className="card space-y-3 p-4">
         <h2 className="font-bold">{t('regcols.title')}</h2>
         <ColumnsPicker value={ITEMS_KEY} onChange={(k) => setSp({ register: k }, { replace: true })} />

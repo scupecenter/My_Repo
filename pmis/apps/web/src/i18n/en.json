@@ -8849,5 +8849,19 @@
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
   },
-  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."},
+  "taskSrc": {
+    "title": "Task source rules",
+    "note": "Which register record gives a task its date. A rule says: a record of this register that matches the condition (for example Order Status is Delivered) is the source of this task and gives it the date of the chosen field. The workflow is unchanged: a record is linked to the task when it is submitted, only while the task is open, and its final approval gives the task the date and approves it. An approved task is never reopened or re-dated. A rule is hidden, never deleted. Nothing new happens until you add a rule here.",
+    "register": "Register",
+    "task": "Task",
+    "when": "When",
+    "date_field": "Date taken from",
+    "always": "Always",
+    "add_title": "Add a rule",
+    "pick": "Choose",
+    "cond_field": "Only when this field",
+    "no_condition": "No condition",
+    "values": "Is one of (comma separated)"
+  }
 }
