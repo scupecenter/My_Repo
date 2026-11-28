@@ -2794,6 +2794,8 @@
   "table": {
     "columns": "Columns",
     "more": "More",
+    "more_search": "Search the tools",
+    "more_none": "No tool matches",
     "resize": "Resize column {{col}}",
     "fit_hint": "Double-click the edge to fit the column to its content",
     "move_earlier": "Move {{col}} earlier",
@@ -4034,7 +4036,8 @@
       "accent": "Accent colour",
       "contrast": "Contrast",
       "inbox_panel": "Notification panel",
-      "inbox_anchor": "Floating panel corner"
+      "inbox_anchor": "Floating panel corner",
+      "more_menu": "More menu"
     },
     "opt": {
       "density": {
@@ -4090,6 +4093,10 @@
         "end-bottom": "End, bottom",
         "start-top": "Start, top",
         "start-bottom": "Start, bottom"
+      },
+      "more_menu": {
+        "list": "List (default)",
+        "grid": "Icon grid with search"
       }
     }
   },
