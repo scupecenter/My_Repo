@@ -529,6 +529,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/invoices/supplier-options'],
   ['get', '/settings/register-rules'],
   ['put', '/settings/register-rules/:key'],
+  ['get', '/settings/register-links'],
+  ['put', '/settings/register-links'],
   ['get', '/settings/register-state'],
   ['put', '/settings/register-state/:key'],
   ['get', '/registers/issues/risk-options'],
