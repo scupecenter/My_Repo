@@ -21,7 +21,11 @@ const weight = z.number().min(0).max(100).refine((n) => Math.abs(Math.round(n * 
 const code = z.string().regex(/^[A-Za-z0-9._-]{1,20}$/);
 const itemSchema = z.object({
   code, name_en: z.string().min(1).max(200), name_ar: z.string().max(200).nullable().optional(), weight,
-  unit: z.string().max(40).nullable().optional(), measure_rule: z.string().max(500).nullable().optional(), source: z.string().max(200).nullable().optional(),
+  unit: z.string().max(40).nullable().optional(), measure_rule: z.string().max(500).nullable().optional().refine((v) => {
+    // 0552: a rule that looks like JSON must parse (it used to reach the database as bad JSON and answer 500); the shape is checked when the draft is published
+    if (!v || v.trim()[0] !== '{') return true;
+    try { return typeof JSON.parse(v) === 'object'; } catch { return false; }
+  }, { message: 'The measure rule is not valid JSON.' }), source: z.string().max(200).nullable().optional(),
 }).strict();
 const activitySchema = z.object({
   code, name_en: z.string().min(1).max(200), name_ar: z.string().max(200).nullable().optional(), weight, items: z.array(itemSchema).max(200).optional(),
