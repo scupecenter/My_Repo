@@ -22,6 +22,7 @@ import { MissingArabicHint } from '@/components/MissingArabicHint';
 import { DateInput } from '@/components/DateInput';
 import { MeasureRuleEditor } from "./MeasureRuleEditor";
 import { ruleErrors } from "@/lib/measureRule";
+import { diffWeightSets } from "@/lib/weightDiff";
 
 const CODES: WeightSetCode[] = [
   "project_status",
@@ -59,6 +60,11 @@ function Preview({ id, onClose }: { id: string; onClose: () => void }) {
     run();
   }, [run]);
   const p = prev.data;
+  const draftQ = useWeightSet(id),
+    listQ = useWeightSetList();
+  const draftSet = draftQ.data?.data;
+  const active = draftSet ? listQ.data?.find((w) => w.code === draftSet.code && w.is_active) : undefined;
+  const diff = draftSet && active ? diffWeightSets(active.activities, draftSet.activities) : null;
   return (
     <FormDialog inline
       open
@@ -109,6 +115,35 @@ function Preview({ id, onClose }: { id: string; onClose: () => void }) {
                 next: p.progress_new_pct ?? "-",
               })}
             </p>
+          )}
+          {diff && (
+            <div className="space-y-1" data-testid="weights-preview-diff">
+              <h3 className="font-semibold">{t("wtSet.diffTitle")}</h3>
+              {diff.length === 0 ? (
+                <p className="text-mute" data-testid="weights-preview-diff-empty">
+                  {t("wtSet.diffNone")}
+                </p>
+              ) : (
+                <ul aria-label={t("wtSet.diffTitle")} className="space-y-1">
+                  {diff.map((d) => (
+                    <li
+                      key={`${d.level}-${d.activity}-${d.code}-${d.kind}`}
+                      data-testid={`weights-diff-${d.kind}-${d.code}`}
+                      data-kind={d.kind}
+                      className={d.level === "item" ? "ms-4" : "font-medium"}
+                    >
+                      <span className="chip">{t(`wtSet.diff_${d.kind}`)}</span>{" "}
+                      <span className="mono" dir="ltr">{d.code}</span> {d.name}
+                      {d.fields.map((f) => (
+                        <span key={f.field} className="block text-xs text-mute">
+                          {t(`wtSet.diffField_${f.field}`)}: <span dir="ltr">{f.before || "-"} → {f.after || "-"}</span>
+                        </span>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       )}

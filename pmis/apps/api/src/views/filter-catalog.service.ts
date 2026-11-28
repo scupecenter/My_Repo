@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import { ProblemException, problems } from '../common/problem';
+import { oneParam, Query } from '../common/query';
 import { DbService } from '../db/db.service';
 import { COLUMNS_SQL } from '../site-master/site-master-columns-sql';
 import { buildMenu, SITE_MASTER_MENUS, type SiteMasterColumnRow, type SiteMasterMenu } from '../site-master/site-master-sections';
@@ -40,6 +41,21 @@ import {
  * field is not an error (the data changes), it matches nothing.
  */
 const CAP = 500;
+
+/**
+ * 0.15.368: the `project_phase` quick filter of the dashboard (a comma-separated list of phase values of `sites.project_phase`, as the filter tree
+ * offers them under the field `project_phase`). Parsed and checked here so every dashboard endpoint (the engine, the ops and extras sections and
+ * Project Status) reads it the same way. It only narrows, like the filter tree; 1 to 24 values, each 1 to 60 characters, else 422.
+ */
+export function phaseParam(q: Query): string[] | undefined {
+  const raw = oneParam(q, 'project_phase');
+  if (raw === undefined) return undefined;
+  const phases = raw.split(',').map((x) => x.trim());
+  if (phases.some((x) => x.length === 0 || x.length > 60) || phases.length > 24 || new Set(phases).size !== phases.length) {
+    throw problems.validation([{ path: '/project_phase', code: 'invalid', message: 'project_phase is 1 to 24 distinct phase values, comma-separated, each 1 to 60 characters.' }]);
+  }
+  return phases;
+}
 
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const SITE_STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
@@ -945,16 +961,21 @@ export class FilterCatalogService {
   /** Like fromQuery, with the JOINs the compiled condition needs (site-master-<menu>: one derived table per Master column used); the list adds them to its FROM clause. */
   async compile(screen: FilterScreen, q: Record<string, unknown>): Promise<{ where: Prisma.Sql | null; joins: Prisma.Sql }> {
     const tree: FilterGroup | null = parseFilterParam(q.filter);
-    if (!tree || tree.items.length === 0) return { where: null, joins: Prisma.empty };
-    const cat = await this.catalog(screen);
-    const keys = treeFields(tree);
-    const hidden = await this.hidden(screen, keys);
-    const where = compileFilter(tree, cat, hidden);
-    const joins = keys.map((k) => cat.get(k)?.join).filter((j): j is Prisma.Sql => j !== undefined);
-    return {
-      where,
-      joins: joins.length ? Prisma.join(joins, ' ') : Prisma.empty,
-    };
+    // 0.15.368: on the dashboard screen the `project_phase` quick filter is ANDed with the tree, so the engine's site set and every section narrow alike
+    const phases = screen === 'dashboard' ? phaseParam(q) : undefined;
+    if ((!tree || tree.items.length === 0) && !phases) return { where: null, joins: Prisma.empty };
+    let where: Prisma.Sql | null = null;
+    let joins: Prisma.Sql = Prisma.empty;
+    if (tree && tree.items.length > 0) {
+      const cat = await this.catalog(screen);
+      const keys = treeFields(tree);
+      const hidden = await this.hidden(screen, keys);
+      where = compileFilter(tree, cat, hidden);
+      const js = keys.map((k) => cat.get(k)?.join).filter((j): j is Prisma.Sql => j !== undefined);
+      joins = js.length ? Prisma.join(js, ' ') : Prisma.empty;
+    }
+    if (phases) where = where === null ? Prisma.sql`s.project_phase = ANY(${phases}::text[])` : Prisma.sql`(${where}) AND s.project_phase = ANY(${phases}::text[])`;
+    return { where, joins };
   }
 
   /**

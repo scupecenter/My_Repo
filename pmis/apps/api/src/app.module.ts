@@ -98,6 +98,8 @@ import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controll
 import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
 import { ProgressRagController } from './dashboard/progress-rag.controller';
 import { ProgressRagService } from './dashboard/progress-rag.service';
+import { ForecastMethodController } from './dashboard/forecast-method.controller';
+import { ForecastMethodService } from './dashboard/forecast-method.service';
 import { ForecastWindowController } from './dashboard/forecast-window.controller';
 import { ForecastWindowService } from './dashboard/forecast-window.service';
 import { GoalsController } from './dashboard/goals.controller';
@@ -154,6 +156,8 @@ import { ExportLockInterceptor } from './security/export-lock';
 import { UiIdentityService } from './settings/ui-identity.service';
 import { LoginPageController } from './settings/login-page.controller';
 import { LoginPageService } from './settings/login-page.service';
+import { DataQualityController } from './data-quality/data-quality.controller';
+import { DataQualityService } from './data-quality/data-quality.service';
 import { MediaController } from './media/media.controller';
 import { MediaService } from './media/media.service';
 import { SettingsScreensController } from './settings/settings-screens.controller';
@@ -266,8 +270,10 @@ DashboardController, DashboardSettingsController, DashboardUserWidgetsController
       PartialCreditController, // 0.15.269 progress standards
       DashboardFinanceController, // 0.15.206 (own line: the restricted financial summary)
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
+      DataQualityController, // 0.15.538
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
+      ForecastMethodController, // 0.15.474 (own line)
       ForecastWindowController, // 0.15.431 (own line)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
@@ -304,8 +310,10 @@ DashboardService, DashboardSettingsService, DashboardUserWidgetsService, GoalsSe
       PartialCreditService, // 0.15.269 progress standards
       DashboardFinanceService, // 0.15.206 (own line)
       MediaService, // 0.15.292
+      DataQualityService, // 0.15.538
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)
+      ForecastMethodService, // 0.15.474 (own line)
       ForecastWindowService, // 0.15.431 (own line)
       PasskeyService, // S4
       DuplicateRowsSettingsService,
