@@ -3956,6 +3956,8 @@
     "zip_picked_many": "تنزيل {{count}} محددًا (zip)",
     "zip_picked_other": "تنزيل {{count}} محدد (zip)",
     "zip_all": "تنزيل كل المعروض (zip)",
+    "zip_acceptance": "حزمة القبول (zip)",
+    "zip_acceptance_hint": "ملفات PAC وFAC وHOTO المعتمدة لهذا الموقع، مجلد لكل نوع مستند، مع فهرس.",
     "zip_scope_needed": "اختر مرحلة أو رمز مستند أولًا، أو ابقَ على هذا الموقع.",
     "zip_running": "جارٍ تجهيز ملف zip…",
     "zip_done": "تم تنزيل {{name}}",
