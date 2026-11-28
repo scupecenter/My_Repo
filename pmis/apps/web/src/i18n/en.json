@@ -310,7 +310,12 @@
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
     "deliverables": "Deliverables",
+    "tools_equipment": "Tools & Equipment",
     "incidents": "Incidents & Security"
+  },
+  "toast": {
+    "done": "Done",
+    "close": "Close the message"
   },
   "top": {
     "search": "Search or jump to…",
@@ -2210,6 +2215,9 @@
     "execution": "Execution",
     "lesson": "Lesson",
     "follow_up": "Follow-up",
+    "equipment": "Equipment",
+    "custody": "Custody",
+    "calibration_inspection": "Calibration and inspection",
     "invoice": "Invoice",
     "payment": "Payment",
     "deliverable": "Deliverable",
@@ -2459,6 +2467,11 @@
     "order_required": "Settings require this invoice to name its Procurement order.",
     "unknown_rule": "This register has no such rule.",
     "supplier_required": "Settings require an invoice to name its supplier company.",
+    "link_invalid": "This is not a record id of the linked register.",
+    "link_not_found": "The linked record does not exist, is not approved when that is required, or you may not see it.",
+    "link_other_site": "The linked record belongs to another site.",
+    "no_delete": "A link is switched off, never removed.",
+    "unknown_field": "Choose a text field of the source register.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -3932,6 +3945,8 @@
     "zip_picked_one": "Download {{count}} selected (zip)",
     "zip_picked_other": "Download {{count}} selected (zip)",
     "zip_all": "Download all shown (zip)",
+    "zip_acceptance": "Acceptance pack (zip)",
+    "zip_acceptance_hint": "Approved PAC, FAC and HOTO files of this site, one folder per document type, with an index.",
     "zip_scope_needed": "Choose a stage or a document code first, or stay on this site.",
     "zip_running": "Preparing the zip…",
     "zip_done": "Downloaded {{name}}",
@@ -4823,6 +4838,22 @@
     "saved": "Rule saved",
     "change_title": "Change: {{rule}}"
   },
+  "links": {
+    "title": "Register links",
+    "note": "Settings for the links between registers (the D60 declaration). A link draws the picker of the record form, fills the Related records panel and, when Check on save is on, is checked on every save while the record is in entry. A link is switched off, never removed. Every change needs a reason and is audited.",
+    "from": "From register",
+    "field": "Field",
+    "to": "To register",
+    "enabled": "On",
+    "enforce": "Check on save",
+    "same_site": "Same site only",
+    "state": "Record state needed",
+    "saved": "Links saved",
+    "add": "Add a link",
+    "add_title": "Add a link between registers",
+    "choose": "Choose",
+    "toggle_title": "Change a link"
+  },
   "regstate": {
     "title": "Register state",
     "note": "Switch a whole register off (it is hidden everywhere; nothing is deleted and switching it on again restores everything) or lock it (readable, but no new record and no change, except by a System Admin). Every change needs a reason and is audited.",
@@ -5458,6 +5489,11 @@
     "suggest": "Suggested: {{green}} / {{amber}}",
     "range": "Numbers from {{min}} to {{max}}.",
     "order": "Green must not be below amber."
+  },
+  "forecastWindow": {
+    "title": "Forecast window",
+    "note": "How many of the last real weeks the progress curve forecast averages the weekly gain over (2 to 12, default 4). A longer window smooths the forecast, a shorter one follows the recent pace. The forecast is drawn from the saved snapshots when the card opens, so nothing stored is recomputed. Own save, reason and audit row.",
+    "weeks": "Weeks averaged"
   },
   "oldVersions": {
     "archived_title": "Deleted versions (archived)",
@@ -7289,6 +7325,11 @@
     "status_expired": "Expired",
     "last": "Last request: {{status}} ({{when}})",
     "result": "Result",
+    "done_title": "Reset complete",
+    "done_total": "{{rows}} rows were deleted and {{sessions}} sessions were ended.",
+    "done_files": "Files: {{moved}} of {{total}} moved to the quarantine.",
+    "done_files_pending": "{{count}} still pending.",
+    "done_close": "Close",
     "result_when": "Reset committed {{when}} (audit row {{audit}}).",
     "result_sessions_one": "{{count}} session ended.",
     "result_sessions_other": "{{count}} sessions ended.",
@@ -7741,6 +7782,8 @@
     "grid_hint": "Edit cells in the table",
     "board": "Board",
     "board_hint": "Cards by milestone or status",
+    "feed": "Feed",
+    "feed_hint": "Latest changes first, one line per record",
     "map": "Map",
     "map_hint": "Items on the map",
     "chart_hint": "The rows as bars or a ring, by a field you choose",
