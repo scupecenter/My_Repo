@@ -3465,6 +3465,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/version-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The archived (deleted) workflow versions (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions. No snapshot body: id, version, effective date, who archived it and why, counts, and when it was restored.
+         */
+        get: operations["listWorkflowVersionArchive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/version-archive/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived workflow version as it was (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions, a reason and a step-up. One transaction: the version comes back published with its version number, ids, dates, milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views. 409 `invalid_transition` (nothing changes) when the version number or an id exists again, it was already restored, or a row it points to is gone. Audited as `workflow_version_restore`.
+         */
+        post: operations["restoreWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete an old published version after archiving a full snapshot (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions, a reason, `If-Match`, a step-up and `confirm_text` = `v<version>` (422 `confirmation_mismatch`). 409 `invalid_transition` when the version is a draft, is in force, has not started, has sites, site tasks or site migrations (`reasons`). The snapshot is archived before the delete, in the same transaction.
+         */
+        post: operations["deleteWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/discard": {
         parameters: {
             query?: never;
@@ -12674,6 +12736,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/default-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's default saved view per screen (0.15.582)
+         * @description 0.15.582 (migration 0655). One default view per screen, personal. A view that was deactivated or became unreadable drops out of the list.
+         */
+        get: operations["getDefaultViews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/set-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a saved view my default for its screen (0.15.582)
+         * @description 0.15.582 (migration 0655). Personal. Replaces the caller's earlier default for the same screen. A view the caller may not read answers 404.
+         */
+        post: operations["setDefaultSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/clear-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear my default view of a screen (0.15.582)
+         * @description 0.15.582 (migration 0655). Removes the caller's default when it is this view; otherwise a no-op.
+         */
+        post: operations["clearDefaultSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/home-pins": {
         parameters: {
             query?: never;
@@ -15120,6 +15242,10 @@ export interface components {
             needs_stamp?: boolean;
             /** @description 0.15.377: the type needs a copy and no current version carries the markers yet. Informs only; nothing is blocked. */
             awaiting_signed_copy?: boolean;
+            /** @description 0.15.564: the minimum photos the document type asks for (photo_rules.min_count); null when it asks for none. */
+            photo_min_count?: number | null;
+            /** @description 0.15.564: how many photos are still missing (current, not superseded image files); 0 when the minimum is met, null without a minimum. Informs only; nothing is blocked. */
+            photos_missing?: number | null;
             /** @enum {string} */
             kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
@@ -18076,6 +18202,17 @@ export interface components {
             width: "narrow" | "medium" | "wide";
             show_tabs: boolean;
         };
+        /** @description 0.15.341. The site map on real tiles (Settings > Screens > Map). `enabled` is the switch (off by default); `tile_url` is empty (no tiles, the outline map stays) or a path on this server with {z}, {x} and {y}, such as /tiles/{z}/{x}/{y}.png: never another host, so the Content-Security-Policy is unchanged. Tiles are served by the customer server (self-hosted); no external account or key. */
+        UiMap: {
+            enabled: boolean;
+            tile_url: string;
+            min_zoom: number;
+            max_zoom: number;
+            attribution: string;
+            center_lat: number;
+            center_lon: number;
+            default_zoom: number;
+        };
         /** @description 0.15.262. The unsaved-changes guard: the master switch and one switch per area. */
         UiUnsavedGuard: {
             enabled: boolean;
@@ -18092,6 +18229,7 @@ export interface components {
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
+            map: components["schemas"]["UiMap"];
             finance_hub: components["schemas"]["UiFinanceHub"];
             panel: components["schemas"]["UiPanel"];
             unsaved_guard: components["schemas"]["UiUnsavedGuard"];
@@ -18101,6 +18239,7 @@ export interface components {
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
+            map?: components["schemas"]["UiMap"];
             finance_hub?: components["schemas"]["UiFinanceHub"];
             panel?: components["schemas"]["UiPanel"];
             unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
@@ -30215,6 +30354,126 @@ export interface operations {
                         outcome: "deleted" | "deactivated";
                         why: string[];
                         version: components["schemas"]["WorkflowVersion"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listWorkflowVersionArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            version: number;
+                            /** Format: date-time */
+                            archived_at: string;
+                            reason?: string;
+                            effective_from?: string | null;
+                            stages?: number;
+                            tasks?: number;
+                            archived_by?: components["schemas"]["UserRef"] | null;
+                            /** Format: date-time */
+                            restored_at?: string | null;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    restoreWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        restored: boolean;
+                        /** Format: uuid */
+                        archive_id: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                    /** @description The text v<version>. */
+                    confirm_text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Deleted; the snapshot is archived. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        deleted: boolean;
+                        /** Format: uuid */
+                        archive_id: string;
                     };
                 };
             };
@@ -46950,6 +47209,93 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getDefaultViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's defaults. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            screen_key: components["schemas"]["SavedViewScreenKey"];
+                            /** Format: uuid */
+                            view_id: string;
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDefaultSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        screen_key: components["schemas"]["SavedViewScreenKey"];
+                        /** @enum {boolean} */
+                        is_default: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    clearDefaultSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        screen_key?: string | null;
+                        /** @enum {boolean} */
+                        is_default: false;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     getHomePins: {
