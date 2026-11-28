@@ -17,6 +17,7 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { FieldInput, fieldLabel, issueText, showValue, SiteCodeField, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
+import { RegisterActivity } from './RegisterActivity';
 import { DrawerFrame, DrawerTabs, panelProps, useDrawerSettled, useReportDirty } from './DrawerFrame';
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
@@ -275,7 +276,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
         {record?.entity_id && <FollowButton target={{ kind: 'record', key, id: record.id }} entityId={record.entity_id} />}
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="reg-close"><X size={16} /></button></Dialog.Close>
       </header>
-      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
+      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'activity', label: t('activity.title') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
         {record && <EditingNotice kind="record" id={record.id} editing={editable} testid="reg-editing-notice" />}
@@ -443,6 +444,11 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
                 onReact={(commentId, emoji, on) => reactComment.mutate({ commentId, emoji, on })}
                 onToggleResolved={(commentId, resolved) => resolveComment.mutate({ commentId, resolved })} />
             ) : <p className="text-mute" data-testid="reg-comments-global">{t('registers.comments_global')}</p>}
+          </div>
+        )}
+        {record && (
+          <div {...panelProps('activity', tab)}>
+            <RegisterActivity registerKey={key} recordId={record.id} entityId={record.entity_id} hasThread={!!record.region_id} />
           </div>
         )}
         {record && (

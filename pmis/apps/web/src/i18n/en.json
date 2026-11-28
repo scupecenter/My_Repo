@@ -2257,6 +2257,14 @@
     "grid": "Grid"
   },
   "registers": {
+    "bulk_set": "Set a field",
+    "bulk_export": "Export selected",
+    "bulk_set_title": "Set a field on {{count}} records",
+    "bulk_set_hint": "The same rules as editing one record: locked records and fields you cannot edit are skipped and listed.",
+    "bulk_set_field": "Field",
+    "bulk_set_pick": "Choose a field",
+    "bulk_set_apply": "Apply to {{count}}",
+    "bulk_exported": "Exported {{count}} rows",
     "tab_asb_cw": "BOQ CW (civil works)",
     "tab_asb_te": "BOQ TE (equipment)",
     "tab_dis_cw": "Dismantle CW",
@@ -8701,5 +8709,6 @@
     "note": "Note",
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
-  }
+  },
+  "activity": {"title": "Activity", "filter": "Filter the activity", "kind_all": "All", "kind_comment": "Comments", "kind_step": "Workflow", "kind_change": "Field changes", "empty": "No activity yet."}
 }

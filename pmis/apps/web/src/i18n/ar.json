@@ -2257,6 +2257,14 @@
     "grid": "شبكة"
   },
   "registers": {
+    "bulk_set": "تعيين حقل",
+    "bulk_export": "تصدير المحدد",
+    "bulk_set_title": "تعيين حقل على {{count}} سجلا",
+    "bulk_set_hint": "نفس قواعد تعديل سجل واحد: السجلات المقفلة والحقول التي لا تملك تعديلها تُتخطى وتُذكر.",
+    "bulk_set_field": "الحقل",
+    "bulk_set_pick": "اختر حقلا",
+    "bulk_set_apply": "تطبيق على {{count}}",
+    "bulk_exported": "تم تصدير {{count}} صفا",
     "tab_asb_cw": "BOQ الأعمال المدنية (CW)",
     "tab_asb_te": "BOQ التركيب (TE)",
     "tab_dis_cw": "فك CW",
@@ -8769,5 +8777,6 @@
     "note": "ملاحظة",
     "title": "مراجعة الخطة، {{region}}، {{date}}",
     "done": "تم الحفظ."
-  }
+  },
+  "activity": {"title": "النشاط", "filter": "تصفية النشاط", "kind_all": "الكل", "kind_comment": "التعليقات", "kind_step": "سير العمل", "kind_change": "تغييرات الحقول", "empty": "لا يوجد نشاط بعد."}
 }
