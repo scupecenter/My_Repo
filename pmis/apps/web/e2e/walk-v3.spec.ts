@@ -12,7 +12,7 @@ test('walk: register timeline', async ({ page }) => {
   await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20000 });
 
   // EN: a register with date fields (permits carries issue/expiry dates) offers the timeline view
-  await page.goto('/registers/permits');
+  await page.goto('/registers/permits_hse');
   await page.getByTestId('register-view').click();
   await page.getByTestId('register-layout-timeline').click();
   await page.waitForURL((u) => u.searchParams.get('layout') === 'timeline', { timeout: 15000 });
