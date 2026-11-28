@@ -5535,6 +5535,12 @@
     "range": "Numbers from {{min}} to {{max}}.",
     "order": "Green must not be below amber."
   },
+  "changeLog": {
+    "title": "Change log",
+    "note": "Who changed these settings, when, why and what. Read only: it lists the audit rows the saves already write, newest first (the last 50).",
+    "empty": "No change has been saved yet.",
+    "reason": "Reason"
+  },
   "forecastMethod": {
     "title": "Forecast method",
     "note": "How the progress curve forecast takes the weekly pace from the saved weekly snapshots: the mean weekly gain of the last weeks (default), or the slope of a straight line fitted through the actual points of the same weeks, which is steadier when one week jumped. The forecast date and the dashed forecast line are drawn when the card opens, so nothing stored is recomputed or rewritten.",

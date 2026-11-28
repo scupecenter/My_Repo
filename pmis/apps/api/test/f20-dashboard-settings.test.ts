@@ -338,6 +338,33 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
     }
   });
 
+  it("settings change log (contract 0.15.433): read only, scope rule, rights, shows the audited saves", async () => {
+    const admin = await plainAdmin(app, db);
+    const g: Team = await team(app, db, "gecol", "gecol", 7);
+    expect((await g.entry.api.call("get", "/settings/change-log?scope=dashboard")).status).toBe(403);
+    const bad = await admin.api.call("get", "/settings/change-log?scope=sites");
+    expect(bad.status).toBe(422);
+    const save = async () => {
+      const cur = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
+      return admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 2, reason: "Change log test" }, { "If-Match": cur.headers.etag as string });
+    };
+    let saved = await save();
+    if (saved.status === 412) saved = await save(); // the version is the update time in seconds: a write in the same second as the read is retried once
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    try {
+      const r = await admin.api.call("get", "/settings/change-log?scope=dashboard");
+      expect(r.status).toBe(200);
+      const hit = r.body.items.find((i: { reason: string }) => i.reason === "Change log test");
+      expect(hit.setting).toBe("dashboard.snapshot_weekday");
+      expect(hit.changes.some((c: { field: string }) => c.field === "weekday")).toBe(true);
+      const goals = await admin.api.call("get", "/settings/change-log?scope=goals");
+      expect(goals.body.items.some((i: { reason: string }) => i.reason === "Change log test")).toBe(false);
+    } finally {
+      const now = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
+      await admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 4, reason: "test reset to the default" }, { "If-Match": now.headers.etag as string });
+    }
+  });
+
   it("forecast window (contract 0.15.431): reads the default 4, admin-only write, range rule, audit, stored snapshots untouched", async () => {
     const admin = await plainAdmin(app, db);
     const g: Team = await team(app, db, "gecol", "gecol", 7);

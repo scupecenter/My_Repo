@@ -96,6 +96,8 @@ import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controll
 import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
 import { ProgressRagController } from './dashboard/progress-rag.controller';
 import { ProgressRagService } from './dashboard/progress-rag.service';
+import { ChangeLogController } from './dashboard/change-log.controller';
+import { ChangeLogService } from './dashboard/change-log.service';
 import { ForecastMethodController } from './dashboard/forecast-method.controller';
 import { ForecastMethodService } from './dashboard/forecast-method.service';
 import { ForecastWindowController } from './dashboard/forecast-window.controller';
@@ -271,6 +273,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       DataQualityController, // 0.15.538
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
+      ChangeLogController, // 0.15.433 (own line)
       ForecastMethodController, // 0.15.474 (own line)
       ForecastWindowController, // 0.15.431 (own line)
       PasskeySettingController, PasskeyController, // S4
@@ -311,6 +314,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       DataQualityService, // 0.15.538
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)
+      ChangeLogService, // 0.15.433 (own line)
       ForecastMethodService, // 0.15.474 (own line)
       ForecastWindowService, // 0.15.431 (own line)
       PasskeyService, // S4

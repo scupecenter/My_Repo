@@ -18,6 +18,7 @@ import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
 import { FinanceReadersPanel } from "./FinanceReadersPanel";
 import { ProgressRag } from "./ProgressRag";
+import { SettingsChangeLog } from "./SettingsChangeLog";
 import { ForecastMethod } from "./ForecastMethod";
 import { ForecastWindow } from "./ForecastWindow";
 import { SnapshotSchedule } from "./SnapshotSchedule";
@@ -161,6 +162,7 @@ export function DashboardSettings() {
       <ForecastMethod />
       <ForecastWindow />
       <HealthBands />
+      <SettingsChangeLog scope="dashboard" />
 
       <fieldset
         className="space-y-2 rounded-md border border-line p-3"
