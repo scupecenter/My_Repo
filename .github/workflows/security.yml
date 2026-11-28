@@ -56,7 +56,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: anchore/scan-action@v6
+      - uses: anchore/scan-action@v7
         with:
           path: pmis
           fail-build: true
