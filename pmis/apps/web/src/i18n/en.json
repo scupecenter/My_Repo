@@ -4215,6 +4215,10 @@
     }
   },
   "nav_side": {
+    "mode": "Menu mode",
+    "mode_pinned": "Pinned (always open)",
+    "mode_autohide": "Auto-hide (opens on hover)",
+    "mode_hint": "Auto-hide shrinks the menu to an icon rail. It opens when you point at it, focus it, press Ctrl+B, or touch it, and closes when you leave or press Esc.",
     "palette_hidden": "Also find the screens I hid from the menu when I search (Ctrl+K)",
     "fixed_first": "Dashboard is always the first entry of the menu and cannot be hidden.",
     "title": "Sidebar",
