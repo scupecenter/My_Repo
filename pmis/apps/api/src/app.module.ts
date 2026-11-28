@@ -222,10 +222,14 @@ import { AbsencesService } from './reassignment/absences.service';
 import { DailyPlanController, DailyPlanSettingsController } from './daily-plan/daily-plan.controller';
 import { DailyPlanService } from './daily-plan/daily-plan.service';
 import { DataHubController } from './data-hub/data-hub.controller';
+import { FinanceHubController } from './finance-hub/finance-hub.controller';
 import { DataHubService } from './data-hub/data-hub.service';
+import { FinanceHubService } from './finance-hub/finance-hub.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
+import { DuplicateRowsSettingsController } from './settings/duplicate-rows-settings.controller';
+import { DuplicateRowsSettingsService } from './settings/duplicate-rows-settings.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -240,6 +244,7 @@ export function appModuleFor(config: AppConfig) {
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
       CspReportController, // SEC-3
+      DuplicateRowsSettingsController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
@@ -255,6 +260,7 @@ export function appModuleFor(config: AppConfig) {
       DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
       LibraryMenuController, // 0.15.70 (0151, W5): Library > Forms and Archive
       DataHubController, // 0.15.311 (0400): Data hub landing page
+      FinanceHubController, // 0.15.361 (0406): Finance hub landing page
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -267,6 +273,7 @@ export function appModuleFor(config: AppConfig) {
       DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
       MediaService, // 0.15.292
       PasskeyService, // S4
+      DuplicateRowsSettingsService,
       TemplateNoticeSettingsService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
@@ -284,6 +291,7 @@ export function appModuleFor(config: AppConfig) {
       DataResetService, DataResetArchiveService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
       DataHubService, // 0.15.311 (0400)
+      FinanceHubService, // 0.15.361 (0406)
       DashboardCacheService, // short cache of the /dashboard figures (30 s, scope-keyed)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: DashboardCacheInvalidator }, // before TxInterceptor: clears the dashboard cache after a configuration write has committed
