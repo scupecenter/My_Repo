@@ -54,3 +54,6 @@ V2–V10 قرارات لاحقة بـ PRs مستقلة: التقويم، الر�
 
 ## P3: Approvals control rows (four to two)
 Inside the list card: row 1 holds the tabs, the quick filters (colours, stale) and the sort; Select all moved into the list header directly above the list (`approvals-list-header`). With the page toolbar that is two control rows in place of four. Behaviour, test ids and Tab order inside each group are unchanged; Select all now comes after the filters.
+
+## P4: one place for density
+`ColumnMenu` takes `density` (default true). Screens that carry the Layout panel (Sites, Register vertical, My Work, Daily Plan, Archive, TaskGrid) pass `density={false}`: Display > Density in the panel is the only control. Screens without the panel (StandardTable users, Audit log, System log, Field changes) keep the Columns-menu density until they get the panel (item d).
