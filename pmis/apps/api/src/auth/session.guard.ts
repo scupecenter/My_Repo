@@ -7,6 +7,7 @@ import { COOKIE_NAME, SessionService, parseCookie } from './session.service';
 import { UserStateService } from './user-state.service';
 import { SecurityLogService } from '../logs/security-log.service';
 import { contextFromRequest } from '../logs/context';
+import { apiPath, guestMayCall } from './guest-routes';
 
 /** The app route the screen reports in X-PMIS-Screen (Online now, current screen). Anything else is ignored. */
 const SCREEN_RE = /^\/[A-Za-z0-9/_\-.?=&%]{0,199}$/;
@@ -52,6 +53,14 @@ export class SessionGuard implements CanActivate {
 
     const state = await this.states.get(user.id, user.email, user.status);
     req.auth = { session, user, state, ip: req.ip ?? null, live };
+
+    // Guest account (migration 0731): it stops at its end date or when an admin ends it, and it only reads (see guest-routes.ts).
+    if (state.guest) {
+      if (state.guest.ended || state.guest.expiresAt.getTime() <= Date.now()) throw problems.unauthenticated('The guest access has ended.');
+      if (!guestMayCall(req.method, apiPath(req.originalUrl))) {
+        throw new ProblemException(403, 'guest_read_only', { detail: 'A guest account can only view the pages shared with it.' });
+      }
+    }
 
     if (!incompleteOk) {
       if (session.authMethod === 'local' && state.mustChange) {

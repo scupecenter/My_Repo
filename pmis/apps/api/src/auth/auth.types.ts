@@ -36,6 +36,8 @@ export interface UserState {
   mustChange: boolean;
   /** pending_assignment, or active without an active assignment and not a System Admin. */
   pending: boolean;
+  /** Set for a guest account (migration 0731): its end date and whether an admin ended it. Null for everyone else. */
+  guest: { expiresAt: Date; ended: boolean } | null;
 }
 
 export interface AuthContext {
