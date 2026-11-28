@@ -635,7 +635,7 @@ const PARTS = ([
   ['as_built', 'As-Built', 'كما بُني', 'As-Built'], ['meetings', 'Meetings', 'الاجتماعات', 'Meetings'], ['contractors', 'Contractors', 'المقاولون', 'Contractors'],
   ['rf_design', 'RF & Design', 'التصميم الراديوي', 'RF & Design'], ['acquisition', 'Acquisition', 'الاستحواذ', 'Acquisition'], ['dismantle', 'Dismantle', 'الإزالة', 'Master'],
   ['car_dispatcher', 'Car Dispatcher', 'حجز وتوزيع السيارات', 'Car Dispatcher'], ['financial_advances', 'Financial Advances', 'السلف المالية', 'Financial Advances'], ['incidents', 'Incidents', 'الحوادث', 'Incidents'],
-  ['lessons_learned', 'Lessons Learned', 'الدروس المستفادة', 'Lessons Learned'], ['invoices', 'Invoices', 'الفواتير', 'Invoices'], ['deliverables', 'Deliverables', 'المخرجات', 'Deliverables'],
+  ['lessons_learned', 'Lessons Learned', 'الدروس المستفادة', 'Lessons Learned'], ['invoices', 'Invoices', 'الفواتير', 'Invoices'], ['deliverables', 'Deliverables', 'المخرجات', 'Deliverables'], ['tools_equipment', 'Tools & Equipment', 'الأدوات والمعدات', 'Tools & Equipment'],
 ] as const).map(([key, label_en, label_ar, master_sheet]) => ({ key, label_en, label_ar, master_sheet }));
 const COLUMNS: Record<string, string[]> = {
   sites: ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'],
