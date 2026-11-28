@@ -1,3 +1,4 @@
+import { OnAirCelebration } from '@/components/OnAirCelebration';
 import { SiteActivity } from '@/components/SiteActivity';
 import { LayoutPanel } from '@/components/LayoutPanel';
 import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
@@ -111,6 +112,7 @@ export function Site() {
 
   return (
     <div data-testid="page-site">
+      <OnAirCelebration key={siteId} code={s?.site_code ?? ''} onAir={s ? (s.pipeline ?? []).find((n) => n.code === 'on_air')?.state === 'done' : undefined} />
       <Link to={`/sites${new URLSearchParams([...(stream ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`} className="mb-2 inline-flex items-center gap-1 text-sm text-link"><ArrowLeft size={14} className="rtl:rotate-180" />{t('site.back')}</Link>
       {s && (
         <>

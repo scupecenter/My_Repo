@@ -32,6 +32,12 @@
 [data-state='open'].motion-overlay { animation: motion-fade var(--motion-base) var(--ease-out) both; }
 [data-state='open'].motion-panel { animation: motion-pop var(--motion-base) var(--ease-out) both; }
 
+/* On-Air celebration (item 20): falling pieces. Reduced motion below sets every animation to nothing, so the pieces stay out of sight and only the message shows. */
+@keyframes celebrate-fall { from { transform: translateY(-10vh) rotate(0); opacity: 1; } to { transform: translateY(105vh) rotate(540deg); opacity: 0.9; } }
+.celebrate-piece { position: absolute; top: 0; width: 8px; height: 14px; border-radius: 2px; animation: celebrate-fall 2.6s var(--ease-in-out) both; }
+@media (prefers-reduced-motion: reduce) { .celebrate-piece { display: none; } }
+html[data-motion='reduced'] .celebrate-piece { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
   .motion-lift:hover { transform: none; }
