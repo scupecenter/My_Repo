@@ -28,11 +28,11 @@ export function relDay(v: string, now: Date): number | null {
   return Math.round((d.getTime() - today.getTime()) / DAY);
 }
 
-export function FieldValue({ f, v, testid }: { f: RegisterField; v: unknown; testid?: string }) {
+export function FieldValue({ f, v, testid, colors = true }: { f: RegisterField; v: unknown; testid?: string; /** Decision V8 (0.15.573): Display > Value colours off draws the plain text (the stored colour is untouched) */ colors?: boolean }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   if (v === undefined || v === null || v === '') return <>{showValue(f, v, lang, t)}</>;
-  if (f.type === 'list' && typeof v === 'string') {
+  if (colors && f.type === 'list' && typeof v === 'string') {
     const o = f.options?.find((x) => x.value === v);
     if (o?.colour) return (
       <span className="chip text-xs" style={{ background: o.colour, color: inkOn(o.colour) }} data-testid={testid} data-colour={o.colour}>
@@ -40,7 +40,7 @@ export function FieldValue({ f, v, testid }: { f: RegisterField; v: unknown; tes
       </span>
     );
   }
-  if (f.type === 'multi_list' && Array.isArray(v)) {
+  if (colors && f.type === 'multi_list' && Array.isArray(v)) {
     const opts = v.map((x) => f.options?.find((y) => y.value === x));
     if (opts.some((o) => o?.colour)) return (
       <span className="inline-flex flex-wrap items-center gap-1" data-testid={testid}>
