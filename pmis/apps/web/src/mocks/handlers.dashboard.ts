@@ -227,6 +227,15 @@ export const dashboardHandlers = [
         ncrs: { open: 6, closed: 41, avg_close_days: 14.2 },
         first_pass_pct: 92.4,
       },
+      // 0.15.206: restricted financial summary, synthetic figures (the mock viewer is a configured reader)
+      finance: {
+        available: true,
+        advances: { total: 14, open: 9, hidden_amounts: 1 },
+        amounts: { approved: 182000, disbursed: 151500, returned: 12300, open_disbursed: 96400 },
+        open_aging: { buckets: [{ key: 'd0_7', count: 2 }, { key: 'd8_14', count: 3 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 2 }], total: 9, oldest_days: 52 },
+        invoices: { open: 6, overdue: 2, aging: { buckets: [{ key: 'd0_7', count: 1 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 1 }], total: 6, oldest_days: 41 } },
+        achievement: { assignments: 8, completed: 3, completion_pct: 37.5, disbursed_on_completed: 48200, disbursed_on_open_work: 103300 },
+      },
       // 0.15.367: phase scope, synthetic figures
       phase_scope: {
         available: true,

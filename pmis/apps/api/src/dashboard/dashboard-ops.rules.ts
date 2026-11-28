@@ -331,6 +331,118 @@ export function actionsSummary(rows: ActionDueRow[]): ActionsSummary {
   return { open, overdue: late.length, no_due_date: none, overdue_aging: bucketAges(late) };
 }
 
+// ---------------------------------------------------------------- item 9 (0.15.206): restricted financial summary
+
+export const OPEN_ADVANCE_STATES: readonly string[] = ["approved_for_disbursement", "disbursed", "settlement_in_progress"];
+
+export interface AdvanceRow {
+  state: string | null;
+  approved: number | null;
+  disbursed: number | null;
+  returned: number | null;
+  days_since_disbursed: number | null;
+  /** The assignment (procurement record) the advance belongs to: null when none; done = its actual end is set. */
+  assignment_id: string | null;
+  assignment_done: boolean;
+  amounts_hidden: boolean;
+}
+
+/** An invoice (latest approved version): its state and the days since the invoice date and past the due date (null when the date is not set). */
+export interface InvoiceRow {
+  state: string | null;
+  days_since_invoice: number | null;
+  days_past_due: number | null;
+}
+
+export interface InvoiceAges {
+  /** Invoices not yet Paid or Cancelled. */
+  open: number;
+  /** Open invoices whose due date is before today. */
+  overdue: number;
+  aging: AgeBuckets;
+}
+
+export const CLOSED_INVOICE_STATES: readonly string[] = ["Paid", "Cancelled"];
+
+/** Invoice ages: age = today minus the invoice date while the invoice is not Paid or Cancelled; overdue = due date before today. Derived only, nothing typed. */
+export function invoiceAges(rows: InvoiceRow[]): InvoiceAges {
+  const open = rows.filter((r) => r.state === null || !CLOSED_INVOICE_STATES.includes(r.state));
+  const ages = open.filter((r) => r.days_since_invoice !== null).map((r) => Math.max(0, r.days_since_invoice as number));
+  return { open: open.length, overdue: open.filter((r) => r.days_past_due !== null && r.days_past_due > 0).length, aging: bucketAges(ages) };
+}
+
+export interface FinanceSummary {
+  advances: { total: number; open: number; hidden_amounts: number };
+  amounts: { approved: number; disbursed: number; returned: number; open_disbursed: number };
+  open_aging: AgeBuckets;
+  /** 0.15.540: the invoices register, when it has records. */
+  invoices: InvoiceAges | null;
+  achievement: {
+    assignments: number;
+    completed: number;
+    completion_pct: number | null;
+    disbursed_on_completed: number;
+    disbursed_on_open_work: number;
+  };
+}
+
+const money = (n: number): number => Math.round(n * 100) / 100;
+
+/**
+ * The advances (latest approved version of each): counts, the amounts of those whose amounts are not hidden (a record
+ * with amounts_hidden counts but adds no amount), the age since disbursement of the open ones, and the disbursed
+ * amount against the completion of the assignments the advances belong to, and the ages of the open invoices.
+ */
+export function financeSummary(rows: AdvanceRow[], invoices: InvoiceRow[] = []): FinanceSummary {
+  let open = 0;
+  let hidden = 0;
+  const amounts = { approved: 0, disbursed: 0, returned: 0, open_disbursed: 0 };
+  const ages: number[] = [];
+  const assignments = new Map<string, boolean>();
+  let onDone = 0;
+  let onOpen = 0;
+  for (const r of rows) {
+    const isOpen = r.state !== null && OPEN_ADVANCE_STATES.includes(r.state);
+    if (isOpen) open += 1;
+    if (r.assignment_id !== null) assignments.set(r.assignment_id, (assignments.get(r.assignment_id) ?? false) || r.assignment_done);
+    if (r.amounts_hidden) {
+      hidden += 1;
+      continue;
+    }
+    const d = r.disbursed ?? 0;
+    amounts.approved += r.approved ?? 0;
+    amounts.disbursed += d;
+    amounts.returned += r.returned ?? 0;
+    if (isOpen) {
+      amounts.open_disbursed += d;
+      if (d > 0 && r.days_since_disbursed !== null) ages.push(Math.max(0, r.days_since_disbursed));
+    }
+    if (r.assignment_id !== null) {
+      if (r.assignment_done) onDone += d;
+      else onOpen += d;
+    }
+  }
+  const done = [...assignments.values()].filter(Boolean).length;
+  return {
+    advances: { total: rows.length, open, hidden_amounts: hidden },
+    amounts: {
+      approved: money(amounts.approved),
+      disbursed: money(amounts.disbursed),
+      returned: money(amounts.returned),
+      open_disbursed: money(amounts.open_disbursed),
+    },
+    open_aging: bucketAges(ages),
+    invoices: invoices.length > 0 ? invoiceAges(invoices) : null,
+    achievement: {
+      assignments: assignments.size,
+      completed: done,
+      completion_pct: assignments.size > 0 ? Math.round((done * 1000) / assignments.size) / 10 : null,
+      disbursed_on_completed: money(onDone),
+      disbursed_on_open_work: money(onOpen),
+    },
+  };
+}
+
 /** Phase scope (0.15.367): one registered phase with its site counts. Counts only; every figure is derived from the sites. */
 export interface PhaseScopeRow {
   phase: string | null;
