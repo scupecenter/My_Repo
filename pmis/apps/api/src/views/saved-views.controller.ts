@@ -78,6 +78,29 @@ export class SavedViewsController {
     return this.svc.pin(auth, id, false);
   }
 
+  @Get('me/view-watches')
+  viewWatches() {
+    return this.svc.viewWatches();
+  }
+
+  @Post('saved-views/:id/watch')
+  @HttpCode(200)
+  watch(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown) {
+    return this.svc.watch(auth, id, body);
+  }
+
+  @Post('saved-views/:id/unwatch')
+  @HttpCode(200)
+  unwatch(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.svc.unwatch(auth, id);
+  }
+
+  @Post('saved-views/:id/watch-report')
+  @HttpCode(200)
+  watchReport(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown) {
+    return this.svc.watchReport(auth, id, body);
+  }
+
   @Get('saved-views/:id')
   async get(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
     return this.tag(res, await this.svc.get(auth, id));

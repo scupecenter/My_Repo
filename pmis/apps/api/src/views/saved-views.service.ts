@@ -186,6 +186,32 @@ export class SavedViewsService {
     return { items: await Promise.all(pins.map(async (p) => ({ ...p, filters: (await this.scrub({ screen_key: p.screen_key, filters: p.filters } as SavedViewDto)).filters }))) };
   }
 
+  // ------------------------------------------------------------------ view watches (0.15.487, item 8)
+  /** The caller's watched views ("alert me when this view has at least N rows"). */
+  async viewWatches(): Promise<{ items: { view_id: string; name: string; screen_key: string; min_rows: number }[] }> {
+    return { items: await this.run<{ view_id: string; name: string; screen_key: string; min_rows: number }[]>(Prisma.sql`SELECT saved_view_watches() AS r`) };
+  }
+
+  /** Watch a view: the caller's own, a view the caller may not read answers 404. */
+  async watch(_auth: AuthContext, id: string, raw: unknown): Promise<{ view_id: string; min_rows: number | null }> {
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound();
+    const b = parse(z.object({ min_rows: z.number().int().min(1).max(100000) }).strict(), raw);
+    return this.run(Prisma.sql`SELECT saved_view_watch_set(${id}::uuid, ${b.min_rows}::int) AS r`);
+  }
+
+  /** Stop watching a view; a missing watch is a no-op. */
+  async unwatch(_auth: AuthContext, id: string): Promise<{ view_id: string; min_rows: number | null }> {
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound();
+    return this.run(Prisma.sql`SELECT saved_view_watch_set(${id}::uuid, NULL::int) AS r`);
+  }
+
+  /** The home page reports the count the screen's own list endpoint gave the caller; the database writes at most one notification a day. */
+  async watchReport(_auth: AuthContext, id: string, raw: unknown): Promise<{ view_id: string; notified: boolean }> {
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound();
+    const b = parse(z.object({ count: z.number().int().min(0).max(100000000) }).strict(), raw);
+    return this.run(Prisma.sql`SELECT saved_view_watch_report(${id}::uuid, ${b.count}::int) AS r`);
+  }
+
   /**
    * "Within the creator's scope" (Q117): a shared view may only carry a region filter inside the sharer's regions for the screen's module.
    * The recipients' own rights still filter the rows; this keeps a lead of one region from publishing a view of another.

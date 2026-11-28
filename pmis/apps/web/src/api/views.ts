@@ -68,6 +68,25 @@ export function useHomePinOps() {
   };
 }
 
+// ---------------------------------------------------------------------------------------------------------------- view watches (0.15.487, item 8)
+export type ViewWatch = S['ViewWatch'];
+
+const WATCH_KEY = ['view-watches'] as const;
+/** The caller's watched views ("alert me when this view has at least N rows"). */
+export const useViewWatches = () =>
+  useQuery({ queryKey: WATCH_KEY, staleTime: 60_000, queryFn: async () => (await api.get<{ items: ViewWatch[] }>('/me/view-watches')).items });
+
+export function useViewWatchOps() {
+  const qc = useQueryClient();
+  const settle = () => void qc.invalidateQueries({ queryKey: WATCH_KEY });
+  return {
+    watch: useMutation<{ view_id: string; min_rows: number }, ApiError, { id: string; min_rows: number }>({ mutationFn: (v) => api.post(`/saved-views/${v.id}/watch`, { body: { min_rows: v.min_rows } }), onSuccess: settle }),
+    unwatch: useMutation<{ view_id: string; min_rows: number | null }, ApiError, string>({ mutationFn: (id) => api.post(`/saved-views/${id}/unwatch`, { body: {} }), onSuccess: settle }),
+  };
+}
+/** The home card reports the count the screen's own list endpoint gave the caller; the database writes at most one notification a day. */
+export const reportViewWatch = (id: string, count: number) => api.post<{ view_id: string; notified: boolean }>(`/saved-views/${id}/watch-report`, { body: { count } });
+
 export type LocalView = { id: string; name: string; filter: unknown };
 /** First use of a screen: the views the browser kept locally move to the server (idempotent per local id). */
 export const importLocalViews = (screen: string, items: LocalView[]) =>

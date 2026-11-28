@@ -12985,6 +12985,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/view-watches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's watched saved views (0.15.487)
+         * @description 0.15.487 (migration 0628). The views the caller watches with a row limit, by name; a view that was deactivated or became unreadable drops out.
+         */
+        get: operations["getViewWatches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Alert me when a saved view has at least N rows (0.15.487)
+         * @description 0.15.487 (migration 0628). Personal: the watch is the caller's own. A view the caller may not read answers 404. At most 20 watches per caller (422 `validation_failed`, `/view` `too_many`). Setting it again changes the limit and allows a new notification today.
+         */
+        post: operations["watchSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/unwatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop watching a saved view (0.15.487)
+         * @description 0.15.487 (migration 0628). Removes the caller's watch; a missing watch is a no-op.
+         */
+        post: operations["unwatchSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/watch-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report the row count of a watched view (0.15.487)
+         * @description 0.15.487 (migration 0628). The home pin card sends the count the screen's own list endpoint gave the caller. When the caller watches the view, the count is at or above the limit and no notification was written today, one in-app notification (kind `alert_rule`) goes to the caller. Nothing else changes; a missing watch answers `notified: false`.
+         */
+        post: operations["reportSavedViewWatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/saved-views/{view_id}/pin": {
         parameters: {
             query?: never;
@@ -23372,6 +23452,14 @@ export interface components {
                 [key: string]: unknown;
             };
             position: number;
+        };
+        /** @description 0.15.487: one watched saved view (migration 0628). */
+        ViewWatch: {
+            /** Format: uuid */
+            view_id: string;
+            name: string;
+            screen_key: components["schemas"]["SavedViewScreenKey"];
+            min_rows: number;
         };
         SavedView: {
             /** Format: uuid */
@@ -48002,6 +48090,126 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getViewWatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's watches. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ViewWatch"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    watchSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    min_rows: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Watching. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        min_rows: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unwatchSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not watching. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        /** @description Always null. */
+                        min_rows: number | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    reportSavedViewWatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    count: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Whether a notification was written. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        notified: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     pinSavedViewHome: {

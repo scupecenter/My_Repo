@@ -33,6 +33,39 @@ describe('Pinned views card (0.15.245, item 16)', () => {
     expect(screen.getByTestId(`pin-link-${id}`).getAttribute('href')).toBe(`/registers/issues?view_id=${id}`);
   }, 30_000);
 
+  it('sets and removes a personal watch on a pinned view and reports the count once the card has it (0.15.487)', async () => {
+    await signIn('pm');
+    const id = await makeView('Watched issues');
+    await api.post(`/saved-views/${id}/pin`, { body: {} });
+    renderApp(<Routes><Route path="/dashboard" element={<Dashboard />} /></Routes>, { route: '/dashboard' });
+    await userEvent.click(await screen.findByTestId(`pin-watch-${id}`));
+    const input = await screen.findByTestId(`pin-watch-min-${id}`);
+    await userEvent.clear(input);
+    await userEvent.type(input, '0');
+    expect(screen.getByTestId(`pin-watch-save-${id}`)).toBeDisabled();
+    await userEvent.clear(input);
+    await userEvent.type(input, '1');
+    await userEvent.click(screen.getByTestId(`pin-watch-save-${id}`));
+    await waitFor(async () => expect((await api.get<{ items: { view_id: string; min_rows: number }[] }>('/me/view-watches')).items.find((w) => w.view_id === id)?.min_rows).toBe(1));
+    await userEvent.click(await screen.findByTestId(`pin-watch-${id}`));
+    await userEvent.click(await screen.findByTestId(`pin-watch-remove-${id}`));
+    await waitFor(async () => expect((await api.get<{ items: unknown[] }>('/me/view-watches')).items).toHaveLength(0));
+  }, 30_000);
+
+  it('the watch report notifies at the limit once a day at most, only for a watched view (0.15.487)', async () => {
+    await signIn('pm');
+    const id = await makeView('Daily alert');
+    await api.post(`/saved-views/${id}/pin`, { body: {} });
+    const rep = (count: number) => api.post<{ notified: boolean }>(`/saved-views/${id}/watch-report`, { body: { count } });
+    expect((await rep(50)).notified).toBe(false);
+    await api.post(`/saved-views/${id}/watch`, { body: { min_rows: 5 } });
+    expect((await rep(4)).notified).toBe(false);
+    expect((await rep(5)).notified).toBe(true);
+    expect((await rep(9)).notified).toBe(false);
+    await api.post(`/saved-views/${id}/watch`, { body: { min_rows: 3 } });
+    expect((await rep(9)).notified).toBe(true);
+  }, 30_000);
+
   it('pins and unpins from the view toolbar of the register screen', async () => {
     await signIn('pm');
     const id = await makeView('My pins test');

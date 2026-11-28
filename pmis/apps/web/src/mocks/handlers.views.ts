@@ -11,13 +11,13 @@ import { uid } from './ids';
 
 const B = API_BASE;
 type Row = SavedView & { owner_key: string; audience_in: SavedViewAudience };
-type State = { views: Row[]; pins: string[]; defaults: Record<string, string>; drafts: Map<string, Draft & { owner: string; payload: Record<string, unknown> }> };
+type State = { views: Row[]; pins: string[]; watches: Map<string, { min: number; last: string | null }>; defaults: Record<string, string>; drafts: Map<string, Draft & { owner: string; payload: Record<string, unknown> }> };
 const states = new WeakMap<Db, State>();
 const omit = <T extends object>(o: T, ...keys: string[]) => Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k)));
 const S = (): State => {
   const d = db();
   let s = states.get(d);
-  if (!s) { s = { views: [], pins: [], defaults: {}, drafts: new Map() }; states.set(d, s); }
+  if (!s) { s = { views: [], pins: [], watches: new Map(), defaults: {}, drafts: new Map() }; states.set(d, s); }
   return s;
 };
 const me = () => viewer()!;
@@ -312,6 +312,42 @@ export const viewsHandlers = [
     const id = String(params.id);
     S().pins = S().pins.filter((x) => x !== id);
     return HttpResponse.json({ view_id: id, pinned_home: false });
+  }),
+  // 0.15.487 (item 8): a personal watch on a view. At most 20, the read check of the view applies; one notification a day at most.
+  http.get(`${B}/me/view-watches`, () => {
+    const g = guard(); if (g) return g;
+    const items = [...S().watches.entries()].map(([id, w]) => ({ w, v: S().views.find((x) => x.id === id) })).filter((x): x is { w: { min: number; last: string | null }; v: Row } => !!x.v && x.v.is_active && canRead(x.v))
+      .map((x) => ({ view_id: x.v.id, name: x.v.name, screen_key: x.v.screen_key, min_rows: x.w.min }));
+    return HttpResponse.json({ items });
+  }),
+  http.post(`${B}/saved-views/:id/watch`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const id = String(params.id);
+    const b = (await request.json().catch(() => ({}))) as { min_rows?: unknown };
+    const min = b.min_rows;
+    if (typeof min !== 'number' || !Number.isInteger(min) || min < 1 || min > 100000) return invalid('/min_rows');
+    const v = S().views.find((x) => x.id === id);
+    if (!v || !v.is_active || !canRead(v)) return problem(404, 'not_found', 'Not found');
+    if (!S().watches.has(id) && S().watches.size >= 20) return invalid('/view', 'too_many');
+    S().watches.set(id, { min, last: null });
+    return HttpResponse.json({ view_id: id, min_rows: min });
+  }),
+  http.post(`${B}/saved-views/:id/unwatch`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const id = String(params.id);
+    S().watches.delete(id);
+    return HttpResponse.json({ view_id: id, min_rows: null });
+  }),
+  http.post(`${B}/saved-views/:id/watch-report`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const id = String(params.id);
+    const b = (await request.json().catch(() => ({}))) as { count?: unknown };
+    if (typeof b.count !== 'number' || !Number.isInteger(b.count) || b.count < 0) return invalid('/count');
+    const w = S().watches.get(id);
+    const day = new Date().toISOString().slice(0, 10);
+    if (!w || b.count < w.min || w.last === day) return HttpResponse.json({ view_id: id, notified: false });
+    w.last = day;
+    return HttpResponse.json({ view_id: id, notified: true });
   }),
   http.get(`${B}/me/drafts`, () => {
     const g = guard(); if (g) return g;
