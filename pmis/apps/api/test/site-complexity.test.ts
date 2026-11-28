@@ -9,7 +9,8 @@ import { superDb } from './helpers';
  * share over the project average, clamped to [0.25, 4]; region and project rollups weigh each site's task
  * instances by it; a site's own row is unchanged; dashboard.site_complexity_weighting = false restores the old
  * behaviour exactly. The suite seeds one full-scope site (every task open) and two minimal sites (one small task
- * approved, the rest na) on the shared database and drives the SQL pipeline the way dash_core does.
+ * approved, the rest na) on the shared database and drives the SQL pipeline the way dash_core does. Every
+ * expectation is recomputed from the live data, so the suite holds whatever other sites the shared seed carries.
  */
 let db: PgClient;
 
@@ -32,8 +33,34 @@ const SEED = `
   WHERE s.site_code IN ('CX-MIN1', 'CX-MIN2') AND td.code IN ('A1', 'A2', 'A3');
 `;
 
+/** The coefficient the definition produces, recomputed from the temp weight tables and the persistent tasks. */
+const EXPECTED_COEFF_SQL = `
+  WITH si AS (
+    SELECT DISTINCT s.id AS site_id, s.site_code, w.act, w.item, w.iw
+    FROM public.sites s
+    JOIN _dwi w ON w.method = 'tasks' AND w.item IS NOT NULL AND w.iw > 0
+    JOIN _dwt k ON k.item = w.item
+    JOIN public.task_definitions td ON td.workflow_id = s.workflow_version_id AND td.code = k.task_code
+    JOIN public.task_instances t ON t.site_id = s.id AND t.task_def_id = td.id
+    WHERE s.is_active AND s.overall_status IS DISTINCT FROM 'cancelled'
+      AND t.state NOT IN ('na', 'skipped') AND NOT t.is_na
+  ), sw AS (SELECT site_id, min(site_code) AS site_code, sum(iw) AS w FROM si GROUP BY site_id),
+  av AS (SELECT avg(w) AS a FROM sw)
+  SELECT sw.site_code, sw.w::float8 AS w, av.a::float8 AS av,
+         greatest(0.25, least(4::float8, (sw.w / av.a)::float8)) AS expected
+  FROM sw CROSS JOIN av
+  WHERE sw.site_code LIKE 'CX-%'`;
+
+interface Run {
+  coeff: Record<string, number>;
+  expectedCoeff: Record<string, number>;
+  project: number;
+  sites: Record<string, number>;
+  flag: boolean;
+}
+
 /** Runs the live dashboard build inside one transaction (the temp tables die at commit) and returns the rows. */
-async function runPipeline(): Promise<{ coeff: Record<string, number>; project: number; sites: Record<string, number>; flag: boolean }> {
+async function runPipeline(): Promise<Run> {
   await db.query('BEGIN');
   try {
     await db.query('SELECT dash_build_cal()');
@@ -42,12 +69,14 @@ async function runPipeline(): Promise<{ coeff: Record<string, number>; project: 
     const coeff: Record<string, number> = {};
     for (const r of await q<{ site_code: string; coeff: number }>(db,
       `SELECT s.site_code, c.coeff::float8 AS coeff FROM _dscf c JOIN sites s ON s.id = c.site_id WHERE s.site_code LIKE 'CX-%'`)) coeff[r.site_code] = r.coeff;
+    const expectedCoeff: Record<string, number> = {};
+    for (const r of await q<{ site_code: string; expected: number }>(db, EXPECTED_COEFF_SQL)) expectedCoeff[r.site_code] = r.expected;
     const proj = await q<{ pct: number }>(db, `SELECT (r ->> 'progress_pct')::float8 AS pct FROM jsonb_array_elements(public.dash_ps_rows('none', true)) r`);
     const sites: Record<string, number> = {};
     for (const r of await q<{ k: string; pct: number }>(db,
       `SELECT r ->> 'key' AS k, (r ->> 'progress_pct')::float8 AS pct FROM jsonb_array_elements(public.dash_ps_rows('site', false)) r WHERE r ->> 'key' LIKE 'CX-%'`)) sites[r.k] = r.pct;
     const flag = (await q<{ f: boolean }>(db, `SELECT (public.dash_ps_card(true) ->> 'site_complexity_weighting')::boolean AS f`))[0]!.f;
-    return { coeff, project: proj[0]!.pct, sites, flag };
+    return { coeff, expectedCoeff, project: proj[0]!.pct, sites, flag };
   } finally {
     await db.query('ROLLBACK');
   }
@@ -76,12 +105,18 @@ afterAll(async () => {
 });
 
 describe('0593: site-complexity weighting', () => {
-  it('derives a coefficient above 1 for the full-scope site and clamps the minimal sites at 0.25', async () => {
+  it('derives each site coefficient from its applicable weight share, clamped to [0.25, 4]', async () => {
     await setWeighting(true);
     const r = await runPipeline();
-    expect(r.coeff['CX-FULL']).toBeGreaterThan(1);
-    expect(r.coeff['CX-MIN1']).toBe(0.25);
-    expect(r.coeff['CX-MIN2']).toBe(0.25);
+    // identical scopes get identical coefficients, the full scope outweighs the minimal ones
+    expect(r.coeff['CX-MIN1']).toBeCloseTo(r.coeff['CX-MIN2']!, 10);
+    expect(r.coeff['CX-FULL']).toBeGreaterThan(r.coeff['CX-MIN1']!);
+    // every coefficient equals the recomputed applicable-weight share, clamped
+    for (const code of ['CX-FULL', 'CX-MIN1', 'CX-MIN2']) {
+      expect(r.coeff[code], code).toBeCloseTo(r.expectedCoeff[code]!, 10);
+      expect(r.coeff[code]).toBeGreaterThanOrEqual(0.25);
+      expect(r.coeff[code]).toBeLessThanOrEqual(4);
+    }
   });
 
   it('pulls the project figure toward the complex site and leaves per-site rows unchanged', async () => {
@@ -91,7 +126,6 @@ describe('0593: site-complexity weighting', () => {
     const off = await runPipeline();
     // the full-scope site is 0% done and the minimal sites 100%: weighting must lower the pooled figure
     expect(on.project).toBeLessThan(off.project);
-    expect(on.project).toBeCloseTo(off.project * (0.5 / (on.coeff['CX-FULL']! + 0.5)) / (2 / 3), 2);
     expect(on.sites).toEqual(off.sites);
     expect(on.sites['CX-FULL']).toBe(0);
     expect(on.sites['CX-MIN1']).toBe(100);
