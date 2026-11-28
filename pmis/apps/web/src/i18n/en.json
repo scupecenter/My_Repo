@@ -7748,6 +7748,8 @@
     "grid_hint": "Edit cells in the table",
     "board": "Board",
     "board_hint": "Cards by milestone or status",
+    "feed": "Feed",
+    "feed_hint": "Latest changes first, one line per record",
     "map": "Map",
     "map_hint": "Items on the map",
     "chart_hint": "The rows as bars or a ring, by a field you choose",
