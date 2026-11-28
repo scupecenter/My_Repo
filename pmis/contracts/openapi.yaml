@@ -137,6 +137,7 @@ info:
     - 0.15.371 (2026-11-27): weight item measure rule checked (migration 0552, mirror `db/sql/551_weight_rule_check.sql`; Settings review gap 1). Additive, no new path. `PUT /settings/weight-sets/{id}`: a measure rule that looks like JSON but does not parse is 422 `validation_failed` (it was 500). Publish and preview: `weight_set_errors` adds `measure_rule_invalid` (path `/activities/{n}/items`) for a rule that is not an object, has an unknown method (none, tasks, register), names no task, names a task code that is in no workflow, has a plan outside MS1 to MS10, or has a `central` that is not true/false.
     - 0.15.456 (2026-11-28): five extra register links declared in `register_links` (L10; migration 0596, mirror `db/sql/595_extra_register_links.sql`). Additive, no endpoint change. Optional fields `lessons_learned.incident_id`, `lessons_learned.issue_id` and `incidents.permit_id` (same site, declared with the check off); the generic picker, the Related records panel on both sides, the orphan report and the filters pick them up through the declaration.
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
+    - 0.15.592 (2026-11-28): the Issues card gains a Pareto view and a weekly trend (migration 0715, mirror `db/sql/714_issues_trend.sql`). Additive. `GET /dashboard/issues-trend` (`getIssuesTrend`, `dashboard.view`, the caller's issues regions): per ISO week opened, closed and open at week end, 4 to 52 weeks (default 12). The Pareto line (cumulative share with an 80 % marker) is computed in the web app from the existing `by_category` and `by_reason` lists. No table, setting or grant.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.431 (2026-11-28): the number of weeks the dashboard forecast averages is editable (Settings review gap 4, approved by the owner 2026-11-27; migration 0572, mirror `db/sql/571_forecast_window.sql`). Additive. `GET /settings/dashboard/forecast-window` (`getForecastWindow`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-window` (`setForecastWindow`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_window_update` with before and after): the new setting `dashboard.forecast_window_weeks` (a whole number 2 to 12, default 4, the value that was fixed in the web code). The progress curve card reads it when it is drawn: the forecast date uses the mean weekly gain over that many last weeks of the saved snapshots. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
@@ -18807,6 +18808,27 @@ paths:
                       items: {$ref: '#/components/schemas/SystemLogEntry'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/issues-trend:
+    get:
+      tags: [dashboard]
+      operationId: getIssuesTrend
+      summary: Issues opened against closed per week (0.15.592)
+      description: |
+        0.15.592. One row per ISO week (Monday to Sunday), oldest first; the last row is the current week up to today (Africa/Tripoli date). `opened` counts current issue records with a
+        `raised_date` in the week, `closed` those with a `resolution_date` in the week, `open_end` the issues open at the end of the week. Only issues of not cancelled sites inside the caller's
+        issues regions. Needs `dashboard.view` (403 `module_forbidden`). `available` is false (and `items` empty) when the caller has no issues region. 422 when `weeks` is outside 4 to 52.
+      x-db-path: issues_weekly_trend
+      parameters:
+      - {name: weeks, in: query, schema: {type: integer, minimum: 4, maximum: 52, default: 12}}
+      responses:
+        '200':
+          description: The weeks.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssuesTrend'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /dashboard/ops:
     get:
       tags: [dashboard]
@@ -28368,6 +28390,24 @@ components:
           version: { type: integer, minimum: 0 }
           updated_at: { type: [string, 'null'], format: date-time }
           updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    IssuesTrend:
+      type: object
+      required: [available, weeks, items]
+      properties:
+        available: { type: boolean }
+        weeks: { type: integer }
+        as_of: { type: [string, 'null'], format: date }
+        items:
+          type: array
+          items:
+            type: object
+            required: [week_start, week_end, opened, closed, open_end]
+            properties:
+              week_start: { type: string, format: date }
+              week_end: { type: string, format: date, description: 'The Sunday, or today for the current week.' }
+              opened: { type: integer, minimum: 0 }
+              closed: { type: integer, minimum: 0 }
+              open_end: { type: integer, minimum: 0 }
     SnapshotScheduleInput:
       type: object
       required: [weekday]

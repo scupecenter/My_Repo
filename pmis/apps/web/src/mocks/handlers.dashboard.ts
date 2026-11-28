@@ -155,6 +155,24 @@ export const dashboardHandlers = [
       },
     });
   }),
+  // 0.15.592: weekly issues opened against closed, a fixed demo series ending in the current ISO week
+  http.get(`${B}/dashboard/issues-trend`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const weeks = Number(new URL(request.url).searchParams.get('weeks') ?? 12);
+    if (!Number.isInteger(weeks) || weeks < 4 || weeks > 52) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/weeks', code: 'too_small' }] });
+    const today = new Date(`${tripoliToday()}T00:00:00Z`);
+    const monday = new Date(today.getTime() - ((today.getUTCDay() + 6) % 7) * 86_400_000);
+    let open = 14;
+    const items = Array.from({ length: weeks }, (_, i) => {
+      const ws = new Date(monday.getTime() - (weeks - 1 - i) * 7 * 86_400_000);
+      const we = new Date(Math.min(ws.getTime() + 6 * 86_400_000, today.getTime()));
+      const opened = 2 + (i % 4), closed = 1 + ((i * 3) % 4);
+      open = Math.max(0, open + opened - closed);
+      return { week_start: ws.toISOString().slice(0, 10), week_end: we.toISOString().slice(0, 10), opened, closed, open_end: open };
+    });
+    return HttpResponse.json({ available: true, weeks, as_of: tripoliToday(), items });
+  }),
   // 0.15.96: the follow-up sections (procurement and materials), synthetic figures
   http.get(`${B}/dashboard/ops`, () => {
     const g = guard(); if (g) return g;

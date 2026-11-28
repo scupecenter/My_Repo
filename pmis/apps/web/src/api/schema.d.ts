@@ -12114,6 +12114,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/issues-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issues opened against closed per week (0.15.592)
+         * @description 0.15.592. One row per ISO week (Monday to Sunday), oldest first; the last row is the current week up to today (Africa/Tripoli date). `opened` counts current issue records with a
+         *     `raised_date` in the week, `closed` those with a `resolution_date` in the week, `open_end` the issues open at the end of the week. Only issues of not cancelled sites inside the caller's
+         *     issues regions. Needs `dashboard.view` (403 `module_forbidden`). `available` is false (and `items` empty) when the caller has no issues region. 422 when `weeks` is outside 4 to 52.
+         */
+        get: operations["getIssuesTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/ops": {
         parameters: {
             query?: never;
@@ -21092,6 +21114,24 @@ export interface components {
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        IssuesTrend: {
+            available: boolean;
+            weeks: number;
+            /** Format: date */
+            as_of?: string | null;
+            items: {
+                /** Format: date */
+                week_start: string;
+                /**
+                 * Format: date
+                 * @description The Sunday, or today for the current week.
+                 */
+                week_end: string;
+                opened: number;
+                closed: number;
+                open_end: number;
+            }[];
         };
         SnapshotScheduleInput: {
             /** @description The weekday of the weekly snapshot: 0 = Sunday ... 6 = Saturday. */
@@ -46597,6 +46637,31 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getIssuesTrend: {
+        parameters: {
+            query?: {
+                weeks?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The weeks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuesTrend"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getDashboardOps: {

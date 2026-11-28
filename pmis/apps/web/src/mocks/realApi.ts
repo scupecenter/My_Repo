@@ -659,6 +659,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/pm-schedules/:id/generate'],
   ['get', '/dashboard/extras'],
   // Contract 0.15.106 (apps/api: dashboard-ops): the operations sections after F13, first the procurement and materials card.
+  ['get', '/dashboard/issues-trend'],
   ['get', '/dashboard/ops'],
   ['put', '/dashboard/pipeline-variant'],
   ['post', '/project-status/manual-items/:item_code/plan'],
