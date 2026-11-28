@@ -312,6 +312,10 @@
     "deliverables": "Deliverables",
     "incidents": "Incidents & Security"
   },
+  "toast": {
+    "done": "Done",
+    "close": "Close the message"
+  },
   "top": {
     "search": "Search or jump to…",
     "language": "Switch language",
@@ -7317,6 +7321,11 @@
     "status_expired": "Expired",
     "last": "Last request: {{status}} ({{when}})",
     "result": "Result",
+    "done_title": "Reset complete",
+    "done_total": "{{rows}} rows were deleted and {{sessions}} sessions were ended.",
+    "done_files": "Files: {{moved}} of {{total}} moved to the quarantine.",
+    "done_files_pending": "{{count}} still pending.",
+    "done_close": "Close",
     "result_when": "Reset committed {{when}} (audit row {{audit}}).",
     "result_sessions_one": "{{count}} session ended.",
     "result_sessions_other": "{{count}} sessions ended.",
