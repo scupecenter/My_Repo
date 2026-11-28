@@ -80,7 +80,7 @@ export class DataQualityService {
   private async run(check: Check, cfg: DataQualitySettingsDto, scope: (a: string) => Prisma.Sql, lim: number): Promise<DataQualityCheckResult> {
     const fin = (rows: (Row & { total: bigint | number })[]): DataQualityCheckResult => ({
       check, count: rows.length ? Number(rows[0]!.total) : 0, truncated: rows.length ? Number(rows[0]!.total) > rows.length : false,
-      rows: rows.map(({ total, ...r }) => r),
+      rows: rows.map((r) => { const { total: _t, ...rest } = r; void _t; return rest; }),
     });
     if (check === 'site_required_empty') {
       const fields = SITE_FIELDS.filter((f) => cfg.required_site_fields.includes(f));
