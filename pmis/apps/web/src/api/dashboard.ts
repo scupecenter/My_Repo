@@ -170,3 +170,14 @@ export function useDecideDelayPeriod(taskId: string) {
     },
   });
 }
+
+// ---------------------------------------------------------------- 0.15.592: weekly trend of issues opened against closed
+export type IssuesTrend = S['IssuesTrend'];
+/** Read only; the caller's issues regions apply on the server. */
+export const useIssuesTrend = (weeks = 12, enabled = true) =>
+  useQuery({
+    queryKey: ['dashboard-issues-trend', weeks],
+    staleTime: 60_000,
+    enabled,
+    queryFn: () => api.get<IssuesTrend>('/dashboard/issues-trend', { query: { weeks } }),
+  });

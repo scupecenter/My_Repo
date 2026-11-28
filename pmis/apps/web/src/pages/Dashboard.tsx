@@ -12,6 +12,7 @@ import {
   useDashboard,
   useDashboardExtras,
   useDashboardOps,
+  useIssuesTrend,
   useProjectStatusSnapshots,
   type Dashboard as Dash,
   type DashboardExtras,
@@ -43,6 +44,7 @@ import {
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
 import { OpsPhaseCard } from "./dashboardPhase";
+import { pareto, paretoOption, PARETO_MARKER, trendOption } from "./dashboardPareto";
 import { PinnedViewsCard } from "./dashboardPins";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
@@ -548,7 +550,7 @@ export function Dashboard() {
   const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const ar = i18n.language === "ar";
-  const [issuesBy, setIssuesBy] = useState<"owner" | "category" | "reason">("owner");
+  const [issuesBy, setIssuesBy] = useState<"owner" | "category" | "reason" | "trend">("owner");
   const toast = useToast();
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
@@ -584,6 +586,7 @@ export function Dashboard() {
   const d = dash.data;
   const extras = useDashboardExtras(q, !!d);
   const ops = useDashboardOps(q, !!d);
+  const issuesTrend = useIssuesTrend(12, !!d && issuesBy === "trend");
   const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -814,108 +817,27 @@ export function Dashboard() {
     [d, t, ar],
   );
 
-  const catBars = useMemo(
-    () => (p: Palette, rtl: boolean) => {
-      const rows = d?.issues?.by_category.slice(0, 8) ?? [];
-      const label = (r: (typeof rows)[number]) =>
-        (ar && r.label_ar ? r.label_ar : r.label_en) ??
-        t("dash.issues.no_category");
-      return {
-        textStyle: { fontFamily: FONT },
-        tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-        grid: { left: 16, right: 24, top: 8, bottom: 8, containLabel: true },
-        xAxis: {
-          type: "value",
-          inverse: rtl,
-          minInterval: 1,
-          axisLabel: { color: p.mute },
-          splitLine: { lineStyle: { color: p.line } },
-        },
-        yAxis: {
-          type: "category",
-          inverse: true,
-          position: rtl ? "right" : "left",
-          data: rows.map(label),
-          axisLabel: {
-            color: p.ink,
-            width: ar ? 160 : 100,
-            overflow: "truncate",
-            ellipsis: "…",
-            align: rtl ? "left" : "right",
-            margin: 10,
-          },
-        },
-        series: [
-          {
-            type: "bar",
-            itemStyle: { color: p.open },
-            data: rows.map((r) => r.count),
-            label: {
-              show: true,
-              position: rtl ? "left" : "right",
-              color: p.ink,
-              formatter: (pt: { dataIndex: number }) =>
-                `${rows[pt.dataIndex]?.count ?? 0} · ${
-                  rows[pt.dataIndex]?.sites ?? 0
-                }`,
-            },
-          },
-        ],
-      };
-    },
-    [d, t, ar],
+  // 0.15.592: Pareto view of the category and reason bars: biggest first, cumulative share line with the 80 % marker (computed over all rows, not only the 8 shown)
+  const catPareto = useMemo(() => pareto(d?.issues?.by_category ?? []), [d]);
+  const reasonPareto = useMemo(() => pareto(d?.issues?.by_reason ?? []), [d]);
+  const paretoTexts = useMemo(
+    () => ({ cum: t("dash.issues.pareto_cum"), count: t("dash.issues.pareto_count"), marker: t("dash.issues.pareto_marker", { n: PARETO_MARKER }) }),
+    [t],
   );
-
+  const catBars = useMemo(
+    () => (p: Palette, rtl: boolean) =>
+      paretoOption(p, rtl, FONT, catPareto, (r) => (ar && r.label_ar ? r.label_ar : r.label_en) ?? t("dash.issues.no_category"), paretoTexts, ar),
+    [catPareto, paretoTexts, t, ar],
+  );
   const reasonBars = useMemo(
-    () => (p: Palette, rtl: boolean) => {
-      const rows = d?.issues?.by_reason.slice(0, 8) ?? [];
-      const label = (r: (typeof rows)[number]) =>
-        (ar && r.label_ar ? r.label_ar : r.label_en) ??
-        t("dash.issues.no_reason");
-      return {
-        textStyle: { fontFamily: FONT },
-        tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-        grid: { left: 16, right: 24, top: 8, bottom: 8, containLabel: true },
-        xAxis: {
-          type: "value",
-          inverse: rtl,
-          minInterval: 1,
-          axisLabel: { color: p.mute },
-          splitLine: { lineStyle: { color: p.line } },
-        },
-        yAxis: {
-          type: "category",
-          inverse: true,
-          position: rtl ? "right" : "left",
-          data: rows.map(label),
-          axisLabel: {
-            color: p.ink,
-            width: ar ? 160 : 100,
-            overflow: "truncate",
-            ellipsis: "…",
-            align: rtl ? "left" : "right",
-            margin: 10,
-          },
-        },
-        series: [
-          {
-            type: "bar",
-            itemStyle: { color: p.open },
-            data: rows.map((r) => r.count),
-            label: {
-              show: true,
-              position: rtl ? "left" : "right",
-              color: p.ink,
-              formatter: (pt: { dataIndex: number }) =>
-                `${rows[pt.dataIndex]?.count ?? 0} · ${
-                  rows[pt.dataIndex]?.sites ?? 0
-                }`,
-            },
-          },
-        ],
-      };
-    },
-    [d, t, ar],
+    () => (p: Palette, rtl: boolean) =>
+      paretoOption(p, rtl, FONT, reasonPareto, (r) => (ar && r.label_ar ? r.label_ar : r.label_en) ?? t("dash.issues.no_reason"), paretoTexts, ar),
+    [reasonPareto, paretoTexts, t, ar],
+  );
+  const trendBars = useMemo(
+    () => (p: Palette, rtl: boolean) =>
+      trendOption(p, rtl, FONT, issuesTrend.data?.items ?? [], { opened: t("dash.issues.trend_opened"), closed: t("dash.issues.trend_closed"), open: t("dash.issues.trend_open") }),
+    [issuesTrend.data, t],
   );
 
   const delayBars = useMemo(
@@ -2412,7 +2334,7 @@ export function Dashboard() {
                             aria-label={t("dash.issues.switch")}
                             data-testid="dash-issues-switch"
                           >
-                            {(["owner", "category", "reason"] as const).map((k) => (
+                            {(["owner", "category", "reason", "trend"] as const).map((k) => (
                               <button
                                 key={k}
                                 type="button"
@@ -2479,6 +2401,9 @@ export function Dashboard() {
                                 })}
                                 testid="dash-issues-cat-chart"
                               />
+                              <p className="mt-1 text-xs text-mute" title={t("dash.issues.pareto_hint", { n: PARETO_MARKER })} data-testid="dash-issues-pareto-category">
+                                {t("dash.issues.pareto_vital", { k: catPareto.vital, total: d.issues.by_category.length, n: PARETO_MARKER })}
+                              </p>
                               <MoreLine total={d.issues.by_category.length} testid="dash-issues-more-category" />
                             </div>
                           )}
@@ -2514,7 +2439,30 @@ export function Dashboard() {
                                 })}
                                 testid="dash-issues-reason-chart"
                               />
+                              <p className="mt-1 text-xs text-mute" title={t("dash.issues.pareto_hint", { n: PARETO_MARKER })} data-testid="dash-issues-pareto-reason">
+                                {t("dash.issues.pareto_vital", { k: reasonPareto.vital, total: d.issues.by_reason.length, n: PARETO_MARKER })}
+                              </p>
                               <MoreLine total={d.issues.by_reason.length} testid="dash-issues-more-reason" />
+                            </div>
+                          )}
+                          {issuesBy === "trend" && (
+                            <div data-testid="dash-issues-trend">
+                              <h3 className="mb-1 text-sm font-semibold">{t("dash.issues.by_trend")}</h3>
+                              <p className="mb-1 text-xs text-mute">{t("dash.issues.trend_hint")}</p>
+                              {!issuesTrend.data ? (
+                                <p className="text-mute" role="status">{t("common.loading")}</p>
+                              ) : issuesTrend.data.items.length === 0 ? (
+                                <p className="text-mute" data-testid="dash-issues-trend-empty">{t("dash.issues.trend_empty")}</p>
+                              ) : (
+                                <EChart
+                                  build={trendBars}
+                                  height={220}
+                                  label={t("dash.issues.trend_chart", {
+                                    list: issuesTrend.data.items.map((w) => `${w.week_start}: ${w.opened} / ${w.closed}`).join("; "),
+                                  })}
+                                  testid="dash-issues-trend-chart"
+                                />
+                              )}
                             </div>
                           )}
                           <ul
