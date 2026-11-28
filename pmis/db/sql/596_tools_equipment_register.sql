@@ -74,6 +74,10 @@ FROM register_definitions r WHERE r.register_key = 'tools_equipment'
 ON CONFLICT (template_id) DO NOTHING;
 SELECT tpl_sync_all();
 
+INSERT INTO nav_item_catalogue (key, default_group, ord, added_in)
+VALUES ('tools_equipment', 'registers', 36, '0597')
+ON CONFLICT (key) DO NOTHING;
+
 -- The data reset: patched in place and idempotently, anchored on the Invoices row (0185).
 DO $$
 DECLARE def text;
