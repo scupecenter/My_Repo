@@ -3,7 +3,7 @@ import { Camera, Download, Eye, FilePlus2, FileUp, History, Pencil, Plus, Refres
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
-import { useLibraryForms } from '@/api/library';
+import { downloadGenerated, generatedHtml, printHtml, useArchiveRows, useLibraryForms } from '@/api/library';
 import { GenerateDialog } from '@/pages/library/Forms';
 import { downloadDocument, openDocument, suggestSlots, taskTarget, useAddSlot, useSlotUpload, useWithdrawFile, type DocumentSlot, type SlotSuggestion, type SlotTarget } from '@/api/documents';
 import type { TaskDetail } from '@/api/types';
@@ -61,6 +61,27 @@ function GenerateButton({ slot, generate }: { slot: DocumentSlot; generate: Gene
       <button type="button" className="btn mt-2 text-sm" data-testid={`slot-generate-${slot.id}`} onClick={() => setOpen(true)}><FilePlus2 size={14} />{t('docs.generate')}</button>
       {open && <GenerateDialog form={form} initialSite={{ id: generate.siteId, site_code: generate.siteCode, name: null }} onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+/**
+ * The generated copy of this document, shown inside the slot as its own entry: "Generated copy (unsigned)". It is not a file of the slot (the slot
+ * status, the signed and stamped upload and the L2 approval are untouched); open, print and download read the Library copy (audited).
+ */
+function GeneratedCopy({ slot, generate }: { slot: DocumentSlot; generate: GenerateContext }) {
+  const { t } = useTranslation();
+  const rows = useArchiveRows({ doc_code: slot.doc_code, site_id: generate.siteId });
+  const row = (rows.data?.pages[0]?.items ?? []).find((r) => r.slot_id === slot.id && !!r.generated_id);
+  if (!row?.generated_id) return null;
+  const id = row.generated_id;
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-2 rounded-md bg-card2 p-2 text-xs" data-testid={`slot-generated-${slot.id}`}>
+      <span className="chip bg-waitBg text-waitInk">{t('docs.generated_copy')}</span>
+      {row.doc_number && <span className="mono">{row.doc_number}</span>}
+      <button type="button" className="btn px-1 py-0.5 text-xs" data-testid={`slot-generated-open-${slot.id}`} onClick={() => void generatedHtml(id, 'view').then((h) => { const w = window.open('', '_blank'); if (w) { w.document.title = row.doc_number ?? ''; const f = w.document.createElement('iframe'); f.setAttribute('sandbox', ''); f.style.cssText = 'border:0;width:100%;height:100vh'; f.srcdoc = h; w.document.body.style.margin = '0'; w.document.body.append(f); } }).catch(() => undefined)}><Eye size={12} className="me-1 inline" />{t('docs.open')}</button>
+      <button type="button" className="btn px-1 py-0.5 text-xs" data-testid={`slot-generated-print-${slot.id}`} onClick={() => void generatedHtml(id, 'print').then(printHtml).catch(() => undefined)}>{t('lib.print')}</button>
+      <button type="button" className="btn px-1 py-0.5 text-xs" data-testid={`slot-generated-dl-${slot.id}`} onClick={() => void downloadGenerated(id).catch(() => undefined)}><Download size={12} className="me-1 inline" />{t('lib.download')}</button>
+    </p>
   );
 }
 
@@ -132,6 +153,7 @@ function SlotCard({ slot, canUpload, onFile, onReplace, onWithdraw, onDeclare, o
       {slot.status === 'rejected' && slot.reject_reason && <p className="mt-1 text-sm text-lateInk" data-testid={`slot-reject-${slot.id}`}>{slot.reject_reason}</p>}
       {slot.blank_form_file_id && <button type="button" className="mt-1 text-xs text-link hover:underline" data-testid={`slot-blank-${slot.id}`} onClick={() => void downloadDocument(slot.blank_form_file_id as string)}>{t('docs.blank_form')}</button>}
       <ul className="mt-1 space-y-1 text-sm text-mute">{current.map((f) => fileLine(f, false))}</ul>
+      {generate && !slot.candidate_label && <GeneratedCopy slot={slot} generate={generate} />}
       {generate && !slot.candidate_label && <GenerateButton slot={slot} generate={generate} />}
       {older.length > 0 && (
         <div className="mt-1">

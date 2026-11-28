@@ -3860,6 +3860,7 @@
     "open": "Open",
     "open_hint": "Open the file in a new tab (PDF and images; other types download)",
     "replace": "Replace",
+    "generated_copy": "Generated copy (unsigned)",
     "replace_hint": "Upload a new version of this file (the old one stays in the history)",
     "generate": "Generate from template",
     "signed": "Signed",
