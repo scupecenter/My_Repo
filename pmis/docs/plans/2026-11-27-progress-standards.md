@@ -26,7 +26,7 @@ Status: in progress. One PR, one branch `feat/progress-standards`, contract labe
 
 ## Out of scope
 
-- Site-complexity weighting factor: under owner review, not built.
+- Site-complexity weighting factor: approved by the owner 2026-11-28 (derived/automatic only) and built on branch `feat/site-complexity-weighting` (migration 0593), so no longer out of scope of the engine.
 - Settings gap 1 from the review: the UI profiles agent builds it in its own Settings PR.
 - Old-version sites: frozen on workflow v1 everywhere above.
 
@@ -46,4 +46,4 @@ Status: in progress. One PR, one branch `feat/progress-standards`, contract labe
 - **تقسيم B11 (مسودة سير العمل v2):** B11 لبنود التهيئة (4.1) فقط؛ B12 «الأعمال الكهربائية الداخلية» لـ4.3 وB16 «الألياف الضوئية للموقع» لـ4.5 بعد B9 مثل B11، يغذيان MS3 وبنفس اتفاقية مستوى الخدمة (4–8 أيام عمل من CW MOS Actual (AZ)). الأربعة B9/B11/B12/B16 تنطبق على كل المواقع. موقع عليه B11 معتمدة تُعتمد له B12 وB16 بنفس التاريخ مع قيد تدقيق؛ وB11 الجارية تتركهما مفتوحتين. مواقع الإصدار 1 مجمدة.
 - **تاريخ المعلم والبوابة (الإصدار 2 فأحدث):** تاريخ المعلم = تاريخ آخر مهمة مرتبطة به، يُحسب تلقائيًا ولا يُكتب يدويًا، وجاهزية الموقع للتركيب (Site RFI/MS4) مثل بقية المعالم: مهامها المرتبطة الأعمال المدنية (MS3) والقبول الابتدائي للأعمال المدنية (B13) وGECOL (C2) ووصلة الألياف (C4) عندما يتطلبها الموقع، وأحدثها يحسم. البوابة تأخذ تاريخ المعلم فقط؛ الشروط (التصاريح، المهام، حقول التاريخ بإزاحة) والإيقافات في Change Control تتحكم في الفتح/الحجب ولا تحرّك التاريخ أبدًا. مواقع الإصدار 1 تبقى على سلوك اليوم حرفيًا ولا يُعاد كتابة أي تاريخ تاريخي. المعالم بلا وزن ولا مدة (عناوين فقط).
 - **يبقى يدويًا:** NMS الثلاثة وPilot وHLD (لا مهمة سير عمل ولا سجل قائم يربطها)، والتدريب يدوي بقرار.
-- **خارج النطاق:** معامل وزن تعقيد الموقع (قيد مراجعة المالك)؛ فجوة الإعدادات الأولى يبنيها وكيل واجهات الإعدادات في PR خاص به.
+- معامل وزن تعقيد الموقع: وافق عليه المالك بتاريخ 2026-11-28 (مشتق/تلقائي فقط) وبُني على فرع `feat/site-complexity-weighting` (الترحيل 0593). فجوة الإعدادات الأولى يبنيها وكيل واجهات الإعدادات في PR خاص به.
