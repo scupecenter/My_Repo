@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.471 (2026-11-28): the address of a site can be proposed through Change Control (A1b; migration 0611, mirror `db/sql/610_site_address_change.sql`; no new path, no new table). Additive. `SiteIdentityProposal` (`POST /sites/{site_id}/change-proposals`) and the `identity` object of `SiteAdminEditRequest` (`POST /sites/{site_id}/admin-edits`) gain the optional `address` (at most 500 characters, as at site creation; null or empty clears it). One Change Control draft per field as for the other identity items: the field item is `site.address`, the result item has `field` `address`, and a hand-made Change Control record may name `site.address`. Field codes on `/identity/address`: `too_long`, `invalid`, `unchanged`. The same right proposes or approves it as for the names (no permission change); on approval the site changes and the change is audited (`site_change_applied` with the old and the new address). `SiteDetail.address` is unchanged.
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
@@ -4199,7 +4200,7 @@ paths:
         Old Value is refused at submit (`old_value_changed`). Field codes: `unknown_field`, `no_approval_needed` (edit it with PATCH), `field_read_only`, `invalid`,
         `required`, `unchanged`; `/reason` `required`.
 
-        **The identity of the site (0.14.1, Q473).** `identity` proposes the English name (`name`), the Arabic name (`name_ar`, null clears it), the coordinates (`latitude`
+        **The identity of the site (0.14.1, Q473).** `identity` proposes the English name (`name`), the Arabic name (`name_ar`, null clears it), the address (`address`, 0.15.471, at most 500 characters, null clears it), the coordinates (`latitude`
         and `longitude` together, six decimals; a pair is replaced, never cleared), the region (`region_id`) and the cluster (`cluster_code`, null clears it). One Change Control
         draft (Data Correction, scope Field) per item, entered by the caller as L1 like the drafts above; the site keeps its values until L2 approves, and nothing is
         proposed when one field is refused. A region change carries the cluster in the same draft (the cluster named in `cluster_code`, else the site's cluster when it is
@@ -22883,6 +22884,7 @@ components:
           properties:
             name: { type: string }
             name_ar: { type: [string, 'null'] }
+            address: { type: [string, 'null'], maxLength: 500, description: '0.15.471 (A1b). The address of the site; null or empty clears it.' }
             latitude: { type: [number, 'null'] }
             longitude: { type: [number, 'null'], description: 'With latitude; both null clears the coordinates.' }
             region_id: { type: integer }
@@ -29277,6 +29279,7 @@ components:
       properties:
         name: { type: string, maxLength: 200, description: 'The English site name (the column `name`).' }
         name_ar: { type: [string, 'null'], maxLength: 200, description: 'The Arabic site name; null or empty clears it.' }
+        address: { type: [string, 'null'], maxLength: 500, description: '0.15.471 (A1b). The address of the site (the column `address`); null or empty clears it.' }
         latitude: { type: number, minimum: -90, maximum: 90, description: 'With `longitude`: the pair is replaced as a whole (six decimals).' }
         longitude: { type: number, minimum: -180, maximum: 180 }
         region_id: { type: integer, minimum: 1, maximum: 7, description: 'System Admin only. The site moves to this region on approval; its tasks and records follow.' }

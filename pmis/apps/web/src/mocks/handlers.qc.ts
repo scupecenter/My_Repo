@@ -210,7 +210,7 @@ export const qcHandlers = [
     if (b.identity) {
       const idn = b.identity, site = detail(siteIndex(id)), m = siteMeta(siteIndex(id));
       const bad = (path: string, code: string) => errs.push({ path: `/identity/${path}`, code });
-      for (const k of Object.keys(idn)) if (!['name', 'name_ar', 'latitude', 'longitude', 'region_id', 'cluster_code', 'site_code'].includes(k)) bad(k, 'unknown_field');
+      for (const k of Object.keys(idn)) if (!['name', 'name_ar', 'address', 'latitude', 'longitude', 'region_id', 'cluster_code', 'site_code'].includes(k)) bad(k, 'unknown_field');
       if ('site_code' in idn) bad('site_code', 'immutable');                                 // the Site ID never changes
       if ('name' in idn) {
         const v = String(idn.name ?? '').trim();
@@ -221,6 +221,14 @@ export const qcHandlers = [
         const v = idn.name_ar === null ? '' : String(idn.name_ar).trim(), was = site.name_ar ?? '';
         if (v.length > 200) bad('name_ar', 'too_long'); else if (v === was) bad('name_ar', 'unchanged');
         else drafts.push({ field: 'name_ar', old_value: was || '(none)', new_value: v || '(none)' });
+      }
+      if ('address' in idn) {
+        if (typeof idn.address !== 'string' && idn.address !== null) bad('address', 'invalid');
+        else {
+          const v = idn.address === null ? '' : String(idn.address).trim(), was = site.address ?? '';
+          if (v.length > 500) bad('address', 'too_long'); else if (v === was) bad('address', 'unchanged');
+          else drafts.push({ field: 'address', old_value: was || '(none)', new_value: v || '(none)' });
+        }
       }
       if ('latitude' in idn || 'longitude' in idn) {
         const lat = idn.latitude, lon = idn.longitude;

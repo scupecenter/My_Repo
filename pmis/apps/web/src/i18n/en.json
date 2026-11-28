@@ -4427,6 +4427,7 @@
     "note_admin": "The site keeps its values until L2 approves. Region and cluster are for a System Admin: they change who can see the site, so a System Admin approves them too.",
     "name": "English name",
     "name_ar": "Arabic name",
+    "address": "Address",
     "latitude": "Latitude",
     "longitude": "Longitude",
     "region": "Region",
