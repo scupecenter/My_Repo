@@ -46,7 +46,15 @@ register, the documents, the imports, the Daily Plan and the KPI snapshots with 
 | `roles` | Roles, groups and delegations | none (optional) | user_role_assignments with their regions, modules and profiles; delegations with their grants and regions; groups but the System Admins group, with their members. |
 | `staff` | Staff registry and absences | none (optional) | staff_registry, absences. |
 
-The Contractors register (companies, teams, contracts) and the vehicles of the Car Dispatcher are master data: kept by every scope (no part), as before.
+The Contractors register (companies, teams, contracts), the vehicles of the Car Dispatcher and the Warehouse item catalogue are master data. Since 0710 each has its own part, OFF by default and never part of "everything" (`data_reset_project_parts()` does not list them); every other scope keeps them, as before:
+
+| Part | Deleted | Takes along (closure) |
+|---|---|---|
+| `master_warehouse_items` | warehouse_items, warehouse_item_need_rules, warehouse_region_vendors, warehouse_reorder_limits, wh_rma. The as-built item list stays; its `warehouse_item_id` is set to NULL first. | `warehouse` (movements and stock) and `sites`, with every part that depends on them |
+| `master_vehicles` | register records of type `vehicle` of the Car Dispatcher, with their steps, slots, comments and drafts | `car_dispatcher` (bookings), and with it `sites` and `procurement` |
+| `master_contractors` | external_parties, external_party_contracts, external_teams, external_team_specializations, contractor_alerts_sent, and the register records of the Contractors register | `sites` and every project part (project rows point at companies with RESTRICT keys) |
+
+Never deleted by any part: settings, definitions, templates, roles and permission grants, groups, the audit log and the security log. The screen lists the closure (what the choice takes along) with row counts before the typed confirmation.
 A register key without a part (a register added by a later migration) stops the reset like an unclassified table (`data_reset_register_part`).
 
 **Shared tables.** The MIXED tables are split row by row: each row has the parts of what it belongs to (`parts_expr` of the plan, computed before any
@@ -409,9 +417,11 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | doc_sequences | KEEP | Numbering sequences. |
 | doc_sequence_counters | KEEP | Counters: kept so a number is never issued twice ("Numbers are never reused"). |
 | doc_number_issues | KEEP | Every number issued, also of deleted forms: kept so a number is never reused. |
-| warehouse_items | KEEP | Warehouse item master. |
-| warehouse_item_need_rules | KEEP | Design-based need rules. |
-| warehouse_region_vendors | KEEP | Setting tblRegionVendor. |
+| warehouse_items | DELETE (`master_warehouse_items` only) | Warehouse item master. Kept by every other scope. |
+| warehouse_item_need_rules | DELETE (`master_warehouse_items` only) | Design-based need rules. |
+| warehouse_region_vendors | DELETE (`master_warehouse_items` only) | Setting tblRegionVendor. |
+| warehouse_reorder_limits | DELETE (`master_warehouse_items` only) | Reorder level per item. |
+| wh_rma | DELETE (`master_warehouse_items` only) | Supplier returns (their key to an item is RESTRICT). Before 0710: LOG. |
 | as_built_items | KEEP | As-Built item list. |
 | as_built_type_sources | KEEP | As-Built item groups. |
 | contractor_rules | KEEP | Contractors register settings. |
@@ -427,11 +437,11 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 
 | Table | Decision | Reason |
 |---|---|---|
-| external_parties | KEEP | The company list (written by the approval of Contractors records). |
-| external_party_contracts | KEEP | Company contracts (see Open). |
-| external_teams | KEEP | Company and internal teams. |
-| external_team_specializations | KEEP | Team specializations. |
-| contractor_alerts_sent | KEEP | Dedup of contractor alerts (certificate expiry, order mismatch); harmless, see Open. |
+| external_parties | DELETE (`master_contractors` only) | The company list (written by the approval of Contractors records). |
+| external_party_contracts | DELETE (`master_contractors` only) | Company contracts. |
+| external_teams | DELETE (`master_contractors` only) | Company and internal teams. |
+| external_team_specializations | DELETE (`master_contractors` only) | Team specializations. |
+| contractor_alerts_sent | DELETE (`master_contractors` only) | Dedup of contractor alerts. |
 | task_sla_choices | KEEP | The explicit no-SLA choice per task code (configuration, 0170). |
 | issue_task_map | KEEP | The task to issue category and reason map (configuration, 0171). |
 | messages | KEEP | Messages between users (append-only). |
@@ -578,18 +588,16 @@ After a reset of the sites part, the owner's Master cannot be applied as it was 
   setting read by `admin_data_reset_request` is the place. A run without a backup cannot be undone from a backup; the quarantined files stay.
 - **Backup rows.** A server needs the updated `db-backup.sh` (migration 0146 era) and one successful backup after it before a Settings run is
   possible. The operator script keeps its own pre-reset `pg_dump`.
-- **External party contracts** (`external_party_contracts`, contract records of the Contractors register) are kept as master data of the
-  companies. If the owner sees contracts as project data, they move to DELETE.
+- **External party contracts** (`external_party_contracts`) are deleted with the part `master_contractors` (0710) and kept by every other scope.
 - **status_transitions, status_updates, mail_outbox** stay (append-only by design). `status_transitions` then holds history of deleted tasks
   and records (no foreign key; joins drop them). `mail_outbox` may hold queued mails about deleted tasks that are still sent after the reset.
   `status_updates` holds weekly status texts of the old project.
-- **contractor_alerts_sent** stays: its order-mismatch rows name deleted orders (harmless, new orders get new ids).
+- **contractor_alerts_sent** stays in every scope but `master_contractors` (0710): its order-mismatch rows name deleted orders (harmless, new orders get new ids).
 - **Quarantine retention.** Project documents are kept for the life of the project plus 10 years (non-functional requirements). The quarantine
   directory and the two backups should be kept (in the encrypted backup store) until the owner decides; the script never deletes them.
 - **Backup encryption.** `pre-reset-*.dump` and the tar are written root-only (0600) but not encrypted; copy them to the encrypted backup store.
 - **Absences and the staff registry** stay in "everything"; since 0152 the optional `staff` part empties both (owner decision 2026-11-24).
-- **Contractors.** The Contractors register (companies, teams, contracts) is master data and has no part: no scope deletes it. If the owner wants it
-  selectable, its part must also decide the companies (`external_parties`) its approval wrote.
+- **Contractors.** Since 0710 the part `master_contractors` deletes the companies, teams, contracts and the Contractors register records; it takes every project part along.
 - **mail_outbox** stays a log in every scope, also with the `notifications` part (queued mails of deleted notifications may still be sent).
 - **Invitations** (`user_invitations`) stay with the `roles` part: an open invitation may name a group or role assignment that the part removed; it
   should be revoked and sent again after such a reset (not automated).

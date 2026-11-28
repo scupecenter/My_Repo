@@ -148,9 +148,12 @@ describe('the state of the screen', () => {
   it('carries the catalogue of parts with their labels, dependencies and rows; everything is every project part, no identity part', async () => {
     const res = await admin1.api.call('get', '/settings/data-reset');
     const parts = new Map<string, any>(res.body.plan.parts.map((p: { code: string }) => [p.code, p]));
-    expect(parts.get('sites')).toMatchObject({ kind: 'project', depends_on: [], selected: true, label_ar: expect.any(String) });
+    expect(parts.get('sites')).toMatchObject({ kind: 'project', depends_on: ['master_contractors'], selected: true, label_ar: expect.any(String) });
     expect(parts.get('sites').dependents).toEqual(expect.arrayContaining(['issues', 'documents', 'imports', 'procurement']));
-    expect(parts.get('car_dispatcher')).toMatchObject({ depends_on: ['sites', 'procurement'] });
+    expect(parts.get('car_dispatcher')).toMatchObject({ depends_on: ['sites', 'procurement', 'master_vehicles'] });
+    expect(parts.get('warehouse').depends_on).toContain('master_warehouse_items');
+    for (const code of ['master_warehouse_items', 'master_vehicles', 'master_contractors']) expect(parts.get(code)).toMatchObject({ selected: false, depends_on: [], label_ar: expect.any(String) });
+    expect(res.body.everything).not.toEqual(expect.arrayContaining(['master_contractors']));
     expect(parts.get('procurement').rows).toBeGreaterThan(0);
     expect(parts.get('procurement').tables).toMatchObject({ procurement_records: 1 });
     for (const code of ['users', 'roles', 'staff']) expect(parts.get(code)).toMatchObject({ kind: 'identity', selected: false });
@@ -258,6 +261,25 @@ describe('the scope of a request (0.15.71)', () => {
     expect((await admin1.api.call('get', '/settings/data-reset/plan?parts=nonsense')).status).toBe(422);
     expect((await admin1.api.call('get', '/settings/data-reset/plan?parts=sites;drop')).status).toBe(422);
     expect((await plain.api.call('get', '/settings/data-reset/plan?parts=users')).status).toBe(403);
+  });
+
+  it('master data parts (migration 0710): off by default, kept by every other scope, deleted only when chosen, with the closure shown', async () => {
+    const base = await admin1.api.call('get', '/settings/data-reset/plan?parts=issues');
+    const kept = new Map<string, { delete: number }>(base.body.tables.map((t: { table: string }) => [t.table, t]));
+    for (const tbl of ['warehouse_items', 'external_parties', 'external_teams', 'wh_rma', 'warehouse_reorder_limits']) expect(kept.get(tbl)).toMatchObject({ action: 'delete', delete: 0 });
+    expect(base.body.scope.parts.some((c: string) => c.startsWith('master_'))).toBe(false);
+    const wh = await admin1.api.call('get', '/settings/data-reset/plan?parts=master_warehouse_items');
+    expect(wh.status).toBe(200);
+    expect(wh.body.scope.parts).toEqual(expect.arrayContaining(['master_warehouse_items', 'warehouse', 'sites']));
+    expect(wh.body.scope.everything).toBe(false);
+    const veh = await admin1.api.call('get', '/settings/data-reset/plan?parts=master_vehicles');
+    expect(veh.body.scope.parts).toEqual(expect.arrayContaining(['master_vehicles', 'car_dispatcher', 'sites', 'procurement']));
+    const con = await admin1.api.call('get', '/settings/data-reset/plan?parts=master_contractors');
+    expect(con.body.scope.parts).toEqual(expect.arrayContaining(['master_contractors', 'sites', 'procurement']));
+    const ct = new Map<string, { delete: number; keep: number }>(con.body.tables.map((t: { table: string }) => [t.table, t]));
+    expect(ct.get('external_parties')?.keep).toBe(0);
+    expect(ct.get('warehouse_items')?.delete).toBe(0);
+    expect(con.body.tables.find((t: { table: string }) => t.table === 'users')).toMatchObject({ delete: 0 });
   });
 
   it('refuses an empty list and an unknown part', async () => {
