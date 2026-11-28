@@ -8465,7 +8465,7 @@
     "check_dates_out_of_order_help": "Tasks whose planned or actual start is after the planned or actual date.",
     "check_site_without_contractor_help": "Active sites where no task has an external party (contractor or team).",
     "check_orphan_ids_help": "Id columns that point to a record that no longer exists (System Admin or settings viewer only).",
-    "check_missing_photos_help": "Photo document slots with photo rules that still have no current file.",
+    "check_missing_photos_help": "Slots whose type asks for a minimum number of photos (set in Settings > Documents) and have fewer.",
     "field_name_ar": "Arabic name",
     "field_latitude": "Latitude",
     "field_longitude": "Longitude",

@@ -114,13 +114,18 @@ export class DataQualityService {
       return fin(rows);
     }
     if (check === 'missing_photos') {
+      // The D6 rule (0.15.564): the photo_rules.min_count of the type against the current, not superseded, not withdrawn image files of the slot.
       const rows = await this.db.tx.$queryRaw<(Row & { total: bigint })[]>(Prisma.sql`
-        SELECT s.id::text AS site_id, s.site_code, d.code AS doc_code, d.name_en AS doc_name, sl.id::text AS slot_id, s.region_id, count(*) OVER () AS total
-        FROM document_slots sl JOIN document_types d ON d.id = sl.doc_type_id JOIN sites s ON s.id = sl.site_id
-        WHERE s.is_active AND d.is_active AND d.kind = 'photo' AND d.photo_rules IS NOT NULL AND sl.status = 'missing'
-          AND NOT EXISTS (SELECT 1 FROM document_files f WHERE f.slot_id = sl.id AND f.is_current AND f.withdrawn_at IS NULL) ${scope('sl')}
-        ORDER BY s.site_code COLLATE "C", d.code COLLATE "C", sl.id LIMIT ${lim}`);
-      return fin(rows);
+        SELECT * FROM (
+          SELECT s.id::text AS site_id, s.site_code, d.code AS doc_code, d.name_en AS doc_name, sl.id::text AS slot_id, s.region_id,
+            (d.photo_rules ->> 'min_count')::int AS min_count,
+            (SELECT count(*)::int FROM document_files f WHERE f.slot_id = sl.id AND f.is_current AND f.superseded_by IS NULL AND f.withdrawn_at IS NULL
+               AND lower(coalesce(f.mime_type, '')) LIKE 'image/%') AS photos
+          FROM document_slots sl JOIN document_types d ON d.id = sl.doc_type_id JOIN sites s ON s.id = sl.site_id
+          WHERE s.is_active AND d.is_active AND jsonb_typeof(d.photo_rules::jsonb) = 'object' AND (d.photo_rules ->> 'min_count') ~ '^[1-9][0-9]{0,5}$' ${scope('sl')}) x
+        WHERE x.photos < x.min_count`).then((all) => all as unknown as Row[]);
+      const total = rows.length;
+      return fin(rows.slice(0, lim).map((r) => ({ ...r, total })) as (Row & { total: number })[]);
     }
     // orphan_ids: constraint names and counts, for a settings viewer only
     await this.access.requireAdmin('settings', 'view');
