@@ -28,6 +28,10 @@ describe('Dashboard ops: procurement and materials card (0.15.96, item 1)', () =
     expect(screen.getByTestId('dash-ops-sites-short')).toHaveTextContent('3');
     expect(screen.getByTestId('dash-ops-short-TR101-PWR-001')).toHaveTextContent('Rectifier module');
     expect(screen.getByTestId('dash-ops-short-TR101-PWR-001')).toHaveTextContent('A&T Global');
+    // A10: the line suggests a draft purchase request: a link to the new Procurement form with the site and the remark (nothing is created by the link)
+    const draft = screen.getByTestId('dash-ops-draft-TR101-PWR-001');
+    expect(draft.getAttribute('href')).toContain('/registers/procurement?record=new&from=shortage&site=');
+    expect(decodeURIComponent(draft.getAttribute('href') ?? '').replace(/\+/g, ' ')).toContain('Shortage of PWR-001 Rectifier module: missing');
     expect(screen.getByTestId('dash-ops-contractor-00000000-0000-4000-8000-000000000201')).toHaveTextContent('6 missing');
     expect(screen.getByTestId('dash-ops-contractor-none')).toHaveTextContent('Unattributed');
   }, 30_000);

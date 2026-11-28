@@ -17,7 +17,7 @@ import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
 import { API_BASE } from '@/api/client';
-import { sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { PALETTE_HIDDEN_KEY, sanitizeUiNav, withoutHidden, type UiNav } from '@/lib/sidebarPrefs';
 import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
@@ -58,7 +58,9 @@ function ShellFrame() {
   const [compactOwn, setCompact] = useState<boolean | null>(null);
   const [autoOwn, setAuto] = useState<boolean | null>(null);
   const compact = compactOwn ?? loadPref<boolean | null>(ICONS_KEY, null) ?? (menuStyle === 'rail');
-  const auto = autoOwn ?? loadPref<boolean | null>(AUTO_KEY, null) ?? (menuStyle === 'autohide');
+  // 0527: the personal choice in the profile (sidebar.mode) comes first, then this browser's pin, then the appearance profile's menu style
+  const profileMode = sanitizeUiNav(me.data?.user.ui_prefs?.sidebar ?? {}).mode;
+  const auto = autoOwn ?? (profileMode ? profileMode === 'autohide' : null) ?? loadPref<boolean | null>(AUTO_KEY, null) ?? (menuStyle === 'autohide');
   const [hover, setHover] = useState(false);
   const [width, setWidth] = useState<number>(() => { const w = Number(loadPref(WIDTH_KEY, SIDEBAR_DEFAULT)); return Number.isFinite(w) ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)) : SIDEBAR_DEFAULT; });
   // The drawer is tied to the page it was opened on, so it closes by itself on navigation.
@@ -132,7 +134,9 @@ function ShellFrame() {
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
   const sideItems = visibleNavItems(me.data);
-  const paletteItems = permittedNavItems(me.data);
+  // the search box follows the personal menu: screens the person hid are left out unless they turned on "also search hidden screens" (Profile, My sidebar)
+  const paletteAll = loadPref<boolean>(PALETTE_HIDDEN_KEY, false) === true;
+  const paletteItems = paletteAll ? permittedNavItems(me.data) : withoutHidden(permittedNavItems(me.data), side);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
@@ -142,7 +146,25 @@ function ShellFrame() {
   };
 
   const resize = (w: number) => { setWidth(w); storePref(WIDTH_KEY, w); };
-  const togglePin = () => { storePref(AUTO_KEY, !auto); setAuto(!auto); setHover(false); };
+  const togglePin = () => {
+    storePref(AUTO_KEY, !auto); setAuto(!auto); setHover(false);
+    const v = me.data?.user.version;
+    if (v !== undefined) updateProfile.mutate({ version: Number(v), patch: { ui_prefs: { sidebar: { ...side, mode: auto ? 'pinned' : 'autohide' } } } });
+  };
+  // auto-hide: Ctrl+B opens or closes the rail (not while typing in a field); a touch on the rail opens it, a touch elsewhere closes it (no hover on touch screens)
+  useEffect(() => {
+    if (!auto) return;
+    const key = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); setHover((h) => !h); }
+      else if (e.key === 'Escape') setHover(false);
+    };
+    const touch = (e: PointerEvent) => { if (e.pointerType === 'touch' && !asideRef.current?.contains(e.target as Node | null)) setHover(false); };
+    window.addEventListener('keydown', key);
+    window.addEventListener('pointerdown', touch);
+    return () => { window.removeEventListener('keydown', key); window.removeEventListener('pointerdown', touch); };
+  }, [auto]);
   /** the rail shows icons only; it opens over the page (no push) while the pointer or the keyboard is in it */
   const open = !auto || hover;
   const rail = compact || !open;
@@ -191,7 +213,7 @@ function ShellFrame() {
     <div className="flex min-h-screen">
       {auto && <div className="hidden shrink-0 md:block" style={{ width: 56 }} aria-hidden />}
       <aside ref={asideRef} data-testid="sidebar" data-auto={auto ? 'true' : 'false'} aria-label={t('nav.sidebar_label')} style={{ width: rail ? 56 : width }}
-        onMouseEnter={auto ? () => setHover(true) : undefined} onMouseLeave={auto ? () => setHover(false) : undefined}
+        onPointerDown={auto ? (e) => { if (e.pointerType === 'touch') setHover(true); } : undefined} onMouseEnter={auto ? () => setHover(true) : undefined} onMouseLeave={auto ? () => setHover(false) : undefined}
         onFocus={auto ? () => setHover(true) : undefined} onBlur={auto ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); } : undefined}
         className={`side-scope ${auto ? 'fixed start-0 z-40' : 'sticky'} top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex`}>
         {brand}
@@ -230,14 +252,14 @@ function ShellFrame() {
           <button className="btn min-w-60 justify-start font-normal text-mute" data-testid="topbar-search" onClick={() => setPalette(true)}>
             <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>
           </button>
-          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
-          <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
+          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.centre')}</button>
+          <button className="btn" data-testid="topbar-lang" aria-label={`${t('top.language')}: ${lang === 'en' ? 'ع' : 'EN'}`} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <QuickCreate me={me.data} allowed={allowed} />
           <NotificationBell count={pending} />
           <Popover.Root>
             <Popover.Trigger asChild>
-              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" aria-label={t('top.account')}>
+              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" title={t('top.account')}>
                 <Avatar name={me.data?.user.display_name} size="sm" />
                 {me.data?.user.display_name}
               </button>

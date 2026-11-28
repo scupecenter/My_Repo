@@ -56,6 +56,42 @@ export class WarehouseController {
     return r;
   }
 
+  // Contract 0.15.342: reorder limits and supplier returns (RMA).
+  @Get("reorder-limits")
+  reorderLimits(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.cfg.listReorderLimits(auth, q);
+  }
+
+  @Put("reorder-limits/:itemId")
+  async putReorderLimit(
+    @Param("itemId") itemId: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.cfg.putReorderLimit(itemId, ifMatch, body);
+  }
+
+  @Get("rma")
+  rmaList(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.cfg.listRma(auth, q);
+  }
+
+  @Post("rma")
+  rmaCreate(@Auth() auth: AuthContext, @Body() body: unknown) {
+    return this.cfg.createRma(auth, body);
+  }
+
+  @Post("rma/:id/status")
+  @HttpCode(200)
+  rmaStatus(
+    @Auth() auth: AuthContext,
+    @Param("id") id: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.cfg.setRmaStatus(auth, id, ifMatch, body);
+  }
+
   @Get("config-gaps")
   configGaps(@Auth() auth: AuthContext) {
     return this.cfg.configGaps(auth);
@@ -126,6 +162,12 @@ export class WarehouseController {
     const r = await this.wh.updateItem(auth, id, ifMatch, body);
     res.setHeader("ETag", etagHeader(r.version));
     return r;
+  }
+
+  /** Migration 0567: the audit trail of one item with the field changes (System Admin or a warehouse_items delegate). Restore uses PATCH items/:id. */
+  @Get("items/:id/history")
+  itemHistory(@Auth() auth: AuthContext, @Param("id") id: string) {
+    return this.wh.itemHistory(auth, id);
   }
 
   @Delete("items/:id")

@@ -1,16 +1,19 @@
 import { ExportAction } from '../security/export-lock';
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
-import type { Response } from 'express';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Req, Res, StreamableFile, UploadedFile as Upload, UseInterceptors } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import type { Request, Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
+import { IdempotencyService } from '../common/idempotency.service';
+import { UploadInterceptor, type UploadedFile } from '../templates/upload.interceptor';
 import { XLSX_MIME } from '../templates/templates.service';
 import { DailyPlanService } from './daily-plan.service';
 
 /** My Work > Daily Plan (contract tag `daily-plan`, 0.15.67, migration 0149). The session guard is global; the database checks the rights. */
 @Controller('daily-plans')
 export class DailyPlanController {
-  constructor(private readonly svc: DailyPlanService) {}
+  constructor(private readonly svc: DailyPlanService, private readonly idem: IdempotencyService) {}
 
   @Get()
   day(@Query() q: Record<string, unknown>) {
@@ -26,6 +29,15 @@ export class DailyPlanController {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return new StreamableFile(buffer);
+  }
+
+  /** 0564 (3b): the approved template TPL-DAILY-PLAN, applied at once (202 with the summary); one refused row refuses the file. */
+  @Post('import')
+  @HttpCode(202)
+  @UseInterceptors(UploadInterceptor)
+  importTemplate(@Auth() auth: AuthContext, @Upload() file: UploadedFile | undefined, @Headers('idempotency-key') key: string | undefined, @Req() req: Request & { id?: string }) {
+    const fingerprint = { file: file ? createHash('sha256').update(file.buffer).digest('hex') : null };
+    return this.idem.run(auth.user.id, 'importDailyPlan', key, fingerprint, () => this.svc.importTemplate(auth, file, req.id));
   }
 
   @Post(':date/regions/:regionId/sites')
@@ -48,6 +60,34 @@ export class DailyPlanController {
   @HttpCode(200)
   lock(@Param('date') d: string, @Param('regionId') r: string, @Headers('if-match') ifMatch: string | undefined) {
     return this.svc.lock(d, r, ifMatch);
+  }
+
+  @Get(':date/regions/:regionId/history')
+  history(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.history(d, r);
+  }
+
+  @Get(':date/regions/:regionId/triage')
+  triage(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.triage(d, r);
+  }
+
+  @Post(':date/regions/:regionId/claim')
+  @HttpCode(200)
+  claim(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.claim(d, r, true);
+  }
+
+  @Delete(':date/regions/:regionId/claim')
+  @HttpCode(200)
+  release(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.claim(d, r, false);
+  }
+
+  @Post(':date/regions/:regionId/triage')
+  @HttpCode(200)
+  decide(@Param('date') d: string, @Param('regionId') r: string, @Body() body: unknown) {
+    return this.svc.decide(d, r, body);
   }
 
   @Post(':date/regions/:regionId/unlock')

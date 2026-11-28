@@ -366,6 +366,33 @@ describe('the appearance profile: PATCH /me/profile ui_prefs and the identity de
     expect((await api.call('get', '/me')).body.user.appearance).toMatchObject({ radius: 'rounded' });
   });
 
+  // 0526: the floating Inbox panel is two more appearance dimensions of the same framework.
+  it('inbox_panel and inbox_anchor: in the options, chosen personally, validated', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const p = await api.call('get', '/me/profile');
+    expect(p.body.identity.pref_options.inbox_panel).toEqual(['overlay', 'floating', 'docked']);
+    expect(p.body.identity.pref_options.inbox_anchor).toEqual(['end-top', 'end-bottom', 'start-top', 'start-bottom']);
+    expect(p.body.appearance).toMatchObject({ inbox_panel: 'overlay', inbox_anchor: 'end-top' });
+    const r = await patchPrefs(api, { inbox_panel: 'docked', inbox_anchor: 'start-bottom' });
+    expect(r.status).toBe(200);
+    expect(r.body.appearance).toMatchObject({ inbox_panel: 'docked', inbox_anchor: 'start-bottom' });
+    expect((await patchPrefs(api, { inbox_panel: 'sideways' })).status).toBe(422);
+  });
+
+  // 0581: the More menu (list or icon grid) is one more appearance dimension of the same framework.
+  it('more_menu: in the options, chosen personally, validated', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const p = await api.call('get', '/me/profile');
+    expect(p.body.identity.pref_options.more_menu).toEqual(['list', 'grid']);
+    expect(p.body.appearance).toMatchObject({ more_menu: 'list' });
+    const r = await patchPrefs(api, { more_menu: 'grid' });
+    expect(r.status).toBe(200);
+    expect(r.body.appearance).toMatchObject({ more_menu: 'grid' });
+    expect((await patchPrefs(api, { more_menu: 'cards' })).status).toBe(422);
+  });
+
   // 0347 (item 19 of the 2026-11-27 batch): `contrast` is an appearance dimension of the same framework - personal choice,
   // organization default and the admin lock all reach it through the same doors, with no parallel path.
   it('contrast: in the options, chosen personally, defaulted by the organization and locked with the rest', async () => {
@@ -437,6 +464,18 @@ describe('the personal sidebar: PATCH /me/profile ui_prefs.sidebar', () => {
     expect((await patchPrefs(api, { sidebar: { hidden: ['No Space'] } })).status).toBe(422);
     expect((await patchPrefs(api, { sidebar: { pins: Array.from({ length: 21 }, (_, i) => `k${i}`) } })).status).toBe(422);
     expect((await patchPrefs(api, { sidebar: 'everything' })).status).toBe(422);
+    expect((await patchPrefs(api, { sidebar: { mode: 'sideways' } })).status).toBe(422);
+  });
+
+  it('0527: the personal sidebar mode (pinned or autohide) is saved and read back; another value is refused', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const r = await patchPrefs(api, { sidebar: { mode: 'autohide' } });
+    expect(r.status).toBe(200);
+    expect(r.body.ui_prefs).toMatchObject({ sidebar: { mode: 'autohide' } });
+    const back = await patchPrefs(api, { sidebar: { mode: 'pinned' } });
+    expect(back.status).toBe(200);
+    expect(back.body.ui_prefs).toMatchObject({ sidebar: { mode: 'pinned' } });
   });
 
   it('while the admin locks the appearance, a sidebar-only change stays allowed; a dimension with it is refused and nothing changes', async () => {

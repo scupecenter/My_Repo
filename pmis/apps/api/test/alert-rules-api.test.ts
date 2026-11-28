@@ -52,7 +52,8 @@ describe('alert-rules routes (0342)', () => {
     const res = await admin.api.call('get', PATH);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.rules)).toBe(true);
-    expect(res.body.catalogue.kinds.map((k: { kind: string }) => k.kind)).toEqual(['weekly_status_missing', 'record_idle']);
+    expect(res.body.catalogue.kinds.map((k: { kind: string }) => k.kind)).toEqual(['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon']);
+    expect(res.body.catalogue.kpis.some((k: { code: string }) => k.code === 'sla_breach')).toBe(true);
     expect(res.body.catalogue.registers.some((r: { register_key: string }) => r.register_key === 'issues')).toBe(true);
 
     expect((await plain.api.call('get', PATH)).status).toBe(403);

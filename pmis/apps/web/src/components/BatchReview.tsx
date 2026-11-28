@@ -7,16 +7,19 @@ import { batchTotals, pct } from './BatchProgress';
 
 /** P8 (data-entry review 2026-11-27): the building blocks of the redesigned upload review. Presentation only: every number is a server count of the batch, every row action is the existing decision door. */
 
-export type BatchShow = 'all' | 'valid' | 'invalid' | 'duplicate' | 'held' | 'warnings';
+export type BatchShow = 'all' | 'valid' | 'invalid' | 'duplicate' | 'overridden' | 'held' | 'warnings';
 export type BatchSort = 'row' | 'result' | 'key';
 export const isDuplicate = (r: Pick<ImportRow, 'action' | 'errors'>): boolean => r.action === 'error' && !!r.errors?.some((e) => e.code === 'duplicate_in_file');
 
 /** The rows a tab shows. `invalid` leaves the duplicates out: they have a tab of their own. */
+export const isOverridden = (r: Pick<ImportRow, 'action' | 'errors'>): boolean => r.action === 'error' && !!r.errors?.some((e) => e.code === 'overridden_by_later_row');
+
 export function filterRows(rows: ImportRow[], show: BatchShow): ImportRow[] {
   switch (show) {
     case 'valid': return rows.filter((r) => r.action !== 'error');
-    case 'invalid': return rows.filter((r) => r.action === 'error' && !isDuplicate(r));
+    case 'invalid': return rows.filter((r) => r.action === 'error' && !isDuplicate(r) && !isOverridden(r));
     case 'duplicate': return rows.filter(isDuplicate);
+    case 'overridden': return rows.filter(isOverridden);
     case 'held': return rows.filter((r) => (r.action === 'create' || r.action === 'update') && r.decision === 'pending_previous_approval');
     case 'warnings': return rows.filter((r) => !!r.warnings?.length);
     default: return rows;
@@ -46,8 +49,8 @@ export function sortRows(rows: ImportRow[], by: BatchSort): ImportRow[] {
 export function BatchKpiCards({ batch: b }: { batch: ImportBatch }) {
   const { t } = useTranslation();
   const c = batchTotals(b.counts);
-  const dup = b.counts.duplicate ?? 0, rejected = Math.max(0, c.error - dup);
-  const legacy: Record<string, string> = { valid: t('batch.valid', { count: c.valid }), invalid: t('batch.invalid', { count: Math.max(0, c.error - (b.counts.duplicate ?? 0)) }), held: t('batch.held_count', { count: c.held }) };
+  const dup = b.counts.duplicate ?? 0, over = b.counts.overridden ?? 0, rejected = Math.max(0, c.error - dup - over);
+  const legacy: Record<string, string> = { valid: t('batch.valid', { count: c.valid }), invalid: t('batch.invalid', { count: Math.max(0, c.error - (b.counts.duplicate ?? 0) - (b.counts.overridden ?? 0)) }), held: t('batch.held_count', { count: c.held }) };
   const card = (key: string, n: number, tone: string, label: string, sub?: ReactNode, icon?: ReactNode, hint?: string) => (
     <Tip text={hint ?? label}>
       <li data-testid={`batch-kpi-${key}`} data-count={n} className={`rounded-lg border border-line p-3 ${tone}`}>
@@ -62,6 +65,7 @@ export function BatchKpiCards({ batch: b }: { batch: ImportBatch }) {
       {card('rows', c.rows, 'bg-card', t('batchReview.kpi_rows'), pct(c.valid, c.rows) ? t('batchReview.kpi_rows_sub', { pct: pct(c.valid, c.rows) }) : undefined, undefined, t('batchReview.hint_rows'))}
       {card('valid', c.valid, 'bg-doneBg text-doneInk', t('batchReview.kpi_valid'), <span data-testid="batch-count-diff">{t('batch.diff', { create: c.create, update: c.update, unchanged: c.unchanged })}</span>, <Check size={14} aria-hidden />, t('batchReview.hint_valid'))}
       {card('duplicate', dup, dup ? 'bg-waitBg text-waitInk' : 'bg-card text-mute', t('batchReview.kpi_duplicate'), undefined, <Copy size={14} aria-hidden />, t('batchReview.hint_duplicate'))}
+      {over > 0 && card('overridden', over, 'bg-waitBg text-waitInk', t('batchReview.kpi_overridden'), undefined, <Copy size={14} aria-hidden />, t('batchReview.hint_overridden'))}
       {card('invalid', rejected, rejected ? 'bg-lateBg text-lateInk' : 'bg-card text-mute', t('batchReview.kpi_invalid'), undefined, <CircleAlert size={14} aria-hidden />, t('batchReview.hint_invalid'))}
       {card('held', c.held, c.held ? 'bg-lockBg text-lockInk' : 'bg-card text-mute', t('batchReview.kpi_held'), undefined, <TriangleAlert size={14} aria-hidden />, t('batchReview.hint_held'))}
     </ul>
@@ -102,7 +106,7 @@ export function BatchToolbar({ show, onShow, counts, query, onQuery, sort, onSor
   onReport: () => void; reportBusy: boolean; reportable: boolean;
 }) {
   const { t } = useTranslation();
-  const tabs = (['all', 'valid', 'invalid', 'duplicate', 'held', 'warnings'] as const).filter((s) => s === 'all' || s === 'valid' || s === 'invalid' || counts[s] > 0);
+  const tabs = (['all', 'valid', 'invalid', 'duplicate', 'overridden', 'held', 'warnings'] as const).filter((s) => s === 'all' || s === 'valid' || s === 'invalid' || counts[s] > 0);
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="batch-toolbar">
       <label className="relative flex min-w-52 flex-1 items-center">

@@ -10,6 +10,7 @@ export function LibraryTabs() {
     { to: '/library/forms', key: 'forms', show: true },
     { to: '/library/templates', key: 'templates', show: !!forms.data?.can_configure },
     { to: '/library/archive', key: 'archive', show: true },
+    { to: '/library/media', key: 'media', show: true },
   ].filter((x) => x.show);
   return (
     <nav className="mb-3 flex flex-wrap gap-1 border-b border-line" aria-label={t('lib.tabs')} data-testid="lib-tabs">

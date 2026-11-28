@@ -27,6 +27,7 @@ import { FieldErr } from "./Calendar";
 import { SlaBulkAdmin } from "./SlaRuleAdmin";
 import { QueryFallback } from "@/components/States";
 import { DateInput } from '@/components/DateInput';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 
 const SCENARIOS: DeliveryScenario[] = [
   "new_build",
@@ -274,6 +275,11 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
 
   return (
     <section className="card space-y-3 p-4" data-testid="sla-editor">
+      {/* Decision 11: per-row edits not yet saved as the draft are asked about before the user leaves (Save asks for the reason) */}
+      <UnsavedGuard scope="settings" dirty={dirty && draft} needsReason label={t("slaSet.save_title")}
+        onSave={(reason) => new Promise<boolean>((res) => {
+          save.mutate({ etag, reason, rules: Object.values(edits) }, { onSuccess: () => { setEdits({}); res(true); }, onError: () => res(false) });
+        })} />
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="me-auto font-bold">
           v{set.version}{" "}
