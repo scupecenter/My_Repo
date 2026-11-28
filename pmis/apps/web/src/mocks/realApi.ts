@@ -130,6 +130,12 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
   ['get', '/finance-hub/summary'],
+  // Migration 0592: custom registers (apps/api: custom-registers)
+  ['get', '/custom-registers'],
+  ['post', '/custom-registers'],
+  ['get', '/custom-registers/:key'],
+  ['patch', '/custom-registers/:key'],
+  ['post', '/custom-registers/:key/enable'],
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
@@ -230,6 +236,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/partial-credit'],
   // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
   ['get', '/settings/alert-rules'],
+  ['get', '/settings/alert-rules/link-orphans'],
   ['post', '/settings/alert-rules'],
   ['put', '/settings/alert-rules/:id'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
@@ -390,6 +397,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/me/home-pins'],
   ['post', '/saved-views/:id/pin'],
   ['post', '/saved-views/:id/unpin'],
+  // Contract 0.15.582 (0655): the default saved view per screen.
+  ['get', '/me/default-views'],
+  ['post', '/saved-views/:id/set-default'],
+  ['post', '/saved-views/:id/clear-default'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],
@@ -485,6 +496,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/ui/public/identity'],
   ['get', '/ui/public/logo/:purpose'],
   ['get', '/ui/assets/:key'],
+  ['get', '/settings/dashboard-finance-readers'],
+  ['put', '/settings/dashboard-finance-readers'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],

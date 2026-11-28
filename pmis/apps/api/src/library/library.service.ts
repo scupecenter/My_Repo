@@ -46,7 +46,8 @@ const SLOT_ROWS = Prisma.sql`
     s.candidate_label, gd.number AS doc_number, gd.id AS generated_id, gd.generated_at, cf.version, s.task_id, td.code AS task_code, td.name_en AS task_name_en, td.name_ar AS task_name_ar,
     ti.state::text AS task_state, cf.id AS file_id, cf.file_group_id, cf.original_name AS file_name, cf.mime_type,
     (SELECT count(*) FROM document_files x WHERE x.slot_id = s.id AND x.is_current)::int AS file_count,
-    cf.uploaded_by, cf.uploaded_at, ap.acted_by AS approved_by, coalesce(cf.approved_date, (ap.created_at AT TIME ZONE 'Africa/Tripoli')::date) AS approved_at
+    cf.uploaded_by, cf.uploaded_at, ap.acted_by AS approved_by, coalesce(cf.approved_date, (ap.created_at AT TIME ZONE 'Africa/Tripoli')::date) AS approved_at,
+    doc_file_marked(cf.id, 'signed') AS signed, doc_file_marked(cf.id, 'stamped') AS stamped
   FROM document_slots s
   JOIN document_types dt ON dt.id = s.doc_type_id
   JOIN sites si ON si.id = s.site_id
@@ -67,7 +68,8 @@ const OLD_ROWS = Prisma.sql`
     rg.name_en AS region_name, rg.name_ar AS region_name_ar, cl.cluster_code AS cluster, dt.id AS doc_type_id, dt.code AS doc_code, dt.name_en AS doc_name_en, dt.name_ar AS doc_name_ar,
     s.candidate_label, NULL::text AS doc_number, NULL::uuid AS generated_id, NULL::timestamptz AS generated_at, f.version, s.task_id, td.code AS task_code, td.name_en AS task_name_en,
     td.name_ar AS task_name_ar, ti.state::text AS task_state, f.id AS file_id, f.file_group_id, f.original_name AS file_name, f.mime_type, 1 AS file_count,
-    f.uploaded_by, f.uploaded_at, NULL::uuid AS approved_by, f.approved_date AS approved_at
+    f.uploaded_by, f.uploaded_at, NULL::uuid AS approved_by, f.approved_date AS approved_at,
+    doc_file_marked(f.id, 'signed') AS signed, doc_file_marked(f.id, 'stamped') AS stamped
   FROM document_files f
   JOIN document_slots s ON s.id = f.slot_id
   JOIN document_types dt ON dt.id = s.doc_type_id
@@ -79,6 +81,8 @@ const OLD_ROWS = Prisma.sql`
   WHERE s.site_id IS NOT NULL AND NOT f.is_current AND f.superseded_by IS NOT NULL`;
 
 interface RowDb {
+  signed: boolean;
+  stamped: boolean;
   key: string;
   slot_id: string;
   status: string;
@@ -440,6 +444,8 @@ export class LibraryMenuService {
              (SELECT count(*) FROM ${from} s WHERE ${Prisma.join(conds, ' AND ')})::int AS filtered`);
     const page = rows.slice(0, limit);
     const forms = await this.formsFor(page);
+    // 0555 / 0474: which document types need a signed and a stamped copy (informs only)
+    const marks = (await this.db.tx.$queryRaw<{ j: { types: Record<string, { signature?: boolean; stamp?: boolean }> } }[]>(Prisma.sql`SELECT doc_marks_cfg() AS j`))[0]?.j.types ?? {};
     const refs = await this.view.userRefs([...new Set(page.flatMap((r) => [r.uploaded_by, r.approved_by]).filter((x): x is string => !!x))]);
     let pasted: PastedSearchDto | undefined;
     if (search.kind === 'list') {
@@ -454,7 +460,9 @@ export class LibraryMenuService {
         task_id: r.task_id, task_code: r.task_code, task_name_en: r.task_name_en, task_name_ar: r.task_name_ar, register_key: r.register_key,
         file_id: r.file_id, file_group_id: r.file_group_id, file_name: r.file_name, mime_type: r.mime_type, file_count: r.file_count,
         uploaded_by: r.uploaded_by ? refs.get(r.uploaded_by) ?? null : null, uploaded_at: r.uploaded_at, approved_by: r.approved_by ? refs.get(r.approved_by) ?? null : null,
-        approved_at: dateOnly(r.approved_at), generated_at: r.generated_at, form_id: forms.get(`${r.doc_type_id}|${r.task_code ?? ''}`) ?? null,
+        approved_at: dateOnly(r.approved_at), generated_at: r.generated_at,
+        signed: r.file_id ? r.signed === true : null, stamped: r.file_id ? r.stamped === true : null,
+        needs_signature: marks[r.doc_code]?.signature === true, needs_stamp: marks[r.doc_code]?.stamp === true, form_id: forms.get(`${r.doc_type_id}|${r.task_code ?? ''}`) ?? null,
       })),
       page: { limit, next_cursor: rows.length > limit ? String(offset + limit) : null },
       counts: cnt[0] ?? { total: 0, filtered: 0 },
