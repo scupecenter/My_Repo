@@ -18,6 +18,9 @@
   "app": {
     "name": "GSDN Workspace"
   },
+  "title": {
+    "product": "Telecom Site Delivery Workspace"
+  },
   "hint": {
     "docs_edit": "Edit this document type: its name, where it applies, mandatory or not, formats and limits. Saved as a draft until you publish.",
     "docs_publish": "Publish the draft so new tasks use it. Choose whether open tasks get it too.",
