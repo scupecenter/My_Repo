@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { availabilityOn, setAvailability } from '@/lib/availability';
 import { useOpenRecordMode } from '@/lib/openRecordPref';
 
 /**
@@ -11,6 +13,7 @@ import { useOpenRecordMode } from '@/lib/openRecordPref';
 export function OpenRecordSettings() {
   const { t } = useTranslation();
   const [mode, setMode] = useOpenRecordMode();
+  const [avail, setAvail] = useState(availabilityOn);
   return (
     <section className="card space-y-4 p-4" data-testid="page-openrecord-settings">
       <div>
@@ -22,6 +25,10 @@ export function OpenRecordSettings() {
           <button key={x} type="button" role="radio" aria-checked={mode === x} data-testid={`open-record-mode-${x}`} onClick={() => setMode(x)} className={`btn px-2 py-1 text-xs ${mode === x ? 'bg-accentSoft text-accentText' : ''}`}>{t(`openrec.${x}`)}</button>
         ))}
       </div>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-1" checked={avail} data-testid="availability-switch" onChange={(e) => { setAvailability(e.target.checked); setAvail(e.target.checked); }} />
+        <span><b>{t('availability.label')}</b><span className="block text-mute">{t('availability.note')}</span></span>
+      </label>
     </section>
   );
 }
