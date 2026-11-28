@@ -4674,6 +4674,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalogue of the links between registers
+         * @description 0.15.586 (migration 0713). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+         */
+        get: operations["listRegisterLinkCatalogue"];
+        /**
+         * Save the catalogue (the whole list)
+         * @description 0.15.586 (migration 0713). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+         */
+        put: operations["saveRegisterLinkCatalogue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/register-rules": {
         parameters: {
             query?: never;
@@ -8474,6 +8498,31 @@ export interface paths {
          *     (`weeks` is a whole number from 2 to 12). One audit row with before and after values and the reason. Nothing stored is recomputed: the forecast is drawn from the saved snapshots when the card opens.
          */
         put: operations["setForecastWindow"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/dashboard/forecast-method": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The method of the dashboard forecast (0.15.474)
+         * @description 0.15.474. The setting `dashboard.forecast_method`: how the progress curve card takes the weekly pace of the saved snapshots for the forecast date: `mean` (the mean weekly gain over the last weeks, the default and the former fixed behaviour) or `linear` (the slope of a straight line fitted through the actual points of the same weeks). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getForecastMethod"];
+        /**
+         * Save the method of the dashboard forecast (reason, If-Match, audited)
+         * @description 0.15.474. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+         *     (`method` is `mean` or `linear`). One audit row with before and after values and the reason. Nothing stored is recomputed: the forecast is drawn from the saved snapshots when the card opens.
+         */
+        put: operations["setForecastMethod"];
         post?: never;
         delete?: never;
         options?: never;
@@ -12319,7 +12368,7 @@ export interface paths {
         };
         /**
          * Project Status (ends at HOTO) with the weight-set version used
-         * @description Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then).
+         * @description Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then). Since 0.15.368 `project_phase` narrows them further, and `group_by=phase` returns one row per project phase (the same engine run once per phase site set; sites without a phase are in no row).
          */
         get: operations["getProjectStatus"];
         put?: never;
@@ -14044,6 +14093,25 @@ export interface components {
             /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
             conflicts?: string[];
         };
+        RegisterLinkEntry: {
+            from_register: string;
+            field: string;
+            to_register: string;
+            /** @description Read only. */
+            target_record_type?: string | null;
+            /** @description Read only: the state a record must have to be picked or accepted. */
+            target_state?: string;
+            same_site?: boolean;
+            /** @description Check the id in entry (D60). */
+            enforce?: boolean;
+            /** @description Declared and active (register_links.is_active). */
+            enabled?: boolean;
+        };
+        RegisterLinkCatalogue: {
+            links: components["schemas"]["RegisterLinkEntry"][];
+            version: number;
+            can_edit: boolean;
+        };
         RegisterState: {
             register_key: string;
             name_en: string;
@@ -14091,6 +14159,13 @@ export interface components {
             view?: components["schemas"]["ExportView"];
             /** @description Subset of the caller's regions (B3). A region outside the caller's scope is 422 `validation_failed`. Default is all of the caller's regions. */
             regions?: components["schemas"]["RegionId"][];
+            /** @description 0.15.461 (D5). The site pack of one site: a zip with one workbook per part and a README. Send it alone (with `parts`, `view` or `regions` it is 422). Only the parts the caller may export in the region of the site, only the columns the caller may read; voided records, project-wide figures and the dismantle part are left out. Same export lock and audit as every export. */
+            site_pack?: {
+                /** Format: uuid */
+                site_id: string;
+                /** @description Default: every part the caller may export that is site scoped. */
+                parts?: components["schemas"]["ExportPartKey"][];
+            };
             /**
              * Format: date
              * @description Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`. 0.15.34: only today is accepted, a past date is 422 with item code `as_of_unsupported`.
@@ -14101,7 +14176,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -14155,7 +14230,12 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "full" | "partial" | "view";
+            kind: "full" | "partial" | "view" | "site_pack";
+            /**
+             * Format: uuid
+             * @description Only for `site_pack` (0.15.461).
+             */
+            site_id?: string;
             /** @description Echo of the request; empty for `full` and `view`. */
             parts?: components["schemas"]["ExportPartKey"][];
             view?: components["schemas"]["ExportView"];
@@ -19154,7 +19234,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment";
         RegisterField: {
             code: string;
             label_en: string;
@@ -21024,6 +21104,20 @@ export interface components {
         ForecastWindowInput: {
             /** @description How many of the last real weeks the forecast averages the weekly gain over. */
             weeks: number;
+        };
+        /** @description 0.15.474. The setting dashboard.forecast_method (default mean). */
+        ForecastMethod: components["schemas"]["ForecastMethodInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ForecastMethodInput: {
+            /**
+             * @description How the forecast takes the weekly pace: the mean weekly gain or a fitted straight line.
+             * @enum {string}
+             */
+            method: "mean" | "linear";
         };
         /** @description 0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity. */
         ProgressRag: {
@@ -23702,7 +23796,7 @@ export interface components {
             /** @description 0.7.2. Active sites behind the figure. */
             sites_in_scope?: number;
             activities: components["schemas"]["ProjectStatusActivity"][];
-            /** @description Present when `group_by` is region or site. */
+            /** @description Present when `group_by` is region, site or (0.15.368) phase; a phase row's key and label are the phase value. */
             rows?: {
                 key: string;
                 label: string;
@@ -24008,6 +24102,8 @@ export interface components {
             }[];
             clusters: string[];
             scenarios: components["schemas"]["DeliveryScenario"][];
+            /** @description 0.15.368: the distinct values of `project_phase` of the sites the caller can see, for the phase quick filter. */
+            phases?: string[];
             streams: {
                 code: string;
                 name_en: string;
@@ -24793,6 +24889,8 @@ export interface components {
         FilterTree: string;
         /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
         DashboardFilterTree: string;
+        /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+        DashboardProjectPhase: string;
         Limit: number;
         /** @description Opaque cursor from `page.next_cursor`. */
         Cursor: string;
@@ -32743,6 +32841,60 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    listRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    links: components["schemas"]["RegisterLinkEntry"][];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The saved catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listRegisterRules: {
         parameters: {
             query?: never;
@@ -39511,6 +39663,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ForecastWindow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getForecastMethod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The method. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastMethod"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setForecastMethod: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["ForecastMethodInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastMethod"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -46303,6 +46511,8 @@ export interface operations {
                 /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
                 filter?: components["parameters"]["DashboardFilterTree"];
                 region_id?: components["schemas"]["RegionId"];
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
             };
             header?: never;
             path?: never;
@@ -46478,6 +46688,8 @@ export interface operations {
                 stream?: string;
                 /** @description A view code from `filters.views` (CW, TE, OM; 0.11.0, Q126). Keeps the sites that have a task of the view that applies, the milestones of the view (its whole stages, or for a view of single tasks such as O&M the stages of those tasks) and the tasks of the view in the SLA and the delay attribution. Combines with `stream`. An unknown one is 422 `unknown_view`. */
                 view?: string;
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
                 /** @description Leave out tasks closed by an admin override. Default is the setting `dashboard.exclude_overrides` (true). The number left out is `meta.override_flagged_count`. */
                 exclude_overrides?: boolean;
             };
@@ -46536,6 +46748,8 @@ export interface operations {
                 scenario?: components["schemas"]["DeliveryScenario"];
                 /** @description Accepted as in `GET /dashboard`; the sections do not depend on it. */
                 stream?: string;
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
             };
             header?: never;
             path?: never;
@@ -46632,9 +46846,11 @@ export interface operations {
             query?: {
                 /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
                 filter?: components["parameters"]["DashboardFilterTree"];
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
                 region_id?: components["schemas"]["RegionId"];
                 site_id?: string;
-                group_by?: "none" | "region" | "site";
+                group_by?: "none" | "region" | "site" | "phase";
                 weight_set_version?: number;
                 /** @description Re-run with this weight set (any published or older set of code `project_status`) instead of the one in force, for comparison (0.2.6). Not together with `weight_set_version` (422). The response `weight_set.is_active` is false. Nothing is saved and snapshots are not touched. */
                 weight_set_id?: string;

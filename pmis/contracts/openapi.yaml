@@ -134,13 +134,16 @@ info:
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.370 (2026-11-27): the personal sidebar mode (migration 0527, mirror `db/sql/526_sidebar_mode.sql`; Ahmed's decision 2026-11-25). Additive. `UiNav` gains `mode` (`pinned` default, `autohide`); `ui_nav_check` is patched in place; a stored sidebar without it is unchanged. Audited like the other sidebar keys.
     - 0.15.371 (2026-11-27): weight item measure rule checked (migration 0552, mirror `db/sql/551_weight_rule_check.sql`; Settings review gap 1). Additive, no new path. `PUT /settings/weight-sets/{id}`: a measure rule that looks like JSON but does not parse is 422 `validation_failed` (it was 500). Publish and preview: `weight_set_errors` adds `measure_rule_invalid` (path `/activities/{n}/items`) for a rule that is not an object, has an unknown method (none, tasks, register), names no task, names a task code that is in no workflow, has a plan outside MS1 to MS10, or has a `central` that is not true/false.
+    - 0.15.456 (2026-11-28): five extra register links declared in `register_links` (L10; migration 0596, mirror `db/sql/595_extra_register_links.sql`). Additive, no endpoint change. Optional fields `lessons_learned.incident_id`, `lessons_learned.issue_id` and `incidents.permit_id` (same site, declared with the check off); the generic picker, the Related records panel on both sides, the orphan report and the filters pick them up through the declaration.
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
     - 0.15.592 (2026-11-28): the Issues card gains a Pareto view and a weekly trend (migration 0715, mirror `db/sql/714_issues_trend.sql`). Additive. `GET /dashboard/issues-trend` (`getIssuesTrend`, `dashboard.view`, the caller's issues regions): per ISO week opened, closed and open at week end, 4 to 52 weeks (default 12). The Pareto line (cumulative share with an 80 % marker) is computed in the web app from the existing `by_category` and `by_reason` lists. No table, setting or grant.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.431 (2026-11-28): the number of weeks the dashboard forecast averages is editable (Settings review gap 4, approved by the owner 2026-11-27; migration 0572, mirror `db/sql/571_forecast_window.sql`). Additive. `GET /settings/dashboard/forecast-window` (`getForecastWindow`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-window` (`setForecastWindow`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_window_update` with before and after): the new setting `dashboard.forecast_window_weeks` (a whole number 2 to 12, default 4, the value that was fixed in the web code). The progress curve card reads it when it is drawn: the forecast date uses the mean weekly gain over that many last weeks of the saved snapshots. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
+    - 0.15.434 (2026-11-28): the weights preview lists the item level differences against the set in force (Settings review gap 7, approved by the owner 2026-11-27; no migration). Web only, no path or schema change: Settings > Weights > Preview now also shows, from the saved draft and the set in force (`GET /settings/weight-sets/{id}` and the list), which activities and items are added, removed or changed (name, weight, unit, measure rule). Nothing is written.
     - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
     - 0.15.436 (2026-11-28): an old published workflow version can be deleted after a full snapshot is archived (owner request relayed 2026-11-27; migration 0575, mirror `db/sql/574_workflow_version_delete.sql`). Additive. `POST /workflow/versions/{version}/delete` (`deleteWorkflowVersion`): `workflow_versions` administer for all regions (the publish right), a reason, `If-Match`, a password step-up and the typed confirmation `v<version>`; audited as `workflow_version_delete`. Allowed only for a published version that is not the one in force, has started, has no site, no site task and no site migration (409 `invalid_transition` with `reasons`: `current`, `not_started`, `sites`, `site_tasks`, `migrations`). The version and all its milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views are written first as one snapshot (`workflow_version_archive`, kept on a data reset); the delete runs in the same transaction. `GET /workflow/version-archive` (`listWorkflowVersionArchive`, `administer`) lists the archived versions (no snapshot body); `POST /workflow/version-archive/{id}/restore` (`restoreWorkflowVersion`, `administer`, reason, step-up) puts one back as it was (published, same version number, same ids) in one transaction and answers 409 `invalid_transition` without changing anything when the version number or an id exists again, it was already restored, or a row it points to is gone. Drafts are still discarded with `/discard`; a published version stays immutable and tasks are still deactivated, not deleted.
+    - 0.15.474 (2026-11-28): the method of the dashboard forecast is editable (phase 5, program progress curve and forecast; migration 0612, mirror `db/sql/611_forecast_method.sql`). Additive. `GET /settings/dashboard/forecast-method` (`getForecastMethod`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-method` (`setForecastMethod`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_method_update` with before and after): the new setting `dashboard.forecast_method` (`mean`, the default and the former fixed behaviour, or `linear`, a straight line fitted through the actual points). The progress curve card reads it when it is drawn and now also draws the forecast as a dashed line to the forecast date. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.376 (2026-11-27): the daily delay log (migration 0554). Additive, data only. The Issues register gets the type value `Daily Delay` (list IssueCategory), the optional date field `delay_date`, and four more values of the list BlockerReason (Weather, Permit Pending, Delivery Delay, Safety Stop); no endpoint or schema changes. The delay reasons are edited in Settings > Registers > Lists and show in the dashboard issue breakdown (`by_category`, `by_reason`) and in the register export.
@@ -201,6 +204,8 @@ info:
     - 0.15.401 (2026-11-27): change the structure of a register by uploading a modified template (Data entry proposals S1 to S9, owner decision 2026-11-27 09:50 and 09:54; migration 0560, mirror `db/sql/559_structure_proposals.sql`). Additive. (1) The download of a register template carries a `Structure` sheet for who may edit the columns (`fields.edit`); the data upload ignores it. (2) New paths `GET|POST /structure-proposals`, `POST /structure-proposals/upload` (multipart `file` and `reason`; the Structure sheet becomes a proposal and nothing is written to the register), `GET /structure-proposals/{id}`, `GET /structure-proposals/{id}/differences` (.xlsx), `POST /structure-proposals/{id}/decision` (approve: System Admin with step-up, applied through the column doors of 0095 in one transaction, a new template version follows; reject needs a note) and `POST /structure-proposals/{id}/revert` (an undo is a proposal of its own). A blocked item (system column, values that do not convert, unknown section or list) disables the approval; a proposal that changes a type or hides a column needs a second System Admin.
     - 0.15.403 (2026-11-27): the rules of structure-change proposals (Data entry proposals S1 to S9, slice 2; owner decision 2026-11-27 09:55 "the settings are complete"; migration 0562, mirror `db/sql/561_structure_policy.sql`). Additive. New paths `GET|PUT /settings/structure-policy` (setting `registers.structure_change`: who proposes, who approves, the second person for every proposal or only for a type change or a hide, the most items in one proposal 1 to 500, the notice to the approvers and to the proposer; PUT needs a reason, If-Match and the step-up, audited). The doors of 0560 follow the setting; a proposal over the limit is 422 `too_many`. Two notification kinds, `structure_proposal` and `structure_decision`, join the mail catalogue (never mailed until an admin lists them).
     - 0.15.520 (2026-11-27): alternative names of a register column (Data entry proposals S1, owner decision 2026-11-27 21:29 "build what remains"; migration 0640, mirror `db/sql/639_structure_aliases.sql`). `import_aliases` (up to 20 names of up to 200 characters) is read and written with the column (`RegisterColumn`, `RegisterColumnCreate`, `RegisterColumnPatch`), travels in the Structure sheet (column "Import aliases") and in structure proposals and their undo, and the data upload accepts a header that equals the label or one of the aliases of its column (case and spaces ignored). The order of the columns, the typed values and the version rules (D112) are unchanged. Additive.
+    - 0.15.461 (2026-11-28): the site pack (D5, spec #521; no migration, the reserved 0601 stays unused). Additive. `POST /exports/master` takes `site_pack: { site_id, parts? }` (alone): the job writes a zip with one workbook per part for that site and a README, `kind` = `site_pack`, downloaded with `GET /exports/master/{id}/download` (`application/zip`). Same export lock, same per part and per region export grant, same column rules as the other exports (a hidden site custom field and a column of a part the caller may not export are left out); voided records, project-wide figures and the dismantle part are not in the pack. Start, completion and download are audited with the site id. Settings: no new setting; which columns a register exports is the existing Settings > Registers > columns (`in_export`), and who may export is the export grant of the Matrix.
+    - 0.15.457 (2026-11-28): the Tools & Equipment register (C4, spec #517; migration 0597, mirror `db/sql/596_tools_equipment_register.sql`): the tools and equipment of the project, with the custodian (a user column) and the next calibration or inspection due date. Register key and module `tools_equipment` (`RegisterKey`, export parts); site-scoped, several per site, two levels; its Matrix row is empty in the seed (the admin names the holders; no permission is granted); lists EquipmentCategory, EquipmentStatus and EquipmentDueKind; template TPL-TOOLS-EQUIPMENT; one data reset part; the due date `next_due_date` is added to the expiry radar setting (30, 14 and 7 days). No new endpoint. Additive.
     - 0.15.571 (2026-11-28): the data upload validates link fields (L7; migration 0642, mirror `db/sql/641_import_link_validation.sql`). No path or field changes. A link cell that is not an id, or is the id of no record, is now a row error on its own column in the error report: the Procurement link of HLC, Car Dispatcher and Financial Advances, the vehicle and the booking to extend of Car Dispatcher, and the advance to extend of Financial Advances (codes `invalid`, `link_not_found`). An error that a rule of the register raises on the probe record (the links of invoices, issues, quality, change control, dismantle, risks) now keeps its own column and message instead of one generic line under Record ID. Blank cells are not errors. Additive.
     - 0.15.572 (2026-11-28): the register rules screen lists the rules keys of every register (L9; migration 0643, mirror `db/sql/642_register_rules_screen.sql`). `GET /settings/register-rules`: the catalogue also offers `currency` of Financial Advances and `master_export` (yes or no) of Car Dispatcher, Financial Advances and Daily Plan (changing `master_export` changes the Master template, which has to be downloaded again); `items` now lists every active register that has rules, each with `other`: the keys that are not editable here (scope maps, scopes, field lists, Daily Plan levels), read only. `PUT` is unchanged (catalogue keys only). Additive.
     - 0.15.15 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 139). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
@@ -284,11 +289,13 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.586 (2026-11-28): Settings > Register links on the D60 table (migration 0713, mirror `db/sql/712_register_link_catalogue.sql`). Additive. `GET /settings/register-links` (`listRegisterLinkCatalogue`, every signed-in user) lists every declared link of `register_links`, switched-off ones included, with the version; `PUT /settings/register-links` (`saveRegisterLinkCatalogue`, System Admin, reason, If-Match, audited) switches a link on or off, sets `enforce` and `same_site`, and declares a new link; a link is switched off, never removed, and its register, field and target never change. New column `register_links.rev` (version). The picker, the check and the orphan report stay D60 (`GET /registers/{key}/links`, `GET /registers/{key}/link-options/{field}`).
     - 0.15.564 (2026-11-28): the missing photo indicator (D6, no migration, no table). Additive and read only. `DocumentSlot` gains `photo_min_count` and `photos_missing`, from the `photo_rules.min_count` of the document type (set in Settings > Documents) and the current image files of the slot. They inform only; nothing is blocked. No new right: the slots are shown to whoever can already see the task.
     - 0.15.410 (2026-11-27): hardening layer 1c, History and Restore for the Warehouse item master and the Daily Plan, and Claim and Triage of a Daily Plan day (migration 0567). Additive. `GET /warehouse/items/{id}/history` and `GET /daily-plans/{date}/regions/{region_id}/history` return the audit trail with the field changes; Restore of an item is a PATCH of the old values through the normal item writer. A plan day (region and date) can be claimed and released (`POST` and `DELETE` on `/daily-plans/{date}/regions/{region_id}/claim`) and accepted or deferred with a note (`POST /daily-plans/{date}/regions/{region_id}/triage`, `GET` for the state), by the L2 holder of the Daily Plan in the region or a System Admin, as for the registers (0340). New plan days start `pending`; existing days stay untriaged. Reject and merge do not apply to a plan day. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
     - 0.15.206 (2026-11-27): the dashboard follow-up sections, restricted financial summary (owner approval 2026-11-26, dashboard proposals item 9; migration 0307). Additive. `GET /dashboard/ops` gains the section `finance` (`DashboardOpsFinance`): the advances (counts, amounts of the records whose amounts are not hidden, age of the open ones since disbursement) and the disbursed amount against the completion of the assignments the advances belong to. It is OFF by default and only a holder of a role listed by the new setting `dashboard.finance_readers` (default Project Manager and Finance Officer) who also has the financial advances view receives figures; everyone else gets `available: false` with null figures, and the card stays hidden. It is never part of a share link or an export. New `GET/PUT /settings/dashboard-finance-readers` (`getDashboardFinanceReaders`, `setDashboardFinanceReaders`) to switch it on and choose the roles (System Admin or an all-regions delegate of settings edit, reason, step-up, If-Match, audited). Invoice ages are not part of the summary: the system holds no invoice data yet.
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
+    - 0.15.368 (2026-11-27): the dashboard phase quick filter and the Project Status group-by phase (owner decision 2026-11-27, phase scope item 1; spec `docs/spec/dashboard-phase-filter-group-by.md`). Additive and read only. (1) `GET /dashboard`, `GET /dashboard/ops`, `GET /dashboard/extras`, `GET /dashboard/export` and `GET /project-status` accept `project_phase`, a comma-separated list of 1 to 24 values of `sites.project_phase` (each 1 to 60 characters, 422 otherwise): it keeps only the sites of those phases, narrowing like the filter tree and `region_id` and never widening anyone's data; a section row that belongs to no site (a global change request or meeting action) counts only when no phase filter is given. `DashboardFilters` gains `phases`, the distinct phase values of the sites the caller can see. (2) `GET /project-status` `group_by` gains `phase`: `rows` holds one entry per phase (`key` and `label` the phase value), computed by the same engine run once per phase site set; sites without a phase are in no row. No migration, no grant, role or permission change.
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
     - **Staff registry** (`staff-registry`): search, hover card with visibility applied, create, update, deactivate, reactivate, template import, field-visibility settings.
@@ -7247,6 +7254,50 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Setting' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/register-links:
+    get:
+      tags: [settings]
+      operationId: listRegisterLinkCatalogue
+      summary: The catalogue of the links between registers
+      x-db-path: register_link_catalogue
+      description: |
+        0.15.586 (migration 0713). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+      responses:
+        '200':
+          description: The links.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterLinkCatalogue' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [settings]
+      operationId: saveRegisterLinkCatalogue
+      summary: Save the catalogue (the whole list)
+      x-db-path: admin_register_link_catalogue_save
+      description: |
+        0.15.586 (migration 0713). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [links, reason]
+              properties:
+                links: { type: array, items: { $ref: '#/components/schemas/RegisterLinkEntry' } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: The saved catalogue.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterLinkCatalogue' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/register-rules:
     get:
       tags: [settings]
@@ -13083,6 +13134,54 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard/forecast-method:
+    get:
+      tags: [settings]
+      operationId: getForecastMethod
+      summary: The method of the dashboard forecast (0.15.474)
+      description: |
+        0.15.474. The setting `dashboard.forecast_method`: how the progress curve card takes the weekly pace of the saved snapshots for the forecast date: `mean` (the mean weekly gain over the last weeks, the default and the former fixed behaviour) or `linear` (the slope of a straight line fitted through the actual points of the same weeks). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+      responses:
+        '200':
+          description: The method.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ForecastMethod'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setForecastMethod
+      summary: Save the method of the dashboard forecast (reason, If-Match, audited)
+      description: |
+        0.15.474. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+        (`method` is `mean` or `linear`). One audit row with before and after values and the reason. Nothing stored is recomputed: the forecast is drawn from the saved snapshots when the card opens.
+      x-db-path: admin_save_forecast_method
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/ForecastMethodInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ForecastMethod'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/dashboard/progress-rag:
     get:
       tags: [settings]
@@ -18690,6 +18789,7 @@ paths:
       - name: region_id
         in: query
         schema: {$ref: '#/components/schemas/RegionId'}
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       responses:
         '200':
           description: The sections.
@@ -18867,6 +18967,7 @@ paths:
         in: query
         schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
         description: 'A view code from `filters.views` (CW, TE, OM; 0.11.0, Q126). Keeps the sites that have a task of the view that applies, the milestones of the view (its whole stages, or for a view of single tasks such as O&M the stages of those tasks) and the tasks of the view in the SLA and the delay attribution. Combines with `stream`. An unknown one is 422 `unknown_view`.'
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       - name: exclude_overrides
         in: query
         schema: {type: boolean}
@@ -18944,6 +19045,7 @@ paths:
         in: query
         schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
         description: Accepted as in `GET /dashboard`; the sections do not depend on it.
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       responses:
         '200':
           description: The sections.
@@ -19019,9 +19121,10 @@ paths:
       tags: [project-status]
       operationId: getProjectStatus
       summary: Project Status (ends at HOTO) with the weight-set version used
-      description: Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then).
+      description: Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then). Since 0.15.368 `project_phase` narrows them further, and `group_by=phase` returns one row per project phase (the same engine run once per phase site set; sites without a phase are in no row).
       parameters:
       - {$ref: '#/components/parameters/DashboardFilterTree'}
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       - name: region_id
         in: query
         schema: {$ref: '#/components/schemas/RegionId'}
@@ -19032,7 +19135,7 @@ paths:
         in: query
         schema:
           type: string
-          enum: [none, region, site]
+          enum: [none, region, site, phase]
           default: none
       - name: weight_set_version
         in: query
@@ -19962,6 +20065,12 @@ components:
       required: false
       description: '0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller''s `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`.'
       schema: {type: string, maxLength: 8000}
+    DashboardProjectPhase:
+      name: project_phase
+      in: query
+      required: false
+      description: '0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller''s regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given.'
+      schema: {type: string, maxLength: 1500}
     Limit:
       name: limit
       in: query
@@ -21476,6 +21585,25 @@ components:
         code: { $ref: '#/components/schemas/ErrorCode' }
         message: { type: string }
         conflicts: { type: array, items: { type: string, format: uuid }, description: '0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module).' }
+    RegisterLinkEntry:
+      type: object
+      required: [from_register, field, to_register]
+      properties:
+        from_register: { type: string }
+        field: { type: string }
+        to_register: { type: string }
+        target_record_type: { type: [string, 'null'], description: 'Read only.' }
+        target_state: { type: string, description: 'Read only: the state a record must have to be picked or accepted.' }
+        same_site: { type: boolean }
+        enforce: { type: boolean, description: 'Check the id in entry (D60).' }
+        enabled: { type: boolean, description: 'Declared and active (register_links.is_active).' }
+    RegisterLinkCatalogue:
+      type: object
+      required: [links, version, can_edit]
+      properties:
+        links: { type: array, items: { $ref: '#/components/schemas/RegisterLinkEntry' } }
+        version: { type: integer }
+        can_edit: { type: boolean }
     RegisterState:
       type: object
       required: [register_key, name_en, enabled, locked, version, records]
@@ -21532,11 +21660,19 @@ components:
           uniqueItems: true
           items: { $ref: '#/components/schemas/RegionId' }
           description: Subset of the caller's regions (B3). A region outside the caller's scope is 422 `validation_failed`. Default is all of the caller's regions.
+        site_pack:
+          type: object
+          additionalProperties: false
+          required: [site_id]
+          description: '0.15.461 (D5). The site pack of one site: a zip with one workbook per part and a README. Send it alone (with `parts`, `view` or `regions` it is 422). Only the parts the caller may export in the region of the site, only the columns the caller may read; voided records, project-wide figures and the dismantle part are left out. Same export lock and audit as every export.'
+          properties:
+            site_id: { type: string, format: uuid }
+            parts: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/ExportPartKey' }, description: 'Default: every part the caller may export that is site scoped.' }
         as_of: { type: string, format: date, description: 'Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`. 0.15.34: only today is accepted, a past date is 422 with item code `as_of_unsupported`.' }
     ExportPartKey:
       type: string
       description: Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
-      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices, deliverables, sites, milestones, tasks, project_status, rf_design, acquisition]
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices, deliverables, tools_equipment, sites, milestones, tasks, project_status, rf_design, acquisition]
     ExportPart:
       type: object
       required: [key, label_en, label_ar, master_sheet]
@@ -21589,7 +21725,8 @@ components:
       required: [id, created_at, status, kind, regions, row_count, expires_at]
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [full, partial, view] }
+        kind: { type: string, enum: [full, partial, view, site_pack] }
+        site_id: { type: string, format: uuid, description: 'Only for `site_pack` (0.15.461).' }
         parts: { type: array, items: { $ref: '#/components/schemas/ExportPartKey' }, description: 'Echo of the request; empty for `full` and `view`.' }
         view:
           $ref: '#/components/schemas/ExportView'
@@ -26249,7 +26386,7 @@ components:
     # ---------------------------------------------------------- registers (B11) and Dismantle
     RegisterKey:
       type: string
-      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices, deliverables]
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices, deliverables, tools_equipment]
     RegisterField:
       type: object
       required: [code, label_en, type]
@@ -28233,6 +28370,22 @@ components:
       additionalProperties: false
       properties:
         weeks: { type: integer, minimum: 2, maximum: 12, description: 'How many of the last real weeks the forecast averages the weekly gain over.' }
+    ForecastMethod:
+      description: '0.15.474. The setting dashboard.forecast_method (default mean).'
+      allOf:
+      - $ref: '#/components/schemas/ForecastMethodInput'
+      - type: object
+        required: [version]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    ForecastMethodInput:
+      type: object
+      required: [method]
+      additionalProperties: false
+      properties:
+        method: { type: string, enum: [mean, linear], description: 'How the forecast takes the weekly pace: the mean weekly gain or a fitted straight line.' }
     ProgressRag:
       description: '0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity.'
       type: object
@@ -30652,7 +30805,7 @@ components:
         activities: { type: array, items: { $ref: '#/components/schemas/ProjectStatusActivity' } }
         rows:
           type: array
-          description: Present when `group_by` is region or site.
+          description: 'Present when `group_by` is region, site or (0.15.368) phase; a phase row''s key and label are the phase value.'
           items:
             type: object
             required: [key, label, progress_pct]
@@ -30926,6 +31079,10 @@ components:
               name_ar: {type: [string, 'null']}
         clusters: {type: array, items: {type: string}}
         scenarios: {type: array, items: {$ref: '#/components/schemas/DeliveryScenario'}}
+        phases:
+          description: '0.15.368: the distinct values of `project_phase` of the sites the caller can see, for the phase quick filter.'
+          type: array
+          items: {type: string}
         streams:
           type: array
           items:
