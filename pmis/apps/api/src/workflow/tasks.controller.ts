@@ -178,6 +178,26 @@ export class TasksController {
     await this.workflow.setResolved(auth, id, false);
   }
 
+  // 0.15.474: sub-tasks under a task or a register record (`kind` is task or record; a record is named by its logical entity id).
+  @Get('sub-tasks/:kind/:parentId')
+  subTasks(@Auth() auth: AuthContext, @Param('kind') kind: string, @Param('parentId') parentId: string) {
+    return this.workflow.subTasks(auth, kind, parentId);
+  }
+
+  @Post('sub-tasks/:kind/:parentId')
+  @HttpCode(201)
+  addSubTask(@Auth() auth: AuthContext, @Param('kind') kind: string, @Param('parentId') parentId: string, @Body() body: unknown) {
+    return this.workflow.saveSubTask(auth, kind, parentId, undefined, undefined, body);
+  }
+
+  @Patch('sub-tasks/:kind/:parentId/:id')
+  saveSubTask(
+    @Auth() auth: AuthContext, @Param('kind') kind: string, @Param('parentId') parentId: string, @Param('id') id: string,
+    @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown,
+  ) {
+    return this.workflow.saveSubTask(auth, kind, parentId, id, ifMatch, body);
+  }
+
   /** My Work (contract 0.2; built with F2, 0.15.30): the caller's open tasks in the buckets late, do_now and waiting. */
   @Get('me/tasks')
   myTasks(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {

@@ -12812,6 +12812,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sub-tasks/{kind}/{parent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The parent: `task`, or `record` (a register record, named by its logical `entity_id`). */
+                kind: "task" | "record";
+                parent_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Sub-tasks of a task or a register record, with the roll-up (0.15.474)
+         * @description 0.15.474 (migration 0613). The sub-tasks that are not removed, oldest first, and the roll-up (how many, how many done, mean progress). Whoever may view the parent (module `sites` for a task, the register's module for a record, in its region) reads. `can_edit` tells whether the caller holds the entry level there. The roll-up is information only and never changes the parent. 404 for a parent the caller cannot see; 422 for a global record (no region, no sub-tasks).
+         */
+        get: operations["listSubTasks"];
+        put?: never;
+        /**
+         * Add a sub-task (0.15.474)
+         * @description Needs the entry level of the parent's module in its region. The owner (optional) must be an active user who can see that region and module. A progress of 100 means done; above 0 on an open sub-task means doing. Audit `sub_task_create`.
+         */
+        post: operations["createSubTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sub-tasks/{kind}/{parent_id}/{sub_task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "task" | "record";
+                parent_id: string;
+                sub_task_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change or remove a sub-task (0.15.474)
+         * @description If-Match is the sub-task `version` (412 when it moved). The entry level of the parent's module and region may change anything; the sub-task's own owner may change only `state` and `progress`. Sending removed true hides it (never deleted). Audit `sub_task_update` or `sub_task_remove`.
+         */
+        patch: operations["updateSubTask"];
+        trace?: never;
+    };
     "/me/default-views": {
         parameters: {
             query?: never;
@@ -15494,6 +15546,52 @@ export interface components {
             resolved?: components["schemas"]["CommentResolved"];
             /** Format: date-time */
             created_at: string;
+        };
+        SubTaskInput: {
+            title?: string;
+            /** Format: uuid */
+            owner_id?: string | null;
+            /** @enum {string} */
+            state?: "open" | "doing" | "done";
+            progress?: number;
+            /** Format: date */
+            due_date?: string | null;
+            /** @description true hides the sub-task (PATCH only). */
+            removed?: boolean;
+        };
+        SubTaskSaved: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+        };
+        SubTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** @enum {string} */
+            state: "open" | "doing" | "done";
+            progress: number;
+            /** Format: date */
+            due_date?: string | null;
+            /** Format: uuid */
+            owner_id?: string | null;
+            owner_name?: string | null;
+            version: number;
+            /** @description The caller owns it. */
+            mine: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        SubTaskList: {
+            items: components["schemas"]["SubTask"][];
+            rollup: {
+                total: number;
+                done: number;
+                progress: number;
+            };
+            can_edit: boolean;
         };
         CommentReactionInput: {
             /**
@@ -47517,6 +47615,101 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listSubTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The parent: `task`, or `record` (a register record, named by its logical `entity_id`). */
+                kind: "task" | "record";
+                parent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sub-tasks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTaskList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createSubTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The parent: `task`, or `record` (a register record, named by its logical `entity_id`). */
+                kind: "task" | "record";
+                parent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubTaskInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTaskSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateSubTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                kind: "task" | "record";
+                parent_id: string;
+                sub_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubTaskInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTaskSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getDefaultViews: {

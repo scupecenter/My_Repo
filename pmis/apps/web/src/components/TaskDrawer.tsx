@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useTask } from '@/api/hooks';
 import { taskErrorMessage } from '@/lib/taskErrors';
 import { errText } from './FormDialog';
+import { SubTasks } from './SubTasks';
 import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, type TaskOp } from '@/api/sites';
 import type { TaskDetail, TaskRegisterField } from '@/api/types';
 import { DocSlots } from './DocSlots';
@@ -103,7 +104,7 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
         <Link className="btn px-2 py-1 text-xs" data-testid="drawer-open-site" to={`/sites/${task.site_id}`}><ExternalLink size={12} />{t('drawer.open_site')}</Link>
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="drawer-close"><X size={16} /></button></Dialog.Close>
       </header>
-      <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: `${t('drawer.tab_documents')} (${task.slots.length})` }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }, { id: 'time', label: t('tis.tab') }, { id: 'delay', label: t('delayp.tab') }]} />
+      <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: `${t('drawer.tab_documents')} (${task.slots.length})` }, { id: 'comments', label: t('drawer.comments') }, { id: 'subtasks', label: t('subtasks.tab') }, { id: 'history', label: t('drawer.history') }, { id: 'time', label: t('tis.tab') }, { id: 'delay', label: t('delayp.tab') }]} />
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {task.lock_reasons?.length ? <div className="rounded-md bg-lockBg p-3 text-sm text-lockInk" data-testid="drawer-locks">{task.lock_reasons.map((r, i) => <p key={i}>{r.message}</p>)}</div> : null}
         {task.lock_reasons?.length ? <BlockedByPanel taskId={task.id} siteId={task.site_id} /> : null}
@@ -168,6 +169,7 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
           <DocSlots task={task} edit={edit} />
         </section>
         <div {...panelProps('comments', tab)}><Comments task={task} /></div>
+        <div {...panelProps('subtasks', tab)}>{tab === 'subtasks' && <SubTasks kind="task" parentId={task.id} />}</div>
         <div {...panelProps('history', tab)}><History task={task} /></div>
         <div {...panelProps('time', tab)}>{tab === 'time' && <TimeInStatePanel taskId={task.id} />}</div>
         <div {...panelProps('delay', tab)}>{tab === 'delay' && <DelayPeriodsPanel taskId={task.id} />}</div>

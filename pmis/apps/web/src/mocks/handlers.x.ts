@@ -104,6 +104,15 @@ function workload(region: number | null) {
 /** Every comment of the mock, task threads and register threads together (PM item 18 actions address a comment by id alone). */
 const everyComment = (): Comment[] => [...db().tasks, ...db().extra].flatMap((t) => t.comments ?? []).concat(Object.values(db().x.regComments).flat());
 
+type MockSubTask = { id: string; title: string; state: 'open' | 'doing' | 'done'; progress: number; due_date: string | null; owner_id: string | null; owner_name: string | null; version: number; mine: boolean; created_at: string; updated_at: string };
+const subTaskRows = new Map<string, MockSubTask[]>();
+function subTaskList(key: string) {
+  const items = subTaskRows.get(key) ?? [];
+  const done = items.filter((r) => r.state === 'done').length;
+  const progress = items.length ? Math.round(items.reduce((a, r) => a + r.progress, 0) / items.length) : 0;
+  return { items, rollup: { total: items.length, done, progress }, can_edit: true };
+}
+
 export const xHandlers = [
   // ---- X1
   http.get(`${B}/notifications`, ({ request }) => { const g = guard(); if (g) return g; return inboxPage(new URL(request.url).searchParams); }),
@@ -178,6 +187,37 @@ export const xHandlers = [
     db().x.regComments[r.entity_id] = [...(db().x.regComments[r.entity_id] ?? []), c];
     save();
     return HttpResponse.json(c, { status: 201 });
+  }),
+
+  // ---- 0.15.474: sub-tasks of a task or a register record (kept in memory; the real rules live in the database functions)
+  http.get(`${B}/sub-tasks/:kind/:parentId`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    return HttpResponse.json(subTaskList(`${String(params.kind)}:${String(params.parentId)}`));
+  }),
+  http.post(`${B}/sub-tasks/:kind/:parentId`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const b = (await request.json()) as { title?: string; owner_id?: string | null; due_date?: string | null };
+    if (!b.title?.trim() || b.title.length > 200) return invalid('/title');
+    const key = `${String(params.kind)}:${String(params.parentId)}`;
+    const now = new Date().toISOString();
+    const row = { id: crypto.randomUUID(), title: b.title.trim(), state: 'open' as const, progress: 0, due_date: b.due_date ?? null, owner_id: b.owner_id ?? null, owner_name: b.owner_id ? 'Owner' : null, version: 1, mine: false, created_at: now, updated_at: now };
+    subTaskRows.set(key, [...(subTaskRows.get(key) ?? []), row]);
+    return HttpResponse.json({ id: row.id, version: 1 }, { status: 201 });
+  }),
+  http.patch(`${B}/sub-tasks/:kind/:parentId/:id`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const key = `${String(params.kind)}:${String(params.parentId)}`;
+    const rows = subTaskRows.get(key) ?? [];
+    const cur = rows.find((r) => r.id === params.id);
+    if (!cur) return problem(404, 'not_found', 'Not found');
+    const b = (await request.json()) as { title?: string; state?: 'open' | 'doing' | 'done'; progress?: number; removed?: boolean };
+    if (b.removed) { subTaskRows.set(key, rows.filter((r) => r !== cur)); return HttpResponse.json({ id: cur.id, version: cur.version + 1 }); }
+    if (b.title !== undefined) cur.title = b.title;
+    if (b.progress !== undefined) cur.progress = b.progress;
+    else if (b.state) cur.progress = b.state === 'done' ? 100 : b.state === 'open' ? 0 : 50;
+    cur.state = cur.progress === 100 ? 'done' : cur.progress > 0 ? 'doing' : 'open';
+    cur.version += 1;
+    return HttpResponse.json({ id: cur.id, version: cur.version });
   }),
 
   // ---- PM item 18 (0.15.247): a 👍 reaction and a resolved flag on any comment (task or register record)
