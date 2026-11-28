@@ -22,7 +22,11 @@ export const useTaskSlots = (taskId: string | null) =>
   useQuery({ queryKey: ['task-slots', taskId], enabled: !!taskId, queryFn: () => api.get<{ items: DocumentSlot[] }>(`/tasks/${taskId}/slots`).then((r) => r.items) });
 
 /** Who owns a set of slots: a task (`/tasks/{id}`) or a register record (`/registers/{key}/records/{id}`, Q131). */
-export interface SlotTarget { base: string; refresh: string[][] }
+export interface SlotTarget {
+  base: string; refresh: string[][];
+  /** 0473: the photo field of the Daily Plan or of Status Updates: the upload names its owner in the form, the withdraw has its own path */
+  photo?: { kind: 'daily-plan' | 'status-update'; fields: Record<string, string> };
+}
 export const taskTarget = (task: Pick<TaskDetail, 'id' | 'site_id'>): SlotTarget => ({
   base: `/tasks/${task.id}`, refresh: [['task', task.id], ['task-slots', task.id], ['site-tasks', task.site_id], ['documents']],
 });
@@ -47,6 +51,11 @@ export function useSlotUpload(owner: Pick<TaskDetail, 'id' | 'site_id'> | SlotTa
       if (marks) { f.append('signed', String(marks.signed)); f.append('stamped', String(marks.stamped)); }
       const cur = slot.files.filter((x) => x.is_current);
       if (slot.max_files === 1 && cur.length === 1) f.append('replaces_file_group_id', cur[0]!.file_group_id);
+      if (target.photo) {
+        for (const [k, v] of Object.entries(target.photo.fields)) f.append(k, v);
+        f.append('site_id', (slot as DocumentSlot & { site_id?: string }).site_id ?? '');
+        return api.post(`/photo-slots/${target.photo.kind}/files`, { body: f });
+      }
       return api.post(`${target.base}/slots/${slot.id}/files`, { body: f });
     },
     onSettled: refresh,
@@ -56,7 +65,7 @@ export function useSlotUpload(owner: Pick<TaskDetail, 'id' | 'site_id'> | SlotTa
 export function useWithdrawFile(owner: Pick<TaskDetail, 'id' | 'site_id'> | SlotTarget) {
   const target = asTarget(owner);
   const refresh = useRefresh(target);
-  return useMutation<DocumentSlot, ApiError, { slotId: string; fileId: string }>({ mutationFn: ({ slotId, fileId }) => api.del(`${target.base}/slots/${slotId}/files/${fileId}`), onSettled: refresh });
+  return useMutation<DocumentSlot, ApiError, { slotId: string; fileId: string }>({ mutationFn: ({ slotId, fileId }) => api.del(target.photo ? `/photo-slots/${target.photo.kind}/${slotId}/files/${fileId}` : `${target.base}/slots/${slotId}/files/${fileId}`), onSettled: refresh });
 }
 
 export function useAddSlot(owner: Pick<TaskDetail, 'id' | 'site_id'> | SlotTarget) {
@@ -150,5 +159,31 @@ export function useSaveDocMark() {
   return useMutation<DocMarks, ApiError, { code: string; signature: boolean; stamp: boolean; reason: string }>({
     mutationFn: ({ code, ...body }) => api.put<DocMarks>(`/settings/document-marks/${encodeURIComponent(code)}`, { body }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['doc-marks'] }); },
+  });
+}
+
+// ------------------------------------------------------------------------------------------------------------- photo fields (0473)
+export type ScreenPhotos = S['ScreenPhotos'];
+export const dailyPlanPhotoTarget = (region: number, date: string): SlotTarget => ({
+  base: '/photo-slots/daily-plan', refresh: [['photo-slots', 'daily-plan'], ['documents'], ['media']], photo: { kind: 'daily-plan', fields: { region_id: String(region), date } },
+});
+export const statusPhotoTarget = (update: string): SlotTarget => ({
+  base: '/photo-slots/status-update', refresh: [['photo-slots', 'status-update', update], ['documents'], ['media']], photo: { kind: 'status-update', fields: { update_id: update } },
+});
+export const useDailyPlanPhotos = (region: number, date: string) =>
+  useQuery({ queryKey: ['photo-slots', 'daily-plan', region, date], enabled: !!date, queryFn: () => api.get<ScreenPhotos>('/photo-slots/daily-plan', { query: { region_id: String(region), date } }) });
+export const useStatusPhotos = (update: string) =>
+  useQuery({ queryKey: ['photo-slots', 'status-update', update], queryFn: () => api.get<ScreenPhotos>('/photo-slots/status-update', { query: { update_id: update } }) });
+/** A photo for a site that has no slot yet: the server makes the slot on first use. */
+export function useNewPhoto(target: SlotTarget) {
+  const refresh = useRefresh(target);
+  return useMutation<unknown, ApiError, { site_id: string; file: File }>({
+    mutationFn: ({ site_id, file }) => {
+      const f = new FormData();
+      f.append('file', file); f.append('site_id', site_id);
+      for (const [k, v] of Object.entries(target.photo?.fields ?? {})) f.append(k, v);
+      return api.post(`/photo-slots/${target.photo?.kind}/files`, { body: f });
+    },
+    onSettled: refresh,
   });
 }

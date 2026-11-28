@@ -3332,6 +3332,13 @@
     "reassign_hint": "Reassign opens the lead decision for the person: the SLA and the stage progress do not change.",
     "no_reassign_hint": "Reassigning needs the reassign right for the region."
   },
+  "photoField": {
+    "title": "Photos",
+    "none": "No photos yet.",
+    "site": "Site",
+    "add": "Add photo",
+    "added": "Photo added to {{site}}."
+  },
   "weekly": {
     "title": "Weekly status",
     "subtitle": "How each region and team is doing this week.",

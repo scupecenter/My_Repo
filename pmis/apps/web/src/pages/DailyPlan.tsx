@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { downloadDailyPlanTemplate, exportDailyPlan, useDailyPlan, useImportDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { MoreMenu, PageHeader } from '@/components/PageHeader';
+import { DailyPlanPhotos } from '@/components/PhotoField';
 import { SavedViews } from '@/components/SavedViews';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { LayoutPanel } from '@/components/LayoutPanel';
@@ -211,6 +212,10 @@ export function DailyPlan() {
           </table>
         </div>
       )}
+
+      {plans.map((p) => (
+        <DailyPlanPhotos key={p.region_id} region={p.region_id} date={shownDate} sites={rows.filter((r) => r.region_id === p.region_id).map((r) => ({ id: r.site_id, label: r.site_code }))} />
+      ))}
 
       <input ref={importInput} type="file" accept=".xlsx" className="sr-only" tabIndex={-1} data-testid="daily-plan-import-file" aria-label={t('dailyPlan.import')}
         onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); importer.reset(); e.target.value = ''; }} />

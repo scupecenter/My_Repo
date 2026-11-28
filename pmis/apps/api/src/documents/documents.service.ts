@@ -161,7 +161,7 @@ function judge(defs: { id: string; condition_rule: unknown }[], ctx: Record<stri
 
 /** Who owns a set of slots: a task, or a register record (keyed on its logical record). */
 export interface SlotOwner {
-  kind: 'task' | 'record';
+  kind: 'task' | 'record' | 'daily_plan' | 'status_update';
   /** task id, or the logical record (entity_id) of a register record */
   key: string;
   site_code: string;
@@ -189,6 +189,10 @@ export interface RecordCtx {
   site: Record<string, unknown> | null;
 }
 
+const photoBody = z.object({
+  region_id: z.coerce.number().int().positive().optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  update_id: z.string().uuid().optional(), site_id: z.string().uuid(),
+}).passthrough();
 const addSlotBody = z.object({ doc_code: z.string().min(1).max(40), candidate_label: z.string().trim().max(100).nullable().optional() }).strict();
 const suggestBody = z.object({ file_names: z.array(z.string().max(255)).min(1).max(50) }).strict();
 
@@ -322,7 +326,11 @@ export class DocumentsService {
   }
 
   private async slotDtosBase(owner: SlotOwner): Promise<Omit<DocumentSlotDto, 'needs_signature' | 'needs_stamp' | 'awaiting_signed_copy'>[]> {
-    const where = owner.kind === 'task' ? Prisma.sql`ds.task_id = ${owner.key}::uuid` : Prisma.sql`ds.register_entity_id = ${owner.key}::uuid`;
+    const where =
+      owner.kind === 'task' ? Prisma.sql`ds.task_id = ${owner.key}::uuid`
+      : owner.kind === 'daily_plan' ? Prisma.sql`ds.daily_plan_row_id IN (SELECT id FROM daily_plan_rows WHERE plan_id = ${owner.key}::uuid)`
+      : owner.kind === 'status_update' ? Prisma.sql`ds.status_update_id = ${owner.key}::uuid`
+      : Prisma.sql`ds.register_entity_id = ${owner.key}::uuid`;
     const slots = await this.db.tx.$queryRaw<SlotRow[]>(Prisma.sql`
       SELECT ds.id::text AS id, ds.doc_type_id::text AS doc_type_id, dt.code AS doc_code, dt.name_en, dt.name_ar, dt.kind::text AS kind, dt.form_kind, ds.status::text AS status, ds.reject_reason,
         ds.candidate_label, ds.conditional_declared, dt.condition_rule, v.spec, dt.is_mandatory AS dt_mandatory, dt.formats AS dt_formats, dt.max_size_mb AS dt_max_size_mb,
@@ -584,6 +592,90 @@ export class DocumentsService {
     return slot;
   }
 
+
+  // ----------------------------------------------------------------------------------------------------------------- photo fields (0473)
+
+  /** A photo slot's site and the owner the screens use: the plan of a Daily Plan row, or the status update. */
+  private async photoOwnerOf(kind: 'daily_plan' | 'status_update', slotId: string): Promise<{ owner: SlotOwner; site_id: string }> {
+    if (!uuidSchema.safeParse(slotId).success) throw problems.notFound();
+    const q = await this.db.tx.$queryRaw<{ key: string | null; site_id: string; site_code: string; region_id: number; plan_date: string | null }[]>(Prisma.sql`
+      SELECT coalesce(r.plan_id, ds.status_update_id)::text AS key, ds.site_id::text AS site_id, s.site_code, ds.region_id, p.plan_date::text AS plan_date
+      FROM document_slots ds JOIN sites s ON s.id = ds.site_id LEFT JOIN daily_plan_rows r ON r.id = ds.daily_plan_row_id LEFT JOIN daily_plans p ON p.id = r.plan_id
+      WHERE ds.id = ${slotId}::uuid AND ${kind === 'daily_plan' ? Prisma.sql`ds.daily_plan_row_id IS NOT NULL` : Prisma.sql`ds.status_update_id IS NOT NULL`}`);
+    const x = q[0];
+    if (!x || !x.key) throw problems.notFound();
+    const can = kind === 'daily_plan'
+      ? (await this.db.tx.$queryRaw<{ c: boolean }[]>(Prisma.sql`SELECT doc_dp_photo_can(${x.region_id}::int, ${x.plan_date}::date) AS c`))[0]?.c === true
+      : (await this.db.tx.$queryRaw<{ c: boolean }[]>(Prisma.sql`SELECT doc_su_photo_can(${x.key}::uuid) AS c`))[0]?.c === true;
+    return { owner: { kind, key: x.key, site_code: x.site_code, name_code: kind === 'daily_plan' ? 'DAILYPLAN' : 'STATUS', can_upload: can, closed_detail: can ? null : 'The photos of this screen can no longer be changed by you (locked day, ended week, or not your update).' }, site_id: x.site_id };
+  }
+
+  /** GET /photo-slots/daily-plan?region_id=&date=: the photos of the day's plan, per site, plus whether the field is on and may be changed. */
+  async dailyPlanPhotos(region: unknown, date: unknown): Promise<{ enabled: boolean; can_upload: boolean; items: (DocumentSlotDto & { site_id: string })[] }> {
+    const p = parse(z.object({ region_id: z.coerce.number().int().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(), { region_id: region, date });
+    const on = await this.photoFieldOn('PHOTO_DAILY_PLAN');
+    const can = (await this.db.tx.$queryRaw<{ c: boolean }[]>(Prisma.sql`SELECT doc_dp_photo_can(${p.region_id}::int, ${p.date}::date) AS c`))[0]?.c === true;
+    const plan = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT id::text AS id FROM daily_plans WHERE region_id = ${p.region_id}::int AND plan_date = ${p.date}::date`);
+    if (!plan[0]) return { enabled: on, can_upload: can && on, items: [] };
+    const slots = await this.slotDtos({ kind: 'daily_plan', key: plan[0].id, site_code: 'X', name_code: null, can_upload: can && on, closed_detail: null });
+    return { enabled: on, can_upload: can && on, items: await this.withSite(slots) };
+  }
+
+  /** GET /photo-slots/status-update?update_id=: the photos of one status update, per site. */
+  async statusUpdatePhotos(updateId: unknown): Promise<{ enabled: boolean; can_upload: boolean; items: (DocumentSlotDto & { site_id: string })[] }> {
+    const p = parse(z.object({ update_id: z.string().uuid() }).strict(), { update_id: updateId });
+    const on = await this.photoFieldOn('PHOTO_STATUS_UPDATE');
+    const can = (await this.db.tx.$queryRaw<{ c: boolean }[]>(Prisma.sql`SELECT doc_su_photo_can(${p.update_id}::uuid) AS c`))[0]?.c === true;
+    const slots = await this.slotDtos({ kind: 'status_update', key: p.update_id, site_code: 'X', name_code: null, can_upload: can && on, closed_detail: null });
+    return { enabled: on, can_upload: can && on, items: await this.withSite(slots) };
+  }
+
+  private async photoFieldOn(code: string): Promise<boolean> {
+    const r = await this.db.tx.$queryRaw<{ on: boolean }[]>(Prisma.sql`SELECT (is_active AND published_version > 0) AS "on" FROM document_types WHERE code = ${code}`);
+    return r[0]?.on === true;
+  }
+
+  private async withSite(slots: DocumentSlotDto[]): Promise<(DocumentSlotDto & { site_id: string })[]> {
+    if (slots.length === 0) return [];
+    const m = new Map((await this.db.tx.$queryRaw<{ id: string; site_id: string }[]>(Prisma.sql`SELECT id::text AS id, site_id::text AS site_id FROM document_slots WHERE id = ANY (${slots.map((x) => x.id)}::uuid[])`)).map((x) => [x.id, x.site_id]));
+    return slots.map((x) => ({ ...x, site_id: m.get(x.id) ?? '' }));
+  }
+
+  /** POST /photo-slots/daily-plan/files (multipart: region_id, date, site_id, file): makes the row and the slot on first use, then the same upload checks. */
+  async uploadDailyPlanPhoto(file: { buffer: Buffer; originalname: string } | undefined, body: Record<string, unknown> | undefined): Promise<DocumentFileDto> {
+    const b = parse(photoBody, body ?? {});
+    if (b.region_id === undefined || b.date === undefined) throw problems.validation([{ path: '/region_id', code: 'required', message: 'region_id and date are needed.' }]);
+    const sid = await this.call(async () => (await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT doc_dp_photo_slot(${b.region_id}::int, ${b.date}::date, ${b.site_id}::uuid, 'PHOTO_DAILY_PLAN')::text AS id`))[0]!.id);
+    return this.uploadPhoto('daily_plan', sid, file, body);
+  }
+
+  /** POST /photo-slots/status-update/files (multipart: update_id, site_id, file). */
+  async uploadStatusUpdatePhoto(file: { buffer: Buffer; originalname: string } | undefined, body: Record<string, unknown> | undefined): Promise<DocumentFileDto> {
+    const b = parse(photoBody, body ?? {});
+    if (b.update_id === undefined) throw problems.validation([{ path: '/update_id', code: 'required', message: 'update_id is needed.' }]);
+    const sid = await this.call(async () => (await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT doc_su_photo_slot(${b.update_id}::uuid, ${b.site_id}::uuid, 'PHOTO_STATUS_UPDATE')::text AS id`))[0]!.id);
+    return this.uploadPhoto('status_update', sid, file, body);
+  }
+
+  private async uploadPhoto(kind: 'daily_plan' | 'status_update', slotId: string, file: { buffer: Buffer; originalname: string } | undefined, body: Record<string, unknown> | undefined): Promise<DocumentFileDto> {
+    const { owner } = await this.photoOwnerOf(kind, slotId);
+    const reload = () => this.slotDtos(owner);
+    const slot = (await reload()).find((x) => x.id === slotId);
+    if (!slot) throw problems.notFound();
+    return this.uploadInto(owner, slot, file, body, reload);
+  }
+
+  /** DELETE /photo-slots/{kind}/{slotId}/files/{fileId}: withdraws a version (hidden, never deleted); the database applies the owner's write rules. */
+  async withdrawPhoto(kind: 'daily_plan' | 'status_update', slotId: string, fileId: string): Promise<DocumentSlotDto> {
+    const { owner } = await this.photoOwnerOf(kind, slotId);
+    if (!uuidSchema.safeParse(fileId).success) throw problems.notFound();
+    await this.call(() => this.db.tx.$queryRaw(Prisma.sql`SELECT doc_withdraw_file(${slotId}::uuid, ${fileId}::uuid)`));
+    await this.dropThumbs(fileId);
+    const slot = (await this.slotDtos(owner)).find((x) => x.id === slotId);
+    if (!slot) throw problems.notFound();
+    return slot;
+  }
+
   // ----------------------------------------------------------------------------------------------------------------- upload
 
   async upload(
@@ -608,7 +700,7 @@ export class DocumentsService {
     if (!slot.can_upload) {
       if (owner.closed_detail) throw new ProblemException(409, 'invalid_transition', { detail: owner.closed_detail });
       if (['approved', 'in_review', 'not_required'].includes(slot.status)) throw new ProblemException(409, 'invalid_transition', { detail: `This slot is ${slot.status} and takes no new file.` });
-      throw new ProblemException(403, 'not_eligible_holder', { detail: `You are not a holder of the level the ${owner.kind === 'task' ? 'task' : 'record'} is at.` });
+      throw new ProblemException(403, 'not_eligible_holder', { detail: `You are not a holder of the level the ${owner.kind === 'task' ? 'task' : owner.kind === 'record' ? 'record' : 'screen'} is at.` });
     }
     const limit = slot.max_size_mb * 1024 * 1024;
     if (file.buffer.length > limit) {

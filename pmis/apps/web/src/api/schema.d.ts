@@ -2982,6 +2982,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/photo-slots/daily-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The photos of the Daily Plan (0.15.535)
+         * @description Photo slots of the Daily Plan, one per site. `enabled` is false when the document type PHOTO_DAILY_PLAN is switched off in Settings > Documents (the field is then hidden). `can_upload` follows the write rules of the screen. Reads follow the region visibility of the screen.
+         */
+        get: operations["listDailyPlanPhotos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/photo-slots/daily-plan/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a photo to a site of the Daily Plan (0.15.535)
+         * @description Multipart. `region_id`, `date` and `site_id` (a site of the plan; an auto row is stored on first use, the plan version is not changed). Allowed to the L1 holders of the region (or a System Admin) on an unlocked day.
+         *     Same upload checks as every document (size, magic bytes, formats, number of files, virus scan, EXIF date). The photo appears in the Media gallery by itself. The audit row is `daily_plan.document_uploaded`.
+         */
+        post: operations["uploadDailyPlanPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/photo-slots/daily-plan/{slot_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a photo of the Daily Plan (0.15.535)
+         * @description The photo is hidden, never deleted (`is_current` false); it stays on record and in the audit log. Same right as adding one.
+         */
+        delete: operations["withdrawDailyPlanPhoto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/photo-slots/status-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The photos of the Status Update (0.15.535)
+         * @description Photo slots of the Status Update, one per site. `enabled` is false when the document type PHOTO_STATUS_UPDATE is switched off in Settings > Documents (the field is then hidden). `can_upload` follows the write rules of the screen. Reads follow the region visibility of the screen.
+         */
+        get: operations["listStatusUpdatePhotos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/photo-slots/status-update/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a photo to a site of the Status Update (0.15.535)
+         * @description Multipart. `update_id` and `site_id` (a site of the region of the update, 404 otherwise). Allowed to the author of the update inside its week.
+         *     Same upload checks as every document (size, magic bytes, formats, number of files, virus scan, EXIF date). The photo appears in the Media gallery by itself. The audit row is `status_update.document_uploaded`.
+         */
+        post: operations["uploadStatusUpdatePhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/photo-slots/status-update/{slot_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a photo of the Status Update (0.15.535)
+         * @description The photo is hidden, never deleted (`is_current` false); it stays on record and in the audit log. Same right as adding one.
+         */
+        delete: operations["withdrawStatusUpdatePhoto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{task_id}/slots/suggest": {
         parameters: {
             query?: never;
@@ -14862,6 +14984,15 @@ export interface components {
             };
             version: number;
         };
+        /** @description The photo field of the Daily Plan or of Status Updates (0.15.535). One slot per site; the slot carries the files. */
+        ScreenPhotos: {
+            enabled: boolean;
+            can_upload: boolean;
+            items: (components["schemas"]["DocumentSlot"] & {
+                /** Format: uuid */
+                site_id: string;
+            })[];
+        };
         DocumentSlot: {
             /** Format: uuid */
             id: string;
@@ -19840,7 +19971,7 @@ export interface components {
             /** @enum {string} */
             key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries" | "login.ip_attempts" | "login.ip_window_seconds" | "login.ip_base_seconds" | "login.ip_max_seconds" | "login.identifier_attempts" | "media.thumbnails_per_minute";
             /** @enum {string} */
-            group: "sessions" | "rows" | "exports" | "media" | "media";
+            group: "sessions" | "rows" | "exports" | "media";
             /** @enum {string} */
             unit: "hours" | "seconds" | "rows" | "sites" | "entries" | "attempts" | "per_minute";
             default: number;
@@ -28965,6 +29096,188 @@ export interface operations {
             header?: never;
             path: {
                 task_id: components["parameters"]["TaskId"];
+                slot_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slot after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listDailyPlanPhotos: {
+        parameters: {
+            query: {
+                region_id: number;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photos. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenPhotos"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadDailyPlanPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: string;
+                    /** Format: uuid */
+                    site_id: string;
+                    region_id: number;
+                    /** Format: date */
+                    date: string;
+                    /** Format: uuid */
+                    replaces_file_group_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentFile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    withdrawDailyPlanPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slot_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slot after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listStatusUpdatePhotos: {
+        parameters: {
+            query: {
+                update_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photos. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenPhotos"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadStatusUpdatePhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: string;
+                    /** Format: uuid */
+                    site_id: string;
+                    /** Format: uuid */
+                    update_id: string;
+                    /** Format: uuid */
+                    replaces_file_group_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentFile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    withdrawStatusUpdatePhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
                 slot_id: string;
                 file_id: string;
             };

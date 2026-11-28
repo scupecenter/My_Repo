@@ -11,13 +11,11 @@
 -- Additive and safe to repeat. Mirror: db/sql/472_photo_daily_status.sql (kept identical to prisma/migrations/0473_photo_daily_status/migration.sql).
 
 ALTER TABLE document_slots ADD COLUMN IF NOT EXISTS daily_plan_row_id uuid REFERENCES daily_plan_rows (id) ON DELETE SET NULL;
-ALTER TABLE document_slots ADD COLUMN IF NOT EXISTS status_update_id uuid REFERENCES status_updates (id);
+ALTER TABLE document_slots ADD COLUMN IF NOT EXISTS status_update_id uuid REFERENCES status_updates (id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS document_slots_dp_row_idx ON document_slots (daily_plan_row_id) WHERE daily_plan_row_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS document_slots_su_idx ON document_slots (status_update_id) WHERE status_update_id IS NOT NULL;
 ALTER TABLE document_slots DROP CONSTRAINT IF EXISTS document_slots_one_owner;
 ALTER TABLE document_slots ADD CONSTRAINT document_slots_one_owner CHECK (num_nonnulls(task_id, register_entity_id, daily_plan_row_id, status_update_id) <= 1);
-
-GRANT SELECT ON daily_plans, daily_plan_rows, status_updates TO pmis_definer;
 
 CREATE OR REPLACE FUNCTION doc_slot_owner_for_write(p_slot public.document_slots, p_actor uuid, p_verb text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
@@ -69,8 +67,7 @@ BEGIN
     PERFORM public.log_audit_write('daily_plan.' || p_action, 'daily_plan', p_owner ->> 'plan_id', p_before,
       coalesce(p_after, '{}'::jsonb) || jsonb_build_object('plan_date', p_owner ->> 'plan_date'), NULL, (p_owner ->> 'site_id')::uuid, (p_owner ->> 'region_id')::int);
   ELSIF p_owner ->> 'kind' = 'status_update' THEN
-    INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, actor_id)
-    VALUES ('status_update.' || p_action, 'status_update', p_owner ->> 'id', (p_owner ->> 'site_id')::uuid, (p_owner ->> 'region_id')::int, p_before, p_after, public.app_actor());
+    PERFORM public.log_audit_write('status_update.' || p_action, 'status_update', p_owner ->> 'id', p_before, p_after, NULL, (p_owner ->> 'site_id')::uuid, (p_owner ->> 'region_id')::int);
   ELSE
     PERFORM public.reg_audit(p_action, (p_owner ->> 'id')::uuid, p_before, p_after, NULL);
   END IF;
@@ -143,6 +140,21 @@ BEGIN
   RETURN sid;
 END $$;
 
+-- Whether the signed-in user may change the photos now (the screens show or hide the upload; the write rules above are the gate).
+CREATE OR REPLACE FUNCTION doc_dp_photo_can(p_region integer, p_date date) RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+BEGIN
+  IF public.app_actor() IS NULL OR p_region IS NULL OR NOT public.app_region_check(p_region) THEN RETURN false; END IF;
+  IF NOT public.dp_right(public.app_actor(), p_region, 'view') THEN RETURN false; END IF;
+  IF EXISTS (SELECT 1 FROM public.daily_plans WHERE region_id = p_region AND plan_date = p_date AND locked_at IS NOT NULL) THEN RETURN false; END IF;
+  RETURN public.app_user_is_system_admin(public.app_actor()) OR public.dp_holds(public.app_actor(), p_region, 'entry');
+END $$;
+
+CREATE OR REPLACE FUNCTION doc_su_photo_can(p_update uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT EXISTS (SELECT 1 FROM public.status_updates u WHERE u.id = p_update AND u.author_id = public.app_actor() AND public.cal_today() <= u.week_start + 6)
+$$;
+
 -- The two photo field types: kind photo, no placement (the field sits on the screen, not on a record), optional, at least one photo, images only.
 DO $$
 DECLARE r record; did uuid; spec jsonb;
@@ -166,6 +178,16 @@ END $$;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
-    GRANT EXECUTE ON FUNCTION doc_dp_photo_slot(integer, date, uuid, text), doc_su_photo_slot(uuid, uuid, text) TO pmis_app;
+    GRANT EXECUTE ON FUNCTION doc_dp_photo_slot(integer, date, uuid, text), doc_su_photo_slot(uuid, uuid, text), doc_dp_photo_can(integer, date), doc_su_photo_can(uuid) TO pmis_app;
   END IF;
+END $$;
+
+DO $$
+DECLARE f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['doc_dp_photo_slot(integer,date,uuid,text)', 'doc_su_photo_slot(uuid,uuid,text)', 'doc_dp_photo_can(integer,date)', 'doc_su_photo_can(uuid)'] LOOP
+    EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_definer', f);
+  END LOOP;
 END $$;
