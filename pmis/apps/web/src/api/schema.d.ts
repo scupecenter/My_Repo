@@ -4674,6 +4674,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalogue of the links between registers
+         * @description 0.15.586 (migration 0713). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+         */
+        get: operations["listRegisterLinkCatalogue"];
+        /**
+         * Save the catalogue (the whole list)
+         * @description 0.15.586 (migration 0713). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+         */
+        put: operations["saveRegisterLinkCatalogue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/register-rules": {
         parameters: {
             query?: never;
@@ -5433,6 +5457,26 @@ export interface paths {
          * @description 0.15.269 (migration 0543, `admin_save_progress_partial_credit`): System Admin only, a reason and If-Match (the setting version). Audited.
          */
         put: operations["putPartialCredit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/alert-rules/link-orphans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The register links that leave records dangling, with example ids (0.15.510)
+         * @description 0.15.510 (migration 0650): System Admin. Per declared link (register_links): `rows_with_value`, `orphan_rows` (current rows whose id is no current record of the target) and up to 20 `examples` (record ids). The same count feeds the alert kind `link_orphans`.
+         */
+        get: operations["getLinkOrphans"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -7406,6 +7450,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard-finance-readers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who sees the restricted financial summary card of the dashboard (0.15.206)
+         * @description Every signed-in user may read it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDashboardFinanceReaders"];
+        /**
+         * Switch the financial summary on or off and choose its roles (reason, step-up, If-Match, audited) (0.15.206)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason (3+ characters), a step-up (401
+         *     `step_up_required`) and `If-Match` (428 / 412) are required. A role code that is not an active role is 422. Saving the values in force is 409
+         *     `invalid_transition`. Audited `dashboard_finance_readers_update` with `{enabled, role_codes}` before and after.
+         */
+        put: operations["setDashboardFinanceReaders"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/ops-limits": {
         parameters: {
             query?: never;
@@ -8402,6 +8472,32 @@ export interface paths {
          *     (`weekday` is a whole number from 0 to 6). One audit row with before and after values and the reason. Applies from the next snapshot; stored snapshots are not moved.
          */
         put: operations["setSnapshotSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/dashboard/forecast-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The number of weeks the dashboard forecast averages (0.15.431)
+         * @description 0.15.431. The setting `dashboard.forecast_window_weeks`: the progress curve card forecasts the date the actual curve reaches 100 % from the mean weekly gain over the last
+         *     N real weeks of the saved snapshots. Default 4, range 2 to 12. `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getForecastWindow"];
+        /**
+         * Save the number of weeks the dashboard forecast averages (reason, If-Match, audited)
+         * @description 0.15.431. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+         *     (`weeks` is a whole number from 2 to 12). One audit row with before and after values and the reason. Nothing stored is recomputed: the forecast is drawn from the saved snapshots when the card opens.
+         */
+        put: operations["setForecastWindow"];
         post?: never;
         delete?: never;
         options?: never;
@@ -11377,6 +11473,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/custom-registers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The custom registers (hidden ones too) with their usage and the limit
+         * @description 0.15.533. System Admin or an all-regions delegate of the custom fields.
+         */
+        get: operations["listCustomRegisters"];
+        put?: never;
+        /**
+         * Create a custom register (disabled until it has columns and is enabled)
+         * @description 0.15.533. The key is generated from the English name (`custom_` and letters). Fails when the limit registers.custom_max is reached.
+         */
+        post: operations["createCustomRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/custom-registers/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        /** One custom register */
+        get: operations["getCustomRegister"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename, hide or show a custom register
+         * @description 0.15.533. The key never changes. Hiding removes the menu entry and the module from the grid editor; records and grants stay.
+         */
+        patch: operations["updateCustomRegister"];
+        trace?: never;
+    };
+    "/custom-registers/{key}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable a custom register (menu key, template, permission module)
+         * @description 0.15.533. Needs at least one active column and one required column. Adds the menu key, the upload and download template and refreshes the templates.
+         */
+        post: operations["enableCustomRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/custom-fields": {
         parameters: {
             query?: never;
@@ -13331,6 +13496,14 @@ export interface components {
             approved_by?: components["schemas"]["UserRef"] | null;
             /** Format: date */
             approved_at?: string | null;
+            /** @description 0.15.536: the current version is marked as the signed copy (0555); null when the row has no file. */
+            signed?: boolean | null;
+            /** @description 0.15.536: the current version is marked as the stamped copy; null when the row has no file. */
+            stamped?: boolean | null;
+            /** @description 0.15.536: the document type needs a signed copy (Settings > Documents > Archive marks). Informs only. */
+            needs_signature?: boolean;
+            /** @description 0.15.536: the document type needs a stamped copy. Informs only. */
+            needs_stamp?: boolean;
             /** Format: date-time */
             generated_at?: string | null;
             /**
@@ -13342,7 +13515,7 @@ export interface components {
         LibraryArchiveConfig: {
             hidden: string[];
             order: string[];
-            default_columns: ("site" | "site_name" | "region" | "cluster" | "doc_type" | "doc_number" | "version" | "status" | "task" | "uploaded_by" | "uploaded_at" | "approved_by" | "approved_at")[];
+            default_columns: ("site" | "site_name" | "region" | "cluster" | "doc_type" | "doc_number" | "version" | "status" | "task" | "uploaded_by" | "uploaded_at" | "approved_by" | "approved_at" | "signed" | "stamped")[];
             zip_limit: number;
         };
         LibraryArchiveSetting: components["schemas"]["LibraryArchiveConfig"] & {
@@ -13873,6 +14046,25 @@ export interface components {
             /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
             conflicts?: string[];
         };
+        RegisterLinkEntry: {
+            from_register: string;
+            field: string;
+            to_register: string;
+            /** @description Read only. */
+            target_record_type?: string | null;
+            /** @description Read only: the state a record must have to be picked or accepted. */
+            target_state?: string;
+            same_site?: boolean;
+            /** @description Check the id in entry (D60). */
+            enforce?: boolean;
+            /** @description Declared and active (register_links.is_active). */
+            enabled?: boolean;
+        };
+        RegisterLinkCatalogue: {
+            links: components["schemas"]["RegisterLinkEntry"][];
+            version: number;
+            can_edit: boolean;
+        };
         RegisterState: {
             register_key: string;
             name_en: string;
@@ -13930,7 +14122,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -18191,7 +18383,7 @@ export interface components {
             id: string;
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon" | "link_orphans";
             /** @description Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}. */
             params: {
                 [key: string]: unknown;
@@ -18218,7 +18410,7 @@ export interface components {
         AlertRuleInput: {
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon" | "link_orphans";
             params: {
                 [key: string]: unknown;
             };
@@ -18983,7 +19175,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment";
         RegisterField: {
             code: string;
             label_en: string;
@@ -20340,6 +20532,7 @@ export interface components {
             quality: components["schemas"]["DashboardOpsQuality"];
             approvals: components["schemas"]["DashboardOpsApprovals"];
             changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
+            finance: components["schemas"]["DashboardOpsFinance"];
             phase_scope: components["schemas"]["DashboardOpsPhaseScope"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
@@ -20565,6 +20758,64 @@ export interface components {
                 overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
             };
         };
+        /** @description 0.15.206 (item 9): the restricted financial summary. Only for a configured reader (setting dashboard.finance_readers); never in an export or a share link. Invoice ages are not included: no invoice data exists. */
+        DashboardOpsFinance: {
+            /** @description False unless the card is switched on, the caller holds a listed role and has the financial advances view; every figure is then null. */
+            available: boolean;
+            advances: {
+                total: number;
+                /** @description States approved_for_disbursement, disbursed and settlement_in_progress. */
+                open: number;
+                /** @description Records whose amounts are hidden: counted, but no amount is added. */
+                hidden_amounts: number;
+            } | null;
+            amounts: {
+                /** @description LYD. */
+                approved: number;
+                /** @description LYD. */
+                disbursed: number;
+                /** @description LYD. */
+                returned: number;
+                /** @description LYD disbursed on advances still open. */
+                open_disbursed: number;
+            } | null;
+            open_aging: components["schemas"]["DashboardOpsAging"] | null;
+            achievement: {
+                /** @description Assignments (procurement records) that have an advance. */
+                assignments: number;
+                /** @description Of them, those with an actual end. */
+                completed: number;
+                completion_pct: number | null;
+                /** @description LYD. */
+                disbursed_on_completed: number;
+                /** @description LYD. */
+                disbursed_on_open_work: number;
+            } | null;
+        };
+        /** @description 0.15.206. Who sees the restricted financial summary card (setting `dashboard.finance_readers`, migration 0307). */
+        DashboardFinanceReaders: {
+            /** @description Off by default. */
+            enabled: boolean;
+            /** @description Active roles whose holders see the card; default PM and FIN_OFFICER. */
+            role_codes: string[];
+            /** @description Every active role, to choose from. */
+            roles: {
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+            }[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        DashboardFinanceReadersInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            role_codes: string[];
+        };
         /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
         DashboardOpsQuality: {
             /** @description False when the caller lacks the quality view; every figure is then null. */
@@ -20770,6 +21021,17 @@ export interface components {
             default_green: number;
             /** @description The suggested amber (not stored). */
             default_amber: number;
+        };
+        /** @description 0.15.431. The setting dashboard.forecast_window_weeks (default 4). */
+        ForecastWindow: components["schemas"]["ForecastWindowInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ForecastWindowInput: {
+            /** @description How many of the last real weeks the forecast averages the weekly gain over. */
+            weeks: number;
         };
         /** @description 0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity. */
         ProgressRag: {
@@ -21047,6 +21309,11 @@ export interface components {
             slot_status?: "uploaded" | "in_review" | "approved" | "rejected";
             /** @default false */
             include_superseded: boolean;
+            /**
+             * @description 0.15.472 (phase 4). The consolidated site acceptance pack: needs `site_id` and no other filter (422 `/pack` `pack_scope`); carries the approved current files of the PAC, FAC and HOTO document types, one folder per document type, with `INDEX.txt` (English and Arabic) and `manifest.csv`. Same job, same rights, same export lock.
+             * @enum {string}
+             */
+            pack?: "acceptance";
         };
         /** @description Common publish body (ADR 0007 §1). */
         PublishRequest: components["schemas"]["WithReason"] & {
@@ -22006,6 +22273,40 @@ export interface components {
             title?: string;
             description?: string;
             severity?: string;
+        };
+        CustomRegister: {
+            register_key: string;
+            /** @description Same as register_key; the permission module. */
+            module_key: string;
+            name_en: string;
+            name_ar: string | null;
+            site_scoped: boolean;
+            multiple_per_site: boolean;
+            /** @description False until enabled; a disabled register has no menu entry or template. */
+            enabled: boolean;
+            /** @description False when hidden. */
+            is_active: boolean;
+            version: number;
+            /** Format: date-time */
+            created_at: string | null;
+            field_count: number;
+            required_count: number;
+            record_count: number;
+            template_id: string | null;
+        };
+        CustomRegisterInput: {
+            name_en: string;
+            name_ar?: string | null;
+            site_scoped: boolean;
+            /** @default true */
+            multiple_per_site: boolean;
+            reason: string;
+        };
+        CustomRegisterPatch: {
+            name_en?: string;
+            name_ar?: string | null;
+            is_active?: boolean;
+            reason: string;
         };
         /** @enum {string} */
         CustomFieldEntity: "site" | "milestone" | "gate" | "task" | "rf_design" | "acquisition" | "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle";
@@ -32450,6 +32751,60 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    listRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    links: components["schemas"]["RegisterLinkEntry"][];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The saved catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listRegisterRules: {
         parameters: {
             query?: never;
@@ -32480,6 +32835,10 @@ export interface operations {
                             name_en: string;
                             name_ar?: string | null;
                             rules: {
+                                [key: string]: unknown;
+                            };
+                            /** @description 0.15.572 (migration 0643). The rules keys that are not in the catalogue: shown read only. */
+                            other?: {
                                 [key: string]: unknown;
                             };
                             version: number;
@@ -33930,6 +34289,37 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getLinkOrphans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        links: {
+                            register_key: string;
+                            field_code: string;
+                            target_register: string;
+                            rows_with_value: number;
+                            orphan_rows: number;
+                            examples: string[];
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     updateAlertRule: {
@@ -37500,6 +37890,62 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getDashboardFinanceReaders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The readers setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardFinanceReaders"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDashboardFinanceReaders: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardFinanceReadersInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardFinanceReaders"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getOpsLimits: {
         parameters: {
             query?: never;
@@ -39071,6 +39517,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnapshotSchedule"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getForecastWindow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The number of weeks. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastWindow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setForecastWindow: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["ForecastWindowInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastWindow"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -44813,6 +45315,164 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listCustomRegisters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The custom registers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CustomRegister"][];
+                        limit: {
+                            /** @description The setting registers.custom_max. */
+                            max: number;
+                            active: number;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createCustomRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomRegisterInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getCustomRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The register. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCustomRegister: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomRegisterPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    enableCustomRegister: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Enabled. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listCustomFields: {
