@@ -70,6 +70,7 @@ export class AlertRulesService {
           { kind: 'advance_unsettled', params: ['days'] },
           { kind: 'invoice_due_soon', params: ['days'] },
           { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] },
+          { kind: 'sla_breach', params: ['party_type', 'min_late_days', 'min_snags'] },
         ],
         kpis,
         audiences: ['system_admin', 'module'],

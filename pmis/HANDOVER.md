@@ -79,6 +79,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 - **Security log:** separate from the Audit Log and the System Log, readable by System Admins or the `view_security_log` grant, and every read is audited. An identifier typed at sign-in that matches nobody is never stored as typed: only a masked keyed hash is kept.
 - **Log integrity:** the Audit Log and the security log are append-only hash chains; an admin check verifies each chain and lists any break.
 - **Online now:** admins see active sessions (status, last activity, current screen) and can end a user's sessions with a reason and step-up MFA. Background polling never extends the idle timeout.
+- **SLA breach notice (0672):** a rule of kind `sla_breach` in Settings > Alerts > Rules notifies the chosen audience once a week per contractor or supplier with snags past their target date. In-app first; the existing `alert_rule` mail kind makes it channel-ready. No amounts.
 - **Log retention:** System Log and security log minimums are 90 and 365 days; reducing one needs a reason and step-up and raises a mandatory alert. The Audit Log stays 10 years and is not settable.
 - **Typed confirmation:** type the target's code or name, in addition to step-up MFA, to lift the structural freeze, publish a workflow version, or dismantle.
 - **No self-grant:** nobody can grant rights to themselves, by a delegation to a role or group they belong to, or by copying assignments to themselves (only a System Admin acting without delegation may do so).

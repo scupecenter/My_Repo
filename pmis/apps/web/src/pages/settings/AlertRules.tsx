@@ -22,6 +22,9 @@ interface Form {
   days: string;
   field_code: string;
   min_rows: string;
+  party_type: string;
+  min_late_days: string;
+  min_snags: string;
   audience: string;
   module: string;
   title_en: string;
@@ -37,14 +40,14 @@ interface Form {
 }
 
 const EMPTY: Form = {
-  id: null, version: 0, code: '', kind: 'weekly_status_missing', register_key: '', state: '', days: '7', field_code: '', min_rows: '1',
+  id: null, version: 0, code: '', kind: 'weekly_status_missing', register_key: '', state: '', days: '7', field_code: '', min_rows: '1', party_type: '', min_late_days: '1', min_snags: '1',
   audience: 'system_admin', module: '', title_en: '', title_ar: '', body_en: '', body_ar: '', link: '', enabled: true,
   kpi: '', op: 'above', value: '', locked: false,
 };
 
 const toForm = (r: AlertRule): Form => ({
   id: r.id, version: r.version, code: r.code, kind: r.kind,
-  register_key: String(r.params.register_key ?? ''), state: String(r.params.state ?? ''), days: String(r.params.days ?? '7'), field_code: String(r.params.field_code ?? ''), min_rows: String(r.params.min_rows ?? '1'),
+  register_key: String(r.params.register_key ?? ''), state: String(r.params.state ?? ''), days: String(r.params.days ?? '7'), field_code: String(r.params.field_code ?? ''), min_rows: String(r.params.min_rows ?? '1'), party_type: String(r.params.party_type ?? ''), min_late_days: String(r.params.min_late_days ?? '1'), min_snags: String(r.params.min_snags ?? '1'),
   audience: String(r.audience.type ?? 'system_admin'), module: String(r.audience.module ?? ''),
   title_en: r.title_en, title_ar: r.title_ar, body_en: r.body_en, body_ar: r.body_ar, link: r.link ?? '', enabled: r.enabled,
   kpi: String(r.params.kpi ?? ''), op: String(r.params.op ?? 'above'), value: r.params.value === undefined ? '' : String(r.params.value), locked: r.locked,
@@ -54,6 +57,7 @@ const toBody = (f: Form): AlertRuleInput => ({
   code: f.code.trim(),
   kind: f.kind as AlertRuleInput['kind'],
   params: f.kind === 'record_idle' ? { register_key: f.register_key, state: f.state.trim(), days: Number(f.days) }
+    : f.kind === 'sla_breach' ? { ...(f.party_type.trim() ? { party_type: f.party_type.trim() } : {}), min_late_days: Number(f.min_late_days), min_snags: Number(f.min_snags) }
     : f.kind === 'link_orphans' ? { ...(f.register_key ? { register_key: f.register_key } : {}), ...(f.register_key && f.field_code.trim() ? { field_code: f.field_code.trim() } : {}), min_rows: Number(f.min_rows) }
     : (f.kind === 'advance_unsettled' || f.kind === 'invoice_due_soon') && f.days.trim() !== '' ? { days: Number(f.days) }
     : f.kind === 'kpi_threshold' ? { kpi: f.kpi, op: f.op, value: Number(f.value) } : {},
@@ -81,6 +85,7 @@ export function AlertRules() {
   const kindDef = catalogue.kinds.find((k) => k.kind === v?.kind);
   const bad = !v || v.code.trim().length < 2
     || (v.kind === 'record_idle' && (v.register_key === '' || v.state.trim() === '' || !/^[0-9]+$/.test(v.days) || Number(v.days) < 1 || Number(v.days) > 3650))
+    || (v.kind === 'sla_breach' && (!/^[0-9]+$/.test(v.min_late_days) || Number(v.min_late_days) < 1 || Number(v.min_late_days) > 100000 || !/^[0-9]+$/.test(v.min_snags) || Number(v.min_snags) < 1 || Number(v.min_snags) > 100000))
     || (v.kind === 'link_orphans' && (!/^[0-9]+$/.test(v.min_rows) || Number(v.min_rows) < 1 || Number(v.min_rows) > 100000))
     || ((v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && v.days.trim() !== '' && (!/^[0-9]+$/.test(v.days) || Number(v.days) > 365 || (v.kind === 'advance_unsettled' && Number(v.days) < 1)))
     || (v.kind === 'kpi_threshold' && (v.kpi === '' || v.value.trim() === '' || isNaN(Number(v.value)) || Number(v.value) < 0 || Number(v.value) > 100000))
@@ -162,6 +167,16 @@ export function AlertRules() {
             <label className="block text-sm font-semibold">{t('alertRules.days')}
               <input type="number" min={v.kind === 'advance_unsettled' ? 1 : 0} max={365} className="input mt-1 w-28 font-normal" data-testid="ar-days" placeholder={v.kind === 'advance_unsettled' ? t('alertRules.days_hub') : '7'} value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
           )}
+          {v.kind === 'sla_breach' && (
+            <div className="flex flex-wrap gap-3">
+              <label className="text-sm font-semibold" title={t('alertRules.party_type_hint')}>{t('alertRules.party_type')}
+                <input className="input mt-1 w-44 font-normal" dir="ltr" data-testid="ar-party-type" placeholder={t('alertRules.any_party')} value={v.party_type} onChange={(e) => setF({ ...v, party_type: e.target.value })} /></label>
+              <label className="text-sm font-semibold" title={t('alertRules.min_late_days_hint')}>{t('alertRules.min_late_days')}
+                <input type="number" min={1} max={100000} className="input mt-1 w-28 font-normal" data-testid="ar-min-late-days" value={v.min_late_days} onChange={(e) => setF({ ...v, min_late_days: e.target.value })} /></label>
+              <label className="text-sm font-semibold" title={t('alertRules.min_snags_hint')}>{t('alertRules.min_snags')}
+                <input type="number" min={1} max={100000} className="input mt-1 w-28 font-normal" data-testid="ar-min-snags" value={v.min_snags} onChange={(e) => setF({ ...v, min_snags: e.target.value })} /></label>
+            </div>
+          )}
           {v.kind === 'link_orphans' && (
             <div className="flex flex-wrap gap-3">
               <label className="text-sm font-semibold">{t('alertRules.register')}
@@ -212,7 +227,7 @@ export function AlertRules() {
             <label className="mt-5 flex items-center gap-2 text-sm font-semibold">
               <input type="checkbox" data-testid="ar-locked" checked={v.locked} onChange={(e) => setF({ ...v, locked: e.target.checked })} />{t('alertRules.locked')}</label>
           </div>
-          {['/code', '/kind', '/params/register_key', '/params/state', '/params/days', '/params/field_code', '/params/min_rows', '/params/kpi', '/params/op', '/params/value', '/audience', '/title_en', '/title_ar', '/body_en', '/body_ar', '/link', '/locked'].map((p) => <span key={p}>{fe(p)}</span>)}
+          {['/code', '/kind', '/params/register_key', '/params/state', '/params/days', '/params/field_code', '/params/min_rows', '/params/party_type', '/params/min_late_days', '/params/min_snags', '/params/kpi', '/params/op', '/params/value', '/audience', '/title_en', '/title_ar', '/body_en', '/body_ar', '/link', '/locked'].map((p) => <span key={p}>{fe(p)}</span>)}
           <div className="flex gap-2">
             <button className="btn btn-accent" data-testid="ar-save" disabled={bad || busy} onClick={() => setAskReason(true)}>{t('common.save')}</button>
             <button className="btn" data-testid="ar-cancel" onClick={() => setF(null)}>{t('common.cancel')}</button>
