@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Eye, EyeOff, KeyRound, Lock, Mail, Palette, PanelLeft, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { DefaultViewsSection } from '@/components/DefaultViewsSection';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -72,6 +73,7 @@ export function Profile() {
         <MySessionsSection />
         <NotificationPrefsSection />
         <PushSection />
+        <DefaultViewsSection />
       </div>
     </div>
   );
