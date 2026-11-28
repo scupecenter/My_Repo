@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { ProjectStatusSnapshot } from "@/api/dashboard";
 import { EChart, type Palette } from "@/components/EChart";
-import { forecastFull, scurveSeries, weeklyVelocity } from "@/lib/scurve";
+import { useForecastWindow } from "@/api/dashboardSettings";
+import { forecastFull, scurveSeries, VELOCITY_WINDOW, weeklyVelocity } from "@/lib/scurve";
 import { Card, pct, signed } from "./dashboardBits";
 
 const FONT = "Cairo, system-ui, sans-serif";
@@ -26,7 +27,9 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
     [snaps],
   );
   const series = useMemo(() => scurveSeries(points), [points]);
-  const velocity = useMemo(() => weeklyVelocity(points), [points]);
+  // contract 0.15.431: the number of weeks is the setting dashboard.forecast_window_weeks (default 4); until it is read the old fixed value is used
+  const windowWeeks = useForecastWindow().data?.weeks ?? VELOCITY_WINDOW;
+  const velocity = useMemo(() => weeklyVelocity(points, windowWeeks), [points, windowWeeks]);
   const forecast = useMemo(() => forecastFull(points, velocity), [points, velocity]);
   const last = series[series.length - 1];
   const lastSnap = (snaps?.items ?? []).filter((s) => s.scope !== "region").sort((a, b) => (a.taken_on < b.taken_on ? 1 : -1))[0];

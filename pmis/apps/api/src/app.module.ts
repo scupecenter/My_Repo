@@ -90,6 +90,8 @@ import { DashboardSettingsController } from './dashboard/dashboard-settings.cont
 import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
 import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controller';
 import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
+import { ForecastWindowController } from './dashboard/forecast-window.controller';
+import { ForecastWindowService } from './dashboard/forecast-window.service';
 import { GoalsController } from './dashboard/goals.controller';
 import { GoalsService } from './dashboard/goals.service';
 import { SiteMapService } from './dashboard/site-map.service';
@@ -253,6 +255,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       PartialCreditController, // 0.15.269 progress standards
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       SnapshotWeekdayController, // 0.15.430 (own line)
+      ForecastWindowController, // 0.15.431 (own line)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
       CspReportController, // SEC-3
@@ -287,6 +290,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       PartialCreditService, // 0.15.269 progress standards
       MediaService, // 0.15.292
       SnapshotWeekdayService, // 0.15.430 (own line)
+      ForecastWindowService, // 0.15.431 (own line)
       PasskeyService, // S4
       DuplicateRowsSettingsService,
       TemplateNoticeSettingsService,

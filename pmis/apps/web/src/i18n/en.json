@@ -5383,6 +5383,11 @@
       "structure_decision": "Your structure proposal was decided"
     }
   },
+  "forecastWindow": {
+    "title": "Forecast window",
+    "note": "How many of the last real weeks the progress curve forecast averages the weekly gain over (2 to 12, default 4). A longer window smooths the forecast, a shorter one follows the recent pace. The forecast is drawn from the saved snapshots when the card opens, so nothing stored is recomputed. Own save, reason and audit row.",
+    "weeks": "Weeks averaged"
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
