@@ -29,6 +29,11 @@ describe('settings gear: central map', () => {
     expect(screenSettingsPath(k)).toMatch(/^\/admin\/settings\//);
   });
 
+  it('points the moved settings at their new Settings sections', () => {
+    expect(screenSettingsPath('template_mapping')).toBe('/admin/settings/data/mapping');
+    expect(screenSettingsPath('security_alerts')).toBe('/admin/settings/security/alerts');
+  });
+
   it('is permission-gated like the sidebar entry', () => {
     const grant = { is_system_admin: false, effective: { nav: ['admin.settings'] } };
     expect(canOpenScreenSettings(grant, 'sites')).toBe(true);
