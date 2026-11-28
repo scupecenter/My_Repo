@@ -7965,6 +7965,11 @@
     "next_help": "A whole number from 1. The database refuses a value that would repeat a number already issued.",
     "region_code": "Region code"
   },
+  "noGrants": {
+    "title_one": "A module nobody can open yet:",
+    "title_other": "{{count}} modules nobody can open yet:",
+    "hint": "No permission profile grants anything on it. Grant it in the permission profiles; nothing is granted automatically."
+  },
   "matrixCoverage": {
     "title": "Matrix coverage",
     "note": "Read only. Shows the cells of the Responsibility Matrix that nobody can act on, per row, region and level. Nothing here changes the matrix.",

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMatrixCoverage } from '@/api/sites';
+import { NoGrantsBadge } from '@/components/NoGrantsBadge';
 import { QueryFallback } from '@/components/States';
 
 const TONE: Record<string, string> = { ok: 'text-ok', empty: 'text-bad font-semibold', no_active_holder: 'text-warn font-semibold' };
@@ -29,6 +30,7 @@ export function MatrixCoverageScreen() {
       <h2 className="font-bold">{t('matrixCoverage.title')}</h2>
       <p className="text-sm text-mute">{t('matrixCoverage.note')}</p>
       <p className="text-xs text-mute">{t('matrixCoverage.as_of')}: {new Date(d.as_of).toLocaleString()} · {t('matrixCoverage.version')}: {d.workflow_version}</p>
+      <NoGrantsBadge modules={d.modules_without_grants} />
       <p className="text-sm" data-testid="mc-summary">{t('matrixCoverage.summary', { ok: d.summary.ok, empty: d.summary.empty, nobody: d.summary.no_active_holder, cells: d.summary.cells })}</p>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-1"><input type="checkbox" checked={gapsOnly} onChange={(e) => setGapsOnly(e.target.checked)} data-testid="mc-gaps-only" />{t('matrixCoverage.gaps_only')}</label>

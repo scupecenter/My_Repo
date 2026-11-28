@@ -268,6 +268,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.562 (2026-11-28): a module with registers and no permission grant is told to the System Admins and shown on the Matrix coverage screen (L8; migration 0702, mirror `db/sql/701_module_no_grants_notice.sql`). `GET /matrix/coverage` gains `modules_without_grants` (module_key, name_en, registers). The daily job writes one in-app notification (kind `module_no_grants`, link the Matrix, the admin's language) per System Admin and module the first time the module is seen without grants. Read and notify only: no grant, role, profile or Matrix cell is changed and the seeds stay empty. Additive, no table or setting.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
 
@@ -22269,7 +22270,7 @@ components:
       enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, permits_hse_te, permits_hse_acq, permits_hse_om, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle, quality_te, site_creation]
     MatrixCoverage:
       type: object
-      required: [workflow_version, as_of, regions, summary, rows]
+      required: [workflow_version, as_of, regions, summary, rows, modules_without_grants]
       properties:
         workflow_version: { type: integer }
         as_of: { type: string, format: date-time }
@@ -22315,6 +22316,24 @@ components:
                     assignees: { type: integer }
                     holders: { type: integer }
                     status: { type: string, enum: [ok, empty, no_active_holder] }
+        modules_without_grants:
+          type: array
+          description: '0.15.562: modules of the active registers that no permission profile grants anything on, so nobody can open them. The Matrix screens show it as a badge.'
+          items:
+            type: object
+            required: [module_key, name_en, registers]
+            properties:
+              module_key: { type: string }
+              name_en: { type: string }
+              registers:
+                type: array
+                items:
+                  type: object
+                  required: [register_key, name_en, name_ar]
+                  properties:
+                    register_key: { type: string }
+                    name_en: { type: string }
+                    name_ar: { type: [string, 'null'] }
     Matrix:
       type: object
       required: [workflow_version, stages, version]

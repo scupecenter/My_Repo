@@ -23,6 +23,7 @@ describe('Settings, Matrix coverage', () => {
     fireEvent.change(screen.getByTestId('mc-region'), { target: { value: '2' } });
     expect(screen.queryByTestId('mc-row-MS1-1-L1')).toBeNull();
     expect(screen.getByTestId('mc-row-gecol-2-L1')).toBeInTheDocument();
+    expect(screen.getByTestId('no-grants-badge')).toHaveTextContent('invoices (Invoices)');
     expect(screen.getByTestId('mc-open-matrix')).toHaveAttribute('href', '/admin/matrix');
     expect(screen.getByTestId('page-matrix-coverage').querySelectorAll('button')).toHaveLength(0);
   });
@@ -31,6 +32,7 @@ describe('Settings, Matrix coverage', () => {
     await signIn('pm');
     page({ locale: 'ar' });
     expect(await screen.findByTestId('mc-summary')).toBeInTheDocument();
+    expect(screen.getByTestId('no-grants-badge')).toHaveTextContent(ar.noGrants.hint);
     expect(await screen.findByTestId('settings-section-workflow-coverage')).toHaveTextContent(ar.settings.section_workflow_coverage);
   });
 });

@@ -15298,6 +15298,16 @@ export interface components {
                     status: "ok" | "empty" | "no_active_holder";
                 }[];
             }[];
+            /** @description 0.15.562: modules of the active registers that no permission profile grants anything on, so nobody can open them. The Matrix screens show it as a badge. */
+            modules_without_grants: {
+                module_key: string;
+                name_en: string;
+                registers: {
+                    register_key: string;
+                    name_en: string;
+                    name_ar: string | null;
+                }[];
+            }[];
         };
         Matrix: {
             workflow_version: number;

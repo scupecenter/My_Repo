@@ -4,9 +4,10 @@ import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
-import { useDeleteMatrixCell, useGroups, useMatrix, useMatrixOverrides, usePicker, usePublishMatrix, useRegions, useRoles } from '@/api/sites';
+import { useDeleteMatrixCell, useGroups, useMatrix, useMatrixCoverage, useMatrixOverrides, usePicker, usePublishMatrix, useRegions, useRoles } from '@/api/sites';
 import type { Matrix as MatrixT, MatrixAssignee, MatrixCell, MatrixPatch } from '@/api/types';
 import { HolderChip } from '@/components/HolderChip';
+import { NoGrantsBadge } from '@/components/NoGrantsBadge';
 import { useToast } from '@/components/Toast';
 import { L1_CELL, L2_CELL, levelCode, usedLevels } from '@/lib/matrixLevels';
 
@@ -146,6 +147,7 @@ export function MatrixPage() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const q = useMatrix(), publish = usePublishMatrix();
+  const coverage = useMatrixCoverage();
   const [cells, setCells] = useState<Record<string, MatrixCell>>({});
   const [asking, setAsking] = useState(false);
   const [reason, setReason] = useState('');
@@ -226,6 +228,7 @@ export function MatrixPage() {
         <button className="btn" disabled={!dirty} data-testid="matrix-discard" onClick={() => { setCells({}); setRefused([]); setError(''); }}>{t('matrix.discard')}</button>
         <button className="btn btn-primary" disabled={!dirty || publish.isPending} data-testid="matrix-publish" onClick={() => setAsking(true)}>{t('matrix.publish')}</button>
       </div>
+      <NoGrantsBadge modules={coverage.data?.modules_without_grants} />
       {error && <p role="alert" data-testid="matrix-error" className="mb-3 rounded-md bg-lateBg p-3 text-lateInk">{t('matrixMore.refused')} {error}</p>}
       {selfRows.length > 0 && (
         <div className="mb-3 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="matrix-warnings">

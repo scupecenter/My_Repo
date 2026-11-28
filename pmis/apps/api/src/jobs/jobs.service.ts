@@ -30,6 +30,8 @@ export interface DailyJobResult {
   digests?: number;
   /** 0342: alert rule notifications (in-app only) written by this run */
   alertRules?: number;
+  /** 0702 (L8): first-time notices to the System Admins about a module with registers and no permission grants */
+  noGrantNotices?: number;
   /** 0360 (A3): expiry radar notices (in-app only) written by this run */
   expiryNotices?: number;
   /** 0362 (A9): approval digest notices written by this run */
@@ -144,6 +146,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (escalated > 0) result.slaEscalations = escalated;
         const ruleNotes = await this.alertRules();
         if (ruleNotes > 0) result.alertRules = ruleNotes;
+        const noGrants = await this.noGrantNotices();
+        if (noGrants > 0) result.noGrantNotices = noGrants;
         const expiring = await this.expiryRadar();
         if (expiring > 0) result.expiryNotices = expiring;
         const changed = await this.templateChanges();
@@ -298,6 +302,17 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('alert rules failed');
       await this.syslog.write('error', 'alert rules failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0702 (L8): one in-app notice per System Admin and module, the first time a module with registers has no permission grant. Notify only; grants nothing. A failure is logged and leaves the other steps alone. */
+  private async noGrantNotices(): Promise<number> {
+    const n = await this.runs.run('module_no_grants', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT modules_no_grants_notify() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('module no-grants notice failed');
+      await this.syslog.write('error', 'module no-grants notice failed', {});
       return 0;
     }
     return n;
