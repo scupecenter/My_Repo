@@ -21,7 +21,7 @@ let app: NestExpressApplication;
 let db: PgClient;
 const R = 2;        // Middle
 const OTHER = 4;    // Zawia
-const R3 = 5;       // Benghazi: the admin-override region (its site_creation cells name another person)
+const R3 = 3;       // WM: the admin-override region (its site_creation cells name another person). No other suite sets site_creation cells here (Benghazi 5 is the working region of site-batch-async)
 const TAG = randomBytes(2).toString('hex').toUpperCase();
 let n = 0;
 const code = (): string => `MCS${TAG}${String(++n).padStart(3, '0')}`;

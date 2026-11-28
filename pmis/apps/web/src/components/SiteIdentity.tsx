@@ -11,12 +11,12 @@ import { taskErrorMessage } from '@/lib/taskErrors';
 import { useToast } from './Toast';
 
 /**
- * Technical decision Q473 (contract 0.14.1): the identity of a site (English and Arabic name, coordinates, region, cluster) is never edited directly. "Propose a change"
+ * Technical decision Q473 (contract 0.14.1): the identity of a site (English and Arabic name, address, coordinates, region, cluster) is never edited directly. "Propose a change"
  * opens the same proposal as the Q225 switch (POST /sites/{id}/change-proposals): a reason is required, one Change Control draft per field, the site keeps its values until
  * L2 approves. The Site ID is shown and never offered for a change. Region and cluster change who can see the site, so only a System Admin sees them (the API answers 403
  * for anybody else).
  */
-const FIELD_PATHS = ['name', 'name_ar', 'latitude', 'longitude', 'region_id', 'cluster_code', 'site_code'];
+const FIELD_PATHS = ['name', 'name_ar', 'address', 'latitude', 'longitude', 'region_id', 'cluster_code', 'site_code'];
 const num = (v: string): number | undefined => (v.trim() === '' || Number.isNaN(Number(v)) ? undefined : Number(v));
 
 export function SiteIdentity({ site }: { site: SiteDetail }) {
@@ -28,7 +28,7 @@ export function SiteIdentity({ site }: { site: SiteDetail }) {
   const admin = isAdmin(me);
   const may = !!me && (admin || hasGrant(me, 'create') || hasGrant(me, 'edit'));
   const initial = () => ({
-    name: site.name ?? '', name_ar: site.name_ar ?? '', latitude: site.latitude == null ? '' : String(site.latitude), longitude: site.longitude == null ? '' : String(site.longitude),
+    name: site.name ?? '', name_ar: site.name_ar ?? '', address: site.address ?? '', latitude: site.latitude == null ? '' : String(site.latitude), longitude: site.longitude == null ? '' : String(site.longitude),
     region_id: String(site.region_id), cluster_code: site.cluster_code ?? '', reason: '',
   });
   const [form, setForm] = useState<ReturnType<typeof initial> | null>(null);
@@ -41,6 +41,7 @@ export function SiteIdentity({ site }: { site: SiteDetail }) {
     const out: SiteIdentityProposal = {};
     if (f.name.trim() !== cur.name) out.name = f.name.trim();
     if (f.name_ar.trim() !== cur.name_ar) out.name_ar = f.name_ar.trim() === '' ? null : f.name_ar.trim();
+    if (f.address.trim() !== cur.address) out.address = f.address.trim() === '' ? null : f.address.trim();
     if (f.latitude.trim() !== cur.latitude || f.longitude.trim() !== cur.longitude) {
       out.latitude = (num(f.latitude) ?? (f.latitude.trim() || null)) as number;   // a blank or a text that is not a number goes to the API, which answers pair_required or invalid
       out.longitude = (num(f.longitude) ?? (f.longitude.trim() || null)) as number;
@@ -67,7 +68,7 @@ export function SiteIdentity({ site }: { site: SiteDetail }) {
   const errText = (path: string) => { const e = err(path); return e ? t(`siteIdentity.err.${e.code}`, { defaultValue: t('siteIdentity.err.invalid') }) : null; };
   const regionName = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
   const other = errors.filter((e) => !FIELD_PATHS.some((p) => e.path === `/identity/${p}`));
-  const field = (k: 'name' | 'name_ar' | 'latitude' | 'longitude' | 'cluster_code', label: string, extra: { dir?: 'rtl'; inputMode?: 'decimal'; path?: string } = {}) => (
+  const field = (k: 'name' | 'name_ar' | 'address' | 'latitude' | 'longitude' | 'cluster_code', label: string, extra: { dir?: 'rtl'; inputMode?: 'decimal'; path?: string } = {}) => (
     <label className="flex flex-col gap-1 text-sm" key={k}>
       <span className="text-mute">{label}</span>
       <input className="input" data-testid={`site-identity-${k}`} value={form![k]} dir={extra.dir} inputMode={extra.inputMode} onChange={(e) => set(k, e.target.value)} aria-invalid={!!err(extra.path ?? k)} />
@@ -90,6 +91,7 @@ export function SiteIdentity({ site }: { site: SiteDetail }) {
           <div className="grid gap-3 sm:grid-cols-2">
             {field('name', t('siteIdentity.name'))}
             {field('name_ar', t('siteIdentity.name_ar'), { dir: 'rtl' })}
+            {field('address', t('siteIdentity.address'))}
             {field('latitude', t('siteIdentity.latitude'), { inputMode: 'decimal' })}
             {field('longitude', t('siteIdentity.longitude'), { inputMode: 'decimal' })}
             {admin && (

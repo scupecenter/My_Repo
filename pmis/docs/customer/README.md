@@ -27,3 +27,4 @@
 المصادر: `CLAUDE.md`، `CHANGELOG.md`، `docs/adr/`، `docs/spec/`، `db/erd.md`، `contracts/openapi.yaml`، `HANDOVER.md`. الإضافات المقترحة غير المؤكدة مكتوبة فيها «يُؤكَّد لاحقاً».
 | [acquisition-site-location.md](acquisition-site-location.md) | Proposing a site location from the selected acquisition candidate |
 | [shortage-draft-purchase-request.md](shortage-draft-purchase-request.md) | Draft purchase request from a material shortage line |
+| [site-address-change.md](site-address-change.md) | Propose a change of the site address through Change Control |
