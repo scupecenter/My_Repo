@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from './client';
+import { api, ApiError, downloadFile } from './client';
 import type { components } from './schema';
 
 type S = components['schemas'];
@@ -12,6 +12,18 @@ export type DataResetPart = S['DataResetPart'];
 export type DataResetScope = S['DataResetScope'];
 export type DataResetNarrow = S['DataResetNarrow'];
 export type DataResetNarrowOptions = S['DataResetNarrowOptions'];
+export type DataResetArchiveInfo = S['DataResetArchiveInfo'];
+export type ArchiveMode = 'none' | 'download' | 'keep_90';
+
+/** Contract 0.15.266 (migration 0371): the archive mode of a request (absent on a request made before: none) and the state of its archive. */
+export const archiveMode = (r: Pick<DataResetRequest, 'archive'> | null | undefined): ArchiveMode => r?.archive?.mode ?? 'none';
+export const archiveOf = (r: Pick<DataResetRequest, 'archive'> | null | undefined) => r?.archive?.archive ?? null;
+/** The run is refused until the archive is ready (mode download: and downloaded once); the database decides, the screen only says why the button waits. */
+export function archiveReady(r: Pick<DataResetRequest, 'archive'> | null | undefined): boolean {
+  const m = archiveMode(r), a = archiveOf(r);
+  if (m === 'none') return true;
+  return a?.status === 'ready' && (m === 'keep_90' || (a.downloads ?? 0) > 0);
+}
 
 /** True when the filter names nothing (the whole part goes). */
 export const narrowEmpty = (n: DataResetNarrow | null | undefined) => !n || (!(n.regions?.length) && !(n.batches?.length) && !n.from && !n.to);
@@ -70,7 +82,7 @@ export const useDataResetRequest = (id: string | null, poll: boolean) =>
   useQuery({
     queryKey: ['data-reset', 'request', id], enabled: !!id && poll, retry: false,
     queryFn: () => api.get<DataResetRequest>(`/settings/data-reset/requests/${id}`, { headers: { 'X-PMIS-Live': '1' } }),
-    refetchInterval: (q) => (!q.state.data || q.state.data.status === 'running' ? 2000 : q.state.data.status === 'files_pending' ? 10_000 : false),
+    refetchInterval: (q) => (!q.state.data || q.state.data.status === 'running' || archiveOf(q.state.data)?.status === 'building' ? 2000 : q.state.data.status === 'files_pending' ? 10_000 : false),
   });
 
 function useAct<B>(fn: (b: B) => Promise<unknown>) {
@@ -79,7 +91,7 @@ function useAct<B>(fn: (b: B) => Promise<unknown>) {
 }
 
 export const useRequestDataReset = () =>
-  useAct((b: { reason: string; confirm_text: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string; narrow?: DataResetNarrow }) =>
+  useAct((b: { reason: string; confirm_text: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string; narrow?: DataResetNarrow; archive?: ArchiveMode }) =>
     api.post('/settings/data-reset/requests', { body: b }));
 /** Contract 0.15.72: a request made without a backup (`require_backup` false); a missing field (an older server) means a backup is required. */
 export const requiresBackup = (r: Pick<DataResetRequest, 'require_backup'> | null | undefined) => r?.require_backup !== false;
@@ -96,3 +108,8 @@ export const useRetryDataResetFiles = () =>
 export const useSetDataResetSettings = () =>
   useAct((b: { version: number; reason: string; request_expiry_minutes: number; backup_max_age_hours: number }) =>
     api.put('/settings/data-reset/settings', { body: { reason: b.reason, request_expiry_minutes: b.request_expiry_minutes, backup_max_age_hours: b.backup_max_age_hours }, version: b.version }));
+
+/** Contract 0.15.266: makes the archive of an approved request (the build runs on the server; the request is polled until it is ready or failed). */
+export const useMakeDataResetArchive = () => useAct((b: { id: string }) => api.post(`/settings/data-reset/requests/${b.id}/archive`));
+/** The archive zip: a System Admin with a step-up (asked once), one security-log entry per download. Returns the file name. */
+export const downloadDataResetArchive = (id: string) => downloadFile(`/settings/data-reset/requests/${id}/archive/download`);

@@ -474,16 +474,23 @@ export class RegistersService {
     // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the register's whitelist; the visibility above stays
     const adv = await this.filters.fromQuery(`register-${key}`, q);
     if (adv) conds.push(adv);
-    // W8 item 6 (0.15.68): the counts, read with the caller's rights (the visibility above and row security), before the cursor narrows the rows
-    const count = async (c: Prisma.Sql[]): Promise<number> => Number((await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
-      SELECT count(*) AS n FROM register_records r LEFT JOIN sites s ON s.id = r.site_id LEFT JOIN task_instances ti ON ti.id = r.task_id
-      LEFT JOIN task_definitions td ON td.id = ti.task_def_id WHERE ${Prisma.join(c, ' AND ')}`))[0]?.n ?? 0);
-    const counts = { total: await count(scope), filtered: await count(conds) };
+    // W8 item 6 (0.15.68): the counts, read with the caller's rights (the visibility above and row security), before the cursor narrows the rows.
+    // D62: one pass over the register for both numbers (it used to be two full count(*) queries)
+    const JOINS = Prisma.sql`FROM register_records r LEFT JOIN sites s ON s.id = r.site_id LEFT JOIN task_instances ti ON ti.id = r.task_id LEFT JOIN task_definitions td ON td.id = ti.task_def_id`;
+    const cn = (await this.db.tx.$queryRaw<{ total: bigint; filtered: bigint }[]>(Prisma.sql`
+      SELECT count(*) FILTER (WHERE ${Prisma.join(scope, ' AND ')}) AS total, count(*) FILTER (WHERE ${Prisma.join(conds, ' AND ')}) AS filtered
+      ${JOINS} WHERE r.register_key = ${key} AND ${this.visibility(regs)}`))[0];
+    const counts = { total: Number(cn?.total ?? 0), filtered: Number(cn?.filtered ?? 0) };
     // found / not found: sites in the register's regions AND in the caller's Sites view regions (never a region where the caller cannot see sites)
     const pasted = search.kind === 'list' ? await pastedSearchResult(this.db.tx, search, siteScope(regs, await this.access.regions('sites', 'view'))) : undefined;
     if (cursor) conds.push(Prisma.sql`(r.created_at, r.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
-    const rows = await this.db.tx.$queryRaw<RecordRow[]>(
-      this.baseSelect(auth, Prisma.join(conds, ' AND '), Prisma.sql`ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit + 1}`));
+    // D62: choose the page first (ids only, same filter, same sort), then compute the per-row workflow functions for those rows alone (the same pattern as GET /users, #408)
+    const ids = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT r.id::text AS id ${JOINS} WHERE ${Prisma.join(conds, ' AND ')} ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit + 1}`);
+    const rows = ids.length
+      ? await this.db.tx.$queryRaw<RecordRow[]>(
+        this.baseSelect(auth, Prisma.sql`r.id = ANY(${ids.map((x) => x.id)}::uuid[])`, Prisma.sql`ORDER BY r.created_at DESC, r.id DESC`))
+      : [];
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
     return { items: await this.dtos(auth, page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null }, counts, ...(pasted ? { search: pasted } : {}) };
@@ -761,9 +768,13 @@ export class RegistersService {
       users: ids.users.size ? await this.view.userRefs([...ids.users]) : new Map<string, UserRefDto>(),
       sites: ids.sites.size ? await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`SELECT id::text AS id, site_code FROM sites WHERE id = ANY(${[...ids.sites]}::uuid[])`) : [],
       items: ids.items.size ? await this.db.tx.$queryRaw<{ id: string; item_code: string; name: string; is_active: boolean }[]>(Prisma.sql`SELECT id::text AS id, item_code, name, is_active FROM warehouse_items WHERE id = ANY(${[...ids.items]}::uuid[])`) : [],
-      // a file name is shown only for a file of a slot of the same logical record
-      files: ids.files.size ? await this.db.tx.$queryRaw<{ id: string; entity: string; name: string }[]>(Prisma.sql`
-        SELECT f.id::text AS id, s.register_entity_id::text AS entity, f.original_name AS name FROM document_files f JOIN document_slots s ON s.id = f.slot_id
+      // a file name is shown only for a file of a slot of the same logical record. LIB-1: a file field follows the latest version of its file (the
+      // newest version of the same file_group_id that is neither superseded nor withdrawn); `latest` is that version's id, `name` its name
+      files: ids.files.size ? await this.db.tx.$queryRaw<{ id: string; entity: string; name: string; latest: string }[]>(Prisma.sql`
+        SELECT f.id::text AS id, s.register_entity_id::text AS entity, coalesce(l.original_name, f.original_name) AS name, coalesce(l.id, f.id)::text AS latest
+        FROM document_files f JOIN document_slots s ON s.id = f.slot_id
+        LEFT JOIN LATERAL (SELECT x.id, x.original_name FROM document_files x WHERE x.file_group_id = f.file_group_id AND x.superseded_by IS NULL AND x.withdrawn_at IS NULL
+                           ORDER BY x.version DESC LIMIT 1) l ON true
         WHERE f.id = ANY(${[...ids.files]}::uuid[]) AND s.register_entity_id IS NOT NULL`) : [],
       tasks: ids.tasks.size ? await this.db.tx.$queryRaw<{ id: string; code: string }[]>(Prisma.sql`
         SELECT t.id::text AS id, td.code FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id WHERE t.id = ANY(${[...ids.tasks]}::uuid[])`) : [],
@@ -779,7 +790,11 @@ export class RegistersService {
       const items = refs.items.filter((x) => has(x.id));
       if (items.length) r.warehouse_items = Object.fromEntries(items.map((x) => [x.id, { item_code: x.item_code, name: x.name, is_active: x.is_active }]));
       const files = refs.files.filter((x) => has(x.id) && x.entity === d.entity_id);
-      if (files.length) r.files = Object.fromEntries(files.map((x) => [x.id, x.name]));
+      if (files.length) {
+        r.files = Object.fromEntries(files.map((x) => [x.id, x.name]));
+        const moved = files.filter((x) => x.latest !== x.id);
+        if (moved.length) r.files_latest = Object.fromEntries(moved.map((x) => [x.id, x.latest]));
+      }
       const tasks = refs.tasks.filter((x) => has(x.id));
       if (tasks.length) r.tasks = Object.fromEntries(tasks.map((x) => [x.id, x.code]));
       if (Object.keys(r).length) d.refs = r;
