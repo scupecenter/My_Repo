@@ -538,6 +538,10 @@ describe('weight sets', () => {
     await u.click(screen.getByTestId('weights-preview'));
     expect(await screen.findByTestId('weights-preview-valid')).toHaveAttribute('data-valid', 'true');
     expect(screen.getByTestId('weights-preview-progress')).toBeInTheDocument();
+    // gap 7 (0.15.434): the preview lists the item level differences against the set in force
+    expect(await screen.findByTestId('weights-preview-diff')).toBeInTheDocument();
+    expect(screen.getByTestId('weights-diff-changed-a1')).toHaveAttribute('data-kind', 'changed');
+    expect(screen.getByTestId('weights-diff-changed-a3_1')).toHaveTextContent('m2');
     await u.click(screen.getByTestId('weights-preview-dialog-submit'));
     await u.click(screen.getByTestId('weights-publish-project_status'));
     await reasonAndSave(u, 'weights-publish-dialog', 'Owner approved');
