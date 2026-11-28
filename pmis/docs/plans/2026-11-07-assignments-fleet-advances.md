@@ -86,3 +86,6 @@ New matrix rows (B11): `car_dispatcher`, `financial_advances` (holders empty in 
 | 2 | frontend-engineer | sonnet | Procurement "Assignment" section (members, readiness badge), the two register menus, vehicle picker, advance balance panel, EN/AR |
 | 3 | qa-engineer | haiku | suites + end-to-end scenario: Procurement record → approval → booking + advance → reserve → disburse → ready |
 | 4 | tech-lead | opus | review, PR |
+
+## Hardening layer 2 (contract 0.15.406, no migration)
+Extending a booking (`POST /registers/car_dispatcher/records/{id}/extend`) and topping up an advance (`POST /registers/financial_advances/records/{id}/top-up`) now use the two mechanisms every other financial or destructive action already uses: `If-Match` with the version of the record read (428 without it, 412 when stale, `common/etag.checkIfMatch`) and a recent step-up (401 `step_up_required`, `StepUpService.require`). The checks run after the module/region rights and the body validation, before the database function. The web sends the record version; the existing step-up dialog handles the 401. No new mechanism, no setting.
