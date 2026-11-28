@@ -17,6 +17,7 @@ export const APPEARANCE_OPTIONS = {
   contrast: ['standard', 'high'], // 0347 (item 19): the high-contrast mode
   inbox_panel: ['overlay', 'floating', 'docked'], // 0526: the notification panel as an overlay, a movable floating window or docked at the edge
   more_menu: ['list', 'grid'], // 0581: the More menu of the table screens as a list or an icon grid with search
+  followup_checklist: ['show', 'hide'], // 0653: the profile-completion checklist of the follow-up hub
   inbox_anchor: ['end-top', 'end-bottom', 'start-top', 'start-bottom'], // 0526: the corner of the floating panel (a drag snaps to the nearest)
 } as const;
 
@@ -25,7 +26,7 @@ export type Appearance = Partial<{ [K in AppearanceKey]: (typeof APPEARANCE_OPTI
 
 /** The built-in standard of every dimension (ui_pref_defaults() in the database). */
 export const APPEARANCE_DEFAULTS: Required<Appearance> = {
-  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top', more_menu: 'list',
+  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top', more_menu: 'list', followup_checklist: 'show',
 };
 
 /** The ready-made profiles of proposal item 1; the theme flips for `night` are saved through the profile like the theme button. */

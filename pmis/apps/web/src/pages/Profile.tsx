@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Eye, EyeOff, KeyRound, Lock, Mail, Palette, PanelLeft, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { DefaultViewsSection } from '@/components/DefaultViewsSection';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
@@ -56,6 +57,17 @@ function Err({ id, msg }: { id: string; msg?: string | null }) {
 export function Profile() {
   const { t } = useTranslation();
   const q = useMyProfile();
+  const { hash } = useLocation();
+  // Item 11: the follow-up hub links to the exact section (/profile#phone, #appearance, #notifications, #push, #two-factor): scroll to it and move the focus there
+  useEffect(() => {
+    const h = hash.slice(1);
+    if (!h || !q.data) return;
+    const el = document.getElementById(h) ?? document.querySelector<HTMLElement>(`[data-testid="profile-${h}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start' });
+    el.setAttribute('tabindex', '-1');
+    el.focus({ preventScroll: true });
+  }, [hash, q.data]);
   if (q.isLoading) return <LoadingSkeleton />;
   if (q.isError || !q.data) return <ErrorState onRetry={() => void q.refetch()} />;
   const p = q.data;
@@ -232,7 +244,7 @@ function AppearanceSection({ p }: { p: MyProfile }) {
   const preset = (name: keyof typeof APPEARANCE_PRESETS) => {
     const pr = APPEARANCE_PRESETS[name];
     // a look does not move the notification panel: the personal inbox_* choices stay
-    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}), ...(draft.more_menu ? { more_menu: draft.more_menu } : {}) });
+    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}), ...(draft.more_menu ? { more_menu: draft.more_menu } : {}), ...(draft.followup_checklist ? { followup_checklist: draft.followup_checklist } : {}) });
     setTheme(pr.theme);
   };
   const dimLabel = (k: AppearanceKey) => t(`appearance.dim.${k}`);

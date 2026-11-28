@@ -393,6 +393,19 @@ describe('the appearance profile: PATCH /me/profile ui_prefs and the identity de
     expect((await patchPrefs(api, { more_menu: 'cards' })).status).toBe(422);
   });
 
+  // 0653: the follow-up hub checklist (show or hide) is one more appearance dimension of the same framework.
+  it('followup_checklist: in the options, shown by default, hidden by personal choice, validated', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const p = await api.call('get', '/me/profile');
+    expect(p.body.identity.pref_options.followup_checklist).toEqual(['show', 'hide']);
+    expect(p.body.appearance).toMatchObject({ followup_checklist: 'show' });
+    const r = await patchPrefs(api, { followup_checklist: 'hide' });
+    expect(r.status).toBe(200);
+    expect(r.body.appearance).toMatchObject({ followup_checklist: 'hide' });
+    expect((await patchPrefs(api, { followup_checklist: 'maybe' })).status).toBe(422);
+  });
+
   // 0347 (item 19 of the 2026-11-27 batch): `contrast` is an appearance dimension of the same framework - personal choice,
   // organization default and the admin lock all reach it through the same doors, with no parallel path.
   it('contrast: in the options, chosen personally, defaulted by the organization and locked with the rest', async () => {

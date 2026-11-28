@@ -317,6 +317,38 @@
     "done": "Done",
     "close": "Close the message"
   },
+  "fup": {
+    "title": "Follow-up",
+    "subtitle": "Hello {{name}}, here is everything waiting for you.",
+    "open": "Follow-up hub",
+    "approvals": "Approvals waiting for me",
+    "assigned": "Tasks assigned to me",
+    "reminders": "Reminders",
+    "checklist": "Complete my profile",
+    "progress": "{{done}} of {{total}} done",
+    "none_approvals": "No approvals are waiting for you.",
+    "none_assigned": "Nothing is assigned to you right now.",
+    "none_reminders": "No unread reminders.",
+    "open_approvals": "Open Approvals",
+    "open_my_work": "Open My Work",
+    "open_inbox": "Open the inbox",
+    "go": "Fix",
+    "done": "(done)",
+    "todo": "(not done)",
+    "check_phone": "Add a phone number",
+    "check_phone_hint": "Opens My profile, Phone",
+    "check_appearance": "Choose how the app looks",
+    "check_appearance_hint": "Opens My profile, Appearance",
+    "check_notifications": "Choose which notifications reach you",
+    "check_notifications_hint": "Opens My profile, Notifications",
+    "check_push": "Turn on push on this browser",
+    "check_push_hint": "Opens My profile, Push",
+    "check_two_factor": "Turn on two-factor sign-in",
+    "check_two_factor_hint": "Opens My profile, Two-factor",
+    "hide_note": "Do not want this list?",
+    "hide_link": "Hide it in Appearance",
+    "note": "This page only gathers what other screens already show. Nothing here changes data."
+  },
   "top": {
     "search": "Search or jump to…",
     "language": "Switch language",
@@ -4198,6 +4230,7 @@
       "menu_style": "Side menu",
       "accent": "Accent colour",
       "contrast": "Contrast",
+      "followup_checklist": "Follow-up hub checklist",
       "inbox_panel": "Notification panel",
       "inbox_anchor": "Floating panel corner",
       "more_menu": "More menu"
@@ -4245,6 +4278,10 @@
       "contrast": {
         "standard": "Standard",
         "high": "High"
+      },
+      "followup_checklist": {
+        "show": "Show (default)",
+        "hide": "Hide"
       },
       "inbox_panel": {
         "overlay": "Overlay (default)",

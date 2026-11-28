@@ -1,5 +1,5 @@
 import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
-import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, ListChecks, Pencil } from 'lucide-react';
 import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -119,6 +119,7 @@ export function MyWork() {
         </div>
         <span className="ms-auto"><ScreenSettingsLink screen="my_work" /></span>
         <button type="button" className="btn" data-testid="my-work-ics" onClick={() => { void downloadFile('/me/tasks.ics').catch(() => undefined); }}><CalendarDays size={16} />{t('myWork.ics')}</button>
+        <Link to="/follow-up" data-testid="my-work-go-followup" className="btn"><ListChecks size={16} aria-hidden />{t('fup.open')}</Link>
         <Link to="/approvals" data-testid="my-work-go-approvals" className="btn btn-accent"><Inbox size={16} />{t('myWork.go_approvals')}<span className="chip bg-card text-ink">{doNow.data?.items.length ?? 0}</span></Link>
       </div>
       <MyWorkCalendar late={late.data?.items ?? []} doNow={doNow.data?.items ?? []} onOpen={setOpen} />
