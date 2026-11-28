@@ -155,7 +155,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
   // A10: a shortage row of the dashboard opens a new Procurement record with the site, the request type and a remark that names the item; nothing is saved until the person submits
   const [shortageSp] = useSearchParams();
-  const fromShortage = !record && rawDef.register_key === 'procurement' && shortageSp.get('from') === 'shortage';
+  const fromShortage = !record && rawDef.register_key === 'procurement' && ['shortage', 'reorder'].includes(shortageSp.get('from') ?? '');
   const [data, setData] = useState<Data>(() => {
     const base = record?.data ?? defaultsFor(rawDef.register_key, rawDef);
     const remark = shortageSp.get('remark');

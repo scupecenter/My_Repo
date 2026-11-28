@@ -13,4 +13,11 @@ describe('Procurement form from a shortage line', () => {
     expect(await screen.findByTestId('reg-field-remark')).toHaveValue('Shortage of PWR-001 Rectifier: missing 4');
     expect(screen.getByTestId('register-drawer')).toHaveTextContent('TR101');
   }, 30_000);
+
+  it('opens the same form from a low-stock notification (from=reorder), nothing saved', async () => {
+    await signIn('pm');
+    const q = new URLSearchParams({ record: 'new', from: 'reorder', remark: 'Reorder PWR-001: available 2, level 5, suggested quantity 20' });
+    renderApp(<Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>, { route: `/registers/procurement?${q.toString()}` });
+    expect(await screen.findByTestId('reg-field-remark')).toHaveValue('Reorder PWR-001: available 2, level 5, suggested quantity 20');
+  }, 30_000);
 });
