@@ -31,6 +31,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 | CI | `.github/workflows/ci.yml` | Four jobs: `api` (typecheck, lint, build, tests on PostgreSQL 16), `web` (typecheck, lint, unit tests, build, Playwright e2e), `contract` (Redocly lint of `openapi.yaml`), `installer` (bash syntax and shellcheck). Runs on pull requests to `main` and on pushes to `main`. |
 | Installer | `tools/install/` | `install-ubuntu.sh` and `update.sh`, the Ubuntu installer scripts. |
 | Capacity sizer | `tools/capacity-sizer/index.html` | Customer sizing tool, a single HTML page (Arabic, RTL). |
+| Display extras | `apps/web/src/lib/uiExtras.ts`, `components/DisplayExtrasCard.tsx` | Per-device switches for small display features; plan `docs/plans/2026-11-28-display-extras.md`, customer text `docs/customer/display-extras.md`. |
 | Design | `design/tokens.*`, `design/GSDN_Workspace_Prototype_v2.html`, `design/screens/` | Clickable prototype, 120 Playwright checks passing |
 | CW forms | `design/forms/` | DN, RN, PAC, FAC as HTML templates rendered to A4 PDF |
 | Agents | `../.claude/agents/*.md`, `ORCHESTRATION.md` | 9 agents with their models and folders |
