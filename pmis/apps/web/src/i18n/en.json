@@ -4603,6 +4603,7 @@
     "plan_hint": "Cumulative: the planned % never falls with the date. Between two points it runs in a straight line.",
     "without_plan": "{{n}} weighted items have no plan yet; Planned and the index stay not available until every measured item has one."
   },
+  "subtasks": {"tab": "Sub-tasks", "heading": "Sub-tasks", "empty": "No sub-tasks yet.", "readonly": "You can see the sub-tasks. Adding or editing needs the entry level here.", "global": "A global record has no region, so it takes no sub-tasks.", "add": "Add sub-task", "title": "What needs doing", "owner": "Owner", "owner_search": "Type 2 letters of a name", "owner_tip": "Who does it. Only people who can see this region and module.", "due": "Due", "due_tip": "Optional due date.", "progress": "Progress", "progress_tip": "Progress of this sub-task. 100 means done.", "done_toggle": "Mark done", "remove": "Remove", "remove_tip": "Hide this sub-task. It stays in the audit log.", "no_owner": "No owner", "state_open": "Open", "state_doing": "In progress", "state_done": "Done", "rollup": "{{done}} of {{total}} done, {{pct}}%", "rollup_tip": "Roll-up of the sub-tasks. It is shown for information and does not change the task or record."},
   "delayp": {
     "tab": "Delay",
     "title": "Delay attribution periods",

@@ -340,6 +340,40 @@ export class WorkflowService {
     }
   }
 
+  /** Sub-tasks of a task or a register record (0.15.474): the rows and the roll-up. Rights are judged by the database from the parent's module and region. */
+  async subTasks(auth: AuthContext, kind: string, parentId: string): Promise<unknown> {
+    void auth;
+    const k = subTaskKind(kind);
+    const id = parse(uuidSchema, parentId);
+    try {
+      const rows = await this.db.tx.$queryRaw<{ j: unknown }[]>(Prisma.sql`SELECT sub_tasks_json(${k}::text, ${id}::uuid) AS j`);
+      return rows[0]?.j ?? { items: [], rollup: { total: 0, done: 0, progress: 0 }, can_edit: false };
+    } catch (e) {
+      const p = mapDbError(e);
+      if (p) throw p;
+      throw e;
+    }
+  }
+
+  /** Create (subId undefined), change (If-Match) or hide (`{removed: true}`) a sub-task. The roll-up never changes the parent. */
+  async saveSubTask(auth: AuthContext, kind: string, parentId: string, subId: string | undefined, ifMatch: string | undefined, body: unknown): Promise<unknown> {
+    void auth;
+    const k = subTaskKind(kind);
+    const id = parse(uuidSchema, parentId);
+    const sid = subId === undefined ? null : parse(uuidSchema, subId);
+    const version = sid === null ? null : parseIfMatch(ifMatch);
+    const patch = JSON.stringify(body ?? null);
+    try {
+      const rows = await this.db.tx.$queryRaw<{ j: unknown }[]>(
+        Prisma.sql`SELECT sub_task_save(${k}::text, ${id}::uuid, ${sid}::uuid, ${version}::integer, ${patch}::jsonb) AS j`);
+      return rows[0]?.j;
+    } catch (e) {
+      const p = mapDbError(e);
+      if (p) throw p;
+      throw e;
+    }
+  }
+
   async setResolved(auth: AuthContext, commentId: string, resolved: boolean): Promise<void> {
     void auth;
     try {
@@ -388,4 +422,10 @@ export class WorkflowService {
   isUuid(v: string): boolean {
     return uuidSchema.safeParse(v).success;
   }
+}
+
+/** The parent of a sub-task is a task or a register record (its logical record id); anything else is a plain 422. */
+function subTaskKind(kind: string): 'task' | 'record' {
+  if (kind === 'task' || kind === 'record') return kind;
+  throw new ProblemException(422, 'validation_failed', { errors: [{ path: '/kind', code: 'invalid', message: 'The parent is a task or a record.' }] });
 }

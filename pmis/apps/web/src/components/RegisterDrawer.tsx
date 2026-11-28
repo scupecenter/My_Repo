@@ -1,3 +1,4 @@
+import { SubTasks } from './SubTasks';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
@@ -275,7 +276,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
         {record?.entity_id && <FollowButton target={{ kind: 'record', key, id: record.id }} entityId={record.entity_id} />}
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="reg-close"><X size={16} /></button></Dialog.Close>
       </header>
-      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
+      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'subtasks', label: t('subtasks.tab') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
         {record && <EditingNotice kind="record" id={record.id} editing={editable} testid="reg-editing-notice" />}
@@ -433,6 +434,9 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
           <div {...panelProps('documents', tab)}>
             {tab === 'documents' && <RecordDocuments record={record} />}
           </div>
+        )}
+        {record && (
+          <div {...panelProps('subtasks', tab)}>{tab === 'subtasks' && <SubTasks kind="record" parentId={record.entity_id ?? ""} enabled={!!record.region_id} />}</div>
         )}
         {record && (
           <div {...panelProps('comments', tab)}>

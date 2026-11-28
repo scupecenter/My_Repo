@@ -98,3 +98,19 @@ export function useStatusOps() {
       mutationFn: ({ u, health, summary }) => api.patch<StatusUpdate>(`/status-updates/${u.id}`, { version: u.version, body: { ...(health ? { health } : {}), ...(summary !== undefined ? { summary } : {}) } }), onSuccess: settle }),
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------------- sub-tasks (0.15.474)
+export type SubTaskKind = 'task' | 'record';
+export type SubTaskList = import('./schema').components['schemas']['SubTaskList'];
+export type SubTaskRow = import('./schema').components['schemas']['SubTask'];
+export type SubTaskInput = import('./schema').components['schemas']['SubTaskInput'];
+/** The sub-tasks of a task or a register record (by its logical entity id) with the roll-up. The server judges who may read or change them. */
+export const useSubTasks = (kind: SubTaskKind, parentId: string, enabled = true) =>
+  useQuery({ queryKey: ['sub-tasks', kind, parentId], enabled: enabled && !!parentId, queryFn: () => api.get<SubTaskList>(`/sub-tasks/${kind}/${parentId}`) });
+export function useSaveSubTask(kind: SubTaskKind, parentId: string) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { id?: string; version?: number; patch: SubTaskInput }>({
+    mutationFn: ({ id, version, patch }) => (id ? api.patch(`/sub-tasks/${kind}/${parentId}/${id}`, { body: patch, version }) : api.post(`/sub-tasks/${kind}/${parentId}`, { body: patch })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['sub-tasks', kind, parentId] }),
+  });
+}

@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.474 (2026-11-28): sub-tasks under a task or a register record (migration 0620, mirror `db/sql/619_sub_tasks.sql`). Additive. `GET`/`POST /sub-tasks/{kind}/{parent_id}` and `PATCH /sub-tasks/{kind}/{parent_id}/{sub_task_id}` (`kind` task or record; a record by its logical `entity_id`). A sub-task has a title, an optional owner, a status (open, doing, done), a progress 0 to 100 and an optional due date; the list carries the roll-up (total, done, mean progress), which is information only and never changes the parent. Read: whoever may view the parent in its region. Write: the entry level of the parent's module and region; the owner of a sub-task may also change its own status and progress. Removing hides, never deletes. Audit `sub_task_create`, `sub_task_update`, `sub_task_remove`. Global records take none (422).
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
@@ -19800,6 +19801,75 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /sub-tasks/{kind}/{parent_id}:
+    parameters:
+      - {name: kind, in: path, required: true, description: 'The parent: `task`, or `record` (a register record, named by its logical `entity_id`).', schema: {type: string, enum: [task, record]}}
+      - {name: parent_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [tasks]
+      operationId: listSubTasks
+      summary: Sub-tasks of a task or a register record, with the roll-up (0.15.474)
+      description: 0.15.474 (migration 0620). The sub-tasks that are not removed, oldest first, and the roll-up (how many, how many done, mean progress). Whoever may view the parent (module `sites` for a task, the register's module for a record, in its region) reads. `can_edit` tells whether the caller holds the entry level there. The roll-up is information only and never changes the parent. 404 for a parent the caller cannot see; 422 for a global record (no region, no sub-tasks).
+      x-db-path: sub_tasks_json
+      responses:
+        '200':
+          description: The sub-tasks.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SubTaskList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [tasks]
+      operationId: createSubTask
+      summary: Add a sub-task (0.15.474)
+      description: Needs the entry level of the parent's module in its region. The owner (optional) must be an active user who can see that region and module. A progress of 100 means done; above 0 on an open sub-task means doing. Audit `sub_task_create`.
+      x-db-path: sub_task_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SubTaskInput'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SubTaskSaved'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /sub-tasks/{kind}/{parent_id}/{sub_task_id}:
+    parameters:
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [task, record]}}
+      - {name: parent_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: sub_task_id, in: path, required: true, schema: {type: string, format: uuid}}
+    patch:
+      tags: [tasks]
+      operationId: updateSubTask
+      summary: Change or remove a sub-task (0.15.474)
+      description: If-Match is the sub-task `version` (412 when it moved). The entry level of the parent's module and region may change anything; the sub-task's own owner may change only `state` and `progress`. Sending removed true hides it (never deleted). Audit `sub_task_update` or `sub_task_remove`.
+      x-db-path: sub_task_save
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SubTaskInput'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SubTaskSaved'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /me/default-views:
     get:
       tags: [saved-views]
@@ -22889,6 +22959,52 @@ components:
         reactions: { type: array, items: { $ref: '#/components/schemas/CommentReaction' }, description: '0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted.' }
         resolved: { $ref: '#/components/schemas/CommentResolved' }
         created_at: { type: string, format: date-time }
+    SubTaskInput:
+      type: object
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        owner_id: { type: [string, 'null'], format: uuid }
+        state: { type: string, enum: [open, doing, done] }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        due_date: { type: [string, 'null'], format: date }
+        removed: { type: boolean, description: 'true hides the sub-task (PATCH only).' }
+    SubTaskSaved:
+      type: object
+      required: [id, version]
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer }
+    SubTask:
+      type: object
+      required: [id, title, state, progress, version, mine]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        state: { type: string, enum: [open, doing, done] }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        due_date: { type: [string, 'null'], format: date }
+        owner_id: { type: [string, 'null'], format: uuid }
+        owner_name: { type: [string, 'null'] }
+        version: { type: integer }
+        mine: { type: boolean, description: 'The caller owns it.' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SubTaskList:
+      type: object
+      required: [items, rollup, can_edit]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/SubTask'}
+        rollup:
+          type: object
+          required: [total, done, progress]
+          properties:
+            total: { type: integer }
+            done: { type: integer }
+            progress: { type: integer, minimum: 0, maximum: 100 }
+        can_edit: { type: boolean }
     CommentReactionInput:
       type: object
       required: [emoji]
