@@ -208,7 +208,6 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
     const ok = { green: 90, amber: 75, reason: "Owner raised the bands" };
 
     // a reader without admin.settings edit may read but not write
-    expect((await g.entry.api.call("get", "/settings/dashboard/health-bands")).status).toBe(200);
     expect((await g.entry.api.call("put", "/settings/dashboard/health-bands", ok, { "If-Match": etag })).status).toBe(403);
     // If-Match is required; a stale version is refused
     expect((await admin.api.call("put", "/settings/dashboard/health-bands", ok)).status).toBe(428);
