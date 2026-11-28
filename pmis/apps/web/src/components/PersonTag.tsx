@@ -1,6 +1,7 @@
 import * as HoverCard from '@radix-ui/react-hover-card';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAway } from '@/api/availability';
 import { useStaffCard } from '@/api/hooks';
 import type { UserAccountStatus } from '@/api/types';
 import { Avatar } from './Avatar';
@@ -25,9 +26,18 @@ export function AccountBadge({ status, employeeId }: { status?: UserAccountStatu
   return <span className="chip bg-lockBg text-lockInk" data-testid={`holder-status-${employeeId}`}>{t(`holderStatus.${status}`)}</span>;
 }
 
+/** Item 19: a small "On leave" chip beside the ID of a person who is away today. It reads only the absences the viewer may already read, and a Settings switch hides it. */
+export function AvailabilityBadge({ employeeId }: { employeeId: string }) {
+  const { t } = useTranslation();
+  const kind = useAway(employeeId);
+  if (!kind) return null;
+  return <span className="chip bg-waitBg text-waitInk" data-testid={`away-${employeeId}`} title={t('availability.title')}>{t('availability.away', { kind: t(`absence.kind_${kind}`) })}</span>;
+}
+
 export function IdBadge({ employeeId }: { employeeId: string }) {
   const [open, setOpen] = useState(false);
   return (
+    <>
     <HoverCard.Root open={open} onOpenChange={setOpen} openDelay={150} closeDelay={100}>
       <HoverCard.Trigger asChild>
         <button type="button" data-testid={`person-id-${employeeId}`} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
@@ -37,6 +47,8 @@ export function IdBadge({ employeeId }: { employeeId: string }) {
         <HoverCard.Content data-testid="staff-card" sideOffset={6} className="card z-50 w-64 p-3 text-sm"><CardBody employeeId={employeeId} open={open} /></HoverCard.Content>
       </HoverCard.Portal>
     </HoverCard.Root>
+    <AvailabilityBadge employeeId={employeeId} />
+    </>
   );
 }
 

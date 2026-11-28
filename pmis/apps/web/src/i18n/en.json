@@ -7119,6 +7119,12 @@
     "min": "Smallest",
     "max": "Largest"
   },
+  "availability": {
+    "title": "Away today",
+    "away": "Away: {{kind}}",
+    "label": "Show who is away on people chips",
+    "note": "A small chip beside a person who has an absence today. It only shows absences you may already read on the Absence screen. Saved in this browser."
+  },
   "openrec": {
     "title": "Opening a record",
     "note": "Where a register record opens when you click its row: in the side drawer (the default) or on its own full page. A personal choice; it applies on every device you sign in from.",
