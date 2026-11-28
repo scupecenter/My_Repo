@@ -47,6 +47,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 |---|---|---|---|---|
 | HLC record | Procurement records of the site | register link, many (`hlc_pr_links`, Q150) | `pr_no`, `hlc_approval_date`, `procurement_record_id` | derived |
 | Dismantle part (outsourced) | Procurement order | register link | `procurement_order_id`, contractor | contractor derived from the order |
+| Site health score (dashboard) | Sites, task SLA clocks, document slots, snags, task delay periods | read only, computed | `site_health_scores()`, `site_health_detail()` | derived; weights in setting `dashboard.site_health_weights`, bands in `dashboard.health_bands` (0714) |
 | Register records, task instances, task delay periods, contractor teams and contracts | Contractor company (`external_parties`) | foreign key | `external_party_id`, `party_id` | chosen |
 | Procurement, snags, quality inspections, issues | Contractor company | foreign key (0182, `_idfk`) | `party_id`, `responsible_party_id` | chosen |
 | Procurement | Contractor team (`external_teams`) | foreign key (0182, `_idfk`) | `team_id` | chosen |
