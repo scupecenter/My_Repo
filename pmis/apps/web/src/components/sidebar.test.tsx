@@ -59,6 +59,19 @@ describe('Sidebar tree (N1-N12)', () => {
     await waitFor(() => expect(screen.getByTestId('sidebar')).toHaveAttribute('data-auto', 'false'));
   });
 
+  it('auto-hide opens and closes with Ctrl+B and Escape (no hover needed), and not while typing in a field', async () => {
+    const u = userEvent.setup();
+    localStorage.setItem('pmis.nav.auto', 'true');
+    app();
+    await screen.findByTestId('nav-my_work');
+    const side = screen.getByTestId('sidebar');
+    expect(side).toHaveStyle({ width: '56px' });
+    await u.keyboard('{Control>}b{/Control}');
+    await waitFor(() => expect(side).not.toHaveStyle({ width: '56px' }));
+    await u.keyboard('{Escape}');
+    await waitFor(() => expect(side).toHaveStyle({ width: '56px' }));
+  });
+
   it('opens the Site Master sub-menus on hover when the arrow has them closed, and in the icon rail', async () => {
     const u = userEvent.setup();
     app();
