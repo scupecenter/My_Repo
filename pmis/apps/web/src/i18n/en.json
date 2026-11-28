@@ -90,6 +90,8 @@
       }
     }
   },
+  "tileMap": {"zoom_in": "Zoom in", "zoom_out": "Zoom out", "show_outline": "Outline map", "show_tiles": "Map tiles", "missing": "The map tiles could not be loaded. Check the tile address and that the tiles are installed on the server."},
+  "maps": {"title": "Map", "note": "The site map on real map tiles. Off by default. The tiles come from your own server, so no other website is contacted. When this is off or the address is empty, the outline map is shown.", "enabled": "Show the site map on map tiles", "tile_url": "Tile address", "tile_url_note": "A path on this server with {z}, {x} and {y}, for example /tiles/{z}/{x}/{y}.png. Leave empty for no tiles.", "tile_url_bad": "Empty, or a path on this server with {z}, {x} and {y}. Another website is not allowed.", "min_zoom": "Smallest zoom", "max_zoom": "Largest zoom", "default_zoom": "Start zoom", "zoom_bad": "The largest zoom cannot be below the smallest.", "center_lat": "Start latitude", "center_lon": "Start longitude", "attribution": "Credit line", "attribution_note": "Shown in the corner of the map, for example the source of the map data."},
   "fhs": {
     "title": "Finance hub settings",
     "widgets_title": "Cards of the page",
@@ -1387,6 +1389,7 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
+    "section_screens_map": "Map",
     "section_screens_data-hub": "Data hub",
     "section_screens_finance-hub": "Finance hub",
     "section_screens_goals": "Goals",
@@ -4215,6 +4218,10 @@
     }
   },
   "nav_side": {
+    "mode": "Menu mode",
+    "mode_pinned": "Pinned (always open)",
+    "mode_autohide": "Auto-hide (opens on hover)",
+    "mode_hint": "Auto-hide shrinks the menu to an icon rail. It opens when you point at it, focus it, press Ctrl+B, or touch it, and closes when you leave or press Esc.",
     "palette_hidden": "Also find the screens I hid from the menu when I search (Ctrl+K)",
     "fixed_first": "Dashboard is always the first entry of the menu and cannot be hidden.",
     "title": "Sidebar",
@@ -5384,6 +5391,34 @@
       "structure_decision": "Your structure proposal was decided"
     }
   },
+  "progressRag": {
+    "title": "Progress figure colours",
+    "note": "Green and amber for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity of the progress curve. Higher is better. Nothing is coloured until a row is turned on and saved, so the dashboard looks exactly as before. The suggested numbers are not stored until you save. Own save, reason and audit row.",
+    "enabled": "Colour this figure",
+    "green": "Green from",
+    "amber": "Amber from",
+    "suggest": "Suggested: {{green}} / {{amber}}",
+    "range": "Numbers from {{min}} to {{max}}.",
+    "order": "Green must not be below amber."
+  },
+  "oldVersions": {
+    "archived_title": "Deleted versions (archived)",
+    "restore": "Restore version",
+    "restore_aria": "Restore version {{version}}",
+    "restore_title": "Restore version {{version}}",
+    "restore_hint": "The version comes back published, as it was (same number, milestones, gates, tasks, links and SLA rules), in one step. It is refused, and nothing changes, if the version number or an id exists again.",
+    "restored": "Version restored.",
+    "title": "Old published versions",
+    "note": "A published version that is not in force and that no site uses can be deleted. A full snapshot of it is archived first, so it can be restored. Needs the publish right, your password, a reason and the typed version number.",
+    "sites": "{{count}} sites",
+    "has_sites": "A site is on this version, so it cannot be deleted.",
+    "delete": "Delete version",
+    "delete_aria": "Delete version {{version}}",
+    "dialog_title": "Delete version {{version}}",
+    "hint": "The version, its milestones, gates, tasks, links, SLA rules and views are archived as one snapshot, then removed. Nothing a site uses is touched; the server refuses the delete if a site, a site task or a site migration still depends on it.",
+    "confirm": "Type v{{version}} to confirm",
+    "deleted": "Version deleted; its snapshot is archived."
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
@@ -5468,6 +5503,10 @@
     "receipt_no_order": "No order (stock without an order)",
     "receipt_order_hint": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
     "advance_none": "Choose the advance",
+    "link_none": "Choose {{target}} record",
+    "link_hint_procurement_order_id": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
+    "link_hint_procurement_record_id": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
+    "link_hint_advance_id": "Only approved advances of this site that are disbursed or being settled are listed.",
     "advance_hint": "Only approved advances of this site that are disbursed or being settled are listed.",
     "supplier_none": "No company (type the name below)",
     "supplier_hint": "Optional. Picking a company links the invoice to the Contractors list and fills the supplier name when it is empty.",
@@ -7002,6 +7041,17 @@
     "page": "Full page",
     "back": "Back to {{name}}"
   },
+  "gsum": {
+    "label": "Status of the {{total}} tasks in {{group}}",
+    "segment": "{{label}}: {{count}}",
+    "segment_hint": "{{label}}: {{count}}. Click to show only these, click again to show all.",
+    "sla_green": "Within target",
+    "sla_amber": "Near the SLA limit",
+    "sla_red": "Late",
+    "sla_none": "No SLA",
+    "filtered": "Showing only: {{label}}",
+    "clear": "Show all"
+  },
   "tstd": {
     "empty": "Nothing to show.",
     "search_table": "Search this table",
@@ -7037,6 +7087,7 @@
     "display_density": "Row density",
     "display_wrap": "Wrap long text",
     "display_zebra": "Zebra rows",
+    "display_groupbar": "Group summary: count and status bar on each group header",
     "display_reset": "Back to the defaults",
     "display_settings": "Defaults in Settings",
     "size_sm": "Small",
@@ -8550,5 +8601,26 @@
     "stop": "Stop",
     "use_video": "Upload video",
     "annotate": "Annotate"
+  },
+  "history": {
+    "empty": "No changes recorded yet.",
+    "restore": "Restore",
+    "title_item": "History of {{code}}",
+    "title_plan": "History of the plan, {{region}}, {{date}}",
+    "open": "History",
+    "restored": "Restored the earlier values."
+  },
+  "dpTriage": {
+    "pending": "Waiting for review",
+    "accepted": "Accepted",
+    "deferred": "Deferred",
+    "claim": "Claim",
+    "release": "Release",
+    "accept": "Accept",
+    "defer": "Defer",
+    "claimed_by": "Claimed by {{name}}",
+    "note": "Note",
+    "title": "Review of the plan, {{region}}, {{date}}",
+    "done": "Saved."
   }
 }
