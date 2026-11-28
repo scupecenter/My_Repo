@@ -126,6 +126,7 @@ type RegisterView = RecordFilters & {
   chx?: string;
   chm?: string;
   chk?: string;
+  tl?: string;
 };
 const VIEW_EMPTY: RegisterView = {
   q: "",
