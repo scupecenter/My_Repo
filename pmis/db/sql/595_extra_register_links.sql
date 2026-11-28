@@ -14,9 +14,9 @@ SELECT set_config('app.region_ids', '*', true);
 
 INSERT INTO register_fields (register_key, code, label_en, label_ar, field_type, required, is_actual, derived, options, in_list, section, sort_order)
 SELECT v.* FROM (VALUES
-  ('lessons_learned', 'incident_id', 'Incident (optional)',       'الحادث (اختياري)',       'text', false, false, false, NULL::text, false, 'Lesson',   45),
-  ('lessons_learned', 'issue_id',    'Issue (optional)',          'المشكلة (اختياري)',      'text', false, false, false, NULL::text, false, 'Lesson',   46),
-  ('incidents',       'permit_id',   'Permit to work (optional)', 'تصريح العمل (اختياري)',  'text', false, false, false, NULL::text, false, 'Incident', 45)
+  ('lessons_learned', 'incident_id', 'Incident (optional)',       'الحادث (اختياري)',       'text', false, false, false, NULL::jsonb, false, 'Lesson',   45),
+  ('lessons_learned', 'issue_id',    'Issue (optional)',          'المشكلة (اختياري)',      'text', false, false, false, NULL::jsonb, false, 'Lesson',   46),
+  ('incidents',       'permit_id',   'Permit to work (optional)', 'تصريح العمل (اختياري)',  'text', false, false, false, NULL::jsonb, false, 'Incident', 45)
 ) v(register_key, code, label_en, label_ar, field_type, required, is_actual, derived, options, in_list, section, sort_order)
 WHERE EXISTS (SELECT 1 FROM register_definitions d WHERE d.register_key = v.register_key)
 ON CONFLICT (register_key, code) DO NOTHING;
