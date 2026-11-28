@@ -19,10 +19,11 @@ import { ImportBatchesController, TemplatesController } from './templates/templa
 import { TemplatesService } from './templates/templates.service';
 import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
-import { RegisterColumnsController, RegisterStateController } from './registers/register-columns.controller';
+import { RegisterColumnsController, RegisterStateController, StructurePolicyController, StructureProposalsController } from './registers/register-columns.controller';
 import { RegisterRulesController } from './registers/register-rules.controller';
 import { RegisterRulesService } from './registers/register-rules.service';
 import { RegisterColumnsService } from './registers/register-columns.service';
+import { StructureProposalsService } from './registers/structure-proposals.service';
 import { RegistersService } from './registers/registers.service';
 // P5 (migration 0057): the list catalogue
 import { ListCataloguesController } from './registers/list-catalogues.controller';
@@ -90,6 +91,8 @@ import { GoalsService } from './dashboard/goals.service';
 import { SiteMapService } from './dashboard/site-map.service';
 import { DashboardExtrasService } from './dashboard/dashboard-extras.service';
 import { DashboardOpsController } from './dashboard/dashboard-ops.controller';
+import { DashboardTargetPolicyController } from './dashboard/dashboard-target-policy.controller';
+import { DashboardTargetPolicyService } from './dashboard/dashboard-target-policy.service';
 import { DashboardOpsService } from './dashboard/dashboard-ops.service';
 import { DelayPeriodsController } from './dashboard/delay-periods.controller';
 import { DelayPeriodsService } from './dashboard/delay-periods.service';
@@ -143,6 +146,7 @@ import { HistoricalWaiverController } from './settings/historical-waiver.control
 import { HistoricalWaiverService } from './settings/historical-waiver.service';
 import { DataResetController } from './settings/data-reset.controller';
 import { DataResetService } from './settings/data-reset.service';
+import { DataResetArchiveService } from './settings/data-reset-archive.service';
 import { MaintenanceService } from './settings/maintenance.service';
 import { SiteMasterController } from './site-master/site-master.controller';
 import { CustomFieldsController } from './custom-fields/custom-fields.controller';
@@ -221,10 +225,14 @@ import { AbsencesService } from './reassignment/absences.service';
 import { DailyPlanController, DailyPlanSettingsController } from './daily-plan/daily-plan.controller';
 import { DailyPlanService } from './daily-plan/daily-plan.service';
 import { DataHubController } from './data-hub/data-hub.controller';
+import { FinanceHubController } from './finance-hub/finance-hub.controller';
 import { DataHubService } from './data-hub/data-hub.service';
+import { FinanceHubService } from './finance-hub/finance-hub.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
+import { DuplicateRowsSettingsController } from './settings/duplicate-rows-settings.controller';
+import { DuplicateRowsSettingsService } from './settings/duplicate-rows-settings.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -232,13 +240,15 @@ export function appModuleFor(config: AppConfig) {
       InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DocumentTextController, PushController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController, RegisterRulesController,
+      DocumentTextController, PushController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, StructureProposalsController, StructurePolicyController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController, RegisterRulesController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
-      DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController, OpsLimitsController,
+DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, DashboardTargetPolicyController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
+DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController, OpsLimitsController,
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
       CspReportController, // SEC-3
+      DuplicateRowsSettingsController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
@@ -254,6 +264,7 @@ export function appModuleFor(config: AppConfig) {
       DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
       LibraryMenuController, // 0.15.70 (0151, W5): Library > Forms and Archive
       DataHubController, // 0.15.311 (0400): Data hub landing page
+      FinanceHubController, // 0.15.361 (0406): Finance hub landing page
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -261,11 +272,13 @@ export function appModuleFor(config: AppConfig) {
       InvitationsService, // 0091
       AccessService, AuthService, UsersRepo, MeService, NotifyAdminsService, MySessionsService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, RegisterRulesService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
+      AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, StructureProposalsService, RegisterRulesService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, DocumentTextService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, PushService, SnagsService,
-      DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
+DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, DashboardTargetPolicyService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
+DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
       MediaService, // 0.15.292
       PasskeyService, // S4
+      DuplicateRowsSettingsService,
       TemplateNoticeSettingsService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
@@ -280,9 +293,10 @@ export function appModuleFor(config: AppConfig) {
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)
       DailyPlanService, // 0.15.67 (migration 0149)
       StaffRegistryService, // 0.15.56 (0142)
-      DataResetService, MaintenanceService, // 0.15.62 (0146)
+      DataResetService, DataResetArchiveService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
       DataHubService, // 0.15.311 (0400)
+      FinanceHubService, // 0.15.361 (0406)
       DashboardCacheService, // short cache of the /dashboard figures (30 s, scope-keyed)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: DashboardCacheInvalidator }, // before TxInterceptor: clears the dashboard cache after a configuration write has committed

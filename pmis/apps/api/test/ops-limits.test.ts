@@ -1,7 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { OPS_LIMIT_DEFAULTS, limit, resetLimits } from '../src/ops/ops-limits';
+import { OpsLimitsService } from '../src/ops/ops-limits.service';
+import { OPS_LIMIT_DEFAULTS, limit, loginLimits, resetLimits } from '../src/ops/ops-limits';
 import { q } from './calc-helpers';
 import { Api, delegate, startApp, superDb } from './helpers';
 import { G } from './reg-helpers';
@@ -113,5 +114,25 @@ describe('PUT /settings/ops-limits', () => {
     const back = await put(admin, { values: { 'session.idle_hours': 2 }, reason: REASON }, etag(await read(admin)));
     expect(back.status).toBe(200);
     expect((await q<{ s: number }>(db, `SELECT ops_limit('stepup.seconds') AS s`))[0]!.s).toBe(300);
+  });
+});
+
+describe('sign-in rate limits (migration 0563)', () => {
+  it('are in the catalogue with the old numbers, are range-checked, and loginLimits() follows a saved value', async () => {
+    await reset();
+    const r = await read(admin);
+    const byKey = Object.fromEntries((r.body.items as { key: string; value: number; group: string }[]).map((i) => [i.key, i]));
+    expect(['login.ip_attempts', 'login.ip_window_seconds', 'login.ip_base_seconds', 'login.ip_max_seconds', 'login.identifier_attempts'].map((k) => byKey[k]?.value)).toEqual([10, 900, 2, 60, 5]);
+    expect(loginLimits()).toEqual({ perIp: 10, windowMs: 900_000, baseSeconds: 2, maxSeconds: 60, perIdentifier: 5 });
+    const tag = etag(r);
+    expect((await put(admin, { values: { 'login.ip_attempts': 1 }, reason: REASON }, tag)).status).toBe(422);
+    expect((await put(admin, { values: { 'login.ip_base_seconds': 30, 'login.ip_max_seconds': 10 }, reason: REASON }, tag)).status).toBe(422);
+    const ok = await put(admin, { values: { 'login.ip_attempts': 20, 'login.ip_window_seconds': 600, 'login.identifier_attempts': 8 }, reason: REASON }, tag);
+    expect(ok.status).toBe(200);
+    await app.get(OpsLimitsService).refresh();
+    expect(loginLimits()).toMatchObject({ perIp: 20, windowMs: 600_000, perIdentifier: 8, baseSeconds: 2, maxSeconds: 60 });
+    await reset();
+    resetLimits();
+    expect(loginLimits().perIp).toBe(10);
   });
 });
