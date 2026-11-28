@@ -1,7 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import ar from '@/i18n/ar.json';
 import { renderApp, signIn } from '@/test/utils';
 import { SettingsRoutes } from './settings/Settings';
 
@@ -14,7 +13,8 @@ describe('Settings, GECOL / HLC counts', () => {
     await signIn('pm');
     page();
     expect(await screen.findByTestId('page-gecol-hlc-counts')).toBeInTheDocument();
-    expect(await screen.findByTestId('settings-section-data-counts')).toHaveTextContent('GECOL / HLC counts');
+    // M1: the tab is hidden from the menu (route and endpoint kept); the generic Register counts replaces it
+    expect(screen.queryByTestId('settings-section-data-counts')).toBeNull();
     expect(await screen.findByTestId('ghc-gecol-total')).toHaveTextContent('5');
     expect(screen.getByTestId('ghc-gecol-pr')).toHaveTextContent('3');
     expect(screen.getByTestId('ghc-hlc-linked')).toHaveTextContent('2');
@@ -28,6 +28,6 @@ describe('Settings, GECOL / HLC counts', () => {
     await signIn('pm');
     page({ locale: 'ar' });
     expect(await screen.findByTestId('ghc-gecol-total')).toBeInTheDocument();
-    expect(await screen.findByTestId('settings-section-data-counts')).toHaveTextContent(ar.settings.section_data_counts);
+    expect(screen.queryByTestId('settings-section-data-counts')).toBeNull();
   });
 });

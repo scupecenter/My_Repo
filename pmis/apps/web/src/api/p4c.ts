@@ -13,6 +13,9 @@ export type HlcLegacyMigration = S['HlcLegacyMigration'];
 export type DismantleOrderOption = S['DismantleOrderOption'];
 export type GecolOrderWarnings = S['GecolOrderWarnings'];
 export type GecolOrderWarningsInput = S['GecolOrderWarningsInput'];
+export type RegisterOrderWarnings = S['RegisterOrderWarnings'];
+export type RegisterOrderWarningsInput = S['RegisterOrderWarningsInput'];
+export type RegisterCounts = S['RegisterCounts'];
 export type DeriveRules = S['DeriveRules'];
 export type DeriveRule = S['DeriveRule'];
 
@@ -106,6 +109,17 @@ export function useSetGecolOrderWarnings() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ['gecolOrderWarnings'] }),
   });
 }
+
+/** 0.15.464 (M1): the order warnings of any register, and the read only counts of every register. */
+export const useRegisterOrderWarnings = (key: string) => useQuery({ queryKey: ['registerOrderWarnings', key], queryFn: () => api.get<RegisterOrderWarnings>(`/settings/registers/${key}/order-warnings`) });
+export function useSetRegisterOrderWarnings(key: string) {
+  const qc = useQueryClient();
+  return useMutation<RegisterOrderWarnings, ApiError, { version: number; body: RegisterOrderWarningsInput & { reason: string } }>({
+    mutationFn: ({ version, body }) => api.put(`/settings/registers/${key}/order-warnings`, { version, body }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['registerOrderWarnings', key] }); void qc.invalidateQueries({ queryKey: ['gecolOrderWarnings'] }); },
+  });
+}
+export const useRegisterCounts = () => useQuery({ queryKey: ['registerCounts'], queryFn: () => api.get<RegisterCounts>('/settings/register-counts') });
 
 /** 0.15.260: the cross-register derive rules (Settings, Registers). */
 export const useDeriveRules = () => useQuery({ queryKey: ['deriveRules'], queryFn: () => api.get<DeriveRules>('/settings/derive-rules') });

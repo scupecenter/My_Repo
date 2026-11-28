@@ -37,7 +37,7 @@ describe('F19: Settings tabs and old routes', () => {
     ['staff-visibility', '/admin/settings/security/staff'],
     ['team-scope', '/admin/settings/registers/team-scope'],
     ['contractor-rules', '/admin/settings/registers/contractors'],
-    ['gecol-order', '/admin/settings/registers/gecol'],
+    ['gecol-order', '/admin/settings/registers/order'],
     ['register-columns', '/admin/settings/registers/columns'],
     ['lists', '/admin/settings/registers/lists'],
     ['mail-kinds', '/admin/settings/alerts/mail'],

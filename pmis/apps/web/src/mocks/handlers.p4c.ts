@@ -28,6 +28,16 @@ const gecolJson = () => {
     fields: gecolDates().map((f) => ({ code: f.code, label_en: f.label_en, label_ar: f.label_ar ?? null })) };
 };
 
+type RegOrderCfg = { enabled: boolean; chains: string[][]; billing_after: string | null; billing_field: string | null; version: number };
+const REG_ORDER = new Map<string, RegOrderCfg>();
+const regOrderJson = (key: string) => {
+  const def = REGISTER_DEFS.find((d) => d.register_key === key);
+  if (!def) return null;
+  const c: RegOrderCfg = key === 'gecol' ? { ...gecolCfg(), billing_field: 'billing_conversion_date' } : (REG_ORDER.get(key) ?? { enabled: false, chains: [], billing_after: null, billing_field: null, version: 0 });
+  return { register_key: key, enabled: c.enabled, chains: c.chains, billing_after: c.billing_after, billing_field: c.billing_field, version: c.version, updated_at: null, updated_by: null,
+    fields: def.fields.filter((f) => f.type === 'date').map((f) => ({ code: f.code, label_en: f.label_en, label_ar: f.label_ar ?? null })) };
+};
+
 const deriveSeed = () => ({ version: 1, rules: [
   { key: 'gecol_procurement_contractor', enabled: true, target_register: 'gecol', output: 'procurement_contractor', source_register: 'procurement', source: 'external_party', link_field: null },
   { key: 'hlc_procurement_contractor', enabled: true, target_register: 'hlc', output: 'procurement_contractor', source_register: 'procurement', source: 'external_party', link_field: 'procurement_record_id', site_fallback: true },
@@ -188,6 +198,38 @@ export const p4cHandlers = [
     Object.assign(c, { enabled: b.enabled as boolean, chains: b.chains as string[][], billing_after: (b.billing_after as string | null) ?? null, version: c.version + 1 });
     save();
     const j = gecolJson();
+    return HttpResponse.json(j, { headers: { ETag: `"${j.version}"` } });
+  }),
+  // M1 (0.15.464): the order warnings of any register. GECOL is the setting above; the others keep theirs in this map (off by default).
+  http.get(`${B}/settings/registers/:key/order-warnings`, ({ params }) => { const g = guard(); if (g) return g; const j = regOrderJson(String(params.key)); if (!j) return problem(404, 'not_found', 'No such register'); return HttpResponse.json(j, { headers: { ETag: `"${j.version}"` } }); }),
+  http.put(`${B}/settings/registers/:key/order-warnings`, async ({ request, params }) => {
+    const g = guard(); if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'Administrators only');
+    const key = String(params.key);
+    const cur = regOrderJson(key); if (!cur) return problem(404, 'not_found', 'No such register');
+    const m = ifMatch(request, cur.version); if (m) return m;
+    const b = await body<{ reason?: string; enabled?: unknown; chains?: unknown; billing_after?: unknown; billing_field?: unknown } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = [];
+    for (const k of Object.keys(b)) if (!['reason', 'enabled', 'chains', 'billing_after', 'billing_field'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    const dates = cur.fields.map((f) => f.code);
+    if (!Array.isArray(b.chains) || b.chains.length > 10) errs.push({ path: '/chains', code: 'invalid' });
+    else (b.chains as unknown[]).forEach((c, i) => {
+      if (!Array.isArray(c) || c.length < 2 || c.length > 20) { errs.push({ path: `/chains/${i}`, code: 'invalid' }); return; }
+      c.forEach((x, j) => { if (typeof x !== 'string' || !dates.includes(x)) errs.push({ path: `/chains/${i}/${j}`, code: 'unknown_field' }); else if (c.indexOf(x) !== j) errs.push({ path: `/chains/${i}/${j}`, code: 'duplicate' }); });
+    });
+    const ev = (b.billing_after as string | null | undefined) ?? null, bf = (b.billing_field as string | null | undefined) ?? null;
+    if (key === 'gecol') { if (bf) errs.push({ path: '/billing_field', code: 'unknown_key' }); }
+    else {
+      if (ev && !dates.includes(ev)) errs.push({ path: '/billing_after', code: 'unknown_field' });
+      if (bf && (!dates.includes(bf) || bf === ev)) errs.push({ path: '/billing_field', code: 'unknown_field' });
+      if (!!ev !== !!bf) errs.push({ path: '/billing_field', code: 'invalid' });
+    }
+    if (errs.length) return fields(...errs);
+    if (key === 'gecol') { const c = gecolCfg(); Object.assign(c, { enabled: b.enabled as boolean, chains: b.chains as string[][], billing_after: ev, version: c.version + 1 }); save(); }
+    else REG_ORDER.set(key, { enabled: b.enabled as boolean, chains: b.chains as string[][], billing_after: ev, billing_field: bf, version: cur.version + 1 });
+    const j = regOrderJson(key)!;
     return HttpResponse.json(j, { headers: { ETag: `"${j.version}"` } });
   }),
   http.get(`${B}/settings/derive-rules`, () => { const g = guard(); if (g) return g; const j = deriveJson(); return HttpResponse.json(j, { headers: { ETag: `"${j.version}"` } }); }),

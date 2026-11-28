@@ -16,6 +16,8 @@ import { StaffVisibility } from './StaffVisibility';
 import { TeamScopeMatch } from './TeamScopeMatch';
 import { DeriveRulesScreen } from './DeriveRules';
 import { GecolOrderWarnings } from './GecolOrderWarnings';
+import { RegisterOrderWarnings } from './RegisterOrderWarnings';
+import { RegisterCounts } from './RegisterCounts';
 import { MailKinds } from './MailKinds';
 import { MailPolicy } from './MailPolicy';
 import { useMe } from '@/api/hooks';
@@ -74,7 +76,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
   { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'sequence' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }, { key: 'simulate', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
-  { key: 'registers', sections: [{ key: 'columns' }, { key: 'custom' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
+  { key: 'registers', sections: [{ key: 'columns' }, { key: 'custom' }, { key: 'lists' }, { key: 'contractors' }, { key: 'order' }, { key: 'counts', adminOnly: true }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'media' }, { key: 'numbering' }, { key: 'search', adminOnly: true }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'mapping' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'structure', adminOnly: true }, { key: 'quality' }, { key: 'reset', adminOnly: true }] },
@@ -111,7 +113,7 @@ export const LEGACY_SETTINGS_PATHS: Readonly<Record<string, string>> = {
   'my-work/daily-plan': 'screens/daily-plan',
   'sla/dlp': 'security/dlp',
   'contractor-rules': 'registers/contractors',
-  'gecol-order': 'registers/gecol',
+  'gecol-order': 'registers/order',
   'register-columns': 'registers/columns',
   'mail-kinds': 'alerts/mail',
   'documents/mail': 'alerts/mail',
@@ -259,6 +261,8 @@ export function SettingsRoutes() {
           <Route path="recycle" element={<RecycleBinScreen />} />
           <Route path="contractors" element={<><ContractorRules /><ContractorPerfThresholds /></>} />
           <Route path="gecol" element={<GecolOrderWarnings />} />
+          <Route path="order" element={<RegisterOrderWarnings />} />
+          <Route path="counts" element={<RegisterCounts />} />
           <Route path="derive" element={<DeriveRulesScreen />} />
           <Route path="team-scope" element={<TeamScopeMatch />} />
           <Route path="issue-map" element={<IssueTaskMap />} />

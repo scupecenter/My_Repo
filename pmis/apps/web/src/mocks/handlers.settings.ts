@@ -12,6 +12,7 @@ import { BRANDS, isBrand } from '@/lib/brands';
 import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
+import { REGISTER_DEFS } from './registersData';
 import type { TableDisplaySetting } from '@/api/display';
 import { UI_FEATURES_SEED, type UiFeaturesSetting } from '@/api/uiFeatures';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
@@ -54,6 +55,18 @@ const PERF_ROWS = [
     quality: { total: 0, failed: 0, fail_pct: null, fail_level: 'insufficient' as const }, orders: { total: 1, open: 0 },
     contract: { active: 1, end_date: '2027-09-01', days_left: 279, level: 'ok' as const }, level: 'ok' as const },
 ];
+
+/** GET /settings/register-counts (contract 0.15.464): the demo records of every register, latest version of each. */
+const registerCounts = () => {
+  const latest = new Map<string, { register_key: string; state: string; v: number }>();
+  for (const r of db().reg.records) { const o = latest.get(r.entity_id); if (!o || r.version_no > o.v) latest.set(r.entity_id, { register_key: r.register_key, state: r.state, v: r.version_no }); }
+  return { as_of: '2026-11-28T09:00:00.000Z', registers: REGISTER_DEFS.map((d) => {
+    const by = new Map<string, number>();
+    for (const x of latest.values()) if (x.register_key === d.register_key) by.set(x.state, (by.get(x.state) ?? 0) + 1);
+    const total = [...by.values()].reduce((a, b) => a + b, 0);
+    return { register_key: d.register_key, total, versions: total, by_state: [...by.entries()].sort().map(([state, count]) => ({ state, count })) };
+  }) };
+};
 
 /** GET /reports/gecol-hlc-counts (contract 0.15.84): demo numbers only. */
 const GECOL_HLC_COUNTS = {
@@ -1700,6 +1713,7 @@ export const settingsHandlers = [
     save();
     return HttpResponse.json(C().contractorRules, tag(C().contractorRules.version));
   }),
+  http.get(`${B}/settings/register-counts`, () => { const g = guard(); if (g) return g; return HttpResponse.json(registerCounts()); }),
   http.get(`${B}/reports/team-scope-mismatch`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MISMATCH); }),
   http.get(`${B}/settings/sla-tasks`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: SLA_TASKS, counts: slaCounts() }); }),
   http.put(`${B}/settings/sla-tasks/:task/no-sla`, async ({ params, request }) => {

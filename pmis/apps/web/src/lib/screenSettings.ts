@@ -14,7 +14,7 @@ export const SCREEN_SETTINGS = {
   sites: { tab: 'workflow', section: 'columns' },
   site_locks: { tab: 'workflow', section: 'sequence' },
   register: { tab: 'registers', section: 'columns' },
-  register_gecol: { tab: 'registers', section: 'gecol' },
+  register_gecol: { tab: 'registers', section: 'order' },
   register_issues: { tab: 'registers', section: 'issue-map' },
   register_contractors: { tab: 'registers', section: 'contractors' },
   contractor_reports: { tab: 'registers', section: 'contractors' },
