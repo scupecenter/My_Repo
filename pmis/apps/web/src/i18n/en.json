@@ -310,7 +310,12 @@
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
     "deliverables": "Deliverables",
+    "tools_equipment": "Tools & Equipment",
     "incidents": "Incidents & Security"
+  },
+  "toast": {
+    "done": "Done",
+    "close": "Close the message"
   },
   "top": {
     "search": "Search or jump to…",
@@ -1756,6 +1761,15 @@
     "end_task_layout_submitted_date": "Layout Submitted Date"
   },
   "wtSet": {
+    "diffTitle": "Changes against the set in force",
+    "diffNone": "No item differs from the set in force.",
+    "diff_added": "Added",
+    "diff_removed": "Removed",
+    "diff_changed": "Changed",
+    "diffField_name": "Name",
+    "diffField_weight": "Weight",
+    "diffField_unit": "Unit",
+    "diffField_measure_rule": "Measure rule",
     "rule": {
       "method": "How the item is counted",
       "m_off": "Not counted automatically",
@@ -2210,6 +2224,9 @@
     "execution": "Execution",
     "lesson": "Lesson",
     "follow_up": "Follow-up",
+    "equipment": "Equipment",
+    "custody": "Custody",
+    "calibration_inspection": "Calibration and inspection",
     "invoice": "Invoice",
     "payment": "Payment",
     "deliverable": "Deliverable",
@@ -2257,6 +2274,10 @@
     "grid": "Grid"
   },
   "registers": {
+    "new_more": "More ways to add",
+    "new_blank": "New blank record",
+    "new_import": "Import rows from the template",
+    "new_import_off": "This register has no template yet, so there is nothing to import.",
     "tab_asb_cw": "BOQ CW (civil works)",
     "tab_asb_te": "BOQ TE (equipment)",
     "tab_dis_cw": "Dismantle CW",
@@ -2459,6 +2480,11 @@
     "order_required": "Settings require this invoice to name its Procurement order.",
     "unknown_rule": "This register has no such rule.",
     "supplier_required": "Settings require an invoice to name its supplier company.",
+    "link_invalid": "This is not a record id of the linked register.",
+    "link_not_found": "The linked record does not exist, is not approved when that is required, or you may not see it.",
+    "link_other_site": "The linked record belongs to another site.",
+    "no_delete": "A link is switched off, never removed.",
+    "unknown_field": "Choose a text field of the source register.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -3932,6 +3958,8 @@
     "zip_picked_one": "Download {{count}} selected (zip)",
     "zip_picked_other": "Download {{count}} selected (zip)",
     "zip_all": "Download all shown (zip)",
+    "zip_acceptance": "Acceptance pack (zip)",
+    "zip_acceptance_hint": "Approved PAC, FAC and HOTO files of this site, one folder per document type, with an index.",
     "zip_scope_needed": "Choose a stage or a document code first, or stay on this site.",
     "zip_running": "Preparing the zip…",
     "zip_done": "Downloaded {{name}}",
@@ -4822,6 +4850,22 @@
     "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
     "saved": "Rule saved",
     "change_title": "Change: {{rule}}"
+  },
+  "links": {
+    "title": "Register links",
+    "note": "Settings for the links between registers (the D60 declaration). A link draws the picker of the record form, fills the Related records panel and, when Check on save is on, is checked on every save while the record is in entry. A link is switched off, never removed. Every change needs a reason and is audited.",
+    "from": "From register",
+    "field": "Field",
+    "to": "To register",
+    "enabled": "On",
+    "enforce": "Check on save",
+    "same_site": "Same site only",
+    "state": "Record state needed",
+    "saved": "Links saved",
+    "add": "Add a link",
+    "add_title": "Add a link between registers",
+    "choose": "Choose",
+    "toggle_title": "Change a link"
   },
   "regstate": {
     "title": "Register state",
@@ -7163,6 +7207,7 @@
     "display_wrap": "Wrap long text",
     "display_zebra": "Zebra rows",
     "display_groupbar": "Group summary: count and status bar on each group header",
+    "display_colors": "Value colours",
     "display_reset": "Back to the defaults",
     "display_settings": "Defaults in Settings",
     "size_sm": "Small",
@@ -7181,6 +7226,16 @@
     "display_pin": "Freeze the first columns"
   },
   "regviews": {
+    "board_drag_note": "Drag a card to another column to change its status. A refused drop says why.",
+    "drag_state": "The approval state moves only through the record's own actions.",
+    "drag_same": "Already in this column.",
+    "drag_locked": "This record is locked.",
+    "drag_field_locked": "This status field is locked.",
+    "drag_no_edit": "You cannot edit this record now.",
+    "drag_required": "This status cannot be empty.",
+    "moved": "Status changed.",
+    "preview_hint": "Space or Escape closes the preview.",
+    "preview_open": "Open the record",
     "group_record": "Record",
     "group_workflow": "Workflow",
     "record": "Record",
@@ -7294,6 +7349,11 @@
     "status_expired": "Expired",
     "last": "Last request: {{status}} ({{when}})",
     "result": "Result",
+    "done_title": "Reset complete",
+    "done_total": "{{rows}} rows were deleted and {{sessions}} sessions were ended.",
+    "done_files": "Files: {{moved}} of {{total}} moved to the quarantine.",
+    "done_files_pending": "{{count}} still pending.",
+    "done_close": "Close",
     "result_when": "Reset committed {{when}} (audit row {{audit}}).",
     "result_sessions_one": "{{count}} session ended.",
     "result_sessions_other": "{{count}} sessions ended.",
@@ -7746,6 +7806,8 @@
     "grid_hint": "Edit cells in the table",
     "board": "Board",
     "board_hint": "Cards by milestone or status",
+    "feed": "Feed",
+    "feed_hint": "Latest changes first, one line per record",
     "map": "Map",
     "map_hint": "Items on the map",
     "chart_hint": "The rows as bars or a ring, by a field you choose",
@@ -8721,5 +8783,6 @@
     "note": "Note",
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
-  }
+  },
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
 }
