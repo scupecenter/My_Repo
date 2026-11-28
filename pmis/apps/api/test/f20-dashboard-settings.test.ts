@@ -193,4 +193,92 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
       );
     }
   });
+
+  it("health index bands (contract 0.15.435): reads the default, admin-only write, order and range rules, version, audit, history untouched", async () => {
+    const admin = await plainAdmin(app, db);
+    const g: Team = await team(app, db, "gecol", "gecol", 7);
+    const cur = await admin.api.call("get", "/settings/dashboard/health-bands");
+    expect(cur.status).toBe(200);
+    expect(cur.body.green).toBe(85);
+    expect(cur.body.amber).toBe(70);
+    const v0 = cur.body.version as number;
+    const etag = cur.headers.etag as string;
+    const put = (b: object, h: Record<string, string> = { "If-Match": etag }) =>
+      admin.api.call("put", "/settings/dashboard/health-bands", b, h);
+    const ok = { green: 90, amber: 75, reason: "Owner raised the bands" };
+
+    // a reader without admin.settings edit may read but not write
+    expect((await g.entry.api.call("put", "/settings/dashboard/health-bands", ok, { "If-Match": etag })).status).toBe(403);
+    // If-Match is required; a stale version is refused
+    expect((await admin.api.call("put", "/settings/dashboard/health-bands", ok)).status).toBe(428);
+    expect((await put(ok, { "If-Match": '"999"' })).status).toBe(412);
+    // green must be above amber; ranges; a key the contract does not know is refused before the database
+    const order = await put({ green: 70, amber: 70, reason: "Order test" });
+    expect(order.status).toBe(422);
+    expect(codesOf(order.body)).toContain("/green:invalid_order");
+    expect((await put({ green: 101, amber: 70, reason: "Range test" })).status).toBe(422);
+    expect((await put({ green: 90, amber: -1, reason: "Range test" })).status).toBe(422);
+    expect((await put({ green: 90, amber: 75, reason: "Extra key", other: 1 })).status).toBe(422);
+    expect((await put({ green: 90, amber: 75, reason: "" })).status).toBe(422);
+
+    const snapBefore = await q(db, `SELECT count(*)::int AS n FROM site_snapshots`);
+    try {
+      const saved = await put(ok);
+      expect(saved.status).toBe(200);
+      expect(saved.body.green).toBe(90);
+      expect(saved.body.amber).toBe(75);
+      expect(saved.body.version).toBe(v0 + 1);
+      // the same version cannot be used twice
+      expect((await put(ok)).status).toBe(412);
+      const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'health_bands_update' AND entity_id = 'dashboard.health_bands'`);
+      expect(au.length).toBeGreaterThan(0);
+      // the stored history is not rewritten
+      const snapAfter = await q(db, `SELECT count(*)::int AS n FROM site_snapshots`);
+      expect(snapAfter[0]!.n).toBe(snapBefore[0]!.n);
+    } finally {
+      const now = await admin.api.call("get", "/settings/dashboard/health-bands");
+      await admin.api.call("put", "/settings/dashboard/health-bands", { green: 85, amber: 70, reason: "test reset to the default" }, { "If-Match": now.headers.etag as string });
+    }
+  });
+
+  it("weekly snapshot day (contract 0.15.430): reads the default Thursday, admin-only write, range rule, audit, stored snapshots untouched", async () => {
+    const admin = await plainAdmin(app, db);
+    const g: Team = await team(app, db, "gecol", "gecol", 7);
+    const cur = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
+    expect(cur.status).toBe(200);
+    expect(cur.body.weekday).toBe(4);
+    const etag = cur.headers.etag as string;
+    const put = (b: object, h: Record<string, string> = { "If-Match": etag }) =>
+      admin.api.call("put", "/settings/dashboard/snapshot-schedule", b, h);
+    const ok = { weekday: 0, reason: "Owner moved the snapshot to Sunday" };
+
+    expect((await g.entry.api.call("put", "/settings/dashboard/snapshot-schedule", ok, { "If-Match": etag })).status).toBe(403);
+    expect((await admin.api.call("put", "/settings/dashboard/snapshot-schedule", ok)).status).toBe(428);
+    expect((await put(ok, { "If-Match": '"999"' })).status).toBe(412);
+    const bad = await put({ weekday: 7, reason: "Range test" });
+    expect(bad.status).toBe(422);
+    expect(codesOf(bad.body).some((c) => c.startsWith("/weekday:"))).toBe(true);
+    expect((await put({ weekday: -1, reason: "Range test" })).status).toBe(422);
+    expect((await put({ weekday: 1.5, reason: "Range test" })).status).toBe(422);
+    expect((await put({ weekday: 0, reason: "Extra key", every_days: 3 })).status).toBe(422);
+    expect((await put({ weekday: 0, reason: "" })).status).toBe(422);
+
+    const snapBefore = await q(db, `SELECT count(*)::int AS n FROM site_snapshots`);
+    try {
+      const saved = await put(ok);
+      expect(saved.status).toBe(200);
+      expect(saved.body.weekday).toBe(0);
+      expect(saved.body.version).toBeGreaterThan(0);
+      // the job reads the same setting
+      const v = await q<{ v: unknown }>(db, `SELECT value AS v FROM settings WHERE key = 'dashboard.snapshot_weekday'`);
+      expect(v[0]!.v).toBe(0);
+      const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'snapshot_weekday_update' AND entity_id = 'dashboard.snapshot_weekday'`);
+      expect(au.length).toBeGreaterThan(0);
+      const snapAfter = await q(db, `SELECT count(*)::int AS n FROM site_snapshots`);
+      expect(snapAfter[0]!.n).toBe(snapBefore[0]!.n);
+    } finally {
+      const now = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
+      await admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 4, reason: "test reset to the default" }, { "If-Match": now.headers.etag as string });
+    }
+  });
 });
