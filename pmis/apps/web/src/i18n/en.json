@@ -5405,6 +5405,7 @@
     "internal_types": "Team types of an internal team (In-House), separated by commas",
     "closed": "Order statuses that end an order, separated by commas"
   },
+  "print": {"filters": "Filters", "printed_by": "Printed by {{name}} on {{when}}", "button": "Print / PDF", "hint": "Opens the print dialog on A4. Choose Save as PDF to get a PDF file."},
   "contractorReports": {
     "title": "Contractor reports",
     "mismatch": "Running orders that no longer match",
