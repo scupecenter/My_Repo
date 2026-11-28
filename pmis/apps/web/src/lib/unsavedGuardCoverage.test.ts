@@ -28,6 +28,7 @@ const EXCLUDED: Record<string, string> = {
   'components/AnnouncementPopup.tsx': 'drafts are per announcement and live inside the popup dialog',
   // OPEN GAPS found by this scan, still to be wired (listed so the test stays honest; remove the entry when wired). None left: SlaRules and NavLayoutEditor are wired.
   'pages/settings/RecycleBin.tsx': 'row selector for a FormDialog',
+  'pages/settings/FinanceReadersPanel.tsx': 'the draft seeds a FormDialog, which guards its own typed input',
 };
 const DRAFT = /const \[(draft|form|dirty|edit|editing)[A-Za-z]*, set/;
 const GUARDED = /unsavedGuard|useReportDirty/;
