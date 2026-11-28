@@ -28,6 +28,30 @@ export function useSetDashboardSettings() {
   });
 }
 
+/** 0.15.430 (settings review gap 3): the weekday of the weekly dashboard snapshot. Kept in the setting dashboard.snapshot_weekday. */
+export type SnapshotSchedule = S["SnapshotSchedule"];
+
+export const useSnapshotSchedule = () =>
+  useQuery({
+    queryKey: ["snapshotSchedule"],
+    queryFn: () =>
+      api.get<SnapshotSchedule>("/settings/dashboard/snapshot-schedule"),
+  });
+
+export function useSetSnapshotSchedule() {
+  const qc = useQueryClient();
+  return useMutation<
+    SnapshotSchedule,
+    ApiError,
+    { version: number; body: { weekday: number; reason: string } }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/snapshot-schedule", { version, body }),
+    onSettled: () =>
+      void qc.invalidateQueries({ queryKey: ["snapshotSchedule"] }),
+  });
+}
+
 /** 0.15.435 (settings review gap 8): the health index bands, green and amber. Kept in the setting dashboard.health_bands. */
 export type HealthBands = S["HealthBands"];
 

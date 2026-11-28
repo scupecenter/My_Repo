@@ -8215,6 +8215,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard/snapshot-schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The weekday of the weekly dashboard snapshot (0.15.430)
+         * @description 0.15.430. The setting `dashboard.snapshot_weekday`: the weekday (0 = Sunday ... 6 = Saturday, on the Africa/Tripoli date) on which the nightly job takes the weekly
+         *     dashboard snapshot. Default 4 (Thursday). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         *     The month-end snapshot is separate: it is taken on the last day of each month and has no setting.
+         */
+        get: operations["getSnapshotSchedule"];
+        /**
+         * Save the weekday of the weekly dashboard snapshot (reason, If-Match, audited)
+         * @description 0.15.430. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+         *     (`weekday` is a whole number from 0 to 6). One audit row with before and after values and the reason. Applies from the next snapshot; stored snapshots are not moved.
+         */
+        put: operations["setSnapshotSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/goals": {
         parameters: {
             query?: never;
@@ -19840,7 +19867,7 @@ export interface components {
             /** @enum {string} */
             key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries" | "login.ip_attempts" | "login.ip_window_seconds" | "login.ip_base_seconds" | "login.ip_max_seconds" | "login.identifier_attempts" | "media.thumbnails_per_minute";
             /** @enum {string} */
-            group: "sessions" | "rows" | "exports" | "media" | "media";
+            group: "sessions" | "rows" | "exports" | "media";
             /** @enum {string} */
             unit: "hours" | "seconds" | "rows" | "sites" | "entries" | "attempts" | "per_minute";
             default: number;
@@ -20362,6 +20389,17 @@ export interface components {
         };
         /** @description 0.15.435. The setting dashboard.health_bands (default 85 and 70). */
         HealthBands: components["schemas"]["HealthBandsInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        SnapshotScheduleInput: {
+            /** @description The weekday of the weekly snapshot: 0 = Sunday ... 6 = Saturday. */
+            weekday: number;
+        };
+        /** @description 0.15.430. The setting dashboard.snapshot_weekday (default 4, Thursday). */
+        SnapshotSchedule: components["schemas"]["SnapshotScheduleInput"] & {
             version: number;
             /** Format: date-time */
             updated_at?: string | null;
@@ -38271,6 +38309,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthBands"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getSnapshotSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The weekday. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotSchedule"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setSnapshotSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["SnapshotScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotSchedule"];
                 };
             };
             401: components["responses"]["Unauthorized"];
