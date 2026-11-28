@@ -38,6 +38,29 @@ describe('Library > Media', () => {
     await waitFor(() => expect(seen.some((s) => s.includes('source=snags'))).toBe(true));
   });
 
+  it('switches the view mode from the Layout panel: list, by site and by date', async () => {
+    await signIn('pm');
+    server.use(
+      http.get(`${API_BASE}/media/items`, () => HttpResponse.json({ enabled: true, items: [item('a1'), item('a2', { site: { id: 's2', code: 'GS-2' } as never, uploaded_at: '2026-11-21T10:00:00Z' }), item('a3', { site: null })], page: { limit: 60, next_cursor: null } })),
+      http.get(`${API_BASE}/media/facets`, () => HttpResponse.json({ document_types: [], snag_types: [], registers: [] })),
+    );
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/library/media" element={<LibraryMedia />} /></Routes>, { route: '/library/media' });
+    expect(await screen.findByTestId('media-grid')).toBeInTheDocument();
+    await u.click(screen.getByTestId('media-view'));
+    await u.click(await screen.findByTestId('media-layout-list'));
+    expect(await screen.findByTestId('media-row-a1')).toBeInTheDocument();
+    await u.click(screen.getByTestId('media-view'));
+    await u.click(await screen.findByTestId('media-layout-site'));
+    expect(await screen.findByTestId('media-group-GS-1')).toBeInTheDocument();
+    expect(screen.getByTestId('media-group-GS-2')).toBeInTheDocument();
+    expect(screen.getByTestId('media-group-none')).toBeInTheDocument();
+    await u.click(screen.getByTestId('media-view'));
+    await u.click(await screen.findByTestId('media-layout-date'));
+    expect(await screen.findByTestId('media-group-2026-11-21')).toBeInTheDocument();
+    expect(screen.getByTestId('media-group-2026-11-20')).toBeInTheDocument();
+  });
+
   it('says so when the gallery is switched off', async () => {
     await signIn('pm');
     server.use(
