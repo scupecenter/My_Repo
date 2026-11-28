@@ -128,7 +128,7 @@ export class MediaService {
         SELECT 'document_file'::text AS kind, f.id::text AS id, f.uploaded_at, s.site_id::text AS site_id, s.region_id, coalesce(si.site_code, 'GLOBAL') AS site_code, si.name AS site_name,
           dt.code AS type_code, dt.name_en AS type_name_en, dt.name_ar AS type_name_ar, dt.kind::text AS doc_kind, f.mime_type, f.original_name AS name, f.size_bytes, f.uploaded_by::text AS uploaded_by,
           CASE WHEN f.withdrawn_at IS NOT NULL THEN 'withdrawn' WHEN NOT f.is_current THEN 'superseded' ELSE 'current' END AS state, f.version, s.status::text AS status,
-          s.register_key, s.register_entity_id::text AS record_id, s.task_id::text AS task_id, NULL::text AS snag_id, NULL::text AS shot_type, f.storage_key
+          s.register_key, COALESCE((SELECT x.id::text FROM register_records x WHERE x.entity_id = s.register_entity_id ORDER BY x.is_current DESC, x.version_no DESC LIMIT 1), s.register_entity_id::text) AS record_id, s.task_id::text AS task_id, NULL::text AS snag_id, NULL::text AS shot_type, f.storage_key
         FROM document_files f JOIN document_slots s ON s.id = f.slot_id LEFT JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id
         WHERE ${Prisma.join(c, ' AND ')}`);
     }
@@ -279,7 +279,7 @@ export class MediaService {
     try {
       made = await makeThumb(Buffer.concat(chunks), px, th.format, th.quality);
     } catch {
-      throw new ProblemException(415, 'thumbnail_unsupported', { detail: 'The image could not be read.' });
+      throw new ProblemException(415, 'thumbnail_unsupported', { detail: 'The image could not be read or is too small for a preview.' });
     }
     if (!made) throw new ProblemException(503, 'thumbnails_unavailable', { detail: 'The thumbnail maker is not available on this server.' });
     try {

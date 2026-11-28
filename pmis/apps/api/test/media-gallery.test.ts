@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RateLimiter } from '../src/auth/rate-limiter';
 import { StorageService } from '../src/documents/storage.service';
 import { applyLimits, resetLimits } from '../src/ops/ops-limits';
-import { loadSharp } from '../src/media/thumbs';
+import { loadSharp, makeThumb } from '../src/media/thumbs';
 import { superDb, startApp } from './helpers';
 import { G } from './reg-helpers';
 import { Actor, actor, makeSite, plainAdmin } from './wf-helpers';
@@ -154,6 +154,13 @@ describe('Media gallery', () => {
     } finally {
       resetLimits();
     }
+  });
+
+  it('makes no thumbnail of a tiny source (the card shows the type icon), a normal one still works', async () => {
+    const sharp = (await loadSharp())!;
+    const tiny = await sharp({ create: { width: 8, height: 4, channels: 3, background: { r: 0, g: 0, b: 0 } } }).png().toBuffer();
+    await expect(makeThumb(tiny, 240, 'webp', 78)).rejects.toThrow('source_too_small');
+    expect(await makeThumb(png, 240, 'webp', 78)).toMatchObject({ width: 240, height: 120 });
   });
 
   it('hides a withdrawal at once and never deletes the row', async () => {
