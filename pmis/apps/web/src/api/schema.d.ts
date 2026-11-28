@@ -4698,6 +4698,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/task-source-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The task source rules of the registers, with the registers, their fields and the tasks to pick from
+         * @description 0.15.646 (migration 0770, automation item 4). Needs the Settings screen (`admin.settings` view). The ETag is the version of the whole set.
+         */
+        get: operations["getTaskSourceRules"];
+        /**
+         * Save task source rules (reason, If-Match, audited)
+         * @description 0.15.646. System Admin, or a delegation of `admin.settings` edit for all regions. A rule is added or changed, hidden with `is_active` false, never deleted. A rule says
+         *     "a record of this register that matches these conditions is the source of this task and gives it the date of this field". The workflow is unchanged: the record is linked to
+         *     the task at its submission only while the task is open, and the final approval gives the task its date and approves it. An approved task is never reopened or re-dated.
+         *     Field errors: `unknown_register`, `unknown_task`, `not_a_date_field`, `unknown_field`, `duplicate`, `invalid`.
+         */
+        put: operations["setTaskSourceRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/register-rules": {
         parameters: {
             query?: never;
@@ -24715,6 +24742,57 @@ export interface components {
                 items: components["schemas"]["DashboardRegion"][];
             };
         };
+        TaskSourceRule: {
+            register_key: string;
+            task_code: string;
+            date_field: string;
+            data_eq: {
+                [key: string]: string;
+            };
+            data_in: {
+                [key: string]: string[];
+            };
+            sort_order: number;
+            is_active: boolean;
+        };
+        TaskSourceRules: {
+            rows: components["schemas"]["TaskSourceRule"][];
+            registers: {
+                register_key: string;
+                name_en: string;
+                name_ar?: string | null;
+                fields: {
+                    code: string;
+                    label_en: string;
+                    label_ar?: string | null;
+                    field_type: string;
+                    options?: string[] | null;
+                }[];
+            }[];
+            tasks: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            version: number;
+            can_edit: boolean;
+        };
+        TaskSourceRulesInput: {
+            reason: string;
+            rows: {
+                register_key: string;
+                task_code: string;
+                date_field: string;
+                data_eq?: {
+                    [key: string]: string;
+                };
+                data_in?: {
+                    [key: string]: string[];
+                };
+                sort_order?: number;
+                is_active?: boolean;
+            }[];
+        };
     };
     responses: {
         /** @description Malformed request. */
@@ -32853,6 +32931,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getTaskSourceRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSourceRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setTaskSourceRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskSourceRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSourceRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listRegisterRules: {

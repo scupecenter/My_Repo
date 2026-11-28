@@ -49,6 +49,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Dismantle part (outsourced) | Procurement order | register link | `procurement_order_id`, contractor | contractor derived from the order |
 | Register records, task instances, task delay periods, contractor teams and contracts | Contractor company (`external_parties`) | foreign key | `external_party_id`, `party_id` | chosen |
 | Procurement, snags, quality inspections, issues | Contractor company | foreign key (0182, `_idfk`) | `party_id`, `responsible_party_id` | chosen |
+| Register records | Tasks (`task_instances`) | register link (`register_records.task_id`, 0019) | rows of `register_task_sources`, editable in Settings (0770) | the task takes the record's date at final approval; open tasks only |
 | Procurement | Contractor team (`external_teams`) | foreign key (0182, `_idfk`) | `team_id` | chosen |
 | Quality inspection | Snag | foreign key (0182, `_idfk`, ON DELETE SET NULL) | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
