@@ -26,7 +26,7 @@ describe('the layout model (lib/navLayout)', () => {
     const d = defaultLayout();
     expect(d.headings.map((h) => h.id)).toEqual(['home', 'work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs']);
     expect(d.headings[0]!.children).toEqual(['dashboard']); // Dashboard is the first main entry on its own (owner, 2026-11-25)
-    expect(d.headings[2]).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] });
+    expect(d.headings[2]).toMatchObject({ name_en: 'Site Master', name_ar: 'سجل المواقع', children: ['sites'] });
     expect(d.headings[1]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'messages', 'absence']);
     expect(resolveLayout(null)).toEqual(d);
   });
@@ -36,9 +36,9 @@ describe('the layout model (lib/navLayout)', () => {
     const list = /unnest\(\s*ARRAY\[([^\]]+)\]/.exec(read('0081_nav_layout'))![1]!.match(/'([^']+)'/g)!.map((s) => s.slice(1, -1));
     // Later releases add their screens in their own migration (0082: the System Log), one INSERT ... VALUES row per key: (key, default group, ord, added_in).
     // 0149: My Work > Daily Plan; 0151 (W5): Library > Forms and Archive (two rows of one INSERT)
-    const added = ['0082_nav_system_log', '0149_daily_plan', '0151_library', '0183_incidents_register', '0184_lessons_learned_register', '0185_invoices_register', '0326_deliverables_register', '0400_data_hub'].flatMap((m) => [...read(m).matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES([^;]*);/g)]
+    const added = ['0082_nav_system_log', '0149_daily_plan', '0151_library', '0183_incidents_register', '0184_lessons_learned_register', '0185_invoices_register', '0326_deliverables_register', '0400_data_hub', '0406_finance_hub'].flatMap((m) => [...read(m).matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES([^;]*);/g)]
       .flatMap((x) => [...x[1]!.matchAll(/\('([^']+)',\s*'([^']+)'/g)].map((y) => ({ key: y[1]!, group: y[2]! }))));
-    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }, { key: 'daily_plan', group: 'work' }, { key: 'library.forms', group: 'library' }, { key: 'library.archive', group: 'library' }, { key: 'incidents', group: 'registers' }, { key: 'lessons_learned', group: 'registers' }, { key: 'invoices', group: 'registers' }, { key: 'deliverables', group: 'registers' }, { key: 'data_hub', group: 'data' }, { key: 'master_import', group: 'data' }, { key: 'column_mapping', group: 'data' }, { key: 'data_reset', group: 'data' }, { key: 'recycle_bin', group: 'data' }]);
+    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }, { key: 'daily_plan', group: 'work' }, { key: 'library.forms', group: 'library' }, { key: 'library.archive', group: 'library' }, { key: 'incidents', group: 'registers' }, { key: 'lessons_learned', group: 'registers' }, { key: 'invoices', group: 'registers' }, { key: 'deliverables', group: 'registers' }, { key: 'data_hub', group: 'data' }, { key: 'master_import', group: 'data' }, { key: 'column_mapping', group: 'data' }, { key: 'data_reset', group: 'data' }, { key: 'recycle_bin', group: 'data' }, { key: 'finance_hub', group: 'registers' }]);
     expect([...list, ...added.map((a) => a.key)].sort()).toEqual(NAV_SIDE.map((n) => n.key).sort());
     for (const a of added) expect(NAV_SIDE.find((n) => n.key === a.key)?.group).toBe(a.group);
     expect(cleanNavLayout(defaultLayout()).errors).toEqual([]);
@@ -127,7 +127,7 @@ describe('the side menu with a shared layout', () => {
       headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle').reverse() } : h)),
     };
     const r = resolveLayout(saved);
-    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] }); // a layout saved under the old name shows the current one
+    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'Site Master', name_ar: 'سجل المواقع', children: ['sites'] }); // a layout saved under the old name shows the current one
     const regs = r.headings.find((h) => h.id === 'registers')!;
     expect(regs.children.at(-1)).toBe('dismantle');
     expect(regs.children.filter((k) => k === 'dismantle')).toHaveLength(1);
@@ -151,15 +151,14 @@ describe('the side menu with a shared layout', () => {
     expect(r3.headings[0]!.children).toEqual(['dismantle']);
   });
 
-  it('a saved Site Master heading holding sites and dismantle renders as the one Site Master row, with six sub-menus and Dismantle under Registers & Logs', async () => {
+  it('a saved Site Master heading holding sites and dismantle renders as the Site Master group: Site 360° then six sub-menus and Dismantle under Registers & Logs', async () => {
     const d = defaultLayout();
     store({ headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', name_ar: 'سايت 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle') } : h)) });
     await signIn('pm');
     app();
     await screen.findByTestId('nav-sites');
-    expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
     expect(screen.queryByText('SITE 360')).not.toBeInTheDocument();
-    expect(screen.getByTestId('nav-sites')).toHaveTextContent(/^Site Master$/);
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent(/^Site 360°$/);
     expect(screen.getByTestId('nav-site-master-menus').querySelectorAll('a')).toHaveLength(6);
     expect(screen.queryByTestId('nav-site-master-dismantle')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-group-registers')).toContainElement(screen.getByTestId('nav-dismantle'));
@@ -194,7 +193,9 @@ describe('the side menu with a shared layout', () => {
     expect(screen.getByTestId('nav-group-toggle-talk')).toHaveTextContent('تواصل');
     const day = screen.getByTestId('nav-group-day');
     expect(within(day).getByTestId('nav-group-talk')).toContainElement(screen.getByTestId('nav-inbox'));
-    expect(keysIn('nav-group-day')).toEqual(['nav-dashboard', 'nav-messages', 'nav-inbox', 'nav-my_work']);
+    // Dashboard is the fixed first row above the groups (nav-first), not a child of any heading
+    expect(keysIn('nav-group-day')).toEqual(['nav-messages', 'nav-inbox', 'nav-my_work']);
+    expect(screen.getByTestId('nav-first')).toContainElement(screen.getByTestId('nav-dashboard'));
     expect(screen.getByTestId('nav-edit')).toHaveTextContent('تعديل القائمة');
   });
 

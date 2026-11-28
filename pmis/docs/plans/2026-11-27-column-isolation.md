@@ -1,0 +1,8 @@
+# Per-list column isolation
+
+Hiding, ordering, sizing and the density of columns are stored per user and per list (`pmis.table.<list>.<user>`, TableKit `useTablePrefs`). Audit of every list:
+
+- Table prefs: every `useTablePrefs` and `StandardTable` call has its own key (Registers `register-<key>`, Daily Plan `<screen>-<tab>`, Sites `sites`, `sites-stream`, `sites-wide-<menu>`, `sites-menu-<menu>`, Library archive `-set`/`-seed`). No two lists share a key. Covered by `lib/columnIsolation.test.ts` (same column keys in two lists, two users, prefix-named lists).
+- Leak found and fixed: saved views carry the columns of the table that saved them, but one view screen is used by two tables in four places (Site tasks: grid and timeline; Library archive: set and seed; Daily Plan: its tabs; Site Master menus). A view saved on one list applied its column order, hidden columns and widths to the other. Fix: a view stamps the saving table's key (`_columns_for` inside its filters, no schema change) and applies columns only to that table; the filters still apply everywhere. Views saved before the stamp have no owner: on those shared screens their columns are skipped (filters kept), elsewhere they apply as before. The Display options and density are part of the columns and follow the same rule.
+- Rename: there is no per-user column rename. Renaming a column (Site Master, register and Warehouse item columns) is an administrator action on the shared schema, by design, audited, and applies to everyone; it is outside per-user preferences.
+- Not touched: the column menu, the export, permissions (hiding is display only).

@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useSetNavLayout } from '@/api/settings';
 import type { NavLayoutSetting } from '@/api/types';
 import { ICONS, ICON_PROPS, type Concept } from '@/lib/icons';
+import { useUnsavedGuard } from '@/lib/unsavedGuard';
 import {
   addMain, addSub, dropOn, headingCount, headingIcon, headingName, headRef, isSub, itemRef, keyMove, MAX_HEADINGS, MAX_MAIN, NAME_MAX, NAV_SIDE, OTHER_ID, position,
   removeHeading, renameHeading, resolveLayout, sameLayout, type Layout, type NavHead, type NavSub, type Ref,
@@ -60,6 +61,14 @@ export function NavLayoutEditor({ setting, onDone }: { setting: NavLayoutSetting
     return { index: p.index, count: p.count, where: p.container ? t('navEdit.in_heading', { heading: headingName(p.container, lang) }) : t('navEdit.top_level') };
   };
   const dirty = !sameLayout(draft, initial);
+  // Decision 11: an edited menu layout that was not saved is asked about before the user leaves (Save asks for the reason, as the Save button does)
+  useUnsavedGuard({
+    scope: 'settings', dirty: dirty && !!setting, needsReason: true, label: t('navEdit.title'),
+    onSave: (reason) => new Promise<boolean>((res) => {
+      if (!setting) { res(false); return; }
+      set.mutate({ version: setting.version, layout: draft, reason }, { onSuccess: () => { toast(t('navEdit.saved')); res(true); }, onError: () => res(false) });
+    }),
+  });
 
   // keep the focus on the handle of the picked entry when it moves to another list (its element is mounted again)
   useLayoutEffect(() => { if (picked) handles.current.get(picked.ref)?.focus(); }, [draft, picked]);
