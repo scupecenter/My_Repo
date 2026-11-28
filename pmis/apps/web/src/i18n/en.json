@@ -529,6 +529,7 @@
     "tab_priority": "Priority"
   },
   "common": {
+    "name_ar_missing": "Arabic name is empty: Arabic users will see the English name.",
     "pick_date": "Pick a date from the calendar",
     "date_hint": "Date as YYYY-MM-DD",
     "search": "Search",
