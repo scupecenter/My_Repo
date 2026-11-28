@@ -312,6 +312,10 @@
     "deliverables": "المخرجات",
     "incidents": "الحوادث والأمن"
   },
+  "toast": {
+    "done": "تم",
+    "close": "إغلاق الرسالة"
+  },
   "top": {
     "search": "ابحث أو انتقل إلى…",
     "language": "تغيير اللغة",
@@ -7364,6 +7368,11 @@
     "status_expired": "انتهت صلاحيته",
     "last": "آخر طلب: {{status}} ({{when}})",
     "result": "النتيجة",
+    "done_title": "اكتملت إعادة الضبط",
+    "done_total": "تم حذف {{rows}} سجلاً وإنهاء {{sessions}} جلسة.",
+    "done_files": "الملفات: نُقل {{moved}} من {{total}} إلى الحجر.",
+    "done_files_pending": "لا يزال {{count}} قيد الانتظار.",
+    "done_close": "إغلاق",
     "result_when": "اعتُمدت إعادة التعيين {{when}} (سطر التدقيق {{audit}}).",
     "result_sessions_one": "انتهت جلسة واحدة ({{count}}).",
     "result_sessions_other": "انتهت {{count}} جلسة.",
