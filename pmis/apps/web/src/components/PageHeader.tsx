@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
 import type { ScreenKey } from '@/lib/screenSettings';
 import { ICONS } from '@/lib/icons';
+import { LastUpdated } from './LastUpdated';
 import { ScreenSettingsLink, useScreenSettings } from './ScreenSettingsLink';
 import { Tip } from './Tip';
 
@@ -13,7 +14,7 @@ import { Tip } from './Tip';
 export function PageHeader({ title, subtitle, context, testid, settings }: { title: string; subtitle?: string; context?: ReactNode; testid?: string; settings?: ScreenKey }) {
   return (
     <header className="mb-3" data-testid={testid}>
-      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{title}</h1>{context}{settings && <span className="ms-auto flex items-center gap-2"><ScreenSettingsLink screen={settings} /></span>}</div>
+      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{title}</h1>{context}<span className="ms-auto flex items-center gap-2"><LastUpdated />{settings && <ScreenSettingsLink screen={settings} />}</span></div>
       {subtitle && <p className="text-mute">{subtitle}</p>}
     </header>
   );
