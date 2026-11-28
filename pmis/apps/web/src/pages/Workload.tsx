@@ -8,6 +8,7 @@ import { useRegisterDefs } from '@/api/registers';
 import type { UserRef } from '@/api/types';
 import { useStateDurations, useTimeReport, useWorkload } from '@/api/x';
 import { useDurationUnits } from '@/components/InsightPanels';
+import { PlanBaselines } from '@/components/PlanBaselines';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
 import { PersonTag } from '@/components/PersonTag';
 import { EmptyState, ErrorState, LoadingSkeleton, NoPermission } from '@/components/States';
@@ -156,6 +157,7 @@ export function Workload() {
       <WorkloadTable region={region} lead={canReassign(me.data)} />
       <TimeReport region={region} />
       <StateDurations region={region} />
+      <PlanBaselines region={region} />
     </div>
   );
 }

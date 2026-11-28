@@ -12836,6 +12836,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plan-freezes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Frozen plans (0.15.480)
+         * @description 0.15.480 (migration 0621). The frozen plans that are not hidden, newest first, and whether the caller may freeze (`can_freeze`, a System Admin). Needs `view` on the dashboard module.
+         */
+        get: operations["listPlanFreezes"];
+        put?: never;
+        /**
+         * Freeze the plan now (0.15.480)
+         * @description System Admin only. Copies, for every active site, the approved baseline date of each milestone as it stands now. The official baselines are not changed. Audit `plan_freeze_create`. At most 50 frozen plans (412).
+         */
+        post: operations["createPlanFreeze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plan-freezes/{freeze_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                freeze_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Hide a frozen plan (0.15.480)
+         * @description System Admin only. Hides it from the list and the report; the rows are kept. Audit `plan_freeze_hide`.
+         */
+        delete: operations["hidePlanFreeze"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plan-freezes/{freeze_id}/report": {
+        parameters: {
+            query?: {
+                region_id?: number;
+            };
+            header?: never;
+            path: {
+                freeze_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Variance of what was done against a frozen plan (0.15.480)
+         * @description Per stage, per region and the 50 worst rows. Calendar days, actual minus the frozen date (negative is early); an open row past its frozen date counts as overdue up to today. Needs `view` on the dashboard module; rows are limited to the caller's regions.
+         */
+        get: operations["getPlanFreezeReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/default-views": {
         parameters: {
             query?: never;
@@ -15537,6 +15607,63 @@ export interface components {
             resolved?: components["schemas"]["CommentResolved"];
             /** Format: date-time */
             created_at: string;
+        };
+        PlanFreeze: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            note?: string | null;
+            site_count: number;
+            row_count: number;
+            /** Format: date-time */
+            frozen_at: string;
+            frozen_by_name?: string | null;
+        };
+        PlanFreezeList: {
+            items: components["schemas"]["PlanFreeze"][];
+            can_freeze: boolean;
+        };
+        PlanFreezeCounts: {
+            rows?: number;
+            done?: number;
+            done_late?: number;
+            open_overdue?: number;
+            avg_days?: number | null;
+        };
+        PlanFreezeReport: {
+            freeze: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+                note?: string | null;
+                /** Format: date-time */
+                frozen_at: string;
+            };
+            /** Format: date */
+            as_of: string;
+            totals: components["schemas"]["PlanFreezeCounts"];
+            stages: (components["schemas"]["PlanFreezeCounts"] & {
+                code: string;
+                name_en?: string | null;
+                name_ar?: string | null;
+                worst_days?: number | null;
+            })[];
+            regions: (components["schemas"]["PlanFreezeCounts"] & {
+                region_id: number;
+            })[];
+            worst: {
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                region_id: number;
+                code: string;
+                /** Format: date */
+                base: string;
+                /** Format: date */
+                actual?: string | null;
+                days: number;
+                open: boolean;
+            }[];
         };
         CommentReactionInput: {
             /**
@@ -47614,6 +47741,115 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listPlanFreezes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frozen plans. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanFreezeList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createPlanFreeze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    label: string;
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Frozen. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        sites: number;
+                        rows: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    hidePlanFreeze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                freeze_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hidden. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlanFreezeReport: {
+        parameters: {
+            query?: {
+                region_id?: number;
+            };
+            header?: never;
+            path: {
+                freeze_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanFreezeReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getDefaultViews: {

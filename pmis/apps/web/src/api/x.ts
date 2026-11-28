@@ -98,3 +98,24 @@ export function useStatusOps() {
       mutationFn: ({ u, health, summary }) => api.patch<StatusUpdate>(`/status-updates/${u.id}`, { version: u.version, body: { ...(health ? { health } : {}), ...(summary !== undefined ? { summary } : {}) } }), onSuccess: settle }),
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------------- frozen plans (0.15.480)
+export type PlanFreezeList = import('./schema').components['schemas']['PlanFreezeList'];
+export type PlanFreezeReport = import('./schema').components['schemas']['PlanFreezeReport'];
+export const usePlanFreezes = () => useQuery({ queryKey: ['plan-freezes'], queryFn: () => api.get<PlanFreezeList>('/plan-freezes') });
+export const usePlanFreezeReport = (id: string, region: string) =>
+  useQuery({ queryKey: ['plan-freeze-report', id, region], enabled: !!id, queryFn: () => api.get<PlanFreezeReport>(`/plan-freezes/${id}/report`, { query: { region_id: region || undefined } }) });
+export function useCreatePlanFreeze() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; sites: number; rows: number }, ApiError, { label: string; note?: string | null }>({
+    mutationFn: (body) => api.post('/plan-freezes', { body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['plan-freezes'] }),
+  });
+}
+export function useHidePlanFreeze() {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, string>({
+    mutationFn: (id) => api.del<void>(`/plan-freezes/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['plan-freezes'] }),
+  });
+}

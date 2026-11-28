@@ -104,6 +104,7 @@ function workload(region: number | null) {
 /** Every comment of the mock, task threads and register threads together (PM item 18 actions address a comment by id alone). */
 const everyComment = (): Comment[] => [...db().tasks, ...db().extra].flatMap((t) => t.comments ?? []).concat(Object.values(db().x.regComments).flat());
 
+const planFreezes: { id: string; label: string; note: string | null; site_count: number; row_count: number; frozen_at: string; frozen_by_name: string }[] = [];
 export const xHandlers = [
   // ---- X1
   http.get(`${B}/notifications`, ({ request }) => { const g = guard(); if (g) return g; return inboxPage(new URL(request.url).searchParams); }),
@@ -178,6 +179,39 @@ export const xHandlers = [
     db().x.regComments[r.entity_id] = [...(db().x.regComments[r.entity_id] ?? []), c];
     save();
     return HttpResponse.json(c, { status: 201 });
+  }),
+
+  // ---- 0.15.480: frozen plans (in memory)
+  http.get(`${B}/plan-freezes`, () => {
+    const g = guard(); if (g) return g;
+    return HttpResponse.json({ items: [...planFreezes].reverse(), can_freeze: true });
+  }),
+  http.post(`${B}/plan-freezes`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    const b = (await request.json()) as { label?: string; note?: string | null };
+    if (!b.label?.trim() || b.label.length > 120) return invalid('/label');
+    const f = { id: crypto.randomUUID(), label: b.label.trim(), note: b.note ?? null, site_count: 3, row_count: 12, frozen_at: new Date().toISOString(), frozen_by_name: 'Admin' };
+    planFreezes.push(f);
+    return HttpResponse.json({ id: f.id, sites: f.site_count, rows: f.row_count }, { status: 201 });
+  }),
+  http.delete(`${B}/plan-freezes/:id`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const i = planFreezes.findIndex((f) => f.id === params.id);
+    if (i < 0) return problem(404, 'not_found', 'Not found');
+    planFreezes.splice(i, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.get(`${B}/plan-freezes/:id/report`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const f = planFreezes.find((x) => x.id === params.id);
+    if (!f) return problem(404, 'not_found', 'Not found');
+    return HttpResponse.json({
+      freeze: { id: f.id, label: f.label, note: f.note, frozen_at: f.frozen_at }, as_of: tripoliToday(),
+      totals: { rows: 12, done: 8, done_late: 3, open_overdue: 2, avg_days: 4.5 },
+      stages: [{ code: 'MS1', name_en: 'Site acquired', name_ar: null, rows: 6, done: 6, done_late: 1, open_overdue: 0, avg_days: 2, worst_days: 9 }, { code: 'MS2', name_en: 'Design approved', name_ar: null, rows: 6, done: 2, done_late: 2, open_overdue: 2, avg_days: 12, worst_days: 20 }],
+      regions: [{ region_id: 1, rows: 12, done: 8, done_late: 3, open_overdue: 2, avg_days: 4.5 }],
+      worst: [{ site_id: crypto.randomUUID(), site_code: 'TRP-001', region_id: 1, code: 'MS2', base: '2026-10-01', actual: null, days: 20, open: true }],
+    });
   }),
 
   // ---- PM item 18 (0.15.247): a 👍 reaction and a resolved flag on any comment (task or register record)

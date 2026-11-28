@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { AccessService } from "../access/access.service";
 import type { AuthContext } from "../auth/auth.types";
+import { mapDbError } from "../common/db-errors";
 import { problems } from "../common/problem";
 import { isCalendarDate, oneParam } from "../common/query";
 import { DbService } from "../db/db.service";
@@ -492,5 +493,40 @@ export class InsightsService {
       blocked: items.length > 0,
       items,
     };
+  }
+  /** Frozen plans (0.15.480): the list, freeze now (System Admin), hide, and the variance report. The database judges every right and the regions. */
+  async planFreezes(): Promise<unknown> {
+    return this.freezeCall(Prisma.sql`SELECT plan_freezes_json() AS j`);
+  }
+
+  async createPlanFreeze(body: unknown): Promise<unknown> {
+    const b = (body ?? {}) as Record<string, unknown>;
+    if (typeof b.label !== "string") throw problems.validation([{ path: "/label", code: "required", message: "Name the frozen plan." }]);
+    const note = typeof b.note === "string" ? b.note : null;
+    return this.freezeCall(Prisma.sql`SELECT plan_freeze_create(${b.label}::text, ${note}::text) AS j`);
+  }
+
+  async hidePlanFreeze(id: string): Promise<void> {
+    if (!UUID.test(id)) throw problems.notFound();
+    await this.freezeCall(Prisma.sql`SELECT plan_freeze_hide(${id}::uuid)::text AS j`);
+  }
+
+  async planFreezeReport(id: string, q: Record<string, unknown>): Promise<unknown> {
+    if (!UUID.test(id)) throw problems.notFound();
+    const r = oneParam(q, "region_id");
+    if (r !== undefined && r !== "" && !/^[0-9]{1,6}$/.test(r)) throw problems.validation([{ path: "/region_id", code: "invalid", message: "A region id." }]);
+    const region = r ? Number(r) : null;
+    return this.freezeCall(Prisma.sql`SELECT plan_freeze_report(${id}::uuid, ${region}::integer) AS j`);
+  }
+
+  private async freezeCall(sql: Prisma.Sql): Promise<unknown> {
+    try {
+      const rows = await this.db.tx.$queryRaw<{ j: unknown }[]>(sql);
+      return rows[0]?.j ?? null;
+    } catch (e) {
+      const p = mapDbError(e);
+      if (p) throw p;
+      throw e;
+    }
   }
 }

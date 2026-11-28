@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from "@nestjs/common";
 import type { AuthContext } from "../auth/auth.types";
 import { Auth } from "../auth/decorators";
 import { InsightsService } from "./insights.service";
@@ -42,5 +42,27 @@ export class InsightsController {
   @Get("reports/workload")
   workload(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.svc.workload(auth, q);
+  }
+
+  @Get("plan-freezes")
+  planFreezes() {
+    return this.svc.planFreezes();
+  }
+
+  @Post("plan-freezes")
+  @HttpCode(201)
+  createPlanFreeze(@Body() body: unknown) {
+    return this.svc.createPlanFreeze(body);
+  }
+
+  @Delete("plan-freezes/:id")
+  @HttpCode(204)
+  async hidePlanFreeze(@Param("id") id: string): Promise<void> {
+    await this.svc.hidePlanFreeze(id);
+  }
+
+  @Get("plan-freezes/:id/report")
+  planFreezeReport(@Param("id") id: string, @Query() q: Record<string, unknown>) {
+    return this.svc.planFreezeReport(id, q);
   }
 }

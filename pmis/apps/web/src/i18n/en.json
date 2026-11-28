@@ -4603,6 +4603,7 @@
     "plan_hint": "Cumulative: the planned % never falls with the date. Between two points it runs in a straight line.",
     "without_plan": "{{n}} weighted items have no plan yet; Planned and the index stay not available until every measured item has one."
   },
+  "planfreeze": {"title": "Plan baselines", "subtitle": "Freeze the plan and compare what was done against it. The official baselines are not changed.", "version": "Frozen plan", "name": "Name", "freeze": "Freeze the plan now", "freeze_tip": "Copies the approved baseline dates of every site under this name. Only a System Admin can. Nothing else changes.", "hide": "Hide", "hide_tip": "Hide this frozen plan from the list. The rows are kept.", "empty": "No frozen plan yet.", "totals": "{{rows}} dated stages, {{done}} done, {{late}} done late, {{overdue}} open past their date, average {{avg}} days.", "unit": "Calendar days: actual minus the frozen date. Negative is early. An open stage past its date counts up to today.", "stage": "Stage", "done": "Done", "late": "Late", "overdue": "Overdue", "avg": "Average", "worst": "Worst", "region": "Region", "worst_rows": "Worst rows", "still_open": "still open"},
   "delayp": {
     "tab": "Delay",
     "title": "Delay attribution periods",
