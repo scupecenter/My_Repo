@@ -78,6 +78,9 @@ export function validateContractorRules(b: Record<string, unknown>) {
   return errs;
 }
 const isAdmin = () => viewer()?.key === 'pm';
+const targetPolicy: { manual_override: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { manual_override: false, version: 1, updated_at: null, updated_by: null };
+const targetPolicyView = () => ({ ...targetPolicy, can_edit: isAdmin() });
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 const reasonErr = (r?: string) => ((r ?? '').trim().length < 3 || (r ?? '').length > 1000 ? fields({ path: '/reason', code: 'required' }) : null);
@@ -282,6 +285,7 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'login.ip_base_seconds', group: 'sessions', unit: 'seconds', default: 2, min: 1, max: 60 },
   { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
   { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
+  { key: 'media.thumbnails_per_minute', group: 'media', unit: 'per_minute', default: 120, min: 0, max: 6000 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
@@ -447,6 +451,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_contractors', label_en: 'Contractor and supplier scorecard: levels, delay and quality', label_ar: 'بطاقة أداء المقاولين والموردين: المستويات والتأخير والجودة' },
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
+    { code: 'ops_phase', label_en: 'Phase scope: sites per project phase, progress and derived targets', label_ar: 'نطاق المراحل: المواقع لكل مرحلة والتقدم والمستهدفات المشتقة' },
     { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
   ],
 };
@@ -460,6 +465,9 @@ let dashState = {
   updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+/** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
+let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
+const bandsView = () => ({ ...bandsState });
 
 /** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
@@ -554,12 +562,47 @@ export const settingsHandlers = [
     return HttpResponse.json({ record_id: x.last_record_id, register_key: x.register_key, next_due: x.next_due }, { status: 201 });
   }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
+  // ------------------------------------------------------------------ 0.15.367: the target policy (manual override of the typed dashboard targets, off by default)
+  http.get(`${B}/settings/dashboard-target-policy`, () => { const g = guard(); if (g) return g; const j = targetPolicyView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/dashboard-target-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ manual_override?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['manual_override', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.manual_override !== 'boolean') errs.push({ path: '/manual_override', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, targetPolicy.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (targetPolicy.manual_override === b.manual_override) return problem(409, 'invalid_transition', 'This is already the target policy.');
+    const v = viewer()!;
+    Object.assign(targetPolicy, { manual_override: b.manual_override as boolean, version: targetPolicy.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = targetPolicyView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     const b = (await request.json()) as { targets: typeof dashState.targets; thresholds: typeof dashState.thresholds; tabs: typeof dashState.tabs };
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
+  }),
+  // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
+  http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
+  http.put(`${B}/settings/dashboard/health-bands`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, bandsState.version); if (p) return p;
+    const b = (await request.json()) as { green?: number; amber?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.green) || b.green! < 1 || b.green! > 100) errs.push({ path: '/green', code: 'invalid' });
+    if (!Number.isInteger(b.amber) || b.amber! < 0 || b.amber! > 99) errs.push({ path: '/amber', code: 'invalid' });
+    if (!errs.length && b.green! <= b.amber!) errs.push({ path: '/green', code: 'invalid_order' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    bandsState = { ...bandsState, version: bandsState.version + 1, green: b.green!, amber: b.amber!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(bandsView(), tag(bandsState.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),

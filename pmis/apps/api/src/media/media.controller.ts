@@ -35,8 +35,8 @@ export class MediaController {
   }
 
   @Get('items/:kind/:id/thumbnail')
-  async thumbnail(@Param('kind') kind: string, @Param('id') id: string, @Query('size') size: string | undefined, @Res({ passthrough: true }) res: Response) {
-    const r = await this.svc.thumbnail(kind, id, size);
+  async thumbnail(@Auth() auth: AuthContext, @Param('kind') kind: string, @Param('id') id: string, @Query('size') size: string | undefined, @Res({ passthrough: true }) res: Response) {
+    const r = await this.svc.thumbnail(auth, kind, id, size);
     for (const [k, v] of Object.entries(r.headers)) res.setHeader(k, v);
     return r.file;
   }

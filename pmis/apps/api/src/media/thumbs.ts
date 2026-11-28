@@ -18,10 +18,15 @@ export function loadSharp(): Promise<SharpFn | null> {
 
 export const thumbMime = (f: ThumbFormat): string => (f === 'webp' ? 'image/webp' : 'image/jpeg');
 
+/** A source smaller than this on either side is not worth a thumbnail (it would only be enlarged by the card): the gallery shows the type icon instead. */
+export const MIN_THUMB_SOURCE_PX = 16;
+
 /** A resized copy that fits in px x px (never enlarged), upright by its EXIF orientation, metadata stripped (no GPS leaves the original). */
 export async function makeThumb(input: Buffer, px: number, format: ThumbFormat, quality: number): Promise<{ data: Buffer; width: number; height: number } | null> {
   const sharp = await loadSharp();
   if (!sharp) return null;
+  const meta = await sharp(input, { failOn: 'none', limitInputPixels: 100_000_000 }).metadata();
+  if (!meta.width || !meta.height || Math.min(meta.width, meta.height) < MIN_THUMB_SOURCE_PX) throw new Error('source_too_small');
   const img = sharp(input, { failOn: 'none', limitInputPixels: 100_000_000 }).rotate().resize(px, px, { fit: 'inside', withoutEnlargement: true });
   const out = format === 'webp' ? img.webp({ quality }) : img.jpeg({ quality, mozjpeg: true });
   const { data, info } = await out.toBuffer({ resolveWithObject: true });

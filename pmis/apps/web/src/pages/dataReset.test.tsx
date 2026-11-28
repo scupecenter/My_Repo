@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -253,6 +253,29 @@ describe('Settings, data reset', () => {
     expect(await screen.findByTestId('dr-forbidden')).toHaveTextContent(en.dr.admin_only);
     expect(screen.queryByTestId('settings-section-data-reset')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-section-data-imports')).toBeInTheDocument();
+  });
+
+  it('waiting period (0.15.268): set in the settings, inherited by the request, shown to the approver, a live countdown disables the run until run_after (EN and AR)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-settings-edit'));
+    await u.selectOptions(screen.getByTestId('dr-cooloff'), '30');
+    await u.type(screen.getByTestId('dr-settings-dialog-reason'), 'Thirty minutes of waiting');
+    await u.click(screen.getByTestId('dr-settings-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-settings-cooloff')).toHaveTextContent('30 minutes'));
+    await api.post('/__mock/data-reset/request-by-other');
+    cleanup(); page();
+    await waitFor(() => expect(screen.getByTestId('dr-cooloff-view')).toHaveTextContent('30 minutes'));
+    await u.click(screen.getByTestId('dr-approve'));
+    expect(screen.getByTestId('dr-approve-cooloff')).toHaveTextContent('waits 30 minutes');
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+    expect(screen.getByTestId('dr-cooloff-view')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('dr-cooloff-clock')).toHaveTextContent(/^0:(29|30):\d\d$/);
+    expect(screen.getByTestId('dr-run')).toBeDisabled();
+    expect(screen.getByTestId('dr-cancel')).toBeEnabled();
   });
 
   it('has every text in English and Arabic', () => {

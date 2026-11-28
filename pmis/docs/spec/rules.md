@@ -226,7 +226,17 @@ Calculation rules (BP §06):
 - **Admin overrides:** tasks closed by admin override are flagged or excluded in KPIs (CLAUDE.md).
   - ASSUMPTION: by default they are excluded from Project Status. A setting can include them with a flag.
 
-### 6.1 Final Closure KPI (separate, CLAUDE.md)
+### 6.1 Progress standards 0.15.269 (owner decisions 2026-11-27)
+- **Bilingual item names.** Every one of the 45 items carries an owner-approved Arabic name next to the English one (migrations 0546/0549). Item names are editable on a draft weight set in Settings; on a published set a name-only change is allowed while the weights stay frozen.
+- **Estimated effort and suggested weights.** A task can carry estimated man-days and a planned duration; the weight suggestion derives from them (migration 0542).
+- **Partial credit.** An activity can credit a partially done item instead of all-or-nothing; the switch is off by default and lives in Settings (migration 0543).
+- **Warehouse-linked central equipment.** The received-quantity equipment items (3.2–3.7, 3.9) are wired to the warehouse task link so the central count and the site task agree (migration 0544).
+- **Per-region forecast dates.** Each dashboard region can carry its own forecast date, used by the forecast rows and the estimate endpoint (migration 0545).
+- **Draft calibrated set v2.** A draft weight set (never auto-published) carries the recalibration A4 25→20, A6 12→15, A7 13→15; every activity still totals 100 (migration 0541).
+- **The B11 split (draft workflow v2).** B11 keeps Adaption only (4.1). The new B12 Internal AC/DC (4.3) and B16 Site internal fiber (4.5) sit after B9 like B11, feed MS3 and carry the B11 SLA (4–8 wd from CW MOS Actual (AZ), start ref B9). B9, B11, B12 and B16 apply to every site; the GECOL/HLC flag rules are unchanged. Transition: 4.3 reads [B11, B12] and 4.5 reads [B11, B16]. A site migrating with an approved B11 gets B12 and B16 approved with the same date (audited); an in-progress B11 leaves them open. Sites on version 1 are frozen (migration 0547).
+- **Milestone and phase-gate dates (workflow version 2+).** A milestone's date is the date of its last linked task and is set automatically, never typed — Site RFI (MS4) included: its linked tasks are the civil works (MS3), CW PAC (B13) and, when the site requires them, GECOL (C2) and HLC fiber (C4); the latest date wins. A phase gate takes the milestone's date and nothing else: its conditions (permits, tasks, date fields with offsets) and Change Control suspensions still decide open/blocked, but they never move the date. Sites on version 1 keep typed milestone dates and gates that take the latest condition and shift past suspensions. No existing date is rewritten: the rule applies at the next entry save, submit or gate evaluation of a v2+ site. Milestones never carry weight or duration; they are headings only (migration 0548).
+
+### 6.2 Final Closure KPI (separate, CLAUDE.md)
 - **Sites closed** = active sites with FM valid.
 - **% closed** = sites closed ÷ base. ASSUMPTION: base = active sites with HOTO (EY) achieved. The alternative base, all active sites, is shown as a secondary figure.
 - **Pending CW FAC:** CW applies, CW PAC valid, FE empty. Age = working days from CW DLP End (FB) to today. Before FB the site counts as "Not due". ASSUMPTION: age measured from DLP End.
