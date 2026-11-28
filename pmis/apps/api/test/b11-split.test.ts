@@ -18,7 +18,6 @@ afterAll(async () => {
 });
 
 const V2 = `(SELECT id FROM workflow_definitions WHERE version = 2)`;
-const V1 = `(SELECT id FROM workflow_definitions WHERE version = 1)`;
 
 describe('the draft workflow v2', () => {
   it('exists as a draft with B12 and B16 after B9 in MS3, counting toward the milestone', async () => {
