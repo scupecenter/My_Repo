@@ -22,7 +22,7 @@ export type LibraryArchiveConfig = S['LibraryArchiveConfig'];
 export type ArchiveRowsPage = { items: LibraryArchiveRow[]; page: { limit: number; next_cursor: string | null }; counts: { total: number; filtered: number }; search?: { pasted: number; found: number; not_found: string[] } };
 
 export const DOC_STATUSES: readonly LibraryDocStatus[] = ['due', 'generated', 'signed_uploaded', 'in_review', 'approved', 'rejected', 'superseded'];
-export const ARCHIVE_COLUMNS = ['site', 'site_name', 'region', 'cluster', 'doc_type', 'doc_number', 'version', 'status', 'task', 'uploaded_by', 'uploaded_at', 'approved_by', 'approved_at'] as const;
+export const ARCHIVE_COLUMNS = ['site', 'site_name', 'region', 'cluster', 'doc_type', 'doc_number', 'version', 'status', 'task', 'uploaded_by', 'uploaded_at', 'approved_by', 'approved_at', 'signed', 'stamped'] as const;
 
 export const useLibraryForms = () => useQuery({ queryKey: ['library-forms'], queryFn: () => api.get<{ items: LibraryForm[]; can_configure: boolean }>('/library/forms') });
 
