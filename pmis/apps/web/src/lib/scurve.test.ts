@@ -65,3 +65,21 @@ describe('forecastFull', () => {
     expect(forecastFull([], null)).toBeNull();
   });
 });
+
+describe('burndownSeries', () => {
+  it('turns actual and planned into remaining and ideal, and projects to zero at the forecast date', async () => {
+    const { burndownSeries } = await import('./scurve');
+    const pts = weekly('2026-01-05', [10, 20, 30], [15, 25, 35]);
+    const rows = burndownSeries(pts, '2026-03-02');
+    expect(rows.map((r) => r.remaining)).toEqual([90, 80, 70, null]);
+    expect(rows.map((r) => r.ideal)).toEqual([85, 75, 65, null]);
+    expect(rows[2]!.projected).toBe(70);
+    expect(rows[3]).toEqual({ date: '2026-03-02', remaining: null, ideal: null, projected: 0 });
+  });
+  it('adds no projection when the work is done or there is no forecast', async () => {
+    const { burndownSeries } = await import('./scurve');
+    expect(burndownSeries(weekly('2026-01-05', [90, 100]), '2026-03-02')).toHaveLength(2);
+    expect(burndownSeries(weekly('2026-01-05', [10, 20]), null)).toHaveLength(2);
+    expect(burndownSeries([], null)).toEqual([]);
+  });
+});

@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { ProjectStatusSnapshot } from "@/api/dashboard";
 import { EChart, type Palette } from "@/components/EChart";
 import { useForecastWindow, useProgressRag } from "@/api/dashboardSettings";
 import { RAG_CLASS, ragTone } from "@/lib/progressRag";
-import { forecastFull, scurveSeries, VELOCITY_WINDOW, weeklyVelocity } from "@/lib/scurve";
+import { burndownSeries, forecastFull, scurveSeries, VELOCITY_WINDOW, weeklyVelocity } from "@/lib/scurve";
 import { Card, pct, signed } from "./dashboardBits";
 
 const FONT = "Cairo, system-ui, sans-serif";
@@ -34,6 +34,8 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
   // contract 0.15.432: the velocity is coloured only when an admin turned it on in Settings > Dashboard
   const velTone = ragTone(useProgressRag().data?.items, "velocity", velocity);
   const forecast = useMemo(() => forecastFull(points, velocity), [points, velocity]);
+  const [mode, setMode] = useState<"progress" | "burndown">("progress");
+  const burn = useMemo(() => burndownSeries(points, forecast), [points, forecast]);
   const last = series[series.length - 1];
   const lastSnap = (snaps?.items ?? []).filter((s) => s.scope !== "region").sort((a, b) => (a.taken_on < b.taken_on ? 1 : -1))[0];
   const fmtDate = (iso: string | null) =>
@@ -87,9 +89,27 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
     [series, t],
   );
 
+  const buildBurn = useMemo(
+    () => (p: Palette, rtl: boolean) => ({
+      textStyle: { fontFamily: FONT },
+      aria: { enabled: true },
+      tooltip: { trigger: "axis", valueFormatter: (v: unknown) => (typeof v === "number" ? pct(v) : "–") },
+      legend: { top: 0, textStyle: { color: p.mute } },
+      grid: { left: 16, right: 16, top: 32, bottom: 8, containLabel: true },
+      xAxis: { type: "category", data: burn.map((s) => s.date), axisLabel: { color: p.mute, hideOverlap: true }, axisLine: { lineStyle: { color: p.line } } },
+      yAxis: { type: "value", min: 0, max: 100, inverse: false, position: rtl ? "right" : "left", axisLabel: { color: p.mute, formatter: "{value}%" }, splitLine: { lineStyle: { color: p.line } } },
+      series: [
+        { name: t("dash.scurve.ideal"), type: "line", symbol: "none", lineStyle: { type: "dashed", color: p.mute, width: 2 }, itemStyle: { color: p.mute }, data: burn.map((s) => s.ideal), connectNulls: true },
+        { name: t("dash.scurve.remaining"), type: "line", symbol: "circle", symbolSize: 5, lineStyle: { color: p.accent, width: 3 }, itemStyle: { color: p.accent }, areaStyle: { color: p.accent, opacity: 0.08 }, data: burn.map((s) => s.remaining) },
+        { name: t("dash.scurve.projected"), type: "line", symbol: "none", lineStyle: { type: "dotted", color: p.accent, width: 2 }, itemStyle: { color: p.accent }, data: burn.map((s) => s.projected), connectNulls: true },
+      ],
+    }),
+    [burn, t],
+  );
+
   return (
     <Card
-      title={t("dash.scurve.title")}
+      title={t(mode === "burndown" ? "dash.scurve.burndown_title" : "dash.scurve.title")}
       testid="dash-scurve"
       aside={
         <Link to="/settings/weight-sets" className="text-sm text-accent hover:underline">
@@ -98,7 +118,16 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
       }
       className="print:break-inside-avoid"
     >
-      <p className="mb-3 text-sm text-mute">{t("dash.scurve.hint")}</p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-mute">{t(mode === "burndown" ? "dash.scurve.burndown_hint" : "dash.scurve.hint")}</p>
+        <div role="group" aria-label={t("dash.scurve.view_label")} className="inline-flex overflow-hidden rounded-md border border-line text-sm" data-testid="dash-scurve-mode">
+          {(["progress", "burndown"] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} title={t(`dash.scurve.mode_${m}_hint`)} data-testid={`dash-scurve-mode-${m}`} className={`px-3 py-1 ${mode === m ? "bg-accent text-white" : "bg-card"}`} onClick={() => setMode(m)}>
+              {t(`dash.scurve.mode_${m}`)}
+            </button>
+          ))}
+        </div>
+      </div>
       {series.length === 0 ? (
         <p className="py-6 text-center text-sm text-mute" data-testid="dash-scurve-empty">
           {t("dash.scurve.empty")}
@@ -125,14 +154,23 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
               {t("dash.scurve.forecast")} <b className="tnum">{fmtDate(forecast)}</b>
             </span>
           </div>
-          <EChart
-            build={build}
-            height={260}
-            label={t("dash.scurve.chart_label", {
-              list: series.map((s) => `${s.date}: ${pct(s.actual)}`).join(", "),
-            })}
-            testid="dash-scurve-chart"
+          {mode === "progress" ? (
+            <EChart
+              build={build}
+              height={260}
+              label={t("dash.scurve.chart_label", {
+                list: series.map((s) => `${s.date}: ${pct(s.actual)}`).join(", "),
+              })}
+              testid="dash-scurve-chart"
           />
+          ) : (
+            <EChart
+              build={buildBurn}
+              height={260}
+              label={t("dash.scurve.burndown_chart_label", { list: burn.filter((s) => s.remaining !== null).map((s) => `${s.date}: ${pct(s.remaining)}`).join(", ") })}
+              testid="dash-burndown-chart"
+            />
+          )}
           <p className="mt-2 text-xs text-mute" data-testid="dash-scurve-basis">
             {t("dash.scurve.basis", { n: series.length })}
           </p>
