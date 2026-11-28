@@ -141,6 +141,7 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
       regions: REGIONS.filter((r) => scope === null || scope.includes(r.id)).map((r) => ({ id: r.id, name_en: r.name_en, name_ar: r.name_ar })),
       clusters: ['CL-TR-01', 'CL-TR-02', 'CL-BN-01'], scenarios: [...SCENARIOS], streams: STREAMS.map((s) => ({ code: s.code, name_en: s.name_en, name_ar: s.name_ar })),
       views: VIEWS.map((v) => ({ code: v.code, name_en: v.name_en, name_ar: v.name_ar })),
+      phases: ['Phase 1', 'Phase 2'],
     },
     headline: {
       sites_total: total, sites_cancelled: region ? 1 : 3,

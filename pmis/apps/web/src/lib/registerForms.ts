@@ -6,7 +6,7 @@ import type { PermitEntryType, RegisterDefinition, RegisterField } from '@/api/t
  * `GET /registers`, and `RegisterField.section` (contract 0.4.6) gives the section of each base field. The checks below
  * mirror the rules the server repeats at submit (V1 to V6), so Submit stays off until they pass.
  */
-export const REGISTER_KEYS_LIVE = ['procurement', 'contractors', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'deliverables'] as const;
+export const REGISTER_KEYS_LIVE = ['procurement', 'contractors', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'deliverables', 'tools_equipment'] as const;
 /** Migration 0592: a custom register key is `custom_` and letters; the register definition list says whether it exists and is enabled. */
 export const isCustomKey = (k: string): boolean => /^custom_[a-z_]{2,24}$/.test(k);
 export const isLive = (k: string): k is (typeof REGISTER_KEYS_LIVE)[number] => (REGISTER_KEYS_LIVE as readonly string[]).includes(k);
@@ -21,6 +21,7 @@ const SECTION_ID: Record<string, string> = {
   Execution: 'execution',
   Lesson: 'lesson', 'Follow-up': 'follow_up', Invoice: 'invoice', Amount: 'amount_section', Payment: 'payment', Deliverable: 'deliverable', Links: 'links_section',
   Incident: 'incident', 'People and damage': 'people_damage', Resolution: 'resolution',
+  Equipment: 'equipment', Custody: 'custody', 'Calibration and inspection': 'calibration_inspection',
 };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'details';
 /** The id of a field section (its translated title is `regSections.<id>`); a field without a section (a custom field) is in `details`. */
