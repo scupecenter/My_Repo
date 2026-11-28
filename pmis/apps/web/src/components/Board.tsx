@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { DragEvent, ReactNode } from 'react';
+import { useState, type DragEvent, type ReactNode } from 'react';
 import type { CardSize } from '@/lib/tablePrefs';
 
 /** V6 (0.15.574): the card size of the board (Display option of the screen): the cell air and the card list's spacing and base text. */
@@ -22,9 +22,11 @@ export interface BoardCell<C> { cards: C[]; more?: ReactNode }
  * record (a site, a register record), so a card moves only through the record's own actions. The screen gives the columns, the lanes, the
  * cells and how a card is drawn.
  */
-export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, testid, empty, emptyTestid, label, total: totalIn, onDropTo, size = 'md' }: {
+export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, testid, empty, emptyTestid, label, total: totalIn, onDropTo, dropHint, size = 'md' }: {
   /** Optional: a card dropped on a cell (the column key, the lane key). Without it nothing can be dropped, as before. */
   onDropTo?: (column: string, lane: string, e: DragEvent) => void;
+  /** Optional: while a card is over a cell, whether the drop would be taken ('ok') or refused ('no', with the reason shown in the cell). The cell is highlighted either way. */
+  dropHint?: (column: string, lane: string) => { ok: boolean; reason?: string } | null;
   /** V6: the card size (Display option of the screen, default comfortable) */
   size?: CardSize;
   columns: BoardColumn[];
@@ -45,6 +47,8 @@ export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, t
   label: (column: BoardColumn, lane: BoardLane) => string;
 }) {
   const total = totalIn ?? columns.reduce((n, c) => n + c.count, 0);
+  const [over, setOver] = useState<string | null>(null);
+  const hint = (c: string, l: string) => (over === `${c}|${l}` && dropHint ? dropHint(c, l) : null);
   return (
     <div className="overflow-auto" data-testid={testid} data-card-size={size}>
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(220px, 1fr))` }}>
@@ -65,8 +69,10 @@ export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, t
             {columns.map((c) => {
               const x = cell(c.key, l.key);
               return (
-                <div key={c.key} className={`min-h-12 rounded-md bg-card2/40 ${CARD_SIZE_CLASS[size].cell}`} data-testid={`board-cell-${c.key}-${l.key}`}
-                  {...(onDropTo ? { onDragOver: (e: DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, onDrop: (e: DragEvent) => { e.preventDefault(); onDropTo(c.key, l.key, e); } } : {})}>
+                <div key={c.key} className={`min-h-12 rounded-md ${CARD_SIZE_CLASS[size].cell} ${hint(c.key, l.key) ? (hint(c.key, l.key)!.ok ? 'bg-doneBg/50 outline outline-2 outline-doneInk' : 'bg-lateBg/50 outline outline-2 outline-dashed outline-lateInk') : 'bg-card2/40'}`} data-testid={`board-cell-${c.key}-${l.key}`}
+                  data-drop={hint(c.key, l.key) ? (hint(c.key, l.key)!.ok ? 'ok' : 'refused') : undefined}
+                  {...(onDropTo ? { onDragOver: (e: DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = hint(c.key, l.key)?.ok === false ? 'none' : 'move'; setOver(`${c.key}|${l.key}`); }, onDragLeave: () => setOver(null), onDrop: (e: DragEvent) => { e.preventDefault(); setOver(null); onDropTo(c.key, l.key, e); } } : {})}>
+                  {hint(c.key, l.key)?.ok === false && hint(c.key, l.key)?.reason && <p role="status" className="mb-1 text-xs font-semibold text-lateInk" data-testid={`board-drop-reason-${c.key}-${l.key}`}>{hint(c.key, l.key)!.reason}</p>}
                   <ul className={CARD_SIZE_CLASS[size].list} aria-label={label(c, l)}>
                     {x?.cards.map((k) => <li key={cardKey(k)}>{card(k)}</li>)}
                   </ul>

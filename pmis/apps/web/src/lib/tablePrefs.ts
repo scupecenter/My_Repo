@@ -9,10 +9,10 @@ export const isDensity = (d: unknown): d is Density => d === 'comfortable' || d 
 /** Decision V6 (0.15.574): the card size of the board views, a personal Display option per screen. */
 export type CardSize = 'sm' | 'md' | 'lg';
 export const CARD_SIZES: readonly CardSize[] = ['sm', 'md', 'lg'];
-export type DisplayOpts = { size: 'sm' | 'md' | 'lg'; align: 'start' | 'center'; wrap: boolean; zebra: boolean; /** Item 9: the count and the status distribution bar on the header of every group of a grouped table */ groupbar: boolean; /** V6: card size of the board (compact/comfortable/large), shown in the Layout panel while the board is on */ card: CardSize };
+export type DisplayOpts = { size: 'sm' | 'md' | 'lg'; align: 'start' | 'center'; wrap: boolean; zebra: boolean; /** Item 9: the count and the status distribution bar on the header of every group of a grouped table */ groupbar: boolean; /** Decision V8 (0.15.573): the list-value colours of item 15 (#321) in this screen's cells; on by default */ colors: boolean; /** V6: card size of the board (compact/comfortable/large), shown in the Layout panel while the board is on */ card: CardSize };
 export type Display = DisplayOpts & { density: Density };
 /** The look before W8, used until Settings > Display answers (and when it cannot be read). */
-export const DISPLAY_SEED: Display = { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true, card: 'md' };
+export const DISPLAY_SEED: Display = { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true, colors: true, card: 'md' };
 /** Only the known Display keys with a valid value (a stored or saved value from an older build is dropped, never trusted). */
 export function cleanDisplay(d: unknown): Partial<DisplayOpts> | undefined {
   if (!d || typeof d !== 'object') return undefined;
@@ -22,6 +22,7 @@ export function cleanDisplay(d: unknown): Partial<DisplayOpts> | undefined {
   if (typeof x.wrap === 'boolean') out.wrap = x.wrap;
   if (typeof x.zebra === 'boolean') out.zebra = x.zebra;
   if (typeof x.groupbar === 'boolean') out.groupbar = x.groupbar;
+  if (typeof x.colors === 'boolean') out.colors = x.colors;
   if (x.card === 'sm' || x.card === 'md' || x.card === 'lg') out.card = x.card;
   return Object.keys(out).length ? out : undefined;
 }

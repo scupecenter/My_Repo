@@ -121,6 +121,7 @@ export function LayoutPanel({ testid, views, options, table, grouped, cards }: {
               <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-pin" checked={!table.prefs.unpinned} onChange={(e) => table.setPinned(e.target.checked)} />{t('tstd.display_pin')}</label>
               <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-zebra" checked={table.display.zebra} onChange={(e) => table.setDisplay({ zebra: e.target.checked })} />{t('tstd.display_zebra')}</label>
               {grouped && <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-groupbar" checked={table.display.groupbar} onChange={(e) => table.setDisplay({ groupbar: e.target.checked })} />{t('tstd.display_groupbar')}</label>}
+              <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-colors" checked={table.display.colors} onChange={(e) => table.setDisplay({ colors: e.target.checked })} />{t('tstd.display_colors')}</label>
               <div className="flex items-center gap-2 border-t border-line pt-2">
                 <button type="button" className="btn px-2 py-1 text-xs" data-testid="display-reset" onClick={table.resetDisplay}>{t('tstd.display_reset')}</button>
                 {canEditDisplayDefaults(me) && <Link to="/admin/settings/screens/tables" className="ms-auto text-xs text-link" data-testid="display-settings-link">{t('tstd.display_settings')}</Link>}
