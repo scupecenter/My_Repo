@@ -9,6 +9,7 @@ import {
   closureOf, narrowBody, narrowEmpty, requiresBackup, RUNNING, useDataResetNarrowOptions, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
   useRunDataReset, useSetDataResetSettings, type DataResetNarrow, type DataResetPart, type DataResetPlanTable, type DataResetRequest,
 } from '@/api/dataReset';
+import { ResetResultDialog } from '@/components/ResetResultDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 
@@ -36,6 +37,10 @@ export function DataReset() {
   const running = !!req && RUNNING.has(req.status);
   useEffect(() => { if (live.data && !RUNNING.has(live.data.status)) void qc.invalidateQueries({ queryKey: ['data-reset'] }); }, [live.data, qc]);
 
+  // a run started on this screen: when it commits, the result opens as a centered dialog (closed only by its button)
+  const [watch, setWatch] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  useEffect(() => { if (watch && req && req.id === watch && (req.status === 'completed' || req.status === 'files_pending')) { setDone(watch); setWatch(null); } }, [watch, req]);
   const ask = useRequestDataReset(), approve = useApproveDataReset(), cancel = useCancelDataReset(), run = useRunDataReset();
   const retry = useRetryDataResetFiles(), setCfg = useSetDataResetSettings(), makeArchive = useMakeDataResetArchive();
   const [archive, setArchive] = useState<ArchiveMode>('download');
@@ -212,7 +217,7 @@ export function DataReset() {
       {dialog === 'run' && req && (
         <FormDialog open onClose={close} testid="dr-run-dialog" title={t('dr.run_title')} withReason={false} submitLabel={t('dr.run')} busy={run.isPending}
           disabled={runTyped !== s.confirmation_phrase} error={run.isError ? errText(run.error, t) : null}
-          onSubmit={() => run.mutate({ id: req.id, version: req.version, confirm_text: runTyped }, { onSuccess: () => { toast(t('dr.started_toast')); close(); } })}>
+          onSubmit={() => run.mutate({ id: req.id, version: req.version, confirm_text: runTyped }, { onSuccess: () => { toast(t('dr.started_toast')); setWatch(req.id); close(); } })}>
           <p className="text-sm text-lateInk">{t('dr.run_hint', { db: s.database })}</p>
           <BackupView r={req} hours={s.settings.backup_max_age_hours} testid="dr-run-backup" />
           <label className="block text-sm font-semibold">{t('dr.type_phrase', { phrase: s.confirmation_phrase })}
@@ -249,6 +254,13 @@ export function DataReset() {
           <p className="text-xs text-mute">{t('dr.cooloff_hint')}</p>
         </FormDialog>
       )}
+      {done && req && req.id === done && (() => {
+        const planRows = ((req.plan_at_request ?? {}) as { delete_rows?: number; parts?: Record<string, number> });
+        const byCode = new Map((s.plan.parts ?? []).map((p) => [p.code, p]));
+        const parts = Object.entries(planRows.parts ?? {}).map(([code, rows]) => ({ code, label: label(byCode.get(code), code, i18n.language), rows }));
+        const sessions = ((req.result ?? {}) as { sessions_ended?: number }).sessions_ended ?? 0;
+        return <ResetResultDialog open summary={{ rows: planRows.delete_rows ?? parts.reduce((n, p) => n + p.rows, 0), parts, sessions, files: { moved: req.files.moved, total: req.files.total, pending: req.files.pending } }} onClose={() => setDone(null)} />;
+      })()}
     </div>
   );
 }
