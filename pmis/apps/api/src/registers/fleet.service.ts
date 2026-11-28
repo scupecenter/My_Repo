@@ -6,6 +6,8 @@ import { problems, type FieldError } from '../common/problem';
 import { oneParam } from '../common/query';
 import { parse } from '../common/zod';
 import { AccessService } from '../access/access.service';
+import { StepUpService } from '../auth/step-up.service';
+import { checkIfMatch } from '../common/etag';
 import { RegistersService } from './registers.service';
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -18,22 +20,26 @@ const topUpSchema = z.object({ requested_amount: z.number().min(0).max(1e9).opti
  */
 @Injectable()
 export class FleetService {
-  constructor(private readonly registers: RegistersService, private readonly access: AccessService) {}
+  constructor(private readonly registers: RegistersService, private readonly access: AccessService, private readonly stepUp: StepUpService) {}
 
   /** POST /registers/car_dispatcher/records/{id}/extend : a child booking (draft) that extends the booking after its end. */
-  async extendBooking(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
+  async extendBooking(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
     const body = parse(extendSchema, raw);
     await this.access.requireRegions('car_dispatcher', 'create');
-    await this.registers.get(auth, 'car_dispatcher', id);
+    const parent = await this.registers.get(auth, 'car_dispatcher', id);
+    checkIfMatch(ifMatch, parent.version as number);   // 428 missing, 412 stale: the booking read is the one extended
+    await this.stepUp.require(auth);                    // a booking extension commits vehicle days: same step-up as the warehouse and register voids
     const nid = await this.registers.call<string>(auth, Prisma.sql`SELECT fleet_extend_booking(${id}::uuid, ${body.to_date}::date) AS r`);
     return this.registers.get(auth, 'car_dispatcher', nid);
   }
 
   /** POST /registers/financial_advances/records/{id}/top-up : a child advance (draft), a top-up and/or an extension of the period. */
-  async topUp(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
+  async topUp(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
     const body = parse(topUpSchema, raw);
     await this.access.requireRegions('financial_advances', 'create');
-    await this.registers.get(auth, 'financial_advances', id);
+    const parent = await this.registers.get(auth, 'financial_advances', id);
+    checkIfMatch(ifMatch, parent.version as number);   // 428 missing, 412 stale: the advance read is the one topped up
+    await this.stepUp.require(auth);                    // a top-up asks for money: step-up like every financial action
     const nid = await this.registers.call<string>(auth, Prisma.sql`SELECT fin_top_up(${id}::uuid, ${body.requested_amount ?? 0}::numeric, ${body.period_to ?? null}::date) AS r`);
     return this.registers.get(auth, 'financial_advances', nid);
   }
