@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { RequiredMark } from './RequiredMark';
 import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -344,7 +345,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
           {types.length > 0 && (
             <section aria-labelledby="rs-type" className="space-y-2" data-testid="reg-section-type">
               {!def.site_scoped && <h3 id="rs-type" className="font-semibold">{t('registers.record_type')}</h3>}
-              <div><label htmlFor="reg-record-type" id={def.site_scoped ? 'rs-type' : undefined} className="text-sm text-mute">{t('registers.record_type')}{typeRequired(key) ? ' *' : ''}</label>
+              <div><label htmlFor="reg-record-type" id={def.site_scoped ? 'rs-type' : undefined} className="text-sm text-mute">{t('registers.record_type')}{typeRequired(key) && <RequiredMark />}</label>
                 {editable && !record
                   ? <select id="reg-record-type" data-testid="reg-record-type" className="input" value={rtype} aria-invalid={!!issues.record_type && tried} aria-required={typeRequired(key)}
                       onChange={(e) => { setRtype(e.target.value); setDirty(true); setServer((x) => { const m = { ...x }; delete m.record_type; return m; }); }}>
@@ -364,7 +365,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
                   const show = iss && (tried || server[f.code] || dirty);
                   return (
                     <div key={f.code} className={(f.type === 'text' && f.code === 'remark') || ['child_list', 'multi_user', 'multi_site'].includes(f.type) ? 'col-span-2' : ''}>
-                      <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
+                      <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required && <RequiredMark />}</label>
                         {!record && prefilled.has(f.code) && <span className="chip bg-card2 text-[10px] text-mute" data-testid={`reg-prefilled-${f.code}`} title={t('registers.prefilled_hint')}>{t('registers.prefilled')}</span>}
                         {f.list?.status === 'pending' && <span className="chip bg-waitBg text-[10px] text-waitInk" data-testid={`reg-list-pending-${f.code}`} title={t('lists.pending_hint')}>{t('lists.pending')}</span>}
                         {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} onRestore={editable && ['text', 'number', 'date', 'yes_no'].includes(f.type) ? (v) => set(f.code, v) : undefined} />}</div>
