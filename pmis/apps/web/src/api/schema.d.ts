@@ -6914,6 +6914,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/data-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Data quality report settings (0.15.538)
+         * @description Every signed-in user may read them (the report screen uses them). `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit.
+         */
+        get: operations["getDataQualitySettings"];
+        /**
+         * Set the Data quality report settings (reason, step-up, If-Match, audited) (0.15.538)
+         * @description A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and values outside the closed lists are 422. One audit row `data_quality_update` with before and after.
+         */
+        put: operations["setDataQualitySettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/data-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The read-only Data quality report (0.15.538)
+         * @description Needs the `sites` view and reads only the regions of the caller. Writes nothing. Rows name the site and what is wrong, never a field value. The `orphan_ids` check (constraint names and counts) needs a settings viewer, else 403. Each check is switched on in the settings; `max_rows` caps the rows of a check and `truncated` says more exist.
+         */
+        get: operations["getDataQualityReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media/items": {
         parameters: {
             query?: never;
@@ -20174,6 +20218,39 @@ export interface components {
             /** @enum {string} */
             format: "webp" | "jpeg";
             max_source_mb: number;
+        };
+        /** @description 0.15.538. Setting `data_quality.report` (migration 0476). */
+        DataQualitySettings: {
+            enabled: boolean;
+            checks: ("site_required_empty" | "dates_out_of_order" | "site_without_contractor" | "orphan_ids" | "missing_photos")[];
+            required_site_fields: ("name_ar" | "latitude" | "longitude" | "address" | "site_type" | "site_scenario" | "sub_region" | "cluster_id" | "rf_survey_date" | "acquisition_date" | "project_phase")[];
+            max_rows: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        DataQualitySettingsInput: components["schemas"]["WithReason"] & {
+            reason?: string;
+            enabled: boolean;
+            checks: string[];
+            required_site_fields: string[];
+            max_rows: number;
+        };
+        DataQualityReport: {
+            enabled: boolean;
+            max_rows: number;
+            checks: {
+                /** @enum {string} */
+                check: "site_required_empty" | "dates_out_of_order" | "site_without_contractor" | "orphan_ids" | "missing_photos";
+                count: number;
+                truncated: boolean;
+                rows: {
+                    [key: string]: unknown;
+                }[];
+            }[];
         };
         /** @description 0.15.292. Setting `media.gallery` (migration 0396). */
         MediaSettings: {
@@ -37033,6 +37110,88 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDataQualitySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataQualitySettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDataQualitySettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataQualitySettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataQualitySettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDataQualityReport: {
+        parameters: {
+            query?: {
+                check?: "site_required_empty" | "dates_out_of_order" | "site_without_contractor" | "orphan_ids" | "missing_photos";
+                region_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataQualityReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listMediaItems: {
