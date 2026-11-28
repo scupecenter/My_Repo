@@ -11403,6 +11403,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/custom-registers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The custom registers (hidden ones too) with their usage and the limit
+         * @description 0.15.533. System Admin or an all-regions delegate of the custom fields.
+         */
+        get: operations["listCustomRegisters"];
+        put?: never;
+        /**
+         * Create a custom register (disabled until it has columns and is enabled)
+         * @description 0.15.533. The key is generated from the English name (`custom_` and letters). Fails when the limit registers.custom_max is reached.
+         */
+        post: operations["createCustomRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/custom-registers/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        /** One custom register */
+        get: operations["getCustomRegister"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename, hide or show a custom register
+         * @description 0.15.533. The key never changes. Hiding removes the menu entry and the module from the grid editor; records and grants stay.
+         */
+        patch: operations["updateCustomRegister"];
+        trace?: never;
+    };
+    "/custom-registers/{key}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable a custom register (menu key, template, permission module)
+         * @description 0.15.533. Needs at least one active column and one required column. Adds the menu key, the upload and download template and refreshes the templates.
+         */
+        post: operations["enableCustomRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/custom-fields": {
         parameters: {
             query?: never;
@@ -22094,6 +22163,40 @@ export interface components {
             title?: string;
             description?: string;
             severity?: string;
+        };
+        CustomRegister: {
+            register_key: string;
+            /** @description Same as register_key; the permission module. */
+            module_key: string;
+            name_en: string;
+            name_ar: string | null;
+            site_scoped: boolean;
+            multiple_per_site: boolean;
+            /** @description False until enabled; a disabled register has no menu entry or template. */
+            enabled: boolean;
+            /** @description False when hidden. */
+            is_active: boolean;
+            version: number;
+            /** Format: date-time */
+            created_at: string | null;
+            field_count: number;
+            required_count: number;
+            record_count: number;
+            template_id: string | null;
+        };
+        CustomRegisterInput: {
+            name_en: string;
+            name_ar?: string | null;
+            site_scoped: boolean;
+            /** @default true */
+            multiple_per_site: boolean;
+            reason: string;
+        };
+        CustomRegisterPatch: {
+            name_en?: string;
+            name_ar?: string | null;
+            is_active?: boolean;
+            reason: string;
         };
         /** @enum {string} */
         CustomFieldEntity: "site" | "milestone" | "gate" | "task" | "rf_design" | "acquisition" | "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle";
@@ -44961,6 +45064,164 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listCustomRegisters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The custom registers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CustomRegister"][];
+                        limit: {
+                            /** @description The setting registers.custom_max. */
+                            max: number;
+                            active: number;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createCustomRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomRegisterInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getCustomRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The register. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCustomRegister: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomRegisterPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    enableCustomRegister: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Enabled. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRegister"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listCustomFields: {

@@ -58,6 +58,7 @@ info:
 
     - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (owner approval 2026-11-27, item 18 of the 2026-11-27 batch; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
     - 0.15.245 (2026-11-27): pin a saved view as a personal card on the home dashboard (owner request 2026-11-27, item 16 of the 2026-11-27 batch; migration 0344; CHANGELOG HomeViewPins). Additive. `POST /saved-views/{view_id}/pin` and `POST /saved-views/{view_id}/unpin` manage the caller's pins (at most 12, position kept; a view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`) and `GET /me/home-pins` (`HomeViewPin`) lists them in order (inactive views drop out). The card shows each pin with a counter the screen's own list endpoint computes for the caller, so the counts stay inside the caller's permissions; the dashboard settings catalogue gains the card `pinned_views` (Settings > Dashboard, shown by default). Personal display preference: no grant, role, permission, visibility or audit change.
+    - 0.15.533 (2026-11-28): admin-defined custom registers (migration 0592, mirror `db/sql/591_custom_registers.sql`): `GET/POST /custom-registers`, `GET/PATCH /custom-registers/{key}` and `POST /custom-registers/{key}/enable`. System Admin or an all-regions delegate of the custom fields; step-up on create, enable, hide and show; reason; If-Match on PATCH and enable. A new register is created disabled; its columns use the existing `/registers/{register_key}/fields`; enable adds the menu key, the upload and download template and the permission module. Nothing is deleted (hide only). New ops limit `registers.custom_max`.
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.266 (2026-11-27): an archive before the project data reset deletes (Data entry proposal P2, approved by the owner 2026-11-27; migration 0371, mirror `db/sql/370_data_reset_archive.sql`). Additive and backward compatible: a request without `archive` is mode none as before. `POST /settings/data-reset/requests` takes optional `archive` (none, download, keep_90), stored and immutable with the request (not part of `scope_hash`). New `POST .../requests/{request_id}/archive` (make, async) and `GET .../archive/download` (System Admin, step-up, a security-log entry per download). `DataResetRequest.archive` (`DataResetArchiveInfo`). `POST .../run` is 409 `archive_required` until the archive is ready (download, and downloaded once). Kept 7 days at most (download) or 90 days (keep_90), then removed. New `ErrorCode` `archive_required`, `archive_expired`.
     - 0.15.267 (2026-11-27): `POST /custom-fields` and `PATCH /custom-fields/{field_id}` now have an implementation (migration 0405, mirror `db/sql/404_custom_fields_door.sql`; the function `admin_save_field`, additive, no table). System Admin or an all-regions delegate of the custom fields, step-up, reason, If-Match on PATCH, audited (`custom_field_create`, `custom_field_update`). Entity, code, type and task are set at create only. Options are switched off, never removed; nothing is deleted (`is_active=false`). `visible_to_role_ids` and `editable_by_role_ids` write the field rules for every active role.
@@ -17765,6 +17766,145 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /custom-registers:
+    get:
+      tags: [registers]
+      operationId: listCustomRegisters
+      summary: The custom registers (hidden ones too) with their usage and the limit
+      description: 0.15.533. System Admin or an all-regions delegate of the custom fields.
+      x-db-path: register_definitions (is_custom)
+      responses:
+        '200':
+          description: The custom registers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, limit]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/CustomRegister'}
+                  limit:
+                    type: object
+                    required: [max, active]
+                    properties:
+                      max: {type: integer, description: The setting registers.custom_max.}
+                      active: {type: integer}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [registers]
+      operationId: createCustomRegister
+      x-step-up: true
+      summary: Create a custom register (disabled until it has columns and is enabled)
+      description: 0.15.533. The key is generated from the English name (`custom_` and letters). Fails when the limit registers.custom_max is reached.
+      x-db-path: admin_register_create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomRegisterInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /custom-registers/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string, pattern: '^custom_[a-z_]{2,24}$'}
+    get:
+      tags: [registers]
+      operationId: getCustomRegister
+      summary: One custom register
+      x-db-path: register_definitions (is_custom)
+      responses:
+        '200':
+          description: The register.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [registers]
+      operationId: updateCustomRegister
+      x-step-up: 'when is_active changes'
+      summary: Rename, hide or show a custom register
+      description: 0.15.533. The key never changes. Hiding removes the menu entry and the module from the grid editor; records and grants stay.
+      x-db-path: admin_register_update
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomRegisterPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /custom-registers/{key}/enable:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string, pattern: '^custom_[a-z_]{2,24}$'}
+    post:
+      tags: [registers]
+      operationId: enableCustomRegister
+      x-step-up: true
+      summary: Enable a custom register (menu key, template, permission module)
+      description: 0.15.533. Needs at least one active column and one required column. Adds the menu key, the upload and download template and refreshes the templates.
+      x-db-path: admin_register_enable
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 3, maxLength: 1000}
+      responses:
+        '200':
+          description: Enabled.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /custom-fields:
     get:
       tags: [custom-fields]
@@ -29072,6 +29212,43 @@ components:
         description: { type: string, maxLength: 2000 }
         severity: { type: string, minLength: 1, maxLength: 40 }
     # ---------------------------------------------------------- custom fields
+    CustomRegister:
+      type: object
+      required: [register_key, module_key, name_en, name_ar, site_scoped, multiple_per_site, enabled, is_active, version, created_at, field_count, required_count, record_count, template_id]
+      properties:
+        register_key: {type: string}
+        module_key: {type: string, description: Same as register_key; the permission module.}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        site_scoped: {type: boolean}
+        multiple_per_site: {type: boolean}
+        enabled: {type: boolean, description: False until enabled; a disabled register has no menu entry or template.}
+        is_active: {type: boolean, description: False when hidden.}
+        version: {type: integer}
+        created_at: {type: [string, 'null'], format: date-time}
+        field_count: {type: integer}
+        required_count: {type: integer}
+        record_count: {type: integer}
+        template_id: {type: [string, 'null']}
+    CustomRegisterInput:
+      type: object
+      additionalProperties: false
+      required: [name_en, site_scoped, reason]
+      properties:
+        name_en: {type: string, minLength: 2, maxLength: 80}
+        name_ar: {type: [string, 'null'], minLength: 2, maxLength: 80}
+        site_scoped: {type: boolean}
+        multiple_per_site: {type: boolean, default: true}
+        reason: {type: string, minLength: 3, maxLength: 1000}
+    CustomRegisterPatch:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        name_en: {type: string, minLength: 2, maxLength: 80}
+        name_ar: {type: [string, 'null'], minLength: 2, maxLength: 80}
+        is_active: {type: boolean}
+        reason: {type: string, minLength: 3, maxLength: 1000}
     CustomFieldEntity:
       type: string
       enum: [site, milestone, gate, task, rf_design, acquisition, procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle]
