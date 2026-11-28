@@ -1274,6 +1274,17 @@
     "on_behalf_note": "Logged as lead on behalf of the assignee. The SLA is not reset and data stays. Approval needs step-up.",
     "alerts_holder_deactivated": "Deactivated or deleted holders"
   },
+  "mobile": {
+    "bar": "Main places",
+    "more": "More",
+    "banner_label": "Install the app",
+    "banner_install": "Add this app to your home screen for quicker access.",
+    "banner_hint": "For quicker access, add this page to your home screen from your browser menu.",
+    "install": "Install",
+    "banner_dismiss": "Dismiss the banner",
+    "replay": "Replay the tour",
+    "replay_hint": "Shows the short first-use tour again"
+  },
   "export": {
     "open": "Export",
     "centre": "Exports centre",
@@ -4199,6 +4210,8 @@
       "accent": "Accent colour",
       "contrast": "Contrast",
       "inbox_panel": "Notification panel",
+      "app_banner": "App banner (small screens)",
+      "first_use_tour": "First-use tour",
       "inbox_anchor": "Floating panel corner",
       "more_menu": "More menu"
     },
@@ -4250,6 +4263,14 @@
         "overlay": "Overlay (default)",
         "floating": "Floating window",
         "docked": "Docked at the edge"
+      },
+      "app_banner": {
+        "show": "Show",
+        "hide": "Hide"
+      },
+      "first_use_tour": {
+        "auto": "Open once by itself",
+        "manual": "Only when I replay it"
       },
       "inbox_anchor": {
         "end-top": "End, top",

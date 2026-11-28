@@ -17,6 +17,8 @@ export const APPEARANCE_OPTIONS = {
   contrast: ['standard', 'high'], // 0347 (item 19): the high-contrast mode
   inbox_panel: ['overlay', 'floating', 'docked'], // 0526: the notification panel as an overlay, a movable floating window or docked at the edge
   more_menu: ['list', 'grid'], // 0581: the More menu of the table screens as a list or an icon grid with search
+  app_banner: ['show', 'hide'], // 0654: the app banner (install the app) on small screens
+  first_use_tour: ['auto', 'manual'], // 0654: the first-use tour opens by itself once (auto) or only when replayed (manual)
   inbox_anchor: ['end-top', 'end-bottom', 'start-top', 'start-bottom'], // 0526: the corner of the floating panel (a drag snaps to the nearest)
 } as const;
 
@@ -25,7 +27,7 @@ export type Appearance = Partial<{ [K in AppearanceKey]: (typeof APPEARANCE_OPTI
 
 /** The built-in standard of every dimension (ui_pref_defaults() in the database). */
 export const APPEARANCE_DEFAULTS: Required<Appearance> = {
-  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top', more_menu: 'list',
+  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top', more_menu: 'list', app_banner: 'show', first_use_tour: 'auto',
 };
 
 /** The ready-made profiles of proposal item 1; the theme flips for `night` are saved through the profile like the theme button. */

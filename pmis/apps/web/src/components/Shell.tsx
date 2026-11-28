@@ -27,6 +27,8 @@ import { NotificationBell } from './NotificationPanel';
 import { ShortcutsHelp } from './ShortcutsHelp';
 import { Avatar } from './Avatar';
 import { QuickTour } from './QuickTour';
+import { AppBanner } from './AppBanner';
+import { MobileBar } from './MobileBar';
 import { PEOPLE_TABS } from './PeopleAdmin';
 import { permittedNavItems, visibleNavItems } from '@/lib/visibleNav';
 import { NAV } from './navItems';
@@ -235,10 +237,10 @@ function ShellFrame() {
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-line bg-card px-4 py-2">
+        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-line bg-card px-3 py-2 md:px-4">
           <button className="btn min-h-11 min-w-11 md:hidden" data-testid="topbar-menu" aria-label={t('nav.open_menu')} aria-expanded={drawer} onClick={() => setDrawer(true)}><Menu size={16} aria-hidden /></button>
           <button className="btn hidden md:inline-flex" data-testid="topbar-collapse" aria-label={t(compact ? 'nav.full_menu' : 'nav.icons_only')} title={t(compact ? 'nav.full_menu' : 'nav.icons_only')} aria-pressed={compact} onClick={toggleCompact}>{compact ? <PanelLeftOpen size={16} aria-hidden className="rtl:-scale-x-100" /> : <PanelLeftClose size={16} aria-hidden className="rtl:-scale-x-100" />}</button>
-          <nav aria-label="breadcrumb" data-testid="breadcrumb" className="min-w-0 text-sm text-mute">
+          <nav aria-label="breadcrumb" data-testid="breadcrumb" className="hidden min-w-0 text-sm text-mute md:block">
             <ol className="flex flex-wrap items-center gap-1">
               <li><Link className="hover:text-ink" to="/my-work">{t('app.name')}</Link></li>
               {current && groupFirst && t(`nav.group_${current.group}`) !== t(`nav.${current.key}`) && <li className="flex gap-1"><span aria-hidden>/</span><Link className="hover:text-ink" to={groupFirst.to}>{t(`nav.group_${current.group}`)}</Link></li>}
@@ -249,10 +251,10 @@ function ShellFrame() {
             </ol>
           </nav>
           <div className="flex-1" />
-          <button className="btn min-w-60 justify-start font-normal text-mute" data-testid="topbar-search" onClick={() => setPalette(true)}>
-            <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>
+          <button className="btn justify-start font-normal text-mute md:min-w-60" data-testid="topbar-search" aria-label={t('top.search')} onClick={() => setPalette(true)}>
+            <Search size={16} /><span className="hidden flex-1 text-start md:block">{t('top.search')}</span><kbd className="mono hidden rounded border border-line px-1 text-xs md:block">Ctrl K</kbd>
           </button>
-          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.centre')}</button>
+          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} aria-hidden /><span className="hidden md:inline">{t('export.centre')}</span><span className="sr-only md:hidden">{t('export.centre')}</span></button>
           <button className="btn" data-testid="topbar-lang" aria-label={`${t('top.language')}: ${lang === 'en' ? 'ع' : 'EN'}`} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <QuickCreate me={me.data} allowed={allowed} />
@@ -261,7 +263,7 @@ function ShellFrame() {
             <Popover.Trigger asChild>
               <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" title={t('top.account')}>
                 <Avatar name={me.data?.user.display_name} size="sm" />
-                {me.data?.user.display_name}
+                <span className="hidden md:inline">{me.data?.user.display_name}</span>
               </button>
             </Popover.Trigger>
             <Popover.Portal>
@@ -277,13 +279,15 @@ function ShellFrame() {
           </Popover.Root>
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
+        {me.data?.user.id && <AppBanner userId={me.data.user.id} enabled={(me.data.user.appearance as { app_banner?: string } | undefined)?.app_banner !== 'hide'} />}
         <AutoHints />
-        <main className="p-6"><Outlet context={{ items: sideItems }} /></main>
+        <main className="p-3 pb-20 md:p-6"><Outlet context={{ items: sideItems }} /></main>
       </div>
+      <MobileBar items={sideItems} unread={pending} onMore={() => setDrawer(true)} />
       <ExportDialog open={exp} onClose={() => setExp(false)} />
       <ShortcutsHelp />
       <RowActions />
-      {me.data?.user.id && <QuickTour userId={me.data.user.id} />}
+      {me.data?.user.id && <QuickTour userId={me.data.user.id} auto={(me.data.user.appearance as { first_use_tour?: string } | undefined)?.first_use_tour !== 'manual'} />}
       <CommandPalette open={palette} onOpenChange={setPalette} items={paletteItems.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
   );

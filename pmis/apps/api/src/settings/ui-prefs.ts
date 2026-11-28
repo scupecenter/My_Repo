@@ -15,6 +15,8 @@ export const UI_PREF_OPTIONS = {
   contrast: ['standard', 'high'], // 0347 (item 19): the high-contrast mode
   inbox_panel: ['overlay', 'floating', 'docked'], // 0526: the notification panel as an overlay, a floating window or docked
   more_menu: ['list', 'grid'], // 0581: the More menu of the table screens as a list or an icon grid with search
+  app_banner: ['show', 'hide'], // 0654: the app banner (install the app) on small screens
+  first_use_tour: ['auto', 'manual'], // 0654: the first-use tour opens by itself once (auto) or only when replayed (manual)
   inbox_anchor: ['end-top', 'end-bottom', 'start-top', 'start-bottom'], // 0526: the corner of the floating panel
 } as const;
 
@@ -23,7 +25,7 @@ export type UiPrefs = Partial<{ [K in UiPrefKey]: (typeof UI_PREF_OPTIONS)[K][nu
 
 /** The built-in standard of every dimension (ui_pref_defaults() in the database). */
 export const UI_PREF_DEFAULTS: Required<UiPrefs> = {
-  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top', more_menu: 'list',
+  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top', more_menu: 'list', app_banner: 'show', first_use_tour: 'auto',
 };
 
 /** A subset of the dimensions, each with one of its allowed values (PATCH /me/profile ui_prefs, PUT /settings/identity defaults). */
@@ -39,6 +41,8 @@ export const uiPrefsSchema = z.object({
   inbox_panel: z.enum(UI_PREF_OPTIONS.inbox_panel).optional(),
   inbox_anchor: z.enum(UI_PREF_OPTIONS.inbox_anchor).optional(),
   more_menu: z.enum(UI_PREF_OPTIONS.more_menu).optional(),
+  app_banner: z.enum(UI_PREF_OPTIONS.app_banner).optional(),
+  first_use_tour: z.enum(UI_PREF_OPTIONS.first_use_tour).optional(),
 }).strict();
 
 /**

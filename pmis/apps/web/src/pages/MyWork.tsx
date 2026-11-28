@@ -112,7 +112,7 @@ export function MyWork() {
   let n = 0;
   return (
     <div className="space-y-4" data-testid="page-my-work">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold">{t('myWork.title')}</h1>
           <p className="text-mute">{t('myWork.hello', { name: me.data?.user.display_name.split(' ')[0] ?? '' })}</p>

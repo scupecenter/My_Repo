@@ -393,6 +393,20 @@ describe('the appearance profile: PATCH /me/profile ui_prefs and the identity de
     expect((await patchPrefs(api, { more_menu: 'cards' })).status).toBe(422);
   });
 
+  // 0654: the app banner and the first-use tour are two more appearance dimensions of the same framework.
+  it('app_banner and first_use_tour: in the options, defaults shown and auto, changed by personal choice, validated', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const p = await api.call('get', '/me/profile');
+    expect(p.body.identity.pref_options.app_banner).toEqual(['show', 'hide']);
+    expect(p.body.identity.pref_options.first_use_tour).toEqual(['auto', 'manual']);
+    expect(p.body.appearance).toMatchObject({ app_banner: 'show', first_use_tour: 'auto' });
+    const r = await patchPrefs(api, { app_banner: 'hide', first_use_tour: 'manual' });
+    expect(r.status).toBe(200);
+    expect(r.body.appearance).toMatchObject({ app_banner: 'hide', first_use_tour: 'manual' });
+    expect((await patchPrefs(api, { app_banner: 'maybe' })).status).toBe(422);
+  });
+
   // 0347 (item 19 of the 2026-11-27 batch): `contrast` is an appearance dimension of the same framework - personal choice,
   // organization default and the admin lock all reach it through the same doors, with no parallel path.
   it('contrast: in the options, chosen personally, defaulted by the organization and locked with the rest', async () => {

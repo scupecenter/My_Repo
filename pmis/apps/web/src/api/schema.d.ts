@@ -20040,6 +20040,16 @@ export interface components {
              * @enum {string}
              */
             more_menu?: "list" | "grid";
+            /**
+             * @description 0.15.581 (0654): the app banner on small screens: shown (default) or hidden.
+             * @enum {string}
+             */
+            app_banner?: "show" | "hide";
+            /**
+             * @description 0.15.581 (0654): the first-use tour opens once by itself (auto, default) or only when replayed (manual).
+             * @enum {string}
+             */
+            first_use_tour?: "auto" | "manual";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
