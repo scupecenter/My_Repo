@@ -1,5 +1,5 @@
--- 0613_sub_tasks: sub-tasks under a task or a register record, with an owner, a status and a progress that rolls up to the parent (contract 0.15.474). Additive.
--- Mirror: db/sql/612_sub_tasks.sql (kept identical to prisma/migrations/0613_sub_tasks/migration.sql).
+-- 0620_sub_tasks: sub-tasks under a task or a register record, with an owner, a status and a progress that rolls up to the parent (contract 0.15.474). Additive.
+-- Mirror: db/sql/619_sub_tasks.sql (kept identical to prisma/migrations/0620_sub_tasks/migration.sql).
 --
 -- WHAT. A small checklist-with-owners under any task (task_instances) or register record (the logical record, entity_id). A sub-task has a title, an optional owner,
 -- a status (open, doing, done), a progress 0..100 and an optional due date. The parent shows the roll-up: how many sub-tasks are done and their mean progress.

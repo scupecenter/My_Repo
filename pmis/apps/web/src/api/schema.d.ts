@@ -12825,7 +12825,7 @@ export interface paths {
         };
         /**
          * Sub-tasks of a task or a register record, with the roll-up (0.15.474)
-         * @description 0.15.474 (migration 0613). The sub-tasks that are not removed, oldest first, and the roll-up (how many, how many done, mean progress). Whoever may view the parent (module `sites` for a task, the register's module for a record, in its region) reads. `can_edit` tells whether the caller holds the entry level there. The roll-up is information only and never changes the parent. 404 for a parent the caller cannot see; 422 for a global record (no region, no sub-tasks).
+         * @description 0.15.474 (migration 0620). The sub-tasks that are not removed, oldest first, and the roll-up (how many, how many done, mean progress). Whoever may view the parent (module `sites` for a task, the register's module for a record, in its region) reads. `can_edit` tells whether the caller holds the entry level there. The roll-up is information only and never changes the parent. 404 for a parent the caller cannot see; 422 for a global record (no region, no sub-tasks).
          */
         get: operations["listSubTasks"];
         put?: never;

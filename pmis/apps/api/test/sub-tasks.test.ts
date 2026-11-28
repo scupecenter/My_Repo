@@ -6,7 +6,7 @@ import { G, PROC, createRec, team } from './reg-helpers';
 import { actor, makeSite, makeTask } from './wf-helpers';
 
 /**
- * 0.15.474 (migration 0613): sub-tasks under a task or a register record. Read = view of the parent in its region; write = entry level there;
+ * 0.15.474 (migration 0620): sub-tasks under a task or a register record. Read = view of the parent in its region; write = entry level there;
  * the owner of a sub-task moves its own status and progress. The roll-up never changes the parent. Region 8.
  */
 const REGION = 8;

@@ -1,4 +1,4 @@
-# Spec: sub-tasks (contract 0.15.474, migration 0613)
+# Spec: sub-tasks (contract 0.15.474, migration 0620)
 
 Status: built, draft PR. Source: the standard-features list approved in the user's conversation on 2026-11-28 ("implement fully").
 

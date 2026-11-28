@@ -173,7 +173,7 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/comments/:id/reactions'],
   ['put', '/comments/:id/resolved'],
   ['delete', '/comments/:id/resolved'],
-  // Contract 0.15.474 (0613): sub-tasks of a task or a register record.
+  // Contract 0.15.474 (0620): sub-tasks of a task or a register record.
   ['get', '/sub-tasks/:kind/:parentId'],
   ['post', '/sub-tasks/:kind/:parentId'],
   ['patch', '/sub-tasks/:kind/:parentId/:id'],
