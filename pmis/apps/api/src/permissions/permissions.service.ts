@@ -10,6 +10,7 @@ import { boolParam, Query } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { DELEGABLE_RIGHTS, MODULE_KEYS, MODULES } from './catalogue';
+import { customModuleDefs, customModuleKeys } from './custom-modules';
 
 /** The contract's PermissionAction. The database enum may hold fewer (manage_users and view_security_log are not in migration 0001). */
 const CONTRACT_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'import', 'download_documents', 'view_audit', 'administer', 'manage_users', 'view_security_log'] as const;
@@ -77,7 +78,7 @@ export class PermissionsService {
     const supported = await this.supportedActions();
     const actions = CONTRACT_ACTIONS.filter((a) => supported.has(a));
     return {
-      modules: MODULES.map((m) => ({
+      modules: [...MODULES, ...(await customModuleDefs(this.db, true))].map((m) => ({
         key: m.key,
         name_en: m.name_en,
         ...(m.screens ? { screens: m.screens } : {}),
@@ -153,8 +154,9 @@ export class PermissionsService {
   private async validate(grants: { module_key: string; action: string }[], rules: { field_id: string }[]): Promise<void> {
     const supported = await this.supportedActions();
     const errors: FieldError[] = [];
+    const custom = await customModuleKeys(this.db);
     grants.forEach((g, i) => {
-      if (!MODULE_KEYS.has(g.module_key)) errors.push({ path: `/grants/${i}/module_key`, code: 'unknown_module', message: `Unknown module ${g.module_key}.` });
+      if (!MODULE_KEYS.has(g.module_key) && !custom.has(g.module_key)) errors.push({ path: `/grants/${i}/module_key`, code: 'unknown_module', message: `Unknown module ${g.module_key}.` });
       if (!supported.has(g.action)) {
         errors.push({ path: `/grants/${i}/action`, code: 'not_supported', message: `The database cannot store the action ${g.action} yet.` });
       }

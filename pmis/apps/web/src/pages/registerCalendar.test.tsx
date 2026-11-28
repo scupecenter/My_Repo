@@ -54,8 +54,8 @@ describe('V2 register calendar', () => {
   it('layoutsOf: the calendar only where the definition has a date field', () => {
     const base = { register_key: 'x', name_en: 'X', name_ar: 'X', module_key: 'x', site_scoped: false, fields: [] } as unknown as RegisterDefinition;
     const dateF = { code: 'd1', name_en: 'D', name_ar: 'D', type: 'date' } as unknown as RegisterField;
-    expect(layoutsOf({ ...base, fields: [{ code: 't', name_en: 'T', name_ar: 'T', type: 'text' } as unknown as RegisterField] })).toEqual(['list', 'wide', 'board', 'gallery', 'chart']);
-    expect(layoutsOf({ ...base, fields: [dateF] })).toEqual(['list', 'wide', 'board', 'gallery', 'calendar', 'chart']);
-    expect(layoutsOf({ ...base, site_scoped: true, fields: [dateF] })).toEqual(['list', 'wide', 'board', 'gallery', 'map', 'calendar', 'chart']);
+    expect(layoutsOf({ ...base, fields: [{ code: 't', name_en: 'T', name_ar: 'T', type: 'text' } as unknown as RegisterField] })).toEqual(['list', 'wide', 'board', 'gallery', 'feed', 'chart']);
+    expect(layoutsOf({ ...base, fields: [dateF] })).toEqual(['list', 'wide', 'board', 'gallery', 'feed', 'calendar', 'chart']);
+    expect(layoutsOf({ ...base, site_scoped: true, fields: [dateF] })).toEqual(['list', 'wide', 'board', 'gallery', 'feed', 'map', 'calendar', 'chart']);
   });
 });

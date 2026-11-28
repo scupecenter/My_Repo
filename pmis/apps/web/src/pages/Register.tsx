@@ -6,6 +6,7 @@ import {
   Download,
   Grid3x3,
   Images,
+  Rss,
   Lock,
   Map as MapIcon,
   Plus,
@@ -73,6 +74,7 @@ import {
   numericFields,
   RegisterChart,
   RegisterBoard,
+  RegisterFeed,
   RegisterCalendar,
   RegisterGallery,
   RegisterMap,
@@ -112,7 +114,7 @@ import {
   NoResults,
 } from "@/components/States";
 import { registerErrorMessage } from "@/lib/registerErrors";
-import { isLive, OWNER_NOTE } from "@/lib/registerForms";
+import { isCustomKey, isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
@@ -275,7 +277,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   ];
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   // the board and the map show every record of the filters (their column counts and sites must not depend on paging), up to ALL_CAP records
-  const needAll = view === "vertical" && (layout === "board" || layout === "map" || layout === "gallery");
+  const needAll = view === "vertical" && (layout === "board" || layout === "map" || layout === "gallery" || layout === "feed");
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
   useEffect(() => {
     if (needAll && hasNextPage && !isFetchingNextPage && items.length < ALL_CAP)
@@ -336,6 +338,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     { id: "grid", label: t("view.grid"), hint: t("view.grid_hint"), icon: <Grid3x3 size={14} />, testid: "register-layout-grid" },
     { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
     { id: "gallery", label: t("view.gallery"), hint: t("view.gallery_hint"), icon: <Images size={14} />, testid: "register-layout-gallery" },
+    { id: "feed", label: t("view.feed"), hint: t("view.feed_hint"), icon: <Rss size={14} />, testid: "register-layout-feed" },
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
     { id: "chart", label: t("chartv.title"), hint: t("view.chart_hint"), icon: <BarChart3 size={14} />, testid: "register-layout-chart" },
     ...(layouts.includes("calendar") ? [{ id: "calendar", label: t("calview.title"), hint: t("view.calendar_hint"), icon: <CalendarDays size={14} />, testid: "register-layout-calendar" }] : []),
@@ -1085,6 +1088,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               partial={partial}
             />
           )}
+          {layout === "feed" && (
+            <RegisterFeed
+              def={def}
+              records={real}
+              regionName={(id) => rname(id as number | null)}
+              onOpen={setRecord}
+              partial={partial}
+            />
+          )}
           {layout === "map" && (
             <RegisterMap records={real} regionId={f.region_id} partial={partial} />
           )}
@@ -1300,7 +1312,7 @@ export function RegisterPage() {
   const { t } = useTranslation();
   const { key = "" } = useParams();
   const defs = useRegisterDefs();
-  if (!isLive(key)) return <RegisterSoon name={key} />;
+  if (!isLive(key) && !isCustomKey(key)) return <RegisterSoon name={key} />;
   if (defs.isLoading) return <p className="text-mute">{t("common.loading")}</p>;
   const def = defs.data?.find((d) => d.register_key === key);
   if (!def)
@@ -1325,7 +1337,7 @@ export function RegisterRecordPage() {
   const { t } = useTranslation();
   const { key = "", id = "" } = useParams();
   const defs = useRegisterDefs();
-  if (!isLive(key)) return <RegisterSoon name={key} />;
+  if (!isLive(key) && !isCustomKey(key)) return <RegisterSoon name={key} />;
   if (defs.isLoading) return <p className="text-mute">{t("common.loading")}</p>;
   const def = defs.data?.find((d) => d.register_key === key);
   if (!def)
