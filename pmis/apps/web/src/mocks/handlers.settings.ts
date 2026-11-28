@@ -78,6 +78,9 @@ export function validateContractorRules(b: Record<string, unknown>) {
   return errs;
 }
 const isAdmin = () => viewer()?.key === 'pm';
+const targetPolicy: { manual_override: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { manual_override: false, version: 1, updated_at: null, updated_by: null };
+const targetPolicyView = () => ({ ...targetPolicy, can_edit: isAdmin() });
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 const reasonErr = (r?: string) => ((r ?? '').trim().length < 3 || (r ?? '').length > 1000 ? fields({ path: '/reason', code: 'required' }) : null);
@@ -447,6 +450,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_contractors', label_en: 'Contractor and supplier scorecard: levels, delay and quality', label_ar: 'بطاقة أداء المقاولين والموردين: المستويات والتأخير والجودة' },
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
+    { code: 'ops_phase', label_en: 'Phase scope: sites per project phase, progress and derived targets', label_ar: 'نطاق المراحل: المواقع لكل مرحلة والتقدم والمستهدفات المشتقة' },
     { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
   ],
 };
@@ -554,6 +558,25 @@ export const settingsHandlers = [
     return HttpResponse.json({ record_id: x.last_record_id, register_key: x.register_key, next_due: x.next_due }, { status: 201 });
   }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
+  // ------------------------------------------------------------------ 0.15.367: the target policy (manual override of the typed dashboard targets, off by default)
+  http.get(`${B}/settings/dashboard-target-policy`, () => { const g = guard(); if (g) return g; const j = targetPolicyView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/dashboard-target-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ manual_override?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['manual_override', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.manual_override !== 'boolean') errs.push({ path: '/manual_override', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, targetPolicy.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (targetPolicy.manual_override === b.manual_override) return problem(409, 'invalid_transition', 'This is already the target policy.');
+    const v = viewer()!;
+    Object.assign(targetPolicy, { manual_override: b.manual_override as boolean, version: targetPolicy.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = targetPolicyView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
