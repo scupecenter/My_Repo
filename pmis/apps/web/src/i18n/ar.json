@@ -255,6 +255,7 @@
     "lessons_learned": "الدروس المستفادة",
     "invoices": "الفواتير",
     "deliverables": "المخرجات",
+    "site_contacts": "جهات اتصال المواقع",
     "incidents": "الحوادث والأمن"
   },
   "top": {
@@ -2122,6 +2123,7 @@
     "payment": "الدفع",
     "deliverable": "المخرج",
     "links_section": "الروابط",
+    "contact_section": "جهة الاتصال",
     "amount_section": "المبلغ",
     "incident": "الحادث",
     "people_damage": "الأشخاص والأضرار",

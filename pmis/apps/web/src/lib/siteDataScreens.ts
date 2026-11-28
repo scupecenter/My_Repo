@@ -28,6 +28,7 @@ export const REGISTER_SCREENS: { key: string; name: string; site: boolean; why?:
   { key: 'lessons_learned', name: 'Lessons Learned', site: true },
   { key: 'invoices', name: 'Invoices', site: true },
   { key: 'deliverables', name: 'Deliverables', site: true },
+  { key: 'site_contacts', name: 'Site Contacts', site: true },
   { key: 'incidents', name: 'Incidents & Security', site: true },
   { key: 'warehouse', name: 'Warehouse', site: false, why: 'stock movements are not site records' },
   { key: 'quality', name: 'Quality Control', site: true },

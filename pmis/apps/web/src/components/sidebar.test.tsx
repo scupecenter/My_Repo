@@ -220,7 +220,7 @@ describe('Sidebar tree (N1-N12)', () => {
     expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
     expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
     const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].filter((a) => !a.getAttribute('data-testid')?.startsWith('nav-group-open-')).map((a) => a.getAttribute('data-testid'));
-    expect(regs).toEqual(['dismantle', 'procurement', 'gecol', 'hlc', 'permits_hse', 'incidents', 'lessons_learned', 'invoices', 'deliverables', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'finance_hub', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
+    expect(regs).toEqual(['dismantle', 'procurement', 'gecol', 'hlc', 'permits_hse', 'incidents', 'lessons_learned', 'invoices', 'deliverables', 'site_contacts', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'finance_hub', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('Change Control Log');
   });
 

@@ -151,3 +151,6 @@ FROM pg_constraint k JOIN pg_class cl ON cl.oid = k.conrelid JOIN pg_class cf ON
 JOIN pg_namespace n ON n.oid = cl.relnamespace JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = ANY (k.conkey)
 WHERE k.contype = 'f' AND n.nspname = 'public' GROUP BY k.oid, cl.relname, cf.relname ORDER BY 2, 1;
 ```
+
+## Site Contacts (C6, migration 0551)
+One register `site_contacts` (site-scoped, several per site) holds the people a site depends on. Links: `party_id` to a company of the Contractors list (`external_parties`, one company list only; the organization is filled from it), `acquisition_record_id`, `permit_record_id`, `gecol_record_id`, `hlc_record_id` to the site's records (declared in `register_links`, check off by default), `also_site_ids` for other sites it serves. Read scope: the view right of Acquisition (same profiles, same regions). Lists: `ContactRole` in Settings > Dropdown lists; field settings through the register columns settings.
