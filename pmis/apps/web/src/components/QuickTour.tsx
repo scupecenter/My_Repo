@@ -10,16 +10,16 @@ export const tourKey = (userId: string): string => `tour.done.${userId}`;
 export function QuickTour({ userId, auto = false }: { userId: string; auto?: boolean }) {
   const { t } = useTranslation();
   // Item 12: opens by itself once, on first use, when the person's choice is `auto` (My profile > Appearance); as a card that does not block the page (no overlay, no focus trap).
-  const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [replay, setReplay] = useState(false);
-  useEffect(() => { if (auto && !loadPref<boolean>(tourKey(userId), false)) setOpen(true); }, [auto, userId]);
+  const open = replay || (auto && !dismissed && !loadPref<boolean>(tourKey(userId), false));
   const [i, setI] = useState(0);
   useEffect(() => {
-    const on = () => { setI(0); setReplay(true); setOpen(true); };
+    const on = () => { setI(0); setReplay(true); };
     window.addEventListener('gsdn:tour', on);
     return () => window.removeEventListener('gsdn:tour', on);
   }, []);
-  const close = () => { savePref(tourKey(userId), true); setOpen(false); setReplay(false); };
+  const close = () => { savePref(tourKey(userId), true); setDismissed(true); setReplay(false); };
   const modal = replay;
   const last = i === STEPS.length - 1;
   return (
