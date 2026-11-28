@@ -28,6 +28,7 @@ import { MyWork } from '@/pages/MyWork';
 import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage, RegisterRecordPage } from '@/pages/Register';
 import { Companies } from '@/pages/Companies';
+import { CompanyPage } from '@/pages/CompanyPage';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { DataHubPage } from '@/pages/DataHub';
 import { FinanceHubPage } from '@/pages/FinanceHub';
@@ -121,6 +122,7 @@ function gated(session: Session) {
         <Route path="inbox" element={<Inbox />} />
         <Route path="workload" element={<Workload />} />
         <Route path="companies" element={<Companies />} />
+        <Route path="companies/:id" element={<CompanyPage />} />
         <Route path="reports/contractors" element={<Navigate to="/companies?tab=ranking" replace />} />
         <Route path="status-updates" element={<StatusUpdates />} />
         <Route path="dashboard" element={<Dashboard />} />
