@@ -39,11 +39,12 @@ function WorkloadTable({ region, lead }: { region: string; lead: boolean }) {
   if (q.isError || !q.data) return <ErrorState onRetry={() => void q.refetch()} testid="workload-error" />;
   const { items, no_holder } = q.data;
   const maxOpen = Math.max(0, ...items.map((r) => r.open));
+  const maxDays = Math.max(0, ...items.map((r) => r.days));
   return (
     <>
       {!items.length && !no_holder.open ? <EmptyState testid="workload-empty" title={t('workload.empty')} /> : (
         <table className="card w-full text-sm" data-testid="workload-table">
-          <thead><tr className="text-start text-mute"><th className="p-2 text-start font-semibold">{t('workload.person')}</th><th className="text-start font-semibold">{t('workload.team')}</th><th className="text-start font-semibold">{t('workload.open')}</th><th className="text-start font-semibold">{t('workload.late')}</th><th className="text-start font-semibold">{t('workload.by_level')}</th><th /></tr></thead>
+          <thead><tr className="text-start text-mute"><th className="p-2 text-start font-semibold">{t('workload.person')}</th><th className="text-start font-semibold">{t('workload.team')}</th><th className="text-start font-semibold">{t('workload.open')}</th><th className="text-start font-semibold">{t('workload.late')}</th><th className="text-start font-semibold" title={t('workload.load_tip')}>{t('workload.load')}</th><th className="text-start font-semibold">{t('workload.by_level')}</th><th /></tr></thead>
           <tbody>
             {items.map((r) => (
               <tr key={r.holder.id} data-testid={`workload-row-${r.holder.employee_id ?? r.holder.id}`} className="border-t border-line">
@@ -51,12 +52,13 @@ function WorkloadTable({ region, lead }: { region: string; lead: boolean }) {
                 <td><span className={`chip ${TEAM_TONE[r.team] ?? ''}`}>{t(`workload.team_${r.team}`)}</span></td>
                 <td className="mono" data-testid="workload-open" data-heat={heatLevel(r.open, maxOpen)}><span className="inline-flex min-w-10 items-center gap-2"><span aria-hidden className="inline-block h-2 rounded bg-accent" style={{ width: `${Math.round((r.open / Math.max(maxOpen, 1)) * 64)}px`, opacity: 0.25 + heatLevel(r.open, maxOpen) * 0.19 }} />{r.open}</span></td>
                 <td>{r.late > 0 ? <span className="chip bg-lateBg text-lateInk mono" data-testid="workload-late">{r.late}</span> : <span className="mono text-mute" data-testid="workload-late">0</span>}</td>
+                <td className="mono" data-testid="workload-days" data-heat={heatLevel(r.days, maxDays)}><span className="inline-flex min-w-10 items-center gap-2"><span aria-hidden className="inline-block h-2 rounded bg-doneInk" style={{ width: `${Math.round((r.days / Math.max(maxDays, 1)) * 64)}px`, opacity: 0.25 + heatLevel(r.days, maxDays) * 0.19 }} />{r.days}</span>{r.unestimated > 0 && <span className="chip bg-card2 text-mute" title={t('workload.unest_tip')} data-testid="workload-unest">{t('workload.unestimated', { n: r.unestimated })}</span>}</td>
                 <td className="mono text-mute">{[['entry', 'L1'], ['review', 'L2'], ['approve', 'L2']].map(([k, l]) => ((r.by_level as Record<string, number | undefined>)[k as string] ? `${l}: ${(r.by_level as Record<string, number>)[k as string]}` : null)).filter(Boolean).join(' · ') || '—'}</td>
                 <td className="p-2 text-end">{lead && <button className="btn px-2 py-1 text-xs" data-testid={`workload-reassign-${r.holder.employee_id ?? r.holder.id}`} onClick={() => setAct(r.holder)}><UserRoundCog size={14} aria-hidden />{t('workload.reassign')}</button>}</td>
               </tr>
             ))}
             {no_holder.open > 0 && (
-              <tr className="border-t border-line bg-lockBg/40" data-testid="workload-no-holder"><td className="p-2" colSpan={2}>{t('workload.no_holder')}</td><td className="mono">{no_holder.open}</td><td className="mono">{no_holder.late}</td><td colSpan={2} /></tr>
+              <tr className="border-t border-line bg-lockBg/40" data-testid="workload-no-holder"><td className="p-2" colSpan={2}>{t('workload.no_holder')}</td><td className="mono">{no_holder.open}</td><td className="mono">{no_holder.late}</td><td className="mono" data-testid="workload-no-holder-days">{no_holder.days}{no_holder.unestimated > 0 ? ` (${t('workload.unestimated', { n: no_holder.unestimated })})` : ''}</td><td colSpan={2} /></tr>
             )}
           </tbody>
         </table>
