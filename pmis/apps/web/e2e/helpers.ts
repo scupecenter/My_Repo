@@ -50,3 +50,9 @@ export async function answerAnnouncements(page: Page, decision: 'agree' | 'disag
     n += 1;
   }
 }
+
+/** P7: Sign out lives in the user menu (top bar, account chip). */
+export async function signOutViaMenu(page: Page) {
+  await page.getByTestId('topbar-user').click();
+  await page.getByTestId('user-menu-signout').click();
+}

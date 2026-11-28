@@ -12,6 +12,7 @@ import { DocSlots } from './DocSlots';
 import { DraftBar, useDraft } from './DraftBar';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
 import { EditingNotice } from './EditingNotice';
+import { useCommentReaction, useCommentResolved } from '@/api/x';
 import { CommentsPanel } from './Comments';
 import { DelayPeriodsPanel } from './DelayPeriods';
 import { Holders } from './HolderChip';
@@ -29,9 +30,12 @@ import { DateInput } from '@/components/DateInput';
 function Comments({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
   const c = useComments(task.id), add = useAddComment(task.id);
+  const react = useCommentReaction(['task-comments', task.id]), resolve = useCommentResolved(['task-comments', task.id]);
   return (
     <CommentsPanel items={c.data?.items} loaded={c.isSuccess} pending={add.isPending} error={add.isError ? errText(add.error, t) : null}
-      onSend={(body, ids) => add.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
+      onSend={(body, ids) => add.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })}
+      onReact={(commentId, emoji, on) => react.mutate({ commentId, emoji, on })}
+      onToggleResolved={(commentId, resolved) => resolve.mutate({ commentId, resolved })} />
   );
 }
 

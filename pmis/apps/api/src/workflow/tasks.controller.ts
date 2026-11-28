@@ -1,14 +1,23 @@
 import { ExportAction } from '../security/export-lock';
-import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
+import { ProblemException } from '../common/problem';
 import { ApprovalsService } from './approvals.service';
 import { MyWorkService } from './my-work.service';
 import { OverridesService } from './overrides.service';
 import { TaskDetailDto, TaskDetailService } from './task-detail.service';
 import { TransitionAction, TransitionResultDto, WorkflowService } from './workflow.service';
+
+
+/** PM item 18: the reaction body is exactly `{emoji: "👍"}`; anything else is a plain 422 (the database re-checks the emoji list). */
+function reactionEmoji(body: unknown): string {
+  const b = (body ?? {}) as Record<string, unknown>;
+  if (typeof b.emoji !== 'string' || !b.emoji) throw new ProblemException(422, 'validation_failed', { errors: [{ path: '/emoji', code: 'required', message: 'Name the emoji.' }] });
+  return b.emoji;
+}
 
 @Controller()
 export class TasksController {
@@ -142,6 +151,31 @@ export class TasksController {
   @HttpCode(201)
   addComment(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown) {
     return this.workflow.addComment(auth, id, body);
+  }
+
+  // PM item 18 (0.15.247): a 👍 reaction and a resolved flag on any comment the caller can read (task or register record).
+  @Put('comments/:id/reactions')
+  @HttpCode(204)
+  async react(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<void> {
+    await this.workflow.react(auth, id, reactionEmoji(body), true);
+  }
+
+  @Delete('comments/:id/reactions')
+  @HttpCode(204)
+  async unreact(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<void> {
+    await this.workflow.react(auth, id, reactionEmoji(body), false);
+  }
+
+  @Put('comments/:id/resolved')
+  @HttpCode(204)
+  async resolveComment(@Auth() auth: AuthContext, @Param('id') id: string): Promise<void> {
+    await this.workflow.setResolved(auth, id, true);
+  }
+
+  @Delete('comments/:id/resolved')
+  @HttpCode(204)
+  async unresolveComment(@Auth() auth: AuthContext, @Param('id') id: string): Promise<void> {
+    await this.workflow.setResolved(auth, id, false);
   }
 
   /** My Work (contract 0.2; built with F2, 0.15.30): the caller's open tasks in the buckets late, do_now and waiting. */

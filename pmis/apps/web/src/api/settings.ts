@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+import type { OpsLimits, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
   ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
+
+import type { DuplicateRowsSettings } from './types';
 
 const refresh = (qc: QueryClient, ...ks: string[]) => ks.forEach((k) => void qc.invalidateQueries({ queryKey: [k] }));
 type Snap = { rollback: () => void };
@@ -194,6 +196,14 @@ export const useSetUiLogoDisplay = () => {
 };
 /** The public read (no session): which public pages show the logo. Both null until an admin switches one on. */
 export const useUiPublicIdentity = () => useQuery({ queryKey: ['ui-public-identity'], queryFn: () => api.get<UiPublicIdentity>('/ui/public/identity'), staleTime: 30_000, retry: 1 });
+/** 0.15.312 (migration 0402): the operational limits (setting ops.limits). Read by everyone, changed by a System Admin only, with a reason and a step-up. */
+export const useOpsLimits = () => useQuery({ queryKey: ['ops-limits'], queryFn: () => api.get<OpsLimits>('/settings/ops-limits') });
+export const useSetOpsLimits = () => {
+  const qc = useQueryClient();
+  return useMutation<OpsLimits, ApiError, { version: number; values: Record<string, number>; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/ops-limits', { version, body }), onSettled: () => refresh(qc, 'ops-limits'),
+  });
+};
 /** 0.15.194 (migration 0294): passkeys as an alternative second step (setting security.passkeys), the own passkeys, and the admin recovery. */
 export const usePasskeySetting = () => useQuery({ queryKey: ['passkey-setting'], queryFn: () => api.get<PasskeySetting>('/settings/passkeys') });
 export const useSetPasskeys = () => {
@@ -219,6 +229,25 @@ export const useSetImportsSettings = () => {
   const qc = useQueryClient();
   return useMutation<ImportsSettings, ApiError, { version: number; async_rows: number; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/imports', { version, body }), onSettled: () => refresh(qc, 'imports-settings'),
+  });
+};
+
+/** 0.15.322 (D49 part 3): the upload policy of the imports (imports.upload_policy): enforce (default) or accept_incomplete. Read by everyone; changed like the threshold. */
+export type ImportsUploadPolicy = import('./schema').components['schemas']['ImportsUploadPolicy'];
+export const useImportsUploadPolicy = () => useQuery({ queryKey: ['imports-upload-policy'], queryFn: () => api.get<ImportsUploadPolicy>('/settings/imports/upload-policy') });
+export const useSetImportsUploadPolicy = () => {
+  const qc = useQueryClient();
+  return useMutation<ImportsUploadPolicy, ApiError, { version: number; policy: ImportsUploadPolicy['policy']; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/imports/upload-policy', { version, body }), onSettled: () => refresh(qc, 'imports-upload-policy'),
+  });
+};
+
+/** 0.15.203 (P3): the notice of a new template version (templates.change_notice). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+export const useTemplateNoticeSettings = () => useQuery({ queryKey: ['template-notice-settings'], queryFn: () => api.get<TemplateChangeNotice>('/settings/template-change-notice') });
+export const useSetTemplateNoticeSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<TemplateChangeNotice, ApiError, { version: number; enabled: boolean; days: number; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/template-change-notice', { version, body }), onSettled: () => refresh(qc, 'template-notice-settings'),
   });
 };
 
@@ -535,6 +564,7 @@ export function usePublishWeights(id: string) {
 
 // 0.15.85: every task with its SLA status (Settings > SLA, "Tasks and their SLA") and the explicit "no SLA" choice
 import type { SlaTaskList } from './types';
+import type { TemplateChangeNotice } from './types';
 export const useSlaTasks = () => useQuery({ queryKey: ['slaTasks'], queryFn: () => api.get<SlaTaskList>('/settings/sla-tasks') });
 export const useSetSlaNoSla = () => {
   const qc = useQueryClient();
@@ -566,5 +596,14 @@ export const useUpdateAlertRule = () => {
   return useMutation<AlertRuleSaved, ApiError, { id: string; version: number; body: AlertRuleInput & { reason: string } }>({
     mutationFn: ({ id, version, body }) => api.put(`/settings/alert-rules/${id}`, { version, body }),
     onSettled: () => refresh(qc, 'alertRules'),
+  });
+};
+
+/** 0.15.345 (migration 0432): how a record that is in an upload file twice is treated (imports.duplicate_rows). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+export const useDuplicateRowsSettings = () => useQuery({ queryKey: ['duplicate-rows-settings'], queryFn: () => api.get<DuplicateRowsSettings>('/settings/duplicate-rows') });
+export const useSetDuplicateRowsSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<DuplicateRowsSettings, ApiError, { version: number; default: 'first' | 'last'; registers: Record<string, 'first' | 'last'>; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/duplicate-rows', { version, body }), onSettled: () => refresh(qc, 'duplicate-rows-settings'),
   });
 };

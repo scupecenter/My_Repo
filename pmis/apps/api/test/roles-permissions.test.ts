@@ -142,8 +142,28 @@ describe('roles', () => {
     const audit = await db.query("SELECT count(*) AS n FROM audit_log WHERE entity_type = 'role' AND entity_id = $1", [created.body.id]);
     expect(Number(audit.rows[0].n)).toBeGreaterThanOrEqual(5);
     expect((await api.call('patch', `/roles/${created.body.id}`, { reason: 'nothing to change' }, ifMatch(back.headers['etag']!))).status).toBe(422);
-    expect((await api.call('patch', `/roles/${created.body.id}`, { code: 'OTHER', reason: 'immutable' }, ifMatch(back.headers['etag']!))).status).toBe(422);
+    expect((await api.call('patch', `/roles/${created.body.id}`, { code: 'bad code', reason: 'bad format' }, ifMatch(back.headers['etag']!))).status).toBe(422);
     expect((await api.call('patch', `/roles/${randomUUID()}`, { name_en: 'Ghost', reason: 'unknown' }, ifMatch('"1"'))).status).toBe(404);
+  });
+
+  it('the code is editable (0500, D51): audited as role_code_changed, format and uniqueness checked, built-in codes locked', async () => {
+    const { api } = await adminApi(app, db);
+    const a = await api.call('post', '/roles', { code: `CODE_${uid()}`, name_en: 'Code A', description_ar: 'وصف', can_hold_matrix_levels: true, reason: 'new role' });
+    const b = await api.call('post', '/roles', { code: `CODE_${uid()}`, name_en: 'Code B', can_hold_matrix_levels: true, reason: 'new role' });
+    expect(a.body.description_ar).toBe('وصف');
+    const next = `RENAMED_${uid()}`;
+    const done = await api.call('patch', `/roles/${a.body.id}`, { code: next, description_ar: 'وصف جديد', reason: 'rename the code' }, ifMatch(a.headers['etag']!));
+    expect(done.status).toBe(200);
+    expect(done.body).toMatchObject({ code: next, description_ar: 'وصف جديد' });
+    const audit = await db.query("SELECT before, after FROM audit_log WHERE action = 'role_code_changed' AND entity_id = $1", [a.body.id]);
+    expect(audit.rowCount).toBe(1);
+    expect(audit.rows[0].after).toMatchObject({ code: next });
+    expect((await api.call('patch', `/roles/${a.body.id}`, { code: b.body.code, reason: 'clash' }, ifMatch(done.headers['etag']!))).status).toBe(409);
+    expect((await api.call('patch', `/roles/${a.body.id}`, { code: '1BAD', reason: 'bad format' }, ifMatch(done.headers['etag']!))).status).toBe(422);
+    const pm = await db.query("SELECT id FROM roles WHERE code = 'PM'");
+    const locked = await api.call('get', `/roles/${pm.rows[0].id}`);
+    expect((await api.call('patch', `/roles/${pm.rows[0].id}`, { code: 'PM_RENAMED', reason: 'built-in' }, ifMatch(locked.headers['etag']!))).status).toBe(422);
+    await expect(db.query("UPDATE roles SET code = 'PM_X' WHERE code = 'PM'")).rejects.toThrow(/used by the platform by name/);
   });
 
   it('deactivates a role only when nobody holds it (409 role_in_use); inactive roles are hidden unless asked for', async () => {

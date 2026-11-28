@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { limit } from '../ops/ops-limits';
 import { Prisma } from '@prisma/client';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -8,8 +9,6 @@ import { DbService } from '../db/db.service';
 import type { AuthMethod, SessionRow, UserRow, UserStatus } from './auth.types';
 
 export const COOKIE_NAME = 'pmis_session';
-export const IDLE_HOURS = 8;
-export const ABSOLUTE_HOURS = 12;
 
 interface LoadedRow {
   id: string;
@@ -81,7 +80,7 @@ export class SessionService {
     const rows = await this.db.client.$queryRaw<LoadedRow[]>(Prisma.sql`
       SELECT s.id::text AS id, s.auth_method::text AS auth_method, s.csrf_token, s.created_at, s.last_activity_at, s.expires_at,
              s.stepup_at, s.two_factor, now() AS db_now,
-             (s.revoked_at IS NULL AND s.expires_at > now() AND s.last_activity_at > now() - make_interval(hours => ${IDLE_HOURS}::int)) AS valid,
+             (s.revoked_at IS NULL AND s.expires_at > now() AND s.last_activity_at > now() - make_interval(hours => ops_limit('session.idle_hours'))) AS valid,
              (s.revoked_at IS NOT NULL) AS revoked,
              u.id::text AS user_id, u.status::text AS user_status, u.email, u.display_name, u.employee_id, u.phone, u.locale, u.theme,
              u.ui_brand, ui_effective_brand(u.ui_brand) AS brand
@@ -143,7 +142,7 @@ export class SessionService {
       secure: this.config.cookieSecure,
       sameSite: 'strict',
       path: '/api',
-      maxAge: ABSOLUTE_HOURS * 3600 * 1000,
+      maxAge: limit('session.absolute_hours') * 3600 * 1000,
     });
   }
 

@@ -1,0 +1,2 @@
+# P10: Daily Plan toolbar, one More menu
+Export and Copy for email left the toolbar and the loose "Settings" link left the title row. They are entries of the standard More menu (`more-menu`): Export, Copy for email, and Screen settings (the standard gear, shown only to people who may open Settings, same gate as before). Add site stays a primary button; Layout and Columns stay. Test ids `daily-plan-export` and `daily-plan-copy` are kept on the menu items.
