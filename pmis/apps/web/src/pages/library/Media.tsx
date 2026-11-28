@@ -1,9 +1,9 @@
-import { CalendarDays, Download, ExternalLink, FileImage, FileText, Grid3x3, List, MapPin, Settings2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { CalendarDays, Download, PackageOpen, ExternalLink, FileImage, FileText, Grid3x3, List, MapPin, Settings2 } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { downloadFile } from '@/api/client';
-import { EMPTY_MEDIA_FILTER, mediaLinkTo, useMediaFacets, useMediaItems, useMediaThumb, type MediaFilter, type MediaItem } from '@/api/media';
+import { ApiError, downloadFile } from '@/api/client';
+import { EMPTY_MEDIA_FILTER, mediaLinkTo, useMediaExportJob, useMediaFacets, useMediaItems, useMediaThumb, useStartMediaExport, type MediaFilter, type MediaItem } from '@/api/media';
 import { DateInput } from '@/components/DateInput';
 import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { PageHeader } from '@/components/PageHeader';
@@ -11,6 +11,7 @@ import { SavedViews } from '@/components/SavedViews';
 import { EmptyState, QueryFallback } from '@/components/States';
 import { SearchBox, TableToolbar } from '@/components/TableStandard';
 import { Tip } from '@/components/Tip';
+import { useToast } from '@/components/Toast';
 import { useRememberedView } from '@/lib/viewPreference';
 import { LibraryTabs } from './LibraryTabs';
 
@@ -21,7 +22,14 @@ const isMode = (v: string): v is Mode => (MODES as readonly string[]).includes(v
 
 const KEYS = Object.keys(EMPTY_MEDIA_FILTER) as (keyof MediaFilter)[];
 
-function Card({ it, ar }: { it: MediaItem; ar: boolean }) {
+const pickKey = (it: MediaItem): string => `${it.kind}:${it.id}`;
+type Pick = { picked: Set<string>; toggle: (it: MediaItem) => void };
+function PickBox({ it, pick }: { it: MediaItem; pick: Pick }) {
+  const { t } = useTranslation();
+  return <input type="checkbox" className="h-4 w-4" aria-label={t('media.pick')} data-testid={`media-pick-${it.id}`} checked={pick.picked.has(pickKey(it))} onChange={() => pick.toggle(it)} />;
+}
+
+function Card({ it, ar, pick }: { it: MediaItem; ar: boolean; pick: Pick }) {
   const { t } = useTranslation();
   const th = useMediaThumb(it, 'small');
   const to = mediaLinkTo(it.link as Record<string, unknown>);
@@ -30,7 +38,8 @@ function Card({ it, ar }: { it: MediaItem; ar: boolean }) {
   const dl = () => void downloadFile(it.download_url).catch(() => undefined);
   return (
     <li className={`card overflow-hidden ${it.state === 'current' ? '' : 'opacity-70'}`} data-testid={`media-card-${it.id}`} data-kind={it.kind} data-state={it.state}>
-      <div className="flex aspect-[4/3] items-center justify-center bg-card2">
+      <div className="relative flex aspect-[4/3] items-center justify-center bg-card2">
+        <span className="absolute start-2 top-2 rounded bg-card p-1"><PickBox it={it} pick={pick} /></span>
         {th.data ? <img src={th.data} alt={typeName} loading="lazy" className="h-full w-full object-cover" data-testid="media-thumb" />
           : it.mime_type.startsWith('image/') ? <FileImage size={36} className="text-mute" aria-hidden /> : <FileText size={36} className="text-mute" aria-hidden />}
       </div>
@@ -51,7 +60,7 @@ function Card({ it, ar }: { it: MediaItem; ar: boolean }) {
 }
 
 
-function Row({ it, ar }: { it: MediaItem; ar: boolean }) {
+function Row({ it, ar, pick }: { it: MediaItem; ar: boolean; pick: Pick }) {
   const { t } = useTranslation();
   const th = useMediaThumb(it, 'small');
   const to = mediaLinkTo(it.link as Record<string, unknown>);
@@ -60,6 +69,7 @@ function Row({ it, ar }: { it: MediaItem; ar: boolean }) {
   const dl = () => void downloadFile(it.download_url).catch(() => undefined);
   return (
     <li className={`card flex items-center gap-3 p-2 text-sm ${it.state === 'current' ? '' : 'opacity-70'}`} data-testid={`media-row-${it.id}`} data-kind={it.kind} data-state={it.state}>
+      <PickBox it={it} pick={pick} />
       <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-card2">
         {th.data ? <img src={th.data} alt={typeName} loading="lazy" className="h-full w-full object-cover" /> : <FileImage size={22} className="text-mute" aria-hidden />}
       </span>
@@ -107,15 +117,36 @@ export function LibraryMedia() {
   const applyView = (id: string) => { const n = new URLSearchParams(sp); if (id === 'grid') n.delete('layout'); else n.set('layout', id); setSp(n, { replace: true }); };
   const remember = useRememberedView('library-media', sp.has('layout'), isMode, applyView);
   const pickView = (id: string) => { applyView(id); remember(id); };
+  const toast = useToast();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [jobId, setJobId] = useState<string | null>(null);
+  const start = useStartMediaExport();
+  const job = useMediaExportJob(jobId).data;
+  const pick: Pick = { picked, toggle: (it) => setPicked((p) => { const n = new Set(p); if (!n.delete(pickKey(it))) n.add(pickKey(it)); return n; }) };
+  const chosen = items.filter((it) => picked.has(pickKey(it)));
+  const runExport = () => start.mutate(chosen.map((it) => ({ kind: it.kind, id: it.id })), {
+    onSuccess: (j) => { setJobId(j.id); toast(t('media.export_started')); },
+    onError: (e) => { if (e instanceof ApiError && e.code === 'step_up_required') return; const c = e instanceof ApiError ? e.problem.errors?.[0]?.code : undefined; toast(c === 'export_too_large' ? t('media.export_too_large') : c === 'not_visible' ? t('media.export_not_visible') : e instanceof ApiError && e.code === 'export_locked' ? t('errors.export_locked') : t('errors.generic'), 'err'); },
+  });
+  const handled = useRef<string | null>(null);
+  const finished = !!job && ['done', 'failed'].includes(job.status);
+  const busy = !!jobId && !finished;
+  useEffect(() => {
+    if (!job || !jobId || handled.current === jobId) return;
+    if (job.status === 'done' && job.result) { handled.current = jobId; void downloadFile(job.result.download_path).then(() => toast(t('media.export_ready'))).catch(() => toast(t('errors.generic'), 'err')); }
+    else if (job.status === 'failed') { handled.current = jobId; toast(t('media.export_failed'), 'err'); }
+    // the download starts once per finished job
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.status, jobId]);
   const gridCls = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6';
   const body: ReactNode = mode === 'list'
-    ? <ul className="space-y-2" data-testid="media-list">{items.map((it) => <Row key={`${it.kind}-${it.id}`} it={it} ar={ar} />)}</ul>
+    ? <ul className="space-y-2" data-testid="media-list">{items.map((it) => <Row key={`${it.kind}-${it.id}`} it={it} ar={ar} pick={pick} />)}</ul>
     : mode === 'grid'
-      ? <ul className={gridCls} data-testid="media-grid">{items.map((it) => <Card key={`${it.kind}-${it.id}`} it={it} ar={ar} />)}</ul>
+      ? <ul className={gridCls} data-testid="media-grid">{items.map((it) => <Card key={`${it.kind}-${it.id}`} it={it} ar={ar} pick={pick} />)}</ul>
       : <div className="space-y-4" data-testid={`media-by-${mode}`}>{groupItems(items, mode, t('media.group_none')).map((g) => (
         <section key={g.key} aria-label={g.label} data-testid={`media-group-${g.key || 'none'}`}>
           <h3 className="mb-2 text-sm font-semibold"><span className={mode === 'site' ? 'mono' : ''}>{mode === 'date' && g.key ? new Date(g.key).toLocaleDateString(ar ? 'ar-LY' : 'en-GB') : g.label}</span> <span className="text-mute">({g.items.length})</span></h3>
-          <ul className={gridCls}>{g.items.map((it) => <Card key={`${it.kind}-${it.id}`} it={it} ar={ar} />)}</ul>
+          <ul className={gridCls}>{g.items.map((it) => <Card key={`${it.kind}-${it.id}`} it={it} ar={ar} pick={pick} />)}</ul>
         </section>))}</div>;
   const sel = (k: keyof MediaFilter, label: string, opts: { v: string; l: string }[]) => (
     <label className="text-xs font-semibold text-mute">{label}
@@ -137,6 +168,10 @@ export function LibraryMedia() {
           {sel('status', t('media.f_status'), [{ v: 'pending_evidence', l: t('media.state_pending_evidence') }, { v: 'withdrawn', l: t('media.state_withdrawn') }])}
           <label className="text-xs font-semibold text-mute">{t('media.f_from')}<DateInput className="input ms-1" data-testid="media-f-from" value={f.uploaded_from} onChange={(e) => set({ uploaded_from: e.target.value })} /></label>
           <label className="text-xs font-semibold text-mute">{t('media.f_to')}<DateInput className="input ms-1" data-testid="media-f-to" value={f.uploaded_to} onChange={(e) => set({ uploaded_to: e.target.value })} /></label>
+        </span>}
+        exporter={<span className="flex items-center gap-1">
+          <button type="button" className="btn px-2 py-1 text-xs" data-testid="media-pick-all" disabled={!items.length} onClick={() => setPicked(chosen.length === items.length ? new Set() : new Set(items.map(pickKey)))}>{chosen.length === items.length && items.length > 0 ? t('media.pick_none') : t('media.pick_all')}</button>
+          <Tip text={t('media.export_hint')}><button type="button" className="btn px-2 py-1 text-xs" data-testid="media-export" disabled={!chosen.length || start.isPending || busy} onClick={runExport}><PackageOpen size={14} aria-hidden />{busy ? t('media.exporting') : t('media.export', { count: chosen.length })}</button></Tip>
         </span>}
         layout={<LayoutPanel testid="media-view" views={{ value: mode, options: viewOptions, onChange: pickView }} />}
         count={<span className="text-sm text-mute" data-testid="media-count">{t('media.count', { count: items.length })}{active > 0 && <button type="button" className="btn ms-2 px-2 py-0.5 text-xs" data-testid="media-clear" onClick={() => setSp(new URLSearchParams(), { replace: true })}>{t('media.clear')}</button>}</span>} />

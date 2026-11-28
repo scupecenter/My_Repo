@@ -8594,6 +8594,17 @@
     "progress": "Progress"
   },
   "media": {
+    "export_too_large": "The selection is larger than the export limit (Settings > Documents > Media). Choose fewer photos.",
+    "export_not_visible": "Some chosen photos are no longer in your gallery. Reload and choose again.",
+    "pick": "Select",
+    "pick_all": "Select loaded",
+    "pick_none": "Clear selection",
+    "export": "Export ({{count}})",
+    "exporting": "Preparing...",
+    "export_hint": "Download the selected photos as a zip with an index file",
+    "export_started": "The export is being prepared. The download starts when it is ready.",
+    "export_ready": "The export is ready.",
+    "export_failed": "The export failed. Try again.",
     "view_grid": "Grid",
     "view_grid_hint": "Cards with a thumbnail",
     "view_list": "List",
@@ -8672,6 +8683,8 @@
     "field_project_phase": "Project phase"
   },
   "mediaSet": {
+    "export_max": "Largest export (MB)",
+    "export_max_note": "The most a person can export from the gallery in one zip, counted from the recorded file sizes (10 to 5000).",
     "title": "Media gallery",
     "note": "What the Media tab of the library reads and how its thumbnails are made. Nothing is deleted: a switch only hides.",
     "enabled": "Show the Media tab",

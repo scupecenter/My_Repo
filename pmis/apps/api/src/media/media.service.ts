@@ -30,19 +30,19 @@ import { isThumbSource, loadSharp, makeThumb, thumbKey, thumbMime, ThumbFormat }
 const putBody = z.object({
   enabled: z.boolean(), snag_photos: z.boolean(), include_site_documents: z.boolean(), image_only: z.boolean(), show_withdrawn: z.boolean(),
   document_kinds: z.array(z.string()).max(5), register_keys: z.array(z.string()).max(60), exclude_doc_codes: z.array(z.string()).max(100),
-  page_size: z.number().int(),
+  page_size: z.number().int(), export_max_mb: z.number().int().optional(),
   thumbnails: z.object({ enabled: z.boolean(), small_px: z.number().int(), medium_px: z.number().int(), quality: z.number().int(), format: z.string(), max_source_mb: z.number().int() }).strict(),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
 
 export interface MediaCfg {
   enabled: boolean; snag_photos: boolean; include_site_documents: boolean; image_only: boolean; show_withdrawn: boolean;
-  document_kinds: string[]; register_keys: string[]; exclude_doc_codes: string[]; page_size: number;
+  document_kinds: string[]; register_keys: string[]; exclude_doc_codes: string[]; page_size: number; export_max_mb: number;
   thumbnails: { enabled: boolean; small_px: number; medium_px: number; quality: number; format: ThumbFormat; max_source_mb: number };
 }
 export type MediaSettingsDto = MediaCfg & { updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null; version: number; can_edit: boolean; thumbnails_available: boolean };
 
-type Row = {
+export type MediaRow = {
   kind: 'document_file' | 'snag_photo'; id: string; uploaded_at: Date; cur_text: string; site_id: string | null; region_id: number | null; site_code: string | null; site_name: string | null;
   type_code: string; type_name_en: string; type_name_ar: string | null; doc_kind: string | null; mime_type: string; name: string | null; size_bytes: bigint; uploaded_by: string;
   state: string; version: number | null; status: string | null; register_key: string | null; record_id: string | null; task_id: string | null; snag_id: string | null; shot_type: string | null;
@@ -73,7 +73,8 @@ export class MediaService {
   }
 
   async setSettings(auth: AuthContext, ifMatch: string | undefined, raw: unknown): Promise<MediaSettingsDto> {
-    const { reason, ...body } = parse(putBody, raw);
+    const { reason, ...parsed } = parse(putBody, raw);
+    const body = { ...parsed, export_max_mb: parsed.export_max_mb ?? (await this.config()).export_max_mb };   // an older client that leaves the cap out keeps the current one
     await this.access.requireAdmin('settings', 'edit');
     const etag = parseIfMatch(ifMatch);
     await this.stepUp.require(auth);
@@ -83,7 +84,7 @@ export class MediaService {
   // ------------------------------------------------------------------------------------------------------------------ items
 
   /** The two branches of the union with every visibility and configuration condition. `extra` narrows them (filters, one id). */
-  private async branches(cfg: MediaCfg, q: Query, only?: { kind: 'document_file' | 'snag_photo'; id: string }): Promise<Prisma.Sql[]> {
+  private async branches(cfg: MediaCfg, q: Query, only?: { kind: 'document_file' | 'snag_photo'; id?: string; ids?: string[] }): Promise<Prisma.Sql[]> {
     const regions = await this.access.requireRegions(SITE_DOCS, 'view');
     const status = oneParam(q, 'status') ?? 'current';
     if (!['current', 'withdrawn', 'pending_evidence'].includes(status)) throw problems.validation([{ path: '/status', code: 'invalid', message: 'status is current, withdrawn or pending_evidence.' }]);
@@ -123,7 +124,7 @@ export class MediaService {
       if (docCode) c.push(Prisma.sql`dt.code = ${docCode}`);
       if (registerKey) c.push(Prisma.sql`s.register_key = ${registerKey}`);
       if (text) c.push(Prisma.sql`(si.site_code ILIKE ${likePattern(text)} OR dt.name_en ILIKE ${likePattern(text)} OR dt.code ILIKE ${likePattern(text)} OR f.original_name ILIKE ${likePattern(text)})`);
-      if (only) c.push(Prisma.sql`f.id = ${only.id}::uuid`);
+      if (only) c.push(Prisma.sql`f.id = ANY(${only.ids ?? [only.id ?? '']}::uuid[])`);
       out.push(Prisma.sql`
         SELECT 'document_file'::text AS kind, f.id::text AS id, f.uploaded_at, s.site_id::text AS site_id, s.region_id, coalesce(si.site_code, 'GLOBAL') AS site_code, si.name AS site_name,
           dt.code AS type_code, dt.name_en AS type_name_en, dt.name_ar AS type_name_ar, dt.kind::text AS doc_kind, f.mime_type, f.original_name AS name, f.size_bytes, f.uploaded_by::text AS uploaded_by,
@@ -152,7 +153,7 @@ export class MediaService {
       const snagType = oneParam(q, 'snag_type');
       if (snagType) c.push(Prisma.sql`st.code = ${snagType}`);
       if (text) c.push(Prisma.sql`(si.site_code ILIKE ${likePattern(text)} OR st.name_en ILIKE ${likePattern(text)} OR st.code ILIKE ${likePattern(text)} OR coalesce(p.shot_type, '') ILIKE ${likePattern(text)})`);
-      if (only) c.push(Prisma.sql`p.id = ${only.id}::uuid`);
+      if (only) c.push(Prisma.sql`p.id = ANY(${only.ids ?? [only.id ?? '']}::uuid[])`);
       out.push(Prisma.sql`
         SELECT 'snag_photo'::text AS kind, p.id::text AS id, p.uploaded_at, sg.site_id::text AS site_id, sg.region_id, si.site_code AS site_code, si.name AS site_name,
           st.code AS type_code, st.name_en AS type_name_en, st.name_ar AS type_name_ar, 'photo'::text AS doc_kind, p.mime_type, NULL::text AS name, p.size_bytes, p.uploaded_by::text AS uploaded_by,
@@ -169,7 +170,25 @@ export class MediaService {
     return s;
   }
 
-  private link(r: Row): Record<string, string | null> {
+  /** The items of an explicit selection that the caller may see in the gallery (the same conditions as the list; every state the gallery can show). Used by the export of a selection. */
+  async resolve(items: { kind: 'document_file' | 'snag_photo'; id: string }[]): Promise<MediaRow[]> {
+    const cfg = await this.config();
+    if (!cfg.enabled) return [];
+    const out = new Map<string, MediaRow>();
+    for (const kind of ['document_file', 'snag_photo'] as const) {
+      const ids = [...new Set(items.filter((i) => i.kind === kind).map((i) => i.id))];
+      if (ids.length === 0) continue;
+      for (const st of ['current', 'withdrawn', 'pending_evidence']) {
+        if (st === 'withdrawn' && !cfg.show_withdrawn) continue;
+        const parts = await this.branches(cfg, { status: st }, { kind, ids });
+        if (parts.length === 0) continue;
+        for (const r of await this.db.tx.$queryRaw<MediaRow[]>(Prisma.sql`SELECT u.* FROM (${Prisma.join(parts, ' UNION ALL ')}) u`)) out.set(`${r.kind}:${r.id}`, r);
+      }
+    }
+    return [...out.values()];
+  }
+
+  private link(r: MediaRow): Record<string, string | null> {
     if (r.kind === 'snag_photo') return { kind: 'snag', snag_id: r.snag_id, site_id: r.site_id };
     if (r.register_key) return { kind: 'register', register_key: r.register_key, record_id: r.record_id, site_id: r.site_id };
     if (r.task_id) return { kind: 'task', task_id: r.task_id, site_id: r.site_id };
@@ -184,7 +203,7 @@ export class MediaService {
     const parts = await this.branches(cfg, q);
     if (parts.length === 0) return { enabled: true, items: [], page: { limit, next_cursor: null } };
     const keyset = cur ? Prisma.sql`WHERE (u.uploaded_at, u.id::uuid) < (${cur[0]}::timestamptz, ${cur[1]}::uuid)` : Prisma.empty;
-    const rows = await this.db.tx.$queryRaw<Row[]>(Prisma.sql`
+    const rows = await this.db.tx.$queryRaw<MediaRow[]>(Prisma.sql`
       SELECT u.*, to_char(u.uploaded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cur_text FROM (${Prisma.join(parts, ' UNION ALL ')}) u
       ${keyset} ORDER BY u.uploaded_at DESC, u.id DESC LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
@@ -237,12 +256,12 @@ export class MediaService {
     const cfg = await this.config();
     if (!cfg.enabled) throw problems.notFound();
     // the item must be in the gallery's scope for this caller (the same conditions as the list; status of any kind)
-    const found: Row[] = [];
+    const found: MediaRow[] = [];
     for (const st of ['current', 'withdrawn', 'pending_evidence']) {
       if (st === 'withdrawn' && !cfg.show_withdrawn) continue;
       const parts = await this.branches(cfg, { status: st }, { kind: kind as 'document_file' | 'snag_photo', id });
       if (parts.length === 0) continue;
-      found.push(...(await this.db.tx.$queryRaw<Row[]>(Prisma.sql`SELECT u.* FROM (${Prisma.join(parts, ' UNION ALL ')}) u LIMIT 1`)));
+      found.push(...(await this.db.tx.$queryRaw<MediaRow[]>(Prisma.sql`SELECT u.* FROM (${Prisma.join(parts, ' UNION ALL ')}) u LIMIT 1`)));
       if (found.length > 0) break;
     }
     const r = found[0];
