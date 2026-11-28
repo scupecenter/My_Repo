@@ -6,6 +6,7 @@ import { useImportSites, useSetWorkflowLocks, type LocksTarget } from '@/api/sit
 import type { SiteDataGap } from '@/api/types';
 import { errText, FormDialog } from './FormDialog';
 import { useToast } from './Toast';
+import { ScreenSettingsLink } from './ScreenSettingsLink';
 
 /**
  * Contract 0.15.4 (migration 0085): the per-site workflow locks. Locked (the default) = a task waits for its predecessors and for the gate in front of its
@@ -34,6 +35,7 @@ export function LocksChip({ siteId, locked, canManage }: { siteId: string; locke
       <span className={`chip ${locked ? 'bg-lockBg text-lockInk' : 'bg-waitBg text-waitInk'}`} data-testid="site-locks-chip" data-locked={locked} title={t(locked ? 'locks.on_title' : 'locks.off_title')}>
         {locked ? <Lock size={12} className="me-1" aria-hidden /> : <LockOpen size={12} className="me-1" aria-hidden />}{t(locked ? 'locks.on' : 'locks.off')}
       </span>
+      <ScreenSettingsLink screen="site_locks" />
       {canManage && <button type="button" className="btn px-2 py-0.5 text-xs" data-testid="site-locks-toggle" onClick={() => setOpen(true)}>{t(locked ? 'locks.open' : 'locks.lock')}</button>}
       {open && <LocksDialog target={{ site_id: siteId }} locked={!locked} onClose={() => setOpen(false)} testid="site-locks-dialog" />}
     </span>
