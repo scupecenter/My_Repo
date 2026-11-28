@@ -7,9 +7,9 @@ test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!loca
 // Site Register streams (owner decision 2026-11-15: the sidebar shows only the six Site Master sub-menus under Site Master; the stream filter is reached by its old URL, ?stream=).
 // EN/light and AR/dark (RTL, dark tokens), against the mock layer.
 const CASES = [
-  { locale: 'en', theme: 'light', title: 'Site Master', cw: 'Civil Works', cwMenu: 'CW', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/,
+  { locale: 'en', theme: 'light', title: 'Site Master', site360: 'Site 360°', cw: 'Civil Works', cwMenu: 'CW', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/,
     phases: ['All', 'Design & Acquisition', 'Civil Works', 'Installation (TE)', 'O&M', 'Handover & Closure', 'Dismantle'] },
-  { locale: 'ar', theme: 'dark', title: 'ماستر المواقع', cw: 'الأعمال المدنية', cwMenu: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/,
+  { locale: 'ar', theme: 'dark', title: 'ماستر المواقع', site360: 'الموقع 360°', cw: 'الأعمال المدنية', cwMenu: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/,
     phases: ['الكل', 'التصميم والاستحواذ', 'الأعمال المدنية', 'التركيبات', 'التشغيل والصيانة', 'التسليم والإغلاق', 'الفك'] },
 ] as const;
 
@@ -22,7 +22,7 @@ for (const c of CASES) {
     await expect(page.locator('html')).toHaveAttribute('dir', c.locale === 'ar' ? 'rtl' : 'ltr');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(c.title);
     await expect(page.getByTestId('nav-group-toggle-site_register')).toHaveCount(1); // Site Master is a group (Site 360 then the six sub-menus), expanded by default
-    await expect(page.getByTestId('nav-sites')).toHaveText(c.title);
+    await expect(page.getByTestId('nav-sites')).toHaveText(c.site360);
 
     // the page has no tab bars; the sidebar shows the six Site Master sub-menus and no stream links
     await expect(page.getByTestId('stream-tabs')).toHaveCount(0);
