@@ -140,6 +140,7 @@ info:
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
     - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
     - 0.15.436 (2026-11-28): an old published workflow version can be deleted after a full snapshot is archived (owner request relayed 2026-11-27; migration 0575, mirror `db/sql/574_workflow_version_delete.sql`). Additive. `POST /workflow/versions/{version}/delete` (`deleteWorkflowVersion`): `workflow_versions` administer for all regions (the publish right), a reason, `If-Match`, a password step-up and the typed confirmation `v<version>`; audited as `workflow_version_delete`. Allowed only for a published version that is not the one in force, has started, has no site, no site task and no site migration (409 `invalid_transition` with `reasons`: `current`, `not_started`, `sites`, `site_tasks`, `migrations`). The version and all its milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views are written first as one snapshot (`workflow_version_archive`, kept on a data reset); the delete runs in the same transaction. `GET /workflow/version-archive` (`listWorkflowVersionArchive`, `administer`) lists the archived versions (no snapshot body); `POST /workflow/version-archive/{id}/restore` (`restoreWorkflowVersion`, `administer`, reason, step-up) puts one back as it was (published, same version number, same ids) in one transaction and answers 409 `invalid_transition` without changing anything when the version number or an id exists again, it was already restored, or a row it points to is gone. Drafts are still discarded with `/discard`; a published version stays immutable and tasks are still deactivated, not deleted.
+    - 0.15.621 (2026-11-28): personal record templates (migration 0741, mirror `db/sql/740_personal_record_templates.sql`). Additive, personal. `GET /record-templates?register_key=` (the caller's own), `POST /record-templates` (save plain field values under a name for one register: text, number, list, yes/no, at most 200 values and 20 KB; 409 `duplicate` for a name in use, 422 `validation_failed`, at most 30 per register), `POST /record-templates/{id}/archive` (hidden, never deleted; another person's id answers 404). A template only fills the form; the normal create still checks every right and value. No grant, role or permission change.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.376 (2026-11-27): the daily delay log (migration 0554). Additive, data only. The Issues register gets the type value `Daily Delay` (list IssueCategory), the optional date field `delay_date`, and four more values of the list BlockerReason (Weather, Permit Pending, Delivery Delay, Safety Stop); no endpoint or schema changes. The delay reasons are edited in Settings > Registers > Lists and show in the dashboard issue breakdown (`by_category`, `by_reason`) and in the register export.
@@ -420,6 +421,8 @@ tags:
     description: "Dashboard KPIs (P3 shapes, refined against the legacy dashboard)."
   - name: project-status
     description: "Project Status with the weight-set version, and weekly snapshots."
+  - name: record-templates
+    description: "Personal templates of register records: saved field values that fill a new form (0.15.621)."
   - name: saved-views
     description: "Saved views of the list screens, shared with roles, groups, users or everyone (Q117), and the caller's server-side drafts (Q115)."
 
@@ -19799,6 +19802,59 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /record-templates:
+    get:
+      tags: [record-templates]
+      operationId: listRecordTemplates
+      summary: The caller's own templates of one register (0.15.621)
+      parameters:
+        - {name: register_key, in: query, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9_-]{0,80}$'}}
+      responses:
+        '200':
+          description: Active templates by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/RecordTemplate'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [record-templates]
+      operationId: saveRecordTemplate
+      summary: Save field values as a template (0.15.621)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RecordTemplateInput'}
+      responses:
+        '201':
+          description: The template.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecordTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /record-templates/{id}/archive:
+    post:
+      tags: [record-templates]
+      operationId: archiveRecordTemplate
+      summary: Hide a template (0.15.621)
+      description: Stays stored, drops out of the list. Never deleted.
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The hidden template.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecordTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /me/default-views:
     get:
       tags: [saved-views]
@@ -20280,6 +20336,33 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    RecordTemplateValue:
+      oneOf:
+        - {type: string, maxLength: 2000}
+        - {type: number}
+        - {type: boolean}
+        - {type: array, maxItems: 100, items: {type: string, maxLength: 200}}
+        - {type: 'null'}
+    RecordTemplate:
+      type: object
+      required: [id, register_key, name, record_type, data, created_at]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        register_key: {type: string}
+        name: {type: string, minLength: 1, maxLength: 60}
+        record_type: {type: [string, 'null']}
+        data: {type: object, additionalProperties: {$ref: '#/components/schemas/RecordTemplateValue'}}
+        created_at: {type: string, format: date-time}
+    RecordTemplateInput:
+      type: object
+      required: [register_key, name, data]
+      additionalProperties: false
+      properties:
+        register_key: {type: string, pattern: '^[a-z][a-z0-9_-]{0,80}$'}
+        name: {type: string, minLength: 1, maxLength: 60}
+        record_type: {type: [string, 'null']}
+        data: {type: object, maxProperties: 200, additionalProperties: {$ref: '#/components/schemas/RecordTemplateValue'}}
     StructurePolicy:
       type: object
       description: 'The setting `registers.structure_change` (0.15.403).'

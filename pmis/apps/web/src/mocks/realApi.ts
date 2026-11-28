@@ -401,6 +401,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/me/default-views'],
   ['post', '/saved-views/:id/set-default'],
   ['post', '/saved-views/:id/clear-default'],
+  // Contract 0.15.621 (0741): personal record templates.
+  ['get', '/record-templates'],
+  ['post', '/record-templates'],
+  ['post', '/record-templates/:id/archive'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],

@@ -12836,6 +12836,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/record-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own templates of one register (0.15.621) */
+        get: operations["listRecordTemplates"];
+        put?: never;
+        /** Save field values as a template (0.15.621) */
+        post: operations["saveRecordTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/record-templates/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hide a template (0.15.621)
+         * @description Stays stored, drops out of the list. Never deleted.
+         */
+        post: operations["archiveRecordTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/default-views": {
         parameters: {
             query?: never;
@@ -12960,6 +12998,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        RecordTemplateValue: string | number | boolean | string[] | null;
+        RecordTemplate: {
+            /** Format: uuid */
+            id: string;
+            register_key: string;
+            name: string;
+            record_type: string | null;
+            data: {
+                [key: string]: components["schemas"]["RecordTemplateValue"];
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
+        RecordTemplateInput: {
+            register_key: string;
+            name: string;
+            record_type?: string | null;
+            data: {
+                [key: string]: components["schemas"]["RecordTemplateValue"];
+            };
+        };
         /** @description The setting `registers.structure_change` (0.15.403). */
         StructurePolicy: {
             /** @enum {string} */
@@ -47611,6 +47670,83 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listRecordTemplates: {
+        parameters: {
+            query: {
+                register_key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active templates by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RecordTemplate"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    saveRecordTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description The template. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordTemplate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    archiveRecordTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The hidden template. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordTemplate"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
