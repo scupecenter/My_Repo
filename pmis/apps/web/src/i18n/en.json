@@ -3859,6 +3859,7 @@
   "docs": {
     "signed": "Signed",
     "stamped": "Stamped",
+    "photos_missing": "Photos missing: {{n}} of {{min}} required. Upload them; nothing is blocked.",
     "awaiting_signed": "Awaiting the signed and stamped copy: upload it as the next version.",
     "mark_signed": "This file is the signed copy",
     "mark_stamped": "This file is the stamped copy",

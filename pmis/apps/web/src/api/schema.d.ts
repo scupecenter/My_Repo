@@ -15055,6 +15055,10 @@ export interface components {
             needs_stamp?: boolean;
             /** @description 0.15.377: the type needs a copy and no current version carries the markers yet. Informs only; nothing is blocked. */
             awaiting_signed_copy?: boolean;
+            /** @description 0.15.564: the minimum photos the document type asks for (photo_rules.min_count); null when it asks for none. */
+            photo_min_count?: number | null;
+            /** @description 0.15.564: how many photos are still missing (current, not superseded image files); 0 when the minimum is met, null without a minimum. Informs only; nothing is blocked. */
+            photos_missing?: number | null;
             /** @enum {string} */
             kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
