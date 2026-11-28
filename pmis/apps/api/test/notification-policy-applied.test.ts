@@ -9,6 +9,9 @@ import { addAssignment, makeSite, newRole } from './wf-helpers';
  * step (approval reminder, escalation, no holder, idle task, retention) and the digest hour. Every test restores the stored policy.
  */
 const REGION = 7;
+// notif_policy_tick() works on every register, task and notice of the shared test database and waits for rows that other test files hold. On CI it took
+// 94 s once and then 0.4 s, and the 30 s and 120 s limits were hit on a loaded runner. One generous limit for every test that runs the tick.
+const TICK_MS = 300000;
 let db: PgClient;
 let saved: { had: boolean; value: unknown };
 
@@ -115,7 +118,7 @@ describe('notif_policy_tick', () => {
     const lonely = await waitingRecord(5, 1);
     await db.query('SELECT notif_policy_tick()');
     expect(await to(lonely.link, 'no_holder', 'Level has no holder')).toBeGreaterThanOrEqual(1);
-  }, 120000);
+  }, TICK_MS);
 
   it('the switch off stops the reminders but not the no-holder alert', async () => {
     await setPolicy({ enabled: false });
@@ -127,7 +130,7 @@ describe('notif_policy_tick', () => {
     expect(await to(lonely.link, 'approval_due', 'Approval escalated')).toBe(0);
     expect(await to(lonely.link, 'no_holder', 'Level has no holder')).toBeGreaterThanOrEqual(1);
     await setPolicy({});
-  }, 120000);
+  }, TICK_MS);
 
   it('deletes notices older than the retention (default 180 days) and keeps the rest', async () => {
     const u = await makeUser(db, { status: 'active' });
@@ -135,7 +138,7 @@ describe('notif_policy_tick', () => {
     const r = await db.query('SELECT notif_policy_tick() AS t');
     expect(r.rows[0].t.purged).toBeGreaterThanOrEqual(1);
     expect((await db.query(`SELECT title FROM notifications WHERE user_id = $1`, [u.id])).rows.map((x) => x.title)).toEqual(['new']);
-  });
+  }, TICK_MS);
 
   it('writes the idle-task alert once per idle spell to the Team Leads, and stops when the switch is off', async () => {
     await setPolicy({});
@@ -149,7 +152,7 @@ describe('notif_policy_tick', () => {
     expect(n1).toBeGreaterThanOrEqual(1);
     await db.query('SELECT notif_policy_tick()');
     expect((await db.query(`SELECT count(*)::int AS n FROM notifications WHERE task_id = $1 AND kind = 'idle_task_alert'`, [id])).rows[0].n).toBe(n1);
-  }, 120000);
+  }, TICK_MS);
 });
 
 describe('notif_digest_due', () => {
