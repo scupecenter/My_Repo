@@ -7810,6 +7810,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/site-linked/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The records of a site per register, with the records they point to (0.15.511)
+         * @description 0.15.511 (D60, phase 3). For every enabled register: the count of the current records of the site the caller can see (register view and region rule), the latest ten with the records they point to through the declared links, and `linked` (false = no link is declared for the register yet). Read only.
+         */
+        get: operations["getSiteLinkedRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{key}/links": {
         parameters: {
             query?: never;
@@ -38566,6 +38586,42 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSiteLinkedRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The registers with records at the site. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            register_key: string;
+                            name_en: string;
+                            name_ar?: string | null;
+                            count: number;
+                            linked: boolean;
+                            items: {
+                                [key: string]: unknown;
+                            }[];
+                        }[];
                     };
                 };
             };

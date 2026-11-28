@@ -80,6 +80,12 @@ export class P4cController {
     return this.p4c.invoiceSupplierOptions(auth);
   }
 
+  /** D60 phase 3: the Linked records view of a site. */
+  @Get('site-linked/:site_id')
+  siteLinked(@Auth() auth: AuthContext, @Param('site_id') siteId: string) {
+    return this.p4c.siteLinked(auth, siteId);
+  }
+
   /** D60: the declared links of a register (the generic link declaration, table register_links). */
   @Get(':key/links')
   registerLinks(@Auth() auth: AuthContext, @Param('key') key: string) {

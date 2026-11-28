@@ -128,3 +128,9 @@ export const useRegisterLinkOptions = (key: string, field: string, siteId: strin
     queryKey: ['register-link-options', key, field, siteId ?? null], enabled,
     queryFn: () => api.get<{ items: { entity_id: string; label: string; site_id?: string; record_type?: string }[] }>(`/registers/${key}/link-options/${field}`, { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
   });
+
+/** D60 phase 3: GET /registers/site-linked/{site_id}: the records of a site per register with the records they point to. */
+export type SiteLinkedItem = { entity_id: string; record_id?: string; record_type?: string; state?: string; title?: string; links: { field: string; target_register: string; entity_id: string; label: string }[] };
+export type SiteLinkedRegister = { register_key: string; name_en: string; name_ar?: string | null; count: number; linked: boolean; items: SiteLinkedItem[] };
+export const useSiteLinked = (siteId: string, enabled = true) =>
+  useQuery({ queryKey: ['site-linked', siteId], enabled, queryFn: () => api.get<{ items: SiteLinkedRegister[] }>(`/registers/site-linked/${siteId}`).then((r) => r.items) });
