@@ -8849,5 +8849,14 @@
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
   },
-  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."},
+  "linkFills": {
+    "title": "Fill linked records on approval",
+    "note": "When a record gets its final approval, copy a field of it into a field of the record it links to (the links are in Register links). Only a linked record that is still in entry is filled, only an empty field, and a value a person typed is never overwritten. Every fill is written to the audit log. Nothing is filled until you add a rule.",
+    "from": "Field of the approved record",
+    "to": "Field of the linked record",
+    "link": "Link",
+    "empty": "No rule yet. Nothing is filled automatically.",
+    "add_title": "Add a fill rule"
+  }
 }

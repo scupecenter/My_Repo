@@ -4674,6 +4674,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/link-fills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The fill rules of the register links, with the declared links and the fields to pick from
+         * @description 0.15.648 (migration 0772, automation item 9). Needs the Settings screen (`admin.settings` view). The ETag is the version of the whole set.
+         */
+        get: operations["getLinkFills"];
+        /**
+         * Save link fill rules (reason, If-Match, audited)
+         * @description 0.15.648. System Admin, or a delegation of `admin.settings` edit for all regions. A rule is added or changed, hidden with `is_active` false, never deleted. A rule says
+         *     "when a record of this register gets its final approval, copy this field of it into that field of the record it links to". Only a linked record still in entry is filled,
+         *     only an empty field, never over a value a person typed, and each fill is audited (`register_link_fill`). Seeded empty.
+         *     Field errors: `unknown_link`, `unknown_field`, `type_mismatch`, `duplicate`, `invalid`.
+         */
+        put: operations["setLinkFills"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/register-links": {
         parameters: {
             query?: never;
@@ -13029,6 +13056,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        LinkFillField: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            field_type: string;
+        };
+        LinkFill: {
+            register_key: string;
+            link_field: string;
+            target_field: string;
+            source_field: string;
+            sort_order: number;
+            is_active: boolean;
+        };
+        LinkFills: {
+            rows: components["schemas"]["LinkFill"][];
+            links: {
+                register_key: string;
+                link_field: string;
+                target_register: string;
+                source_fields: components["schemas"]["LinkFillField"][];
+                target_fields: components["schemas"]["LinkFillField"][];
+            }[];
+            version: number;
+            can_edit: boolean;
+        };
+        LinkFillsInput: {
+            reason: string;
+            rows: {
+                register_key: string;
+                link_field: string;
+                target_field: string;
+                source_field: string;
+                sort_order?: number;
+                is_active?: boolean;
+            }[];
+        };
         /** @description The setting `registers.structure_change` (0.15.403). */
         StructurePolicy: {
             /** @enum {string} */
@@ -32876,6 +32940,61 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getLinkFills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkFills"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setLinkFills: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkFillsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkFills"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listRegisterLinkCatalogue: {
