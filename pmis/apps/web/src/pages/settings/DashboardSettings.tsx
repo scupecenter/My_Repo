@@ -16,6 +16,8 @@ import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
+import { ProgressRag } from "./ProgressRag";
+import { SnapshotSchedule } from "./SnapshotSchedule";
 import { HealthBands } from "./HealthBands";
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
@@ -151,6 +153,8 @@ export function DashboardSettings() {
         </p>
       )}
 
+      <SnapshotSchedule />
+      <ProgressRag />
       <HealthBands />
 
       <fieldset
