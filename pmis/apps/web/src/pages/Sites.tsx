@@ -343,7 +343,7 @@ export function Sites() {
       {/* W8: the shared table toolbar, in the same order on every site-data screen */}
       <TableToolbar testid="sites-toolbar"
         views={/* a menu keeps its own saved views (contract 0.15.49): the tree, the quick filters, the layout and the column order of the list */
-        <SavedViews screen={savedScreen}
+        <SavedViews screen={savedScreen} sharedScreen={savedScreen.startsWith('site360-')}
           value={siteMenu
             ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: asWide ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
             : { ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }}
@@ -387,7 +387,7 @@ export function Sites() {
             </label>
           ) : undefined}
           table={asBoard || asMap || asTimeline || asCalendar ? undefined : tbl} />}
-        columns={<ColumnMenu api={tbl} label={label} />}
+        columns={<ColumnMenu density={false} api={tbl} label={label} />}
         exporter={menuTpl ? <TemplateExportMenu testid="sites-tools" exportTestid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} hasTemplate
           onBlank={() => void downloadTemplate(menuTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}
           onFilled={() => { if (!nRows) { toast(t('sites.menu_template_none'), 'err'); return; } void downloadTemplate(menuTpl.template_id, { prefill: true, filters: viewFilters }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err')); }}

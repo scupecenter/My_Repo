@@ -377,7 +377,7 @@ describe('hybrid mode list', () => {
       'GET /settings/dlp', 'POST /settings/dlp/versions', 'GET /settings/table-display', 'PUT /settings/table-display', 'GET /settings/ui-features', 'PUT /settings/ui-features', 'GET /settings/idle-task-alert', 'PUT /settings/idle-task-alert', 'GET /settings/notification-policy/catalogue', 'GET /settings/notification-policy', 'PUT /settings/notification-policy', 'POST /settings/holidays/import',
       // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
       // 0.15.67 (migration 0149): My Work > Daily Plan
-      'GET /daily-plans', 'GET /daily-plans/export', 'POST /daily-plans/:date/regions/:regionId/sites', 'PATCH /daily-plans/:date/regions/:regionId/sites/:siteId',
+      'GET /daily-plans', 'GET /daily-plans/export', 'POST /daily-plans/import', 'POST /daily-plans/:date/regions/:regionId/sites', 'PATCH /daily-plans/:date/regions/:regionId/sites/:siteId',
       'DELETE /daily-plans/:date/regions/:regionId/sites/:siteId', 'POST /daily-plans/:date/regions/:regionId/lock', 'POST /daily-plans/:date/regions/:regionId/unlock',
       'GET /settings/daily-plan', 'PUT /settings/daily-plan',
       'GET /absences', 'POST /absences', 'GET /absences/:id', 'PATCH /absences/:id', 'DELETE /absences/:id', 'GET /reassignments/alerts', 'GET /reassignments/eligible-users',
@@ -389,7 +389,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.62 (migration 0146): the project data reset in Settings
       'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/plan', 'GET /settings/data-reset/narrow-options', 'GET /settings/data-reset/requests/:id',
       'POST /settings/data-reset/requests/:id/approve', 'POST /settings/data-reset/requests/:id/cancel', 'POST /settings/data-reset/requests/:id/run',
-      'POST /settings/data-reset/requests/:id/retry-files',
+      'POST /settings/data-reset/requests/:id/retry-files', 'POST /settings/data-reset/requests/:id/archive', 'GET /settings/data-reset/requests/:id/archive/download',
       // contract 0.15.70 (migration 0151): the Library menu (W5)
       'GET /library/forms', 'POST /library/forms/:id/preview', 'POST /library/forms/:id/generate', 'GET /library/generated/:id/download', 'POST /library/generated/:id/void', 'GET /library/archive', 'GET /library/archive/rows', 'POST /library/archive/zip', 'GET /library/form-templates', 'POST /library/form-templates', 'GET /library/form-templates/:id/html', 'POST /library/form-templates/:id/approve', 'POST /library/form-templates/:id/retire', 'GET /settings/library-archive', 'PUT /settings/library-archive', 'GET /settings/document-marks', 'PUT /settings/document-marks/:code',
       // contract 0.15.401: structure proposals
