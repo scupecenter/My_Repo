@@ -133,7 +133,7 @@ export function MyWork() {
         filter={<UnifiedFilter screen="tasks-board" value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree) })} onClearAll={clearAll} />}
         extra={<PastedChip search={late.data?.search ?? doNow.data?.search ?? waiting.data?.search} />}
         count={<TableCount testid="my-work-count" noun="tasks" total={screenTotal} filtered={filtered} active={active} onClear={clearAll} />}
-        columns={<ColumnMenu api={tbl} label={label} />}
+        columns={<ColumnMenu density={false} api={tbl} label={label} />}
         layout={switcher}
         exporter={<ExportCsvButton testid="my-work-export" name="my-work" head={['#', t('approvals.bucket'), label('site'), t('grid.code'), label('task'), label('sla')]}
           rows={() => { let i = 0; return BUCKETS.flatMap(([k]) => (qs[k].data?.items ?? []).map((x) => [++i, t(`myWork.${k}`), x.site_code, x.task_code, (i18n.language === 'ar' && x.name_ar) || x.name_en, x.sla?.colour ?? ''])); }} />} />

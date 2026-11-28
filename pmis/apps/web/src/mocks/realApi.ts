@@ -686,6 +686,7 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.67 (migration 0149): My Work > Daily Plan and its settings.
   ['get', '/daily-plans'],
   ['get', '/daily-plans/export'],
+  ['post', '/daily-plans/import'],
   ['post', '/daily-plans/:date/regions/:regionId/sites'],
   ['patch', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
   ['delete', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
