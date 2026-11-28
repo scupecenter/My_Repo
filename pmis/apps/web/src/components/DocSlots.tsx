@@ -93,6 +93,7 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
         <span className={`chip ms-auto ${SLOT_TONE[slot.status]}`} data-testid={`slot-status-${slot.id}`}>{t(`slotStatus.${slot.status}`)}</span>
       </div>
       <p className="text-xs text-mute" data-testid={`slot-limits-${slot.id}`}>{t('docs.limits', { formats: (slot.formats ?? []).join(', '), mb: slot.max_size_mb ?? 20 })}{slot.max_files ? ` · ${t('docs.max_files', { n: slot.max_files })}` : ''}</p>
+      {(slot.photos_missing ?? 0) > 0 && <p className="mt-1 rounded-md bg-waitBg p-2 text-xs text-waitInk" data-testid={`slot-photos-missing-${slot.id}`}>{t('docs.photos_missing', { n: slot.photos_missing, min: slot.photo_min_count })}</p>}
       {slot.awaiting_signed_copy && <p className="mt-1 rounded-md bg-waitBg p-2 text-xs text-waitInk" data-testid={`slot-awaiting-signed-${slot.id}`}>{t('docs.awaiting_signed')}</p>}
       {slot.determination_pending && <p className="mt-1 rounded-md bg-waitBg p-2 text-xs text-waitInk" data-testid={`slot-pending-${slot.id}`}>{t('docs.determination_pending')}</p>}
       {slot.inherited_approval && <p className="mt-1 text-xs text-mute" data-testid={`slot-inherited-${slot.id}`}>{t('docs.inherited_approval')}</p>}

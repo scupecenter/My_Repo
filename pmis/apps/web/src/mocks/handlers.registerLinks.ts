@@ -4,7 +4,7 @@ import type { RegisterLinkEntry } from '@/api/registerLinks';
 import { viewer } from './db';
 import { guard, problem } from './handlers';
 
-/** Contract 0.15.584: the link catalogue, as register_link_catalogue and admin_register_link_catalogue_save of migration 0713 decide it. Synthetic: a few declared links; nothing is removed. */
+/** Contract 0.15.586: the link catalogue, as register_link_catalogue and admin_register_link_catalogue_save of migration 0713 decide it. Synthetic: a few declared links; nothing is removed. */
 const SEED: RegisterLinkEntry[] = [
   { from_register: 'warehouse', field: 'procurement_order_id', to_register: 'procurement', target_state: 'approved', target_record_type: null, enforce: false, same_site: true, enabled: true },
   { from_register: 'issues', field: 'risk_entity_id', to_register: 'risks', target_state: 'approved', target_record_type: null, enforce: false, same_site: false, enabled: true },

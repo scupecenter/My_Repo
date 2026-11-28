@@ -3,7 +3,7 @@ import { api, type ApiError } from './client';
 import type { components } from './schema';
 
 /**
- * Contract 0.15.584 (migration 0713): Settings > Register links. The catalogue is the D60 table `register_links`: every declared link, switched-off ones included.
+ * Contract 0.15.586 (migration 0713): Settings > Register links. The catalogue is the D60 table `register_links`: every declared link, switched-off ones included.
  * (The links of one register for the record form come from `useRegisterLinks` in p4c.ts; this is the settings view.)
  */
 export type RegisterLinkEntry = components['schemas']['RegisterLinkEntry'];

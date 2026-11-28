@@ -4683,12 +4683,12 @@ export interface paths {
         };
         /**
          * The catalogue of the links between registers
-         * @description 0.15.584 (migration 0713). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+         * @description 0.15.586 (migration 0713). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
          */
         get: operations["listRegisterLinkCatalogue"];
         /**
          * Save the catalogue (the whole list)
-         * @description 0.15.584 (migration 0713). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+         * @description 0.15.586 (migration 0713). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
          */
         put: operations["saveRegisterLinkCatalogue"];
         post?: never;
@@ -12695,6 +12695,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/default-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's default saved view per screen (0.15.582)
+         * @description 0.15.582 (migration 0655). One default view per screen, personal. A view that was deactivated or became unreadable drops out of the list.
+         */
+        get: operations["getDefaultViews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/set-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a saved view my default for its screen (0.15.582)
+         * @description 0.15.582 (migration 0655). Personal. Replaces the caller's earlier default for the same screen. A view the caller may not read answers 404.
+         */
+        post: operations["setDefaultSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/clear-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear my default view of a screen (0.15.582)
+         * @description 0.15.582 (migration 0655). Removes the caller's default when it is this view; otherwise a no-op.
+         */
+        post: operations["clearDefaultSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/home-pins": {
         parameters: {
             query?: never;
@@ -15160,6 +15220,10 @@ export interface components {
             needs_stamp?: boolean;
             /** @description 0.15.377: the type needs a copy and no current version carries the markers yet. Informs only; nothing is blocked. */
             awaiting_signed_copy?: boolean;
+            /** @description 0.15.564: the minimum photos the document type asks for (photo_rules.min_count); null when it asks for none. */
+            photo_min_count?: number | null;
+            /** @description 0.15.564: how many photos are still missing (current, not superseded image files); 0 when the minimum is met, null without a minimum. Informs only; nothing is blocked. */
+            photos_missing?: number | null;
             /** @enum {string} */
             kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
@@ -46987,6 +47051,93 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getDefaultViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's defaults. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            screen_key: components["schemas"]["SavedViewScreenKey"];
+                            /** Format: uuid */
+                            view_id: string;
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDefaultSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        screen_key: components["schemas"]["SavedViewScreenKey"];
+                        /** @enum {boolean} */
+                        is_default: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    clearDefaultSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        screen_key?: string | null;
+                        /** @enum {boolean} */
+                        is_default: false;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     getHomePins: {

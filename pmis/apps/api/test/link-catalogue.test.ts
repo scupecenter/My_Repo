@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loggedIn, makeAdmin, startApp, superDb } from './helpers';
 import { Team, recPath, team } from './reg-helpers';
 
-/** Contract 0.15.584 (migration 0713): Settings > Register links, on the D60 table register_links. */
+/** Contract 0.15.586 (migration 0713): Settings > Register links, on the D60 table register_links. */
 let app: NestExpressApplication;
 let db: PgClient;
 let t: Team;
