@@ -255,6 +255,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const slaDb = await buildDatabase(adminUrl, slaDb_, appPassword);
   process.env.TEST_DATABASE_URL_SLA = slaDb.appUrl;
   process.env.TEST_SUPER_URL_SLA = slaDb.superUrl;
+  // The progress-standards database (migrations 0540+): its suites read the seeded draft workflow v2 and the seeded draft weight set, so they
+  // cannot share the main database with the weights suite, which clears and publishes drafts there.
+  const pstd = `${dbName}_pstd`;
+  const pstdDb = await buildDatabase(adminUrl, pstd, appPassword);
+  process.env.TEST_DATABASE_URL_PSTD = pstdDb.appUrl;
+  process.env.TEST_SUPER_URL_PSTD = pstdDb.superUrl;
   // The register-columns database (migration 0095): the suite adds, converts and deletes register columns, which issues new register template versions.
   const rcols = `${dbName}_rcols`;
   const rcolsDb = await buildDatabase(adminUrl, rcols, appPassword);
@@ -356,6 +362,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${scols} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${ssa} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${slaDb_} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${pstd} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${f20k} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${drst} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${mcs} WITH (FORCE)`);

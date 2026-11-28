@@ -36,6 +36,7 @@ import { TemplatesPage } from '@/pages/Templates';
 import { LibraryForms } from '@/pages/library/Forms';
 import { LibraryTemplates } from '@/pages/library/Templates';
 import { ArchiveList, LibraryArchive } from '@/pages/library/Archive';
+import { LibraryMedia } from '@/pages/library/Media';
 import { ReconciliationPage } from '@/pages/Reconciliation';
 import { AsBuiltItems } from '@/pages/AsBuiltItems';
 import { MenuGroup } from './pages/MenuGroup';
@@ -142,6 +143,7 @@ function gated(session: Session) {
         <Route path="library/forms" element={<LibraryForms />} />
         <Route path="library/templates" element={<LibraryTemplates />} />
         <Route path="library/archive" element={<LibraryArchive />} />
+        <Route path="library/media" element={<LibraryMedia />} />
         <Route path="library/archive/:docCode" element={<ArchiveList />} />
         <Route path="templates/batches/:batchId" element={<RegisterBatch />} />
         <Route path="templates/master-import" element={<ReconciliationPage />} />

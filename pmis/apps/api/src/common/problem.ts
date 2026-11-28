@@ -24,7 +24,7 @@ export type ErrorCode =
   // 0396 (0.15.292): the Media gallery thumbnails
   | 'thumbnail_unsupported' | 'thumbnails_unavailable'
   // 0371 (0.15.266): the archive before a project data reset
-  | 'archive_required' | 'archive_expired';
+  | 'archive_required' | 'archive_expired' | 'cooloff_active';
 
 export interface FieldError {
   path: string;
@@ -108,6 +108,7 @@ const TITLES: Record<string, string> = {
   plan_incomplete: 'The reset plan does not cover every table',
   archive_required: 'The archive of this reset is not ready',
   archive_expired: 'The archive is no longer kept',
+  cooloff_active: 'The waiting period is not over',
   storage_not_supported: 'The document store is not supported here',
   quarantine_unavailable: 'The quarantine directory cannot be made',
   maintenance: 'A project data reset is running',

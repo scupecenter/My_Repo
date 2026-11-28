@@ -400,6 +400,7 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | register_sections | KEEP | Register form sections. |
 | register_task_sources | KEEP | Register to task date sources. |
 | register_column_locks | KEEP | Column locks of register fields (configuration, not records). |
+| structure_proposals | KEEP | Proposals to change the structure of a register through a modified template (configuration history, not records). |
 | task_field_sources | KEEP | Task fields fed by registers. |
 | permit_types | KEEP | Permit types. |
 | snag_types | KEEP | Snag types and photo rules. |
@@ -603,3 +604,13 @@ A request can ask for an archive of what the reset deletes. The choice is made w
 - **Restore:** upload the Excel file again through the template of each register. The rows enter the normal approval path (L1, then L2) as new data. The archive does not restore users, settings or anything outside the registers.
 - **Expiry:** an archive past its keep date is removed (the stored file, then the row is marked `purged`) the next time the reset page is read.
 - **Storage:** the archive is a stored object (encrypted) in the document store, not in the quarantine directory. The archive row survives the reset (`data_reset_archives` is KEEP in `data_reset_plan()`).
+
+## Waiting period after the approval (contract 0.15.268, migration 0372)
+
+The approval does not open the run at once. Settings > Data > Data reset has a setting "Waiting period after approval", next to the request expiry and the backup age: immediately (0), 30 minutes, 24 hours (the default) or a custom number of hours or days (up to 30 days). A request takes the value as it is when the request is made, the approver sees it in the approval dialog, and it cannot change afterwards (the guard `data_reset_rows_guard`).
+
+- The approval sets `run_after` (approval plus the wait). The request then stays open for the usual request expiry counted from `run_after`, so a long wait does not expire it.
+- Until `run_after` the run is refused with 409 `cooloff_active`; the Run button is disabled and the request card shows a live countdown.
+- Either System Admin can cancel while the request waits (the cancel door is open to any System Admin in `requested` and `approved`).
+- Both admins (the requester and the approver) get an in-app notice at the approval and another shortly before the wait ends (an hour before, or half way for a short wait). `data_reset_cooloff_notify()` sends it; the API calls it with the state of the page and from a one-minute timer when jobs are on. It is safe to call by hand.
+- The setting can be changed only while no request is open, as the other two.
