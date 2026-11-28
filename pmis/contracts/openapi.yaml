@@ -444,7 +444,7 @@ paths:
                     start: { type: integer, minimum: 0, maximum: 1439 }
                     end: { type: integer, minimum: 0, maximum: 1439 }
                     days: { type: array, maxItems: 7, items: { type: integer, minimum: 0, maximum: 6 } }
-                    timezone: { type: string, maxLength: 64, nullable: true }
+                    timezone: { type: [string, 'null'], maxLength: 64 }
       responses:
         '200':
           description: Saved.
@@ -471,7 +471,7 @@ paths:
               additionalProperties: false
               required: [until]
               properties:
-                until: { type: string, format: date-time, nullable: true }
+                until: { type: [string, 'null'], format: date-time }
       responses:
         '200':
           description: Saved.
@@ -525,8 +525,8 @@ paths:
                         kind: { type: string }
                         channel: { type: string }
                         reason: { type: string, enum: [type_off, duplicate, quiet_mail] }
-                        title: { type: string, nullable: true }
-                        link: { type: string, nullable: true }
+                        title: { type: [string, 'null'] }
+                        link: { type: [string, 'null'] }
                         created_at: { type: string, format: date-time }
         '401': {$ref: '#/components/responses/Unauthorized'}
   /admin/notification-personal:
@@ -19417,9 +19417,9 @@ components:
             start: { type: integer }
             end: { type: integer }
             days: { type: array, items: { type: integer } }
-            timezone: { type: string, nullable: true }
+            timezone: { type: [string, 'null'] }
             effective_timezone: { type: string }
-        snooze_until: { type: string, format: date-time, nullable: true }
+        snooze_until: { type: [string, 'null'], format: date-time }
         quiet_now: { type: boolean }
         org:
           type: object

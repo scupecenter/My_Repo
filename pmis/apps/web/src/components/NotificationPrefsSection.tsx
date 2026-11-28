@@ -108,7 +108,7 @@ function Body({ p, title }: { p: NotificationPrefs; title: string }) {
 
       <div className="space-y-2" data-testid="npp-snooze">
         <h3 className="text-sm font-semibold">{t('npp.snooze')}</h3>
-        <p className="text-xs text-mute" data-testid="npp-snooze-state">{p.snooze_until && new Date(p.snooze_until) > new Date() ? t('npp.snoozed_until', { when: fmtDateTime(p.snooze_until) }) : t('npp.snooze_none')}</p>
+        <p className="text-xs text-mute" data-testid="npp-snooze-state">{p.snooze_until && new Date(p.snooze_until) > new Date() ? t('npp.snoozed_until', { when: fmtDateTime(p.snooze_until, i18n.language) }) : t('npp.snooze_none')}</p>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn" data-testid="npp-snooze-1" disabled={off || snooze.isPending} onClick={() => hold(1)}>{t('npp.snooze_1h')}</button>
           <button type="button" className="btn" data-testid="npp-snooze-4" disabled={off || snooze.isPending} onClick={() => hold(4)}>{t('npp.snooze_4h')}</button>
@@ -133,7 +133,7 @@ function Body({ p, title }: { p: NotificationPrefs; title: string }) {
           <ul className="mt-1 space-y-1 text-sm">
             {decisions.data.map((d) => (
               <li key={d.id} className="flex flex-wrap gap-x-2" data-testid={`npp-held-${d.id}`}>
-                <span className="text-xs text-mute">{fmtDateTime(d.created_at)}</span><span>{d.title ?? d.kind}</span><span className="text-xs text-mute">{t(`npp.reason_${d.reason}`)}</span>
+                <span className="text-xs text-mute">{fmtDateTime(d.created_at, i18n.language)}</span><span>{d.title ?? d.kind}</span><span className="text-xs text-mute">{t(`npp.reason_${d.reason}`)}</span>
               </li>))}
           </ul>)}
       </div>
