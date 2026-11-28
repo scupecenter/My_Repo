@@ -5383,6 +5383,16 @@
       "structure_decision": "Your structure proposal was decided"
     }
   },
+  "progressRag": {
+    "title": "Progress figure colours",
+    "note": "Green and amber for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity of the progress curve. Higher is better. Nothing is coloured until a row is turned on and saved, so the dashboard looks exactly as before. The suggested numbers are not stored until you save. Own save, reason and audit row.",
+    "enabled": "Colour this figure",
+    "green": "Green from",
+    "amber": "Amber from",
+    "suggest": "Suggested: {{green}} / {{amber}}",
+    "range": "Numbers from {{min}} to {{max}}.",
+    "order": "Green must not be below amber."
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
