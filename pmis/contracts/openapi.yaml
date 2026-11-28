@@ -285,6 +285,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.625 (2026-11-28): Companies K3, contacts and documents with expiry (migration 0745, mirror `db/sql/744_company_contacts_documents.sql`). Additive. New tables `company_contacts`, `company_documents` and `company_document_types`, hung on the company (external_parties). `GET/PUT /settings/company-document-types` (the one list of document types: label EN/AR, required for company types, alert lead days, hide not delete; reason, If-Match, audited `company_doc_types_update`). `GET/POST /companies/{id}/contacts` and `PATCH /companies/{id}/contacts/{contact_id}` (name, role, phone, email, one primary; hide not delete; audited `company_contact_save`). `GET/POST /companies/{id}/documents`, `PATCH /companies/{id}/documents/{doc_id}` and `GET /companies/{id}/documents/{doc_id}/file` (type, number, issue and expiry date, notes, one file through the same store, scan and encryption as every document; the download is audited and covered by the uploaded files download lock). `GET /companies/compliance` and `GET /companies/{id}/compliance` give expired, expiring and missing required documents per company (information only). The daily job alerts once per document and stage (due, expired) to the contractor alert roles, like the safety certificate. Needs the Contractors or Procurement view to read, an edit right on either to write. The tables are KEEP in the data reset plan. No grant, role or permission change.
     - 0.15.586 (2026-11-28): Settings > Register links on the D60 table (migration 0713, mirror `db/sql/712_register_link_catalogue.sql`). Additive. `GET /settings/register-links` (`listRegisterLinkCatalogue`, every signed-in user) lists every declared link of `register_links`, switched-off ones included, with the version; `PUT /settings/register-links` (`saveRegisterLinkCatalogue`, System Admin, reason, If-Match, audited) switches a link on or off, sets `enforce` and `same_site`, and declares a new link; a link is switched off, never removed, and its register, field and target never change. New column `register_links.rev` (version). The picker, the check and the orphan report stay D60 (`GET /registers/{key}/links`, `GET /registers/{key}/link-options/{field}`).
     - 0.15.564 (2026-11-28): the missing photo indicator (D6, no migration, no table). Additive and read only. `DocumentSlot` gains `photo_min_count` and `photos_missing`, from the `photo_rules.min_count` of the document type (set in Settings > Documents) and the current image files of the slot. They inform only; nothing is blocked. No new right: the slots are shown to whoever can already see the task.
     - 0.15.410 (2026-11-27): hardening layer 1c, History and Restore for the Warehouse item master and the Daily Plan, and Claim and Triage of a Daily Plan day (migration 0567). Additive. `GET /warehouse/items/{id}/history` and `GET /daily-plans/{date}/regions/{region_id}/history` return the audit trail with the field changes; Restore of an item is a PATCH of the old values through the normal item writer. A plan day (region and date) can be claimed and released (`POST` and `DELETE` on `/daily-plans/{date}/regions/{region_id}/claim`) and accepted or deferred with a note (`POST /daily-plans/{date}/regions/{region_id}/triage`, `GET` for the state), by the L2 holder of the Daily Plan in the region or a System Admin, as for the registers (0340). New plan days start `pending`; existing days stay untriaged. Reject and merge do not apply to a plan day. No grant, role or permission change.
@@ -9394,6 +9395,265 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/company-document-types:
+    get:
+      tags: [settings]
+      operationId: getCompanyDocumentTypes
+      summary: Document types of the companies (label EN/AR, required for company types, alert lead days)
+      description: 0.15.625 (migration 0745, Companies K3). Needs the Settings screen (`admin.settings` view). The ETag is the version of the whole list.
+      responses:
+        '200':
+          description: The types.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyDocumentTypes'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setCompanyDocumentTypes
+      summary: Save the document types (reason, If-Match, audited)
+      description: |
+        0.15.625. System Admin, or a delegation of `admin.settings` edit for all regions. A type is added or changed, hidden with `is_active` false, and never deleted (a type missing from the list stays as it is).
+        `required_for` lists company types (`cw_contractor`, `te_vendor`, `gecol`, `hlc`, `supplier`, `landlord`, `other`); it is empty until the owner sets it. Audited as `company_doc_types_update`.
+        Field errors: `invalid`, `duplicate`, `out_of_range`, `unknown_type`.
+      x-db-path: admin_save_company_doc_types
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyDocumentTypesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyDocumentTypes'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /companies/compliance:
+    get:
+      tags: [registers]
+      operationId: listCompanyCompliance
+      summary: The document status of every active company (the red chip of the company list)
+      description: 0.15.625 (Companies K3). Needs the Contractors or Procurement view. `status` is `expired`, `missing`, `expiring` or `ok`; information only, nothing is blocked.
+      responses:
+        '200':
+          description: One row per active company.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/CompanyCompliance'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /companies/{id}/compliance:
+    get:
+      tags: [registers]
+      operationId: getCompanyCompliance
+      summary: The document status of one company
+      description: 0.15.625 (Companies K3). Needs the Contractors or Procurement view.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      responses:
+        '200':
+          description: The status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyCompliance'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /companies/{id}/contacts:
+    get:
+      tags: [registers]
+      operationId: listCompanyContacts
+      summary: The contacts of a company (hidden ones included)
+      description: 0.15.625 (Companies K3). Needs the Contractors or Procurement view.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      responses:
+        '200':
+          description: The contacts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/CompanyContact'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: createCompanyContact
+      summary: Add a contact to a company
+      description: |
+        0.15.625. Needs an edit right on Contractors or Procurement. One contact is primary; setting a new primary clears the old one. Audited as `company_contact_save`.
+        Field errors: `required`, `invalid`, `too_long`, `unknown_key`.
+      x-db-path: company_contact_save
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyContactInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyContact'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /companies/{id}/contacts/{contact_id}:
+    patch:
+      tags: [registers]
+      operationId: updateCompanyContact
+      summary: Change or hide a contact (If-Match)
+      description: 0.15.625. A contact is hidden with `is_active` false, never deleted. Audited as `company_contact_save` with before and after.
+      x-db-path: company_contact_save
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      - {name: contact_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyContactInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyContact'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /companies/{id}/documents:
+    get:
+      tags: [registers]
+      operationId: listCompanyDocuments
+      summary: The documents and certificates of a company (hidden ones included)
+      description: 0.15.625 (Companies K3). Needs the Contractors or Procurement view. `status` is `expired`, `expiring` (inside the lead days of its type), `valid` or `no_expiry`.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      responses:
+        '200':
+          description: The documents.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/CompanyDocument'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: createCompanyDocument
+      summary: Add a document or certificate (multipart, the file is optional)
+      description: |
+        0.15.625. Needs an edit right on Contractors or Procurement. The file goes through the same type check, size cap (25 MB), virus scan and encryption as every document.
+        A renewed certificate is a new row; the older one stays as history. Audited as `company_document_save`. Field errors: `unknown_type`, `before_issue`, `invalid`, `too_long`, `unknown_key`; file errors `file_rejected`, `file_too_large`.
+      x-db-path: company_document_save
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/CompanyDocumentInput'}
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyDocumentInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyDocument'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {description: The file is too large.}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /companies/{id}/documents/{doc_id}:
+    patch:
+      tags: [registers]
+      operationId: updateCompanyDocument
+      summary: Change or hide a document (If-Match; a new file replaces the file of this row)
+      description: 0.15.625. A document is hidden with `is_active` false, never deleted. Audited as `company_document_save` with before and after.
+      x-db-path: company_document_save
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      - {name: doc_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/CompanyDocumentInput'}
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyDocumentInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyDocument'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /companies/{id}/documents/{doc_id}/file:
+    get:
+      tags: [registers]
+      operationId: downloadCompanyDocumentFile
+      summary: Download the file of a company document (audited, covered by the uploaded files download lock)
+      description: |
+        0.15.625. Needs the Contractors or Procurement view. `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`. The audit row `company_document_download` is written first.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      - {name: doc_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The file.
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/octet-stream:
+              schema: { type: string, contentMediaType: application/octet-stream }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /reports/team-scope-mismatch:
     get:
       tags: [registers]
@@ -25035,6 +25295,110 @@ components:
         cw_delivery_scopes: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Q147: the order scopes of the CW Delivery Model (default CW, Tower Erection, Site Adaption, CW Dismantle).' }
         internal_team_types: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Q147: the Team Type values of an internal (Aljeel) team for an In-House order (default Internal, In-House).' }
         closed_order_statuses: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Q145: the order statuses that end an order (default Closed, Cancelled, Completed).' }
+    CompanyDocumentType:
+      type: object
+      required: [code, label_en, label_ar, required_for, lead_days, has_expiry, is_active]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9_]{1,40}$'}
+        label_en: {type: string}
+        label_ar: {type: [string, 'null']}
+        required_for: {type: array, items: {type: string}}
+        lead_days: {type: integer, minimum: 0, maximum: 365}
+        has_expiry: {type: boolean}
+        is_active: {type: boolean}
+    CompanyDocumentTypes:
+      type: object
+      required: [types, party_types, version, can_edit]
+      properties:
+        types: {type: array, items: {$ref: '#/components/schemas/CompanyDocumentType'}}
+        party_types: {type: array, items: {type: string}}
+        version: {type: integer}
+        can_edit: {type: boolean}
+    CompanyDocumentTypesInput:
+      type: object
+      required: [types, reason]
+      properties:
+        reason: {type: string, minLength: 3, maxLength: 1000}
+        types:
+          type: array
+          maxItems: 60
+          items:
+            type: object
+            required: [code, label_en]
+            properties:
+              code: {type: string, pattern: '^[a-z][a-z0-9_]{1,40}$'}
+              label_en: {type: string, minLength: 1, maxLength: 80}
+              label_ar: {type: [string, 'null'], maxLength: 80}
+              required_for: {type: array, items: {type: string}}
+              lead_days: {type: integer, minimum: 0, maximum: 365}
+              has_expiry: {type: boolean}
+              is_active: {type: boolean}
+    CompanyCompliance:
+      type: object
+      required: [party_id, status, expired, expiring, missing, valid]
+      properties:
+        party_id: {type: string, format: uuid}
+        status: {type: string, enum: [expired, missing, expiring, ok]}
+        expired: {type: integer}
+        expiring: {type: integer}
+        missing: {type: integer}
+        valid: {type: integer}
+    CompanyContact:
+      type: object
+      required: [id, party_id, name, role, phone, email, is_primary, is_active, version, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        party_id: {type: string, format: uuid}
+        name: {type: string}
+        role: {type: [string, 'null']}
+        phone: {type: [string, 'null']}
+        email: {type: [string, 'null']}
+        is_primary: {type: boolean}
+        is_active: {type: boolean}
+        version: {type: integer}
+        updated_at: {type: string, format: date-time}
+    CompanyContactInput:
+      type: object
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        role: {type: [string, 'null'], maxLength: 120}
+        phone: {type: [string, 'null'], maxLength: 40}
+        email: {type: [string, 'null'], maxLength: 200}
+        is_primary: {type: boolean}
+        is_active: {type: boolean}
+    CompanyDocument:
+      type: object
+      required: [id, party_id, type_code, title, doc_number, issued_on, expires_on, notes, has_file, original_name, mime_type, size_bytes, status, is_active, version, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        party_id: {type: string, format: uuid}
+        type_code: {type: string}
+        type_label_en: {type: [string, 'null']}
+        type_label_ar: {type: [string, 'null']}
+        title: {type: [string, 'null']}
+        doc_number: {type: [string, 'null']}
+        issued_on: {type: [string, 'null'], format: date}
+        expires_on: {type: [string, 'null'], format: date}
+        notes: {type: [string, 'null']}
+        has_file: {type: boolean}
+        original_name: {type: [string, 'null']}
+        mime_type: {type: [string, 'null']}
+        size_bytes: {type: [integer, 'null']}
+        status: {type: string, enum: [expired, expiring, valid, no_expiry]}
+        is_active: {type: boolean}
+        version: {type: integer}
+        updated_at: {type: string, format: date-time}
+    CompanyDocumentInput:
+      type: object
+      properties:
+        type_code: {type: string}
+        title: {type: [string, 'null'], maxLength: 160}
+        doc_number: {type: [string, 'null'], maxLength: 80}
+        issued_on: {type: [string, 'null'], format: date}
+        expires_on: {type: [string, 'null'], format: date}
+        notes: {type: [string, 'null'], maxLength: 2000}
+        is_active: {type: boolean}
+        file: {type: string, format: binary}
     ContractorRules:
       allOf:
       - {$ref: '#/components/schemas/ContractorRulesInput'}

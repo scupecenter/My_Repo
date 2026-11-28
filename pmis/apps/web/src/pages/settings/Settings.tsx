@@ -21,6 +21,7 @@ import { MailPolicy } from './MailPolicy';
 import { useMe } from '@/api/hooks';
 import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
+import { CompanyDocumentTypes } from './CompanyDocumentTypes';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
 import { RecycleBinScreen } from './RecycleBin';
 import { ExportSchedulesScreen } from './ExportSchedules';
@@ -256,7 +257,7 @@ export function SettingsRoutes() {
           <Route path="custom" element={<CustomRegisters />} />
           <Route path="lists" element={<Lists />} />
           <Route path="recycle" element={<RecycleBinScreen />} />
-          <Route path="contractors" element={<><ContractorRules /><ContractorPerfThresholds /></>} />
+          <Route path="contractors" element={<><ContractorRules /><CompanyDocumentTypes /><ContractorPerfThresholds /></>} />
           <Route path="gecol" element={<GecolOrderWarnings />} />
           <Route path="derive" element={<DeriveRulesScreen />} />
           <Route path="team-scope" element={<TeamScopeMatch />} />
