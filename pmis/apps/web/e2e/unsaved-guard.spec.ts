@@ -18,6 +18,7 @@ for (const c of [{ locale: 'en', theme: 'light' }, { locale: 'ar', theme: 'dark'
     await expect(page.getByTestId('dept-code')).toHaveValue('zz');
     await expect(page.getByTestId('unsaved-dialog')).toHaveCount(0);
     await page.getByTestId('dept-code').focus();
+    await expect(page.getByTestId('dept-code')).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('unsaved-dialog')).toBeVisible();
     await page.getByTestId('unsaved-discard').click();

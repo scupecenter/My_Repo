@@ -16,6 +16,7 @@ import { attachmentHeader, cleanOriginalName, displayName, NameParts } from './n
 import { evalRule } from './rules';
 import { formatAllowed, sniff } from './sniff';
 import { StorageService, newObjectKey } from './storage.service';
+import { thumbKeysOf } from '../media/thumbs';
 import { suggestSlots } from './suggest';
 
 export const SITE_DOCS = 'sites.documents';
@@ -442,9 +443,23 @@ export class DocumentsService {
     const { task } = await this.slotOf(auth, taskId, slotId);
     if (!uuidSchema.safeParse(fileId).success) throw problems.notFound();
     await this.call(() => this.db.tx.$queryRaw(Prisma.sql`SELECT doc_withdraw_file(${slotId}::uuid, ${fileId}::uuid)`));
+    await this.dropThumbs(fileId);
     const slot = (await this.buildSlots(auth, task)).find((s) => s.id === slotId);
     if (!slot) throw problems.notFound();
     return slot;
+  }
+
+  /** A withdrawn file keeps its row and its original; its generated thumbnails (derived data) are removed. A failure here never fails the withdrawal. */
+  private async dropThumbs(fileId: string): Promise<void> {
+    try {
+      const r = await this.db.tx.$queryRaw<{ storage_key: string; cfg: { thumbnails?: { small_px: number; medium_px: number } } }[]>(
+        Prisma.sql`SELECT f.storage_key, media_gallery_state() AS cfg FROM document_files f WHERE f.id = ${fileId}::uuid`);
+      const th = r[0]?.cfg?.thumbnails;
+      if (!r[0] || !th) return;
+      for (const k of thumbKeysOf(r[0].storage_key, th)) await this.storage.store.remove(k).catch(() => undefined);
+    } catch {
+      /* derived data: it is made again on request */
+    }
   }
 
   async suggest(auth: AuthContext, taskId: string, raw: unknown): Promise<{ items: { file_name: string; suggestions: { slot_id: string; doc_code: string; score: number }[] }[] }> {
@@ -563,6 +578,7 @@ export class DocumentsService {
     const { r } = await this.recordSlotOf(auth, key, recordId, slotId);
     if (!uuidSchema.safeParse(fileId).success) throw problems.notFound();
     await this.call(() => this.db.tx.$queryRaw(Prisma.sql`SELECT doc_withdraw_file(${slotId}::uuid, ${fileId}::uuid)`));
+    await this.dropThumbs(fileId);
     const slot = (await this.recordSlotsFor(auth, r)).find((s) => s.id === slotId);
     if (!slot) throw problems.notFound();
     return slot;
