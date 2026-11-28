@@ -8533,6 +8533,7 @@
     "when_kpi_threshold": "{{kpi}} goes {{op}} {{value}}",
     "when_advance_unsettled": "an advance stays unsettled for {{days}} days",
     "when_invoice_due_soon": "an invoice is due within {{days}} days",
+    "when_data_gaps": "at least {{min}} site(s) of a region have missing data, every week",
     "when_link_orphans": "at least {{min}} row(s) of a register link point to a missing record"
   },
   "alertRules": {
@@ -8573,8 +8574,11 @@
     "locked": "Locked (no edits until unlocked)",
     "kind_kpi_threshold": "KPI crosses a threshold",
     "kind_kpi_threshold_help": "Fires when the live KPI of the dashboard crosses the rule's own threshold. Placeholders: {{kpi}}, {{value}}, {{threshold}}.",
+    "kind_data_gaps": "Data gaps in sites",
+    "kind_data_gaps_help": "Fires weekly for every region that has at least the minimum number of active sites with missing data: a delivery scenario not set, or a task with no actual date that a later task already has. The audience is the module audience, so the reminder reaches the people who work on the sites of that region. Placeholders: {{region}}, {{count}}, {{week}}.",
     "kind_link_orphans": "Links leave records dangling",
     "kind_link_orphans_help": "Fires weekly for every declared register link that has at least the minimum rows (1 when empty) holding an id which is no current record of the target. Leave the register and field empty to check every link. Placeholders: {{register}}, {{field}}, {{target}}, {{count}}.",
+    "min_sites": "Minimum sites",
     "min_rows": "Minimum rows",
     "any_link": "Any link",
     "field_code": "Field"

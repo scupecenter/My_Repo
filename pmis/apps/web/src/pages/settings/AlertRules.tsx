@@ -44,7 +44,7 @@ const EMPTY: Form = {
 
 const toForm = (r: AlertRule): Form => ({
   id: r.id, version: r.version, code: r.code, kind: r.kind,
-  register_key: String(r.params.register_key ?? ''), state: String(r.params.state ?? ''), days: String(r.params.days ?? '7'), field_code: String(r.params.field_code ?? ''), min_rows: String(r.params.min_rows ?? '1'),
+  register_key: String(r.params.register_key ?? ''), state: String(r.params.state ?? ''), days: String(r.params.days ?? '7'), field_code: String(r.params.field_code ?? ''), min_rows: String(r.params.min_rows ?? r.params.min_sites ?? '1'),
   audience: String(r.audience.type ?? 'system_admin'), module: String(r.audience.module ?? ''),
   title_en: r.title_en, title_ar: r.title_ar, body_en: r.body_en, body_ar: r.body_ar, link: r.link ?? '', enabled: r.enabled,
   kpi: String(r.params.kpi ?? ''), op: String(r.params.op ?? 'above'), value: r.params.value === undefined ? '' : String(r.params.value), locked: r.locked,
@@ -54,6 +54,7 @@ const toBody = (f: Form): AlertRuleInput => ({
   code: f.code.trim(),
   kind: f.kind as AlertRuleInput['kind'],
   params: f.kind === 'record_idle' ? { register_key: f.register_key, state: f.state.trim(), days: Number(f.days) }
+    : f.kind === 'data_gaps' ? { min_sites: Number(f.min_rows) }
     : f.kind === 'link_orphans' ? { ...(f.register_key ? { register_key: f.register_key } : {}), ...(f.register_key && f.field_code.trim() ? { field_code: f.field_code.trim() } : {}), min_rows: Number(f.min_rows) }
     : (f.kind === 'advance_unsettled' || f.kind === 'invoice_due_soon') && f.days.trim() !== '' ? { days: Number(f.days) }
     : f.kind === 'kpi_threshold' ? { kpi: f.kpi, op: f.op, value: Number(f.value) } : {},
@@ -81,6 +82,7 @@ export function AlertRules() {
   const kindDef = catalogue.kinds.find((k) => k.kind === v?.kind);
   const bad = !v || v.code.trim().length < 2
     || (v.kind === 'record_idle' && (v.register_key === '' || v.state.trim() === '' || !/^[0-9]+$/.test(v.days) || Number(v.days) < 1 || Number(v.days) > 3650))
+    || (v.kind === 'data_gaps' && (!/^[0-9]+$/.test(v.min_rows) || Number(v.min_rows) < 1 || Number(v.min_rows) > 100000))
     || (v.kind === 'link_orphans' && (!/^[0-9]+$/.test(v.min_rows) || Number(v.min_rows) < 1 || Number(v.min_rows) > 100000))
     || ((v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && v.days.trim() !== '' && (!/^[0-9]+$/.test(v.days) || Number(v.days) > 365 || (v.kind === 'advance_unsettled' && Number(v.days) < 1)))
     || (v.kind === 'kpi_threshold' && (v.kpi === '' || v.value.trim() === '' || isNaN(Number(v.value)) || Number(v.value) < 0 || Number(v.value) > 100000))
@@ -176,6 +178,10 @@ export function AlertRules() {
               <label className="text-sm font-semibold">{t('alertRules.min_rows')}
                 <input type="number" min={1} max={100000} className="input mt-1 w-28 font-normal" data-testid="ar-min-rows" value={v.min_rows} onChange={(e) => setF({ ...v, min_rows: e.target.value })} /></label>
             </div>
+          )}
+          {v.kind === 'data_gaps' && (
+            <label className="text-sm font-semibold">{t('alertRules.min_sites')}
+              <input type="number" min={1} max={100000} className="input mt-1 w-28 font-normal" data-testid="ar-min-rows" value={v.min_rows} onChange={(e) => setF({ ...v, min_rows: e.target.value })} /></label>
           )}
           {v.kind === 'kpi_threshold' && (
             <div className="flex flex-wrap gap-3">
