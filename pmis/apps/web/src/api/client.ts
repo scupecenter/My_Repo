@@ -138,6 +138,20 @@ export async function fetchBlob(path: string, query?: RequestOptions['query']): 
 }
 
 /** Fetch a file with the session cookie and hand it to the browser as a download. Returns the file name. */
+/** Types the browser may show in a tab without running anything of the file: PDF and raster images. Everything else is downloaded. */
+const VIEWABLE_MIME = /^(application\/pdf|image\/(png|jpe?g|gif|webp))$/;
+
+/** Opens a stored file in a new tab when its type is safe to show (the blob is typed from the stored type, never from the file); otherwise downloads it. */
+export async function viewFile(path: string, mime: string | null | undefined): Promise<string> {
+  if (!mime || !VIEWABLE_MIME.test(mime) || typeof URL.createObjectURL !== 'function') return downloadFile(path);
+  const res = await fetch(buildUrl(path, undefined), { credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, await toProblem(res));
+  const url = URL.createObjectURL(new Blob([await res.blob()], { type: mime }));
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return parseFilename(res.headers.get('Content-Disposition'));
+}
+
 export async function downloadFile(path: string, query?: RequestOptions['query'], retried = false): Promise<string> {
   const res = await fetch(buildUrl(path, query), { credentials: 'include' });
   if (!res.ok) {

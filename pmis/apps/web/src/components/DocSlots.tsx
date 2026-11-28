@@ -1,9 +1,11 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Camera, Download, FileUp, History, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Camera, Download, Eye, FilePlus2, FileUp, History, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
-import { downloadDocument, suggestSlots, taskTarget, useAddSlot, useSlotUpload, useWithdrawFile, type DocumentSlot, type SlotSuggestion, type SlotTarget } from '@/api/documents';
+import { useLibraryForms } from '@/api/library';
+import { GenerateDialog } from '@/pages/library/Forms';
+import { downloadDocument, openDocument, suggestSlots, taskTarget, useAddSlot, useSlotUpload, useWithdrawFile, type DocumentSlot, type SlotSuggestion, type SlotTarget } from '@/api/documents';
 import type { TaskDetail } from '@/api/types';
 import { taskErrorMessage } from '@/lib/taskErrors';
 import { AnnotatePhoto } from './AnnotatePhoto';
@@ -47,8 +49,25 @@ const acceptOf = (s: DocumentSlot): string => (s.formats ?? []).map((x) => `.${x
 const camera = (s: DocumentSlot): boolean => s.kind === 'photo' || (s.formats ?? []).some((x) => IMAGE_FORMATS.has(x.toLowerCase()));
 const size = (n: number): string => (n >= MB ? `${(n / MB).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
-function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandidate, busy }: {
-  slot: DocumentSlot; canUpload: boolean; onFile: (f: File, marks?: { signed: boolean; stamped: boolean }) => void; onWithdraw: (fileId: string) => void; onDeclare: () => void; onAddCandidate: (label: string) => void; busy: boolean;
+/** A task document with an approved form: opens the Library generate dialog for this site (the same preview, number, print and signed upload). */
+function GenerateButton({ slot, generate }: { slot: DocumentSlot; generate: GenerateContext }) {
+  const { t } = useTranslation();
+  const forms = useLibraryForms();
+  const [open, setOpen] = useState(false);
+  const form = (forms.data?.items ?? []).find((f) => f.kind === 'html' && f.doc_code === slot.doc_code && f.trigger_task_code === generate.taskCode);
+  if (!form) return null;
+  return (
+    <>
+      <button type="button" className="btn mt-2 text-sm" data-testid={`slot-generate-${slot.id}`} onClick={() => setOpen(true)}><FilePlus2 size={14} />{t('docs.generate')}</button>
+      {open && <GenerateDialog form={form} initialSite={{ id: generate.siteId, site_code: generate.siteCode, name: null }} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+export interface GenerateContext { siteId: string; siteCode: string; taskCode: string }
+
+function SlotCard({ slot, canUpload, onFile, onReplace, onWithdraw, onDeclare, onAddCandidate, busy, generate }: {
+  slot: DocumentSlot; canUpload: boolean; generate?: GenerateContext; onReplace?: (f: File, group: string) => void; onFile: (f: File, marks?: { signed: boolean; stamped: boolean }) => void; onWithdraw: (fileId: string) => void; onDeclare: () => void; onAddCandidate: (label: string) => void; busy: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [over, setOver] = useState(false);
@@ -75,6 +94,14 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
   const fileLine = (f: (typeof slot.files)[number], old: boolean) => (
     <li key={f.id} className={`flex flex-wrap items-center gap-2 ${old ? 'opacity-75' : ''}`} data-testid={`file-${f.id}`}>
       <button type="button" className="mono truncate text-link hover:underline" data-testid={`file-dl-${f.id}`} title={f.download_name} onClick={() => void downloadDocument(f.id)}><Download size={12} className="me-1 inline" />{f.original_name}</button>
+      <button type="button" className="btn px-1 py-0.5 text-xs" data-testid={`file-open-${f.id}`} title={t('docs.open_hint')} onClick={() => void openDocument(f.id, f.mime_type).catch(() => undefined)}><Eye size={12} className="me-1 inline" />{t('docs.open')}</button>
+      {canUpload && !old && onReplace && (
+        <label className="btn cursor-pointer px-1 py-0.5 text-xs" data-testid={`file-replace-${f.id}`} title={t('docs.replace_hint')}>
+          <RefreshCw size={12} className="me-1 inline" />{t('docs.replace')}
+          <input type="file" className="sr-only" accept={acceptOf(slot) || undefined} data-testid={`file-replace-input-${f.id}`} disabled={busy}
+            onChange={(e) => { const file = e.target.files?.[0]; if (file) onReplace(file, f.file_group_id); e.target.value = ''; }} />
+        </label>
+      )}
       <span className="chip bg-card2" data-testid={`file-v-${f.id}`}>v{f.version}</span>
       <span className="text-xs">{size(f.size_bytes)}</span>
       {f.signed && <span className="chip bg-doneBg text-doneInk" data-testid={`file-signed-${f.id}`}>{t('docs.signed')}</span>}
@@ -105,6 +132,7 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
       {slot.status === 'rejected' && slot.reject_reason && <p className="mt-1 text-sm text-lateInk" data-testid={`slot-reject-${slot.id}`}>{slot.reject_reason}</p>}
       {slot.blank_form_file_id && <button type="button" className="mt-1 text-xs text-link hover:underline" data-testid={`slot-blank-${slot.id}`} onClick={() => void downloadDocument(slot.blank_form_file_id as string)}>{t('docs.blank_form')}</button>}
       <ul className="mt-1 space-y-1 text-sm text-mute">{current.map((f) => fileLine(f, false))}</ul>
+      {generate && !slot.candidate_label && <GenerateButton slot={slot} generate={generate} />}
       {older.length > 0 && (
         <div className="mt-1">
           <button type="button" className="inline-flex items-center gap-1 text-xs text-link" aria-expanded={history} data-testid={`slot-history-${slot.id}`} onClick={() => setHistory(!history)}><History size={12} />{t('docs.history', { count: older.length })}</button>
@@ -211,14 +239,14 @@ function SuggestDialog({ task, files, slots, onClose, onUpload }: { task: string
 
 /** The Documents tab of a task: one named slot per required document (CLAUDE.md "Upload UI"). */
 export function DocSlots({ task, edit }: { task: TaskDetail; edit: boolean }) {
-  return <SlotList slots={task.slots as DocumentSlot[]} target={taskTarget(task)} edit={edit} suggestFor={task.id} />;
+  return <SlotList slots={task.slots as DocumentSlot[]} target={taskTarget(task)} edit={edit} suggestFor={task.id} generate={{ siteId: task.site_id, siteCode: task.site_code, taskCode: task.task_code }} />;
 }
 
 /**
  * The named slots of a task or of a register record (Q131): drag, click or camera into a slot, versions, withdraw, "this document applies", candidates.
  * `suggestFor`: the task whose multi-file suggestion endpoint is used (records have none: one file per slot).
  */
-export function SlotList({ slots, target, edit, suggestFor }: { slots: DocumentSlot[]; target: SlotTarget; edit: boolean; suggestFor?: string }) {
+export function SlotList({ slots, target, edit, suggestFor, generate }: { slots: DocumentSlot[]; target: SlotTarget; edit: boolean; suggestFor?: string; generate?: GenerateContext }) {
   const { t } = useTranslation();
   const toast = useToast();
   const up = useSlotUpload(target), del = useWithdrawFile(target), add = useAddSlot(target);
@@ -228,10 +256,10 @@ export function SlotList({ slots, target, edit, suggestFor }: { slots: DocumentS
   const active = slots.filter((s) => s.status !== 'not_required' || s.determination_pending);
   const optional = slots.filter((s) => s.status === 'not_required' && !s.determination_pending);
   const uploadable = active.filter((s) => slotUploadable(s, edit));
-  const send = (slot: DocumentSlot, file: File, marks?: { signed: boolean; stamped: boolean }): Promise<boolean> => {
+  const send = (slot: DocumentSlot, file: File, marks?: { signed: boolean; stamped: boolean }, replaceGroup?: string): Promise<boolean> => {
     const pre = precheck(t, slot, file);
     if (pre) { toast(`${file.name}: ${pre}`, 'err'); return Promise.resolve(false); }
-    return up.mutateAsync({ slot, file, marks }).then(() => true, (e) => { toast(`${file.name}: ${uploadMessage(t, e, slot)}`, 'err'); return false; });
+    return up.mutateAsync({ slot, file, marks, replaceGroup }).then(() => true, (e) => { toast(`${file.name}: ${uploadMessage(t, e, slot)}`, 'err'); return false; });
   };
   const sendMany = async (rows: Pending[]) => {
     setMulti(null);
@@ -254,7 +282,9 @@ export function SlotList({ slots, target, edit, suggestFor }: { slots: DocumentS
       <ul className="space-y-2" data-testid="slot-list">
         {active.map((s) => (
           <SlotCard key={s.id} slot={s} canUpload={slotUploadable(s, edit)} busy={busy}
+            generate={generate}
             onFile={(f, m) => void send(s, f, m)}
+            onReplace={(f, group) => void send(s, f, undefined, group)}
             onWithdraw={(fileId) => act(del.mutateAsync({ slotId: s.id, fileId }))}
             onDeclare={() => act(add.mutateAsync({ doc_code: s.doc_code, candidate_label: s.candidate_label ?? null }))}
             onAddCandidate={(label) => act(add.mutateAsync({ doc_code: s.doc_code, candidate_label: label }))} />

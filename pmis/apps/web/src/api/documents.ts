@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, downloadFile } from './client';
+import { api, ApiError, downloadFile, viewFile } from './client';
 import type { Job, Page, TaskDetail } from './types';
 import type { components } from './schema';
 import { trackRealJob } from '@/lib/hybrid';
@@ -40,13 +40,14 @@ function useRefresh(target: SlotTarget) {
 export function useSlotUpload(owner: Pick<TaskDetail, 'id' | 'site_id'> | SlotTarget) {
   const target = asTarget(owner);
   const refresh = useRefresh(target);
-  return useMutation<unknown, ApiError, { slot: DocumentSlot; file: File; marks?: { signed: boolean; stamped: boolean } }>({
-    mutationFn: ({ slot, file, marks }) => {
+  return useMutation<unknown, ApiError, { slot: DocumentSlot; file: File; marks?: { signed: boolean; stamped: boolean }; replaceGroup?: string }>({
+    mutationFn: ({ slot, file, marks, replaceGroup }) => {
       const f = new FormData();
       f.append('file', file);
       if (marks) { f.append('signed', String(marks.signed)); f.append('stamped', String(marks.stamped)); }
       const cur = slot.files.filter((x) => x.is_current);
-      if (slot.max_files === 1 && cur.length === 1) f.append('replaces_file_group_id', cur[0]!.file_group_id);
+      if (replaceGroup) f.append('replaces_file_group_id', replaceGroup);
+      else if (slot.max_files === 1 && cur.length === 1) f.append('replaces_file_group_id', cur[0]!.file_group_id);
       return api.post(`${target.base}/slots/${slot.id}/files`, { body: f });
     },
     onSettled: refresh,
@@ -75,6 +76,8 @@ export const suggestSlots = (taskId: string, file_names: string[]) =>
 
 /** Download one file; the server audits it and names it SITE_TASK_DOC_APPROVEDDATE.ext. */
 export const downloadDocument = (fileId: string) => downloadFile(`/files/${fileId}/download`);
+/** Open (view) a stored file in a new tab when it is a PDF or an image; any other type is downloaded. */
+export const openDocument = (fileId: string, mime?: string | null) => viewFile(`/files/${fileId}/download`, mime);
 
 // ------------------------------------------------------------------------------------------------------------- the site Documents tab
 export interface DocFilters {
