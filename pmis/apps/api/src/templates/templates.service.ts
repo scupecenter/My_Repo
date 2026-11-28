@@ -8,6 +8,7 @@ import { boolParam, oneParam } from '../common/query';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { SitesService } from '../sites/sites.service';
+import { limit } from '../ops/ops-limits';
 
 /** One column of a template (the JSON that tpl_columns() stores with every version). */
 export interface TplColumn {
@@ -87,9 +88,9 @@ export const TPL_SHEET = '_tpl';
 export const LISTS_SHEET = '_lists';
 /** Rows below the pre-filled ones that are formatted and validated for typing. */
 const BLANK_ROWS = 300;
-const MAX_PREFILL_ROWS = 5000;
+const maxPrefillRows = (): number => limit('prefill.max_rows');
 /** The most sites a filter-based pre-fill reads (one row per site in a stream template). */
-const MAX_PREFILL_SITES = 5000;
+const maxPrefillSites = (): number => limit('prefill.max_sites');
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isoToDate = (s: string): Date => new Date(`${s}T00:00:00.000Z`);
@@ -321,7 +322,7 @@ export class TemplatesService {
     return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
-  /** The ids of the sites the Sites list shows for these filters (JSON object of the list's query), at most MAX_PREFILL_SITES. */
+  /** The ids of the sites the Sites list shows for these filters (JSON object of the list's query), at most the prefill.max_sites limit. */
   private async siteIdsFromFilters(auth: AuthContext, raw: string): Promise<string[]> {
     let parsed: unknown;
     try { parsed = JSON.parse(raw); } catch { throw problems.validation([{ path: '/filters', code: 'invalid', message: 'filters is a JSON object.' }]); }
@@ -337,9 +338,9 @@ export class TemplatesService {
       const r = (await this.sitesSvc.list(auth, { ...base, limit: '200', ...(cursor ? { cursor } : {}) })) as { items: { id: string }[]; page: { next_cursor: string | null } };
       for (const it of r.items) if (typeof it.id === 'string') ids.push(it.id);
       cursor = r.page.next_cursor;
-      if (!cursor || ids.length >= MAX_PREFILL_SITES) break;
+      if (!cursor || ids.length >= maxPrefillSites()) break;
     }
-    return ids.slice(0, MAX_PREFILL_SITES);
+    return ids.slice(0, maxPrefillSites());
   }
 
   private siteIds(q: Record<string, unknown>): string[] {
@@ -362,7 +363,7 @@ export class TemplatesService {
         ${region !== null ? Prisma.sql`AND r.region_id = ${region}` : Prisma.empty}
       ORDER BY r.entity_id, r.is_current DESC, r.version_no DESC`);
     rows.sort((a, b) => (a.site_code ?? '').localeCompare(b.site_code ?? '', 'en') || a.entity_id.localeCompare(b.entity_id));
-    const page = rows.slice(0, MAX_PREFILL_ROWS);
+    const page = rows.slice(0, maxPrefillRows());
 
     // ids that the file shows as names / employee IDs
     const teamIds = new Set<string>(), userIds = new Set<string>();
@@ -517,7 +518,7 @@ export class TemplatesService {
         ${region !== null ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}
         AND EXISTS (SELECT 1 FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id
                     WHERE ti.site_id = s.id AND td.workflow_id = s.workflow_version_id AND td.code = ANY(${codes}::text[]) AND NOT ti.is_na)
-      ORDER BY s.site_code COLLATE "C" LIMIT ${MAX_PREFILL_ROWS}`);
+      ORDER BY s.site_code COLLATE "C" LIMIT ${maxPrefillRows()}`);
     if (sites.length === 0) return [];
     const ids = sites.map((s) => s.id);
     const tasks = await this.db.tx.$queryRaw<TaskCell[]>(Prisma.sql`

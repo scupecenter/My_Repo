@@ -32,6 +32,7 @@ import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { DataReset } from './DataReset';
 import { Imports, TemplateNoticeCard } from './Imports';
+import { DuplicateRowsCard } from './DuplicateRows';
 import { KanbanWip } from './KanbanWip';
 import { NumberSequences } from './NumberSequences';
 import { Studio } from './studio/Studio';
@@ -40,6 +41,7 @@ import { DashboardSettings } from './DashboardSettings';
 import { GoalsSettings } from './GoalsSettings';
 import { Identity } from './Identity';
 import { SecurityLocks } from './SecurityLocks';
+import { OpsLimits } from './OpsLimits';
 import { SupportAccess } from './SupportAccess';
 import { NewDeviceCode } from './NewDeviceCode';
 import { Passkeys } from './Passkeys';
@@ -50,6 +52,7 @@ import { MotionSettings } from './MotionSettings';
 import { AlertRules } from './AlertRules';
 import { LoginPageSettings } from './LoginPage';
 import { DataHubSettings } from './DataHubSettings';
+import { FinanceHubSettings } from './FinanceHubSettings';
 import { InterfaceSettings } from './InterfaceSettings';
 import { OpenRecordSettings } from './OpenRecordSettings';
 
@@ -69,9 +72,9 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -114,6 +117,7 @@ function Layout() {
     <div data-testid="page-settings">
       <h1 className="text-2xl font-bold">{t('nav.admin.settings')}</h1>
       <nav className="my-3 flex flex-wrap gap-1" aria-label={t('nav.admin.settings')}>
+        <NavLink to="/admin/settings/all" data-testid="settings-tab-all" className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t('settings.tab_all')}</NavLink>
         {SETTINGS_TABS.map((tab) => <NavLink key={tab.key} to={`/admin/settings/${tab.key}`} data-testid={`settings-tab-${tab.key}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.tab_${tab.key}`)}</NavLink>)}
       </nav>
       <Outlet />
@@ -143,12 +147,37 @@ function LegacyRedirect({ to }: { to: string }) {
   return <Navigate to={{ pathname: `/admin/settings/${to}`, search, hash }} replace />;
 }
 
+/** The first page of Settings (review item 11): every tab with its sections, so nobody has to guess where a setting lives. System-admin-only sections are hidden from others. */
+function SettingsIndex() {
+  const { t } = useTranslation();
+  const me = useMe(true);
+  return (
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="settings-index">
+      {SETTINGS_TABS.map((tab) => {
+        const sections = tab.sections.filter((s) => !s.adminOnly || me.data?.is_system_admin);
+        return (
+          <div key={tab.key} className="card space-y-2 p-4" data-testid={`settings-index-${tab.key}`}>
+            <h2 className="font-bold"><NavLink to={`/admin/settings/${tab.key}`} className="hover:underline">{t(`settings.tab_${tab.key}`)}</NavLink></h2>
+            <p className="text-xs text-mute">{t(`settings.index_${tab.key}`)}</p>
+            {sections.length > 0 && (
+              <ul className="flex flex-wrap gap-1">
+                {sections.map((s) => <li key={s.key}><NavLink to={`/admin/settings/${tab.key}/${s.key}`} data-testid={`settings-index-${tab.key}-${s.key}`} className="btn px-2 py-1 text-xs">{t(`settings.section_${tab.key}_${s.key}`)}</NavLink></li>)}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 /** Mounted at `admin/settings/*`. */
 export function SettingsRoutes() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Navigate to="sla" replace />} />
+        <Route path="all" element={<SettingsIndex />} />
         <Route path="identity" element={<Identity />} />
         <Route path="screens" element={<TabFrame tab="screens" />}>
           <Route index element={<Navigate to="dashboard" replace />} />
@@ -162,6 +191,7 @@ export function SettingsRoutes() {
           <Route path="login" element={<LoginPageSettings />} />
           <Route path="interface" element={<InterfaceSettings />} />
           <Route path="data-hub" element={<DataHubSettings />} />
+          <Route path="finance-hub" element={<FinanceHubSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
@@ -208,7 +238,7 @@ export function SettingsRoutes() {
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>
           <Route index element={<Navigate to="imports" replace />} />
-          <Route path="imports" element={<><Imports /><TemplateNoticeCard /></>} />
+          <Route path="imports" element={<><Imports /><TemplateNoticeCard /><DuplicateRowsCard /></>} />
           <Route path="historical" element={<HistoricalWaiver />} />
           <Route path="counts" element={<GecolHlcCounts />} />
           <Route path="export" element={<ExportSchedulesScreen />} />
@@ -220,6 +250,7 @@ export function SettingsRoutes() {
           <Route path="retention" element={<Retention />} />
           <Route path="dlp" element={<Dlp />} />
           <Route path="locks" element={<SecurityLocks />} />
+          <Route path="limits" element={<OpsLimits />} />
           <Route path="support" element={<SupportAccess />} />
           <Route path="newdevice" element={<NewDeviceCode />} />
           <Route path="passkeys" element={<Passkeys />} />

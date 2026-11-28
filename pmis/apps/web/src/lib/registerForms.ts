@@ -32,7 +32,7 @@ const is = (v: unknown, s: string) => typeof v === 'string' && v.toLowerCase() =
 /** Q63c: the switch decides whether the expiry date exists. Unset counts as Yes (the permit type's default is a Setting, not in the contract). */
 export const hasExpiry = (d: Data) => d.has_expiry !== false;
 
-export type FormSection = { id: string; title: string; fields: RegisterField[] };
+export type FormSection = { id: string; title: string; title_ar?: string; fields: RegisterField[] };
 
 /** Sections to show, in the order the server lists the fields: only fields the caller may see and that apply (see `isHidden`). Custom fields land in "details". */
 export function sectionsFor(def: RegisterDefinition, data: Data): FormSection[] {
@@ -43,6 +43,8 @@ export function sectionsFor(def: RegisterDefinition, data: Data): FormSection[] 
     const id = f.section ? (SECTION_ID[f.section] ?? slug(f.section)) : 'details';
     let s = out.find((x) => x.id === id);
     if (!s) { s = { id, title, fields: [] }; out.push(s); }
+    // 0422: the Arabic name of the section (register_sections.name_ar), when the server sends one; the renderers fall back to title
+    if (!s.title_ar && f.section_ar) s.title_ar = f.section_ar;
     s.fields.push(f);
   }
   return out;
