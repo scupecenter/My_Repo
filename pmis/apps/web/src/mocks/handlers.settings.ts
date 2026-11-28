@@ -1,5 +1,6 @@
 // MSW handlers for phase 3b: work calendar, rules, freeze, DLP, idle days, notification policy, log retention,
 // staff visibility, security log, integrity, online now. Synthetic data; validation mirrors the contract.
+import { isSafeTileTemplate } from '@/lib/tileMap';
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, TeamScopeMatch, TeamScopeMatchInput, TeamSpecialization, WeightSet } from '@/api/types';
@@ -1554,6 +1555,15 @@ export const settingsHandlers = [
           if (!['templates', 'uploads', 'exports', 'master_import'].includes(k)) errs.push({ path: `${path}/default_view/${k}`, code: 'unknown_key' });
           else if (!['cards', 'rows', 'table', 'compact'].includes(String(v[k]))) errs.push({ path: `${path}/default_view/${k}`, code: 'invalid' });
         }
+      } else if (name === 'map') {
+        for (const k of Object.keys(o)) if (!['enabled', 'tile_url', 'min_zoom', 'max_zoom', 'attribution', 'center_lat', 'center_lon', 'default_zoom'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });
+        if (typeof o.tile_url !== 'string' || !isSafeTileTemplate(o.tile_url)) errs.push({ path: `${path}/tile_url`, code: 'invalid' });
+        for (const k of ['min_zoom', 'max_zoom', 'default_zoom'] as const) { const n = o[k]; if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 19) errs.push({ path: `${path}/${k}`, code: 'invalid' }); }
+        if (typeof o.min_zoom === 'number' && typeof o.max_zoom === 'number' && o.max_zoom < o.min_zoom) errs.push({ path: `${path}/max_zoom`, code: 'out_of_range' });
+        if (typeof o.attribution !== 'string' || o.attribution.length > 200) errs.push({ path: `${path}/attribution`, code: 'invalid' });
+        if (typeof o.center_lat !== 'number' || o.center_lat < -85 || o.center_lat > 85) errs.push({ path: `${path}/center_lat`, code: 'invalid' });
+        if (typeof o.center_lon !== 'number' || o.center_lon < -180 || o.center_lon > 180) errs.push({ path: `${path}/center_lon`, code: 'invalid' });
       } else if (name === 'finance_hub') {
         for (const k of Object.keys(o)) if (!['widgets', 'settle_warn_days', 'aging_days'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         const w = o.widgets as Record<string, unknown> | undefined;

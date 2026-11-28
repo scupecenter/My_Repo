@@ -18,6 +18,7 @@ import { StudioReview } from './StudioReview';
 import { StudioLists, type ListKind } from './StudioLists';
 import { StudioTree } from './StudioTree';
 import { useAsk, useWrites, type Ctx } from './studioCtx';
+import { OldVersions } from './OldVersions';
 import { editedCodes, pendingChanges, type StudioSel, type Struct } from './studioModel';
 
 type View = 'form' | 'add' | 'review';
@@ -33,7 +34,10 @@ export function Studio() {
   const one = useWorkflowVersion(shown);
   if (q.isError || one.isError) return <p role="alert" className="text-lateInk" data-testid="studio-error">{t('errors.generic')}</p>;
   if (!one.data) return <p data-testid="studio-loading">{'…'}</p>;
-  return <StudioBody key={one.data.version} v={one.data} liveNo={live?.version ?? null} versions={items} />;
+  return (<>
+    <StudioBody key={one.data.version} v={one.data} liveNo={live?.version ?? null} versions={items} />
+    {one.data.can_publish && <OldVersions />}
+  </>);
 }
 
 function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: number | null; versions: WorkflowVersionSummary[] }) {

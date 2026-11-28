@@ -503,3 +503,62 @@ describe('phase 2: remove (delete or deactivate) and discard, owner rule 2026-11
     expect((await admin.api.call('post', `${BASE}/1/discard`, { reason: REASON }, hdr((await current(admin.api, 1)).tag))).status).toBe(409);
   });
 });
+
+describe('delete an old published version (migration 0575, contract 0.15.436)', () => {
+  const del = (who: Actor, v: number, t: string, body: object = { reason: REASON, confirm_text: `v${v}` }) => who.api.call('post', `${BASE}/${v}/delete`, body, hdr(t));
+
+  it('refuses without the right, with a wrong confirmation, for the version in force and for a draft', async () => {
+    const list = await admin.api.call('get', BASE);
+    const pub: number[] = list.body.items.filter((x: { status: string }) => x.status === 'published').map((x: { version: number }) => x.version);
+    const top = Math.max(...pub);
+    const t = (await current(admin.api, top)).tag;
+    expect((await del(plain, top, t)).status).toBe(403);
+    expect((await del(admin, top, t, { reason: REASON, confirm_text: 'v0' })).status).toBe(422);
+    expect((await del(admin, top, t)).status).toBe(409);
+    expect((await db.query(`SELECT 1 FROM workflow_definitions WHERE version = $1`, [top])).rowCount).toBe(1);
+  });
+
+  it('archives a full snapshot and deletes an old version that no site uses; a version with sites stays', async () => {
+    const list = await admin.api.call('get', BASE);
+    const pub: number[] = list.body.items.filter((x: { status: string }) => x.status === 'published').map((x: { version: number }) => x.version);
+    const top = Math.max(...pub);
+    const used = new Set((await db.query<{ v: number }>(
+      `SELECT DISTINCT w.version AS v FROM workflow_definitions w WHERE EXISTS (SELECT 1 FROM sites s WHERE s.workflow_version_id = w.id)
+          OR EXISTS (SELECT 1 FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id WHERE td.workflow_id = w.id)`)).rows.map((r) => r.v));
+    const withSites = pub.find((v) => v !== top && used.has(v));
+    if (withSites !== undefined) {
+      const r = await del(admin, withSites, (await current(admin.api, withSites)).tag);
+      expect(r.status).toBe(409);
+      expect((await db.query(`SELECT 1 FROM workflow_definitions WHERE version = $1`, [withSites])).rowCount).toBe(1);
+    }
+    const free = pub.find((v) => v !== top && !used.has(v));
+    if (free === undefined) return;
+    const stages = (await db.query(`SELECT count(*)::int AS n FROM stage_definitions WHERE workflow_id = (SELECT id FROM workflow_definitions WHERE version = $1)`, [free])).rows[0].n;
+    const r = await del(admin, free, (await current(admin.api, free)).tag);
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ version: free, deleted: true });
+    expect((await db.query(`SELECT 1 FROM workflow_definitions WHERE version = $1`, [free])).rowCount).toBe(0);
+    const arch = await db.query(`SELECT id, snapshot, reason FROM workflow_version_archive WHERE version = $1`, [free]);
+    expect(arch.rowCount).toBe(1);
+    expect(arch.rows[0].reason).toBe(REASON);
+    expect(arch.rows[0].snapshot.stages.length).toBe(stages);
+    expect((await db.query(`SELECT 1 FROM audit_log WHERE action = 'workflow_version_delete' AND entity_id = $1`, [String(free)])).rowCount).toBeGreaterThan(0);
+
+    // restore it from the archive: same number, same stage count, published, audited; a second restore is refused
+    const archId: string = arch.rows[0].id ?? (await db.query(`SELECT id FROM workflow_version_archive WHERE version = $1`, [free])).rows[0].id;
+    const listed = await admin.api.call('get', '/workflow/version-archive');
+    expect(listed.status).toBe(200);
+    expect(listed.body.items.some((x: { id: string }) => x.id === archId)).toBe(true);
+    const noReason = await admin.api.call('post', `/workflow/version-archive/${archId}/restore`, { reason: 'x' });
+    expect([400, 422]).toContain(noReason.status);
+    const back = await admin.api.call('post', `/workflow/version-archive/${archId}/restore`, { reason: REASON });
+    expect(back.status).toBe(200);
+    expect(back.body).toMatchObject({ version: free, restored: true });
+    const row = await db.query(`SELECT id, status FROM workflow_definitions WHERE version = $1`, [free]);
+    expect(row.rows[0].status).toBe('published');
+    expect((await db.query(`SELECT count(*)::int AS n FROM stage_definitions WHERE workflow_id = $1`, [row.rows[0].id])).rows[0].n).toBe(stages);
+    expect((await db.query(`SELECT 1 FROM audit_log WHERE action = 'workflow_version_restore' AND entity_id = $1`, [String(free)])).rowCount).toBeGreaterThan(0);
+    const again = await admin.api.call('post', `/workflow/version-archive/${archId}/restore`, { reason: REASON });
+    expect(again.status).toBe(409);
+  });
+});
