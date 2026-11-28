@@ -775,7 +775,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             {t("registers.new")}
           </button>
         }
-        columns={view === "vertical" ? <ColumnMenu api={tbl} label={label} /> : undefined}
+        columns={view === "vertical" ? <ColumnMenu density={false} api={tbl} label={label} /> : undefined}
         exporter={
             <TemplateExportMenu
               testid="register-tools"
