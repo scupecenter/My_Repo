@@ -20,7 +20,7 @@ describe('Acquisition site location', () => {
     const u = userEvent.setup();
     expect(await screen.findByTestId('acq-location-cand')).toHaveTextContent('32.9, 13.2');
     await u.click(screen.getByTestId('acq-location-send'));
-    await waitFor(() => expect(body).toMatchObject({ identity: { latitude: 32.9, longitude: 13.2 } }));
+    await waitFor(() => expect(body).toMatchObject({ identity: { latitude: 32.9, longitude: 13.2, address: 'Candidate road' } }));
   }, 30_000);
 
   it('asks before proposing different coordinates, and hides when they match', async () => {
@@ -36,5 +36,17 @@ describe('Acquisition site location', () => {
     expect(screen.getByTestId('acq-location-confirm')).toBeInTheDocument();
     await u.click(screen.getByTestId('acq-location-send'));
     await waitFor(() => expect(n).toBe(1));
+  }, 30_000);
+
+  it('proposes only the address when the coordinates match, and only what differs', async () => {
+    await signIn('pm');
+    server.use(http.get(`${API_BASE}/sites/:id`, () => HttpResponse.json({ id: 's1', latitude: 32.9, longitude: 13.2, address: null })));
+    let body: { identity?: Record<string, unknown> } | null = null;
+    server.use(http.post(`${API_BASE}/sites/:id/change-proposals`, async ({ request }) => { body = (await request.json()) as typeof body; return HttpResponse.json({ items: [{ change_id: 'CH-3' }] }); }));
+    renderApp(<AcquisitionSiteLocation siteId="s1" data={cand} />);
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('acq-location-send'));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.identity).toEqual({ address: 'Candidate road' });
   }, 30_000);
 });

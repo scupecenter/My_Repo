@@ -1,5 +1,5 @@
 # Spec: A1 site latitude, longitude and address from the selected acquisition candidate
-Status: built in this PR (frontend only, no migration). The address is not covered: the change proposal has no address field.
+Status: built in this PR (frontend only). The address is covered through the optional identity.address of A1b (migration 0611, contract 0.15.471, included here from that PR).
 ## Requirements
 - When a candidate is selected in Acquisition, offer to fill the site latitude, longitude and address from it.
 - Fill empty fields automatically as an offer; when a field already has a value, ask for confirmation before overwriting. Never overwrite silently.
