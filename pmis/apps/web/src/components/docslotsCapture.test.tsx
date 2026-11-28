@@ -90,4 +90,14 @@ describe('voice capture on the comment box (item 14 widened)', () => {
     act(() => onresult?.({ results: [[{ transcript: 'needs rebar check', isFinal: true }]] }));
     expect(screen.getByTestId('comment-input')).toHaveValue('needs rebar check');
   });
+  it('shows the missing photo indicator when the type asks for photos (D6), and nothing without a minimum or when met', () => {
+    const a = { ...slot(['jpg']), photo_min_count: 3, photos_missing: 2 } as DocumentSlot;
+    const b = { ...slot(['jpg']), photo_min_count: 3, photos_missing: 0 } as DocumentSlot;
+    const c = { ...slot(['jpg']), photo_min_count: null, photos_missing: null } as DocumentSlot;
+    render(<SlotList slots={[a, b, c]} target={{ target: 'task', ref: 'T1' } as never} edit />);
+    expect(screen.getByTestId(`slot-photos-missing-${a.id}`)).toHaveTextContent('2');
+    expect(screen.getByTestId(`slot-photos-missing-${a.id}`)).toHaveTextContent('3');
+    expect(screen.queryByTestId(`slot-photos-missing-${b.id}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`slot-photos-missing-${c.id}`)).not.toBeInTheDocument();
+  });
 });
