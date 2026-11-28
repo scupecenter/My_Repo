@@ -173,6 +173,11 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/comments/:id/reactions'],
   ['put', '/comments/:id/resolved'],
   ['delete', '/comments/:id/resolved'],
+  // Contract 0.15.480 (0621): frozen plans and the variance report.
+  ['get', '/plan-freezes'],
+  ['post', '/plan-freezes'],
+  ['delete', '/plan-freezes/:id'],
+  ['get', '/plan-freezes/:id/report'],
   ['get', '/tasks/:id/time-in-state'],
   ['get', '/tasks/:id/blocked-by'],
   ['get', '/reports/time-in-state'],

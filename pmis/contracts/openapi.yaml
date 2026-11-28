@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.480 (2026-11-28): frozen plans and variance against them (migration 0621, mirror `db/sql/620_plan_freezes.sql`). Additive. `GET`/`POST /plan-freezes`, `DELETE /plan-freezes/{freeze_id}` and `GET /plan-freezes/{freeze_id}/report`. A System Admin freezes the plan: the approved baseline date of each milestone of every active site is copied under a name; the official baselines are not changed. The report (view on the dashboard module, rows limited to the caller's regions, optional `region_id`) gives per stage, per region and for the 50 worst rows the rows, how many are done, done late, open past their frozen date, the average variance and the worst, in calendar days (actual minus the frozen date). Hide, never delete. Audit `plan_freeze_create`, `plan_freeze_hide`.
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
@@ -19753,6 +19754,88 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /plan-freezes:
+    get:
+      tags: [reports]
+      operationId: listPlanFreezes
+      summary: Frozen plans (0.15.480)
+      description: 0.15.480 (migration 0621). The frozen plans that are not hidden, newest first, and whether the caller may freeze (`can_freeze`, a System Admin). Needs `view` on the dashboard module.
+      x-db-path: plan_freezes_json
+      responses:
+        '200':
+          description: The frozen plans.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlanFreezeList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [reports]
+      operationId: createPlanFreeze
+      summary: Freeze the plan now (0.15.480)
+      description: System Admin only. Copies, for every active site, the approved baseline date of each milestone as it stands now. The official baselines are not changed. Audit `plan_freeze_create`. At most 50 frozen plans (412).
+      x-db-path: plan_freeze_create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              additionalProperties: false
+              properties:
+                label: { type: string, minLength: 1, maxLength: 120 }
+                note: { type: [string, 'null'], maxLength: 1000 }
+      responses:
+        '201':
+          description: Frozen.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, sites, rows]
+                properties:
+                  id: { type: string, format: uuid }
+                  sites: { type: integer }
+                  rows: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /plan-freezes/{freeze_id}:
+    parameters:
+      - {name: freeze_id, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      tags: [reports]
+      operationId: hidePlanFreeze
+      summary: Hide a frozen plan (0.15.480)
+      description: System Admin only. Hides it from the list and the report; the rows are kept. Audit `plan_freeze_hide`.
+      x-db-path: plan_freeze_hide
+      responses:
+        '204': {description: Hidden.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /plan-freezes/{freeze_id}/report:
+    parameters:
+      - {name: freeze_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: region_id, in: query, required: false, schema: {type: integer}}
+    get:
+      tags: [reports]
+      operationId: getPlanFreezeReport
+      summary: Variance of what was done against a frozen plan (0.15.480)
+      description: Per stage, per region and the 50 worst rows. Calendar days, actual minus the frozen date (negative is early); an open row past its frozen date counts as overdue up to today. Needs `view` on the dashboard module; rows are limited to the caller's regions.
+      x-db-path: plan_freeze_report
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlanFreezeReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /me/default-views:
     get:
       tags: [saved-views]
@@ -22823,6 +22906,82 @@ components:
         reactions: { type: array, items: { $ref: '#/components/schemas/CommentReaction' }, description: '0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted.' }
         resolved: { $ref: '#/components/schemas/CommentResolved' }
         created_at: { type: string, format: date-time }
+    PlanFreeze:
+      type: object
+      required: [id, label, site_count, row_count, frozen_at]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        note: { type: [string, 'null'] }
+        site_count: { type: integer }
+        row_count: { type: integer }
+        frozen_at: { type: string, format: date-time }
+        frozen_by_name: { type: [string, 'null'] }
+    PlanFreezeList:
+      type: object
+      required: [items, can_freeze]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/PlanFreeze'}
+        can_freeze: { type: boolean }
+    PlanFreezeCounts:
+      type: object
+      properties:
+        rows: { type: integer }
+        done: { type: integer }
+        done_late: { type: integer }
+        open_overdue: { type: integer }
+        avg_days: { type: [number, 'null'] }
+    PlanFreezeReport:
+      type: object
+      required: [freeze, as_of, totals, stages, regions, worst]
+      properties:
+        freeze:
+          type: object
+          required: [id, label, frozen_at]
+          properties:
+            id: { type: string, format: uuid }
+            label: { type: string }
+            note: { type: [string, 'null'] }
+            frozen_at: { type: string, format: date-time }
+        as_of: { type: string, format: date }
+        totals: {$ref: '#/components/schemas/PlanFreezeCounts'}
+        stages:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/PlanFreezeCounts'
+              - type: object
+                required: [code]
+                properties:
+                  code: { type: string }
+                  name_en: { type: [string, 'null'] }
+                  name_ar: { type: [string, 'null'] }
+                  worst_days: { type: [integer, 'null'] }
+        regions:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/PlanFreezeCounts'
+              - type: object
+                required: [region_id]
+                properties:
+                  region_id: { type: integer }
+        worst:
+          type: array
+          items:
+            type: object
+            required: [site_id, site_code, region_id, code, base, days, open]
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              region_id: { type: integer }
+              code: { type: string }
+              base: { type: string, format: date }
+              actual: { type: [string, 'null'], format: date }
+              days: { type: integer }
+              open: { type: boolean }
     CommentReactionInput:
       type: object
       required: [emoji]
