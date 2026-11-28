@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { useAlertRuleRuns, useAlertRules, useCreateAlertRule } from '@/api/settings';
-import type { AlertRule, AlertRuleTemplate } from '@/api/types';
+import { usePicker } from '@/api/admin';
+import { useRegions } from '@/api/sites';
+import { useAlertRuleRuns, useAlertRules, useAssignmentRules, useCreateAlertRule, useCreateAssignmentRule, useUpdateAssignmentRule } from '@/api/settings';
+import type { AlertRule, AlertRuleTemplate, AssignmentRule } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { QueryFallback } from '@/components/States';
 import { useToast } from '@/components/Toast';
@@ -117,6 +119,8 @@ export function AutomationCentre() {
         <Link className="text-xs underline" to="/admin/logs/audit" data-testid="au-audit-link">{t('automation.audit_link')}</Link>
       </div>
 
+      <AssignmentRules />
+
       {pick && (
         <FormDialog open onClose={() => setPick(null)} testid="au-dialog" title={t('automation.use_title', { name: ar ? pick.title_ar : pick.title_en })} busy={create.isPending}
           error={create.isError ? errText(create.error, t) : null} onSubmit={add}>
@@ -124,5 +128,102 @@ export function AutomationCentre() {
         </FormDialog>
       )}
     </section>
+  );
+}
+
+/**
+ * Assignment rules (contract 0.15.481, migration 0622): who a step opens to. A rule only chooses among people the Responsibility Matrix, the grants and
+ * the region already allow (the database re-checks when the step opens), so it widens nothing. Remove hides the rule, it is never deleted.
+ */
+function AssignmentRules() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const ar = i18n.language === 'ar';
+  const rules = useAssignmentRules();
+  const regions = useRegions();
+  const create = useCreateAssignmentRule();
+  const update = useUpdateAssignmentRule();
+  const [open, setOpen] = useState(false);
+  const [applies, setApplies] = useState<'task' | 'record'>('task');
+  const [region, setRegion] = useState('');
+  const [key, setKey] = useState('');
+  const [kind, setKind] = useState('');
+  const [note, setNote] = useState('');
+  const [search, setSearch] = useState('');
+  const [who, setWho] = useState<{ id: string; name: string } | null>(null);
+  const picker = usePicker(who ? '' : search);
+  const regName = (id: number | null) => { if (id == null) return t('automation.assign_any_region'); const r = regions.data?.find((x) => x.id === id); return r ? (ar && r.name_ar ? r.name_ar : r.name_en) : String(id); };
+  const reset = () => { setOpen(false); setRegion(''); setKey(''); setKind(''); setNote(''); setSearch(''); setWho(null); };
+  const save = () => {
+    if (!who) return;
+    create.mutate({ applies_to: applies, region_id: region ? Number(region) : null, item_key: key.trim() || null, level_kind: (kind || null) as never, user_id: who.id, enabled: true, note: note.trim() || null },
+      { onSuccess: () => { toast(t('automation.assign_added')); reset(); } });
+  };
+  const toggle = (r: AssignmentRule) => update.mutate({ id: r.id, version: r.version, body: { enabled: !r.enabled } });
+  const remove = (r: AssignmentRule) => update.mutate({ id: r.id, version: r.version, body: { removed: true } }, { onSuccess: () => toast(t('automation.assign_removed')) });
+  return (
+    <div className="card space-y-3 p-4" data-testid="assign-rules">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold" title={t('automation.assign_tip')}>{t('automation.assign_title')}</h3>
+        <button className="btn btn-accent" data-testid="assign-add" onClick={() => setOpen((v) => !v)}>{t('automation.assign_add')}</button>
+      </div>
+      <p className="text-xs text-mute">{t('automation.assign_note')}</p>
+      {rules.data && rules.data.length === 0 && <p className="text-sm text-mute" data-testid="assign-empty">{t('automation.assign_empty')}</p>}
+      <ul className="space-y-2">
+        {(rules.data ?? []).map((r) => (
+          <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line p-3" data-testid={`assign-rule-${r.id}`}>
+            <span className="text-sm">{t('automation.assign_sum', {
+              applies: t(`automation.assign_${r.applies_to}`), region: regName(r.region_id ?? null), key: r.item_key || t('automation.assign_key_ph'),
+              kind: r.level_kind ? t(`automation.assign_${r.level_kind}`) : t('automation.assign_any_kind'), person: r.user_name ?? r.user_id,
+            })}{r.note ? ` · ${r.note}` : ''}</span>
+            <span className="flex items-center gap-2">
+              <button className="btn" data-testid={`assign-toggle-${r.id}`} aria-pressed={r.enabled} onClick={() => toggle(r)}>{r.enabled ? t('automation.assign_enabled') : t('automation.assign_disabled')}</button>
+              <button className="btn" data-testid={`assign-remove-${r.id}`} onClick={() => remove(r)}>{t('automation.assign_remove')}</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {(create.isError || update.isError) && <p className="text-sm text-danger" role="alert" data-testid="assign-error">{errText((create.error ?? update.error)!, t)}</p>}
+      {open && (
+        <div className="grid gap-3 rounded-lg border border-dashed border-line p-3 md:grid-cols-2" data-testid="assign-form">
+          <label className="text-sm">{t('automation.assign_applies')}
+            <select className="input mt-1" data-testid="assign-applies" value={applies} onChange={(e) => setApplies(e.target.value as 'task' | 'record')}>
+              <option value="task">{t('automation.assign_task')}</option><option value="record">{t('automation.assign_record')}</option>
+            </select>
+          </label>
+          <label className="text-sm">{t('automation.assign_region')}
+            <select className="input mt-1" data-testid="assign-region" value={region} onChange={(e) => setRegion(e.target.value)}>
+              <option value="">{t('automation.assign_any_region')}</option>
+              {(regions.data ?? []).map((r) => <option key={r.id} value={r.id}>{ar && r.name_ar ? r.name_ar : r.name_en}</option>)}
+            </select>
+          </label>
+          <label className="text-sm">{t('automation.assign_key')}
+            <input className="input mt-1" data-testid="assign-key" maxLength={80} placeholder={t('automation.assign_key_ph')} value={key} onChange={(e) => setKey(e.target.value)} />
+          </label>
+          <label className="text-sm">{t('automation.assign_kind')}
+            <select className="input mt-1" data-testid="assign-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="">{t('automation.assign_any_kind')}</option>
+              <option value="entry">{t('automation.assign_entry')}</option><option value="review">{t('automation.assign_review')}</option><option value="approve">{t('automation.assign_approve')}</option>
+            </select>
+          </label>
+          <div className="text-sm">{t('automation.assign_person')}
+            {who ? (
+              <p className="mt-1 flex items-center gap-2"><span data-testid="assign-who">{who.name}</span><button className="btn" onClick={() => { setWho(null); setSearch(''); }}>{t('automation.assign_remove')}</button></p>
+            ) : (
+              <>
+                <input className="input mt-1" data-testid="assign-search" placeholder={t('automation.assign_person_ph')} value={search} onChange={(e) => setSearch(e.target.value)} />
+                <ul className="mt-1 max-h-40 overflow-y-auto">
+                  {(picker.data ?? []).map((u) => <li key={u.id}><button className="w-full px-2 py-1 text-start hover:bg-card2" data-testid={`assign-pick-${u.id}`} onClick={() => setWho({ id: u.id, name: u.display_name })}>{u.display_name}</button></li>)}
+                </ul>
+              </>
+            )}
+          </div>
+          <label className="text-sm">{t('automation.assign_note_label')}
+            <input className="input mt-1" data-testid="assign-note" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+          <div className="md:col-span-2"><button className="btn btn-accent" data-testid="assign-save" disabled={!who || create.isPending} onClick={save}>{t('automation.assign_save')}</button></div>
+        </div>
+      )}
+    </div>
   );
 }

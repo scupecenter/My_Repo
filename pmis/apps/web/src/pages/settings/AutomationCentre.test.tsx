@@ -28,4 +28,25 @@ describe('Settings, automation centre', () => {
     await u.click(await screen.findByTestId('au-use-issue-stuck'));
     expect(await screen.findByTestId('au-dialog')).toHaveTextContent('tpl-issue-stuck');
   });
+
+  it('adds an assignment rule for a person, switches it off and removes it', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    expect(await screen.findByTestId('assign-empty')).toBeTruthy();
+    await u.click(screen.getByTestId('assign-add'));
+    expect(screen.getByTestId('assign-save')).toBeDisabled();
+    await u.type(screen.getByTestId('assign-search'), '10');
+    const pick = await screen.findAllByTestId(/^assign-pick-/);
+    await u.click(pick[0]!);
+    await u.type(screen.getByTestId('assign-key'), 'site-visit');
+    await u.click(screen.getByTestId('assign-save'));
+    const row = await screen.findByTestId(/^assign-rule-/);
+    expect(row).toHaveTextContent('site-visit');
+    const id = row.getAttribute('data-testid')!.replace('assign-rule-', '');
+    await u.click(screen.getByTestId(`assign-toggle-${id}`));
+    await waitFor(() => expect(screen.getByTestId(`assign-toggle-${id}`)).toHaveTextContent('Off'));
+    await u.click(screen.getByTestId(`assign-remove-${id}`));
+    await waitFor(() => expect(screen.getByTestId('assign-empty')).toBeTruthy());
+  });
 });
