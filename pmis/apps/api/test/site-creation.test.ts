@@ -47,7 +47,7 @@ afterAll(async () => {
 });
 
 const input = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  site_code: code(), region_id: R, name: 'Synthetic Site', name_ar: 'موقع تجريبي', delivery_scenario: 'new_build', ...over,
+  site_code: code(), region_id: R, name: 'Synthetic Site', name_ar: 'موقع تجريبي', delivery_scenario: 'new_build', latitude: 32.5, longitude: 13.2, ...over,
 });
 /** 0257: the duplicate warnings (name, coordinates, similar Site ID) come on top of the older ones; fixtures of this file reuse names, so those tests look at the older warnings only. */
 const withoutDup = (w: { code: string }[]): { code: string }[] => w.filter((x) => !['duplicate_name', 'close_coordinates', 'similar_site_code'].includes(x.code));
@@ -267,6 +267,10 @@ describe('validation (field errors in the usual problem format)', () => {
     const other = await l1.api.call('post', '/sites', input({ site_type: 'Castle' }));
     expect(other.status).toBe(201);
     expect(withoutDup(other.body.warnings)).toEqual([expect.objectContaining({ field: 'site_type', code: 'list_other' })]);
+    // the coordinates are required for a new site: none is the field error `required`, one of the two keeps `pair_required`
+    const none = await l1.api.call('post', '/sites', input({ latitude: undefined, longitude: undefined }));
+    expect(none.status).toBe(422);
+    expect(none.body.errors).toEqual([expect.objectContaining({ path: '/latitude', code: 'required' })]);
     const pair = await l1.api.call('post', '/sites', input({ latitude: 32.5 }));
     expect(pair.body.errors).toEqual([expect.objectContaining({ path: '/longitude', code: 'pair_required' })]);
     const badDate = await l1.api.call('post', '/sites', input({ rf_survey_date: '2026-02-31' }));

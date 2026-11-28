@@ -77,8 +77,11 @@ describe('New site: the manual way', () => {
     const u = userEvent.setup();
     expect(await screen.findByTestId('new-site-form')).toBeInTheDocument();
     expect(screen.getByTestId('ns-privacy-note')).toHaveTextContent(/not loaded/);
-    await fill(u, { site_code: 'NS-HAND-1', region_id: '1', name: 'Hand site', name_ar: 'موقع يدوي', delivery_scenario: 'expansion', scope_tower_erection: 'Yes' });
+    await fill(u, { site_code: 'NS-HAND-1', region_id: '1', name: 'Hand site', latitude: '32.5', longitude: '13.2', name_ar: 'موقع يدوي', delivery_scenario: 'expansion', scope_tower_erection: 'Yes' });
     expect(screen.getByTestId('ns-name_ar')).toHaveAttribute('dir', 'rtl');
+    // the required marker: a red asterisk on the coordinates like the other required fields
+    for (const k of ['site_code', 'name', 'latitude', 'longitude']) expect(within(screen.getByTestId(`ns-${k}`).closest('div') as HTMLElement).getByTestId('required-mark')).toHaveClass('text-lateInk');
+    expect(within(screen.getByTestId('ns-address').closest('div') as HTMLElement).queryByTestId('required-mark')).not.toBeInTheDocument();
     await u.click(screen.getByTestId('ns-save'));
     const row = await screen.findByTestId('ns-draft-NS-HAND-1');
     expect(row).toHaveAttribute('data-status', 'entry');
@@ -104,7 +107,7 @@ describe('New site: the manual way', () => {
     await signIn('engineer');
     const first = renderApp(<Routed />, { route: '/sites/new' });
     const u = userEvent.setup();
-    await fill(u, { site_code: 'NS-BACK-1', region_id: '2', name: 'Back site' });
+    await fill(u, { site_code: 'NS-BACK-1', region_id: '2', name: 'Back site', latitude: '32.6', longitude: '13.3' });
     await u.click(screen.getByTestId('ns-save'));
     await u.click(await screen.findByTestId('ns-submit-NS-BACK-1'));
     await waitFor(() => expect(screen.getByTestId('ns-draft-NS-BACK-1')).toHaveAttribute('data-status', 'in_approval'));

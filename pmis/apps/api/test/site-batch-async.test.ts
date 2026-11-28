@@ -164,7 +164,7 @@ describe('a big New sites batch is sent in the background (self-approval, B5)', 
     // a site with the Site ID of row 3 appears after the upload (another path), so that row fails when it is sent
     const victim = b.codes[2]!;
     await db.query(`INSERT INTO site_drafts (site_code, region_id, data, status, created_by) VALUES ($1, $2, $3, 'in_approval', $4)`,
-      [victim, R, JSON.stringify({ site_code: victim, region_id: R, name: 'Taken', delivery_scenario: 'new_build' }), l1.user.id]);
+      [victim, R, JSON.stringify({ site_code: victim, region_id: R, name: 'Taken', latitude: 32.5, longitude: 13.2, delivery_scenario: 'new_build' }), l1.user.id]);
     const sent = await both.api.call('post', `/import-batches/${b.id}/submit`, undefined, { 'If-Match': b.tag });
     expect(sent.status).toBe(202);
     await jobs.process(await runOf(b.id));

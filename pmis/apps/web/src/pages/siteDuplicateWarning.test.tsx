@@ -19,11 +19,11 @@ describe('New site, duplicate warnings', () => {
     await signIn('pm');
     renderApp(<Routes><Route path="/sites/new" element={<NewSite />} /></Routes>, { route: '/sites/new' });
     const u = userEvent.setup();
-    await fill(u, { site_code: 'DUPW-1', region_id: '1', name: 'Twin Hill' });
+    await fill(u, { site_code: 'DUPW-1', region_id: '1', name: 'Twin Hill', latitude: '32.5', longitude: '13.2' });
     await u.click(await screen.findByTestId('ns-save'));
     await screen.findByTestId('ns-draft-DUPW-1');
     expect(screen.queryByTestId('ns-saved-warnings')).not.toBeInTheDocument();
-    await fill(u, { site_code: 'DUPW-2', region_id: '1', name: 'twin  hill' });
+    await fill(u, { site_code: 'DUPW-2', region_id: '1', name: 'twin  hill', latitude: '32.7', longitude: '13.4' });
     await u.click(screen.getByTestId('ns-save'));
     const box = await screen.findByTestId('ns-saved-warnings');
     expect(box).toHaveTextContent('DUPW-2');

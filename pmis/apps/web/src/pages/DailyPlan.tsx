@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, ClipboardCopy, Download, FileSpreadsheet, Lock, LockOpen, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { RequiredMark } from '@/components/RequiredMark';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -293,7 +294,7 @@ function RowDialog({ row, tab, onClose, onSave, busy, error }: {
             </label>
           );
         })}
-        <label className="text-sm font-semibold sm:col-span-2">{t('dailyPlan.col.reason')}{below && <span className="ms-1 text-lateInk">*</span>}
+        <label className="text-sm font-semibold sm:col-span-2">{t('dailyPlan.col.reason')}{below && <RequiredMark />}
           <textarea className="input mt-1 min-h-12 font-normal" data-testid="daily-plan-field-reason" aria-required={below} value={reason} onChange={(e) => setReason(e.target.value)} />
           {below && !reason.trim() && <span role="alert" className="text-xs font-normal text-lateInk" data-testid="daily-plan-reason-required">{t('dailyPlan.reason_required')}</span>}
         </label>
