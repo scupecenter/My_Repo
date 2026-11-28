@@ -288,9 +288,13 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
     expect((await g.entry.api.call("get", "/settings/change-log?scope=dashboard")).status).toBe(403);
     const bad = await admin.api.call("get", "/settings/change-log?scope=sites");
     expect(bad.status).toBe(422);
-    const cur = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
-    const saved = await admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 2, reason: "Change log test" }, { "If-Match": cur.headers.etag as string });
-    expect(saved.status).toBe(200);
+    const save = async () => {
+      const cur = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
+      return admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 2, reason: "Change log test" }, { "If-Match": cur.headers.etag as string });
+    };
+    let saved = await save();
+    if (saved.status === 412) saved = await save(); // the version is the update time in seconds: a write in the same second as the read is retried once
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
     try {
       const r = await admin.api.call("get", "/settings/change-log?scope=dashboard");
       expect(r.status).toBe(200);
