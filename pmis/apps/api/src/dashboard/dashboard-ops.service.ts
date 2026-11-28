@@ -130,35 +130,35 @@ export class DashboardOpsService {
       (sitesRegions === null || sitesRegions.length > 0);
 
     // 0.15.368: the phase quick filter narrows the site-based sections like the region filter (materials narrow through the filter tree, `adv`)
-    const phase = p.project_phase ?? null;
-    const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null, phase) : null;
+    const phaseFilter = p.project_phase ?? null;
+    const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null, phaseFilter) : null;
     const adv = whOk ? await this.filters.fromQuery("dashboard", q) : null;
     const materials = whOk
       ? await this.materialsSection(whScope, p.region_id ?? null, adv)
       : null;
     const permits = permitsOk
-      ? await this.permitsSection(permitScope, p.region_id ?? null, phase)
+      ? await this.permitsSection(permitScope, p.region_id ?? null, phaseFilter)
       : null;
     const gecol = gecolOk
-      ? await this.gecolSection(gecolScope, p.region_id ?? null, phase)
+      ? await this.gecolSection(gecolScope, p.region_id ?? null, phaseFilter)
       : null;
     const hlc = hlcOk
-      ? await this.hlcSection(hlcScope, p.region_id ?? null, phase)
+      ? await this.hlcSection(hlcScope, p.region_id ?? null, phaseFilter)
       : null;
     const score = contractorsOk
-      ? scorecardSummary((await this.perf.reportData(phase)).items)
+      ? scorecardSummary((await this.perf.reportData(phaseFilter)).items)
       : null;
     const quality = qualityOk
-      ? await this.qualitySection(qualityScope, p.region_id ?? null, phase)
+      ? await this.qualitySection(qualityScope, p.region_id ?? null, phaseFilter)
       : null;
     const approvals = approvalsOk
-      ? await this.approvalsSection(approvalsScope, p.region_id ?? null, phase)
+      ? await this.approvalsSection(approvalsScope, p.region_id ?? null, phaseFilter)
       : null;
     const changes = changesOk
-      ? await this.changesSection(changeScope, p.region_id ?? null, phase)
+      ? await this.changesSection(changeScope, p.region_id ?? null, phaseFilter)
       : null;
     const actions = meetingsOk
-      ? await this.actionsSection(meetingScope, p.region_id ?? null, phase)
+      ? await this.actionsSection(meetingScope, p.region_id ?? null, phaseFilter)
       : null;
 
     const phase = dashOk
