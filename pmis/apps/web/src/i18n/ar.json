@@ -7038,6 +7038,17 @@
     "page": "صفحة كاملة",
     "back": "عودة إلى {{name}}"
   },
+  "gsum": {
+    "label": "حالة {{total}} مهمة في {{group}}",
+    "segment": "{{label}}: {{count}}",
+    "segment_hint": "{{label}}: {{count}}. انقر لعرض هذه فقط، وانقر مرة أخرى لعرض الكل.",
+    "sla_green": "ضمن الهدف",
+    "sla_amber": "قرب حد المهلة",
+    "sla_red": "متأخرة",
+    "sla_none": "بلا مهلة",
+    "filtered": "المعروض فقط: {{label}}",
+    "clear": "عرض الكل"
+  },
   "tstd": {
     "empty": "لا يوجد ما يُعرض.",
     "search_table": "ابحث في هذا الجدول",
@@ -7073,6 +7084,7 @@
     "display_density": "كثافة الصفوف",
     "display_wrap": "التفاف النص الطويل",
     "display_zebra": "صفوف متناوبة الألوان",
+    "display_groupbar": "ملخص المجموعة: العدد وشريط الحالة على رأس كل مجموعة",
     "display_reset": "العودة إلى الافتراضي",
     "display_settings": "الافتراضي في الإعدادات",
     "size_sm": "صغير",
