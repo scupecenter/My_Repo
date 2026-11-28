@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useNavLayout } from '@/api/settings';
 import type { NavItem } from '@/components/navItems';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
-import { headingName, resolveLayout, type NavSub } from '@/lib/navLayout';
+import { useMe } from '@/api/hooks';
+import { applySidebarOverlay, sanitizeUiNav } from '@/lib/sidebarPrefs';
+import { headingName, NO_PAGE_GROUPS, resolveLayout, type NavSub } from '@/lib/navLayout';
 
 /**
  * The page of a menu group (Registers, the Logs...): the same screens the menu lists, as cards, so a parent entry opens its own page like Site Master does. It reads the
@@ -14,8 +16,13 @@ export function MenuGroup() {
   const { id } = useParams();
   const { items } = useOutletContext<{ items: NavItem[] }>();
   const navQ = useNavLayout();
-  const layout = resolveLayout(navQ.data?.layout ?? null);
+  const me = useMe(true);
+  // the page lists what the menu lists: the personal hide and order apply here too
+  const layout = applySidebarOverlay(resolveLayout(navQ.data?.layout ?? null), sanitizeUiNav(me.data?.user.ui_prefs?.sidebar ?? {}));
   const head = layout.headings.find((h) => h.id === id);
+  // a group with no page of its own: an old link or bookmark opens its first screen instead
+  const firstKey = head ? head.children.flatMap((c) => (typeof c === 'string' ? [c] : c.children)).find((k) => items.some((i) => i.key === k)) : undefined;
+  if (head && NO_PAGE_GROUPS.includes(head.id) && firstKey) return <Navigate to={items.find((i) => i.key === firstKey)!.to} replace />;
   if (!head) return navQ.isLoading ? null : <Navigate to="/my-work" replace />;
   const byKey = (k: string) => items.find((i) => i.key === k);
   const label = (n: NavItem) => t(n.key === 'sites' ? 'nav.sites_all' : `nav.${n.key}`);

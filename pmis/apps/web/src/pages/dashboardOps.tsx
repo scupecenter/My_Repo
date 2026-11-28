@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { DashboardOps } from "@/api/dashboard";
+import { useMe } from "@/api/hooks";
+import { hasGrant, isAdmin } from "@/lib/perm";
 import { Bar, Card, pct } from "./dashboardBits";
 
 type Ops = DashboardOps | undefined;
@@ -58,6 +60,20 @@ export function AgingRow({
         ))}
       </ul>
     </div>
+  );
+}
+
+/** A10: a shortage line suggests a draft purchase request. It only opens the new Procurement form with the site, the type and a remark filled; nothing is saved until the person submits it. */
+function ShortageDraftLink({ r }: { r: { site_id: string; site_code: string; item_code: string; item_name: string; missing: number; required: number; dispatched: number } }) {
+  const { t } = useTranslation();
+  const me = useMe(true).data;
+  if (!me || !(isAdmin(me) || hasGrant(me, "create"))) return null;
+  const remark = t("dash.ops.draft_remark", { item: `${r.item_code} ${r.item_name}`, missing: r.missing, required: r.required, dispatched: r.dispatched });
+  const q = new URLSearchParams({ record: "new", from: "shortage", site: r.site_id, site_code: r.site_code, remark });
+  return (
+    <Link className="btn text-xs" to={`/registers/procurement?${q.toString()}`} data-testid={`dash-ops-draft-${r.site_code}-${r.item_code}`}>
+      {t("dash.ops.draft_pr")}
+    </Link>
   );
 }
 
@@ -179,6 +195,9 @@ export function OpsProcurementCard({ ops }: { ops: Ops }) {
                     <th scope="col" className="text-start font-normal">
                       {t("dash.ops.col_contractor")}
                     </th>
+                    <th scope="col" className="text-end font-normal">
+                      {t("dash.ops.col_draft")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,6 +223,9 @@ export function OpsProcurementCard({ ops }: { ops: Ops }) {
                       </td>
                       <td className="py-1">
                         {r.contractor ?? t("dash.ops.unattributed")}
+                      </td>
+                      <td className="py-1 text-end">
+                        <ShortageDraftLink r={r} />
                       </td>
                     </tr>
                   ))}
