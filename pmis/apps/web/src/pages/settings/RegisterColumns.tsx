@@ -10,7 +10,9 @@ import { FieldInput, showValue } from '@/components/RegisterFields';
 import { ColumnDialog, type Place } from '@/components/ColumnDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
+import { useStructureProposals } from '@/api/structureProposals';
 import { ItemColumns } from './ItemColumns';
+import { StructureChangesTab } from './StructureByTemplate';
 import { RegisterStatePanel } from './RegisterStatePanel';
 import { RegisterRulesPanel } from './RegisterRulesPanel';
 import { isStreamKey, STREAM_MENUS, STREAM_PREFIX, StreamColumns, type StreamMenu } from './StreamColumns';
@@ -27,7 +29,29 @@ export function RegisterColumns() {
   const [sp] = useSearchParams();
   const k = sp.get('register') || 'gecol';
   if (k === ITEMS_KEY) return <ItemsPage />;
-  return isStreamKey(k) ? <StreamPage menu={k.slice(STREAM_PREFIX.length) as StreamMenu} /> : <RegisterColumnsOf />;
+  if (isStreamKey(k)) return <StreamPage menu={k.slice(STREAM_PREFIX.length) as StreamMenu} />;
+  return <RegisterColumnsTabs register={k} />;
+}
+
+/** Two tabs for a register: its columns, and its structure changes (the proposals made from a modified template, reviewed and approved here; 0.15.401 and 0.15.403). */
+function RegisterColumnsTabs({ register }: { register: string }) {
+  const { t } = useTranslation();
+  const [sp, setSp] = useSearchParams();
+  const tab = sp.get('tab') === 'structure' ? 'structure' : 'columns';
+  const props = useStructureProposals();
+  const pending = (props.data ?? []).filter((p) => p.register_key === register && p.status === 'pending').length;
+  const go = (x: 'columns' | 'structure') => setSp(x === 'structure' ? { register, tab: 'structure' } : { register }, { replace: true });
+  return (
+    <div className="space-y-3">
+      <div role="tablist" aria-label={t('regcols.title')} className="flex gap-1 border-b border-line">
+        <button type="button" role="tab" aria-selected={tab === 'columns'} className={`btn btn-ghost rounded-b-none ${tab === 'columns' ? 'border-b-2 border-accent font-bold' : ''}`} data-testid="regcols-tab-columns" onClick={() => go('columns')}>{t('struct.tab_columns')}</button>
+        <button type="button" role="tab" aria-selected={tab === 'structure'} className={`btn btn-ghost rounded-b-none ${tab === 'structure' ? 'border-b-2 border-accent font-bold' : ''}`} data-testid="regcols-tab-structure" onClick={() => go('structure')}>
+          {t('struct.tab_structure')}{pending > 0 && <span className="ms-1 chip" data-testid="regcols-tab-structure-n">{pending}</span>}
+        </button>
+      </div>
+      {tab === 'structure' ? <StructureChangesTab register={register} /> : <RegisterColumnsOf />}
+    </div>
+  );
 }
 
 const ITEMS_KEY = 'wh:items';

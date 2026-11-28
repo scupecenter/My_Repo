@@ -400,6 +400,7 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | register_sections | KEEP | Register form sections. |
 | register_task_sources | KEEP | Register to task date sources. |
 | register_column_locks | KEEP | Column locks of register fields (configuration, not records). |
+| structure_proposals | KEEP | Proposals to change the structure of a register through a modified template (configuration history, not records). |
 | task_field_sources | KEEP | Task fields fed by registers. |
 | permit_types | KEEP | Permit types. |
 | snag_types | KEEP | Snag types and photo rules. |
