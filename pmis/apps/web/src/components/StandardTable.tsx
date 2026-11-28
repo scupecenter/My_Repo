@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import type { ColDef } from '@/lib/tablePrefs';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { ColumnMenu, HeaderRow, pin, rowPad, totalWidth, tracks, useTablePrefs } from './TableKit';
 import { displayAttrs, ExportCsvButton, SearchBox, TableCount, TableToolbar, type TableNoun } from './TableStandard';
 
@@ -90,7 +91,8 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
       extra={extra}
       count={<TableCount testid={`${testid}-count`} noun={noun} total={total ?? rows.length} filtered={needle ? shown.length : total ?? rows.length} active={!!q.trim()} onClear={() => setQ('')} />}
       primary={primary}
-      columns={<ColumnMenu api={tbl} label={label} />}
+      layout={<LayoutPanel testid={`${testid}-layout`} table={tbl} />}
+      columns={<ColumnMenu density={false} api={tbl} label={label} />}
       exporter={<ExportCsvButton testid={`${testid}-export`} name={exportName} head={exportCols.map((c) => c.label)} rows={() => shown.map((r) => exportCols.map((c) => c.text(r)))} />}
       more={more} />
   );
