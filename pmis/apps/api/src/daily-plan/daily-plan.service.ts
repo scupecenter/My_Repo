@@ -3,6 +3,10 @@ import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
+import { SyslogService } from '../auth/syslog.service';
+import { DATA_SHEET, TPL_SHEET } from '../templates/templates.service';
+import { importMaxRows, type UploadedFile } from '../templates/upload.interceptor';
+import { guardXlsx } from '../templates/xlsx-guard';
 import { mapDbError } from '../common/db-errors';
 import { parseIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
@@ -63,7 +67,7 @@ function split(raw: unknown): { reason: string | null; rest: J } {
  */
 @Injectable()
 export class DailyPlanService {
-  constructor(private readonly db: DbService, private readonly stepUp: StepUpService) {}
+  constructor(private readonly db: DbService, private readonly stepUp: StepUpService, private readonly syslog: SyslogService) {}
 
   private async one<T>(sql: Prisma.Sql): Promise<T> {
     try {
@@ -148,6 +152,78 @@ export class DailyPlanService {
     const state = typeof b.state === 'string' ? b.state : '';
     const note = typeof b.note === 'string' ? b.note : '';
     return this.one(Prisma.sql`SELECT dp_plan_triage(${region(r)}::integer, ${date(d)}::date, ${state}::text, ${note}::text) AS j`);
+  }
+
+  /**
+   * POST /daily-plans/import (0564, 3b): the approved xlsx template TPL-DAILY-PLAN only. The guards of the other template imports apply (size limit of the upload
+   * interceptor, xlsx guard, the _tpl sheet naming the template and its current version, the header row as issued); each rejection goes to the System Log. The
+   * rows go to dp_import_rows in one call: each row is applied through dp_add_site, dp_save_row and dp_remove_site (rights, lock, audit inside), and one refused
+   * row refuses the whole file (errors at /rows/<line>/<field>).
+   */
+  async importTemplate(auth: AuthContext, file: UploadedFile | undefined, requestId: string | undefined): Promise<J> {
+    if (!file || file.size === 0) throw problems.validation([{ path: '/file', code: 'required', message: 'Send the filled TPL-DAILY-PLAN template as the form field "file".' }]);
+    const fileName = (file.originalname ?? '').slice(0, 200);
+    const reject = async (code: string, detail: string, ctx: Record<string, unknown> = {}): Promise<never> => {
+      await this.syslog.write('warn', `daily plan import rejected: ${code}`, { reason: code, detail, file_name: fileName, ...ctx }, auth.user.id, requestId, 'daily-plan-import');
+      throw new ProblemException(422, 'template_rejected', { detail, extra: { reason: code }, commit: true });
+    };
+    const guard = guardXlsx(file.originalname ?? '', file.buffer);
+    if (!guard.ok) return reject(guard.reason ?? 'not_xlsx', guard.detail ?? 'The file is not accepted: upload the TPL-DAILY-PLAN template (.xlsx).');
+    const wb = new ExcelJS.Workbook();
+    try {
+      await wb.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
+    } catch {
+      return reject('not_xlsx', 'The file is not a valid .xlsx workbook.');
+    }
+    const text = (cell: ExcelJS.Cell): string => {
+      const v = cell.value;
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return (cell.text ?? '').toString().trim();
+    };
+    const tpl = wb.getWorksheet(TPL_SHEET);
+    if (!tpl) return reject('tpl_missing', 'This file is not an approved GSDN Workspace template: the hidden _tpl sheet is missing. Download TPL-DAILY-PLAN from the Templates page.');
+    const kv = new Map<string, string>();
+    tpl.eachRow((row) => {
+      const k = text(row.getCell(1));
+      if (k) kv.set(k, text(row.getCell(2)));
+    });
+    const templateId = (kv.get('template_id') ?? '').slice(0, 60);
+    const versionText = (kv.get('version') ?? '').slice(0, 12);
+    if (templateId !== 'TPL-DAILY-PLAN' || !/^[0-9]{1,6}$/.test(versionText)) {
+      return reject('wrong_template', `This file is not the Daily Plan template (TPL-DAILY-PLAN); it names ${templateId || 'no template'}.`, { template_id: templateId });
+    }
+    const cur = await this.db.tx.$queryRaw<{ current_version: number; columns: { code: string; header: string }[] }[]>(Prisma.sql`
+      SELECT d.current_version, v.columns FROM template_definitions d
+      JOIN template_versions v ON v.template_def_id = d.id AND v.is_current
+      WHERE d.template_id = 'TPL-DAILY-PLAN' AND d.is_active`);
+    if (!cur[0]) return reject('template_unknown_or_inactive', 'The Daily Plan template is not in use.');
+    const version = Number(versionText);
+    if (version !== cur[0].current_version) {
+      return reject('outdated_version', `This file was made from version ${version} of TPL-DAILY-PLAN; the current version is ${cur[0].current_version}. Download the template again.`,
+        { version, current_version: cur[0].current_version });
+    }
+    const data = wb.getWorksheet(DATA_SHEET);
+    if (!data) return reject('checksum_mismatch', 'The Data sheet is missing.');
+    const cols = cur[0].columns;
+    const head = data.getRow(1);
+    if (cols.some((c, i) => text(head.getCell(i + 1)) !== c.header)) {
+      return reject('checksum_mismatch', 'The header row of the file was changed. Use the template as it was issued, without adding, moving or renaming columns.');
+    }
+    const rows: J[] = [];
+    for (let r = 2; r <= data.rowCount; r++) {
+      const cells = cols.map((_, i) => text(data.getRow(r).getCell(i + 1)));
+      if (cells.every((v) => v === '')) continue;
+      if (rows.length >= importMaxRows()) return reject('size_or_rows_exceeded', `At most ${importMaxRows()} rows per file.`);
+      const row: J = { line: r };
+      cols.forEach((c, i) => { row[c.code] = cells[i]; });
+      rows.push(row);
+    }
+    if (rows.length === 0) throw problems.validation([{ path: '/file', code: 'empty', message: 'The Data sheet has no row.' }]);
+    const meta = { file_name: fileName, template_version: version };
+    const out = await this.one<{ id: string; rows: number; updated: number; added: number; removed: number; unchanged: number }>(
+      Prisma.sql`SELECT dp_import_rows(${JSON.stringify(rows)}::jsonb, ${JSON.stringify(meta)}::jsonb) AS j`);
+    await this.syslog.write('info', 'daily plan imported', { import_id: out.id, ...out, version }, auth.user.id, requestId, 'daily-plan-import');
+    return { ...out, template_id: 'TPL-DAILY-PLAN', template_version: version, source: 'template', file_name: fileName, status: 'applied' };
   }
 
   /** GET /settings/daily-plan */

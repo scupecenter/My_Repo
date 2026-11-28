@@ -225,6 +225,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractor-performance'],
   ['get', '/settings/contractor-performance'],
   ['put', '/settings/contractor-performance'],
+  // Contract 0.15.269: the manual partial-credit entries of the progress editor (apps/api: settings; migration 0543).
+  ['get', '/settings/partial-credit'],
+  ['put', '/settings/partial-credit'],
   // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
   ['get', '/settings/alert-rules'],
   ['post', '/settings/alert-rules'],
@@ -239,6 +242,14 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/me/push'],
   ['post', '/me/push/subscribe'],
   ['post', '/me/push/unsubscribe'],
+  // Contract 0.15.531: personal notification settings (apps/api: notifications; migration 0583).
+  ['get', '/me/notification-prefs'],
+  ['put', '/me/notification-prefs'],
+  ['post', '/me/notification-prefs/snooze'],
+  ['post', '/me/notification-prefs/test'],
+  ['get', '/me/notification-prefs/decisions'],
+  ['get', '/admin/notification-personal'],
+  ['put', '/admin/notification-personal'],
   ['get', '/admin/web-push'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
@@ -322,6 +333,11 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/warehouse/dispatch-status/:id'],
   ['get', '/warehouse/region-vendors'],
   ['put', '/warehouse/region-vendors/:id'],
+  ['get', '/warehouse/reorder-limits'],
+  ['put', '/warehouse/reorder-limits/:id'],
+  ['get', '/warehouse/rma'],
+  ['post', '/warehouse/rma'],
+  ['post', '/warehouse/rma/:id/status'],
   ['get', '/warehouse/config-gaps'],
   // Contract 0.13.1 (follow-up B, Q270, migration 0067): the quarantine exit documents.
   ['post', '/warehouse/quarantine-exits'],
@@ -433,6 +449,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/media/facets'],
   ['get', '/media/items/:kind/:id/thumbnail'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
+  ['get', '/settings/dashboard-target-policy'],
+  ['put', '/settings/dashboard-target-policy'],
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
   // Contract 0.15.193 (migration 0293; apps/api: security): the download lock categories (Settings, Security, Lock keys).
@@ -541,6 +559,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/site-master/columns/:ord/reactivate'],
   ['get', '/custom-fields'],
   ['get', '/custom-fields/:id'],
+  ['post', '/custom-fields'],
+  ['patch', '/custom-fields/:id'],
   ['get', '/site-master/sites/:siteId/sources'],
   ['post', '/sites/:id/admin-edits'],
   ['get', '/sites/:id/admin-edits'],
@@ -562,6 +582,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/workflow/versions'],
   ['get', '/workflow/versions/:version'],
   ['put', '/workflow/versions/:version'],
+  ['put', '/workflow/versions/:version/lock-mode'],
   ['post', '/workflow/versions/:version/remove'],
   ['post', '/workflow/versions/:version/discard'],
   ['post', '/workflow/versions/:version/migrations'],
@@ -574,6 +595,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/workflow/versions/:version/weight-totals'],
   ['put', '/workflow/versions/:version/tasks/:task/sla-rule'],
   ['post', '/workflow/versions/:version/tasks/:task/sla-rules/:rule/remove'],
+  // Contract 0.15.269: estimated man-days and planned duration of a task in a draft (migration 0542).
+  ['put', '/workflow/versions/:version/tasks/:task/estimate'],
   ['put', '/workflow/versions/:version/tasks/:task/weight'],
   ['put', '/workflow/versions/:version/tasks/:task/closing'],
   ['put', '/workflow/versions/:version/tasks/:task/successors'],
@@ -594,6 +617,8 @@ export const REAL_API_AUTH_USERS = [
   // (warehouse, as-built items, My Work, dashboard extras and settings, documents grid, fleet actions, invitations, admin overrides).
   ['get', '/settings/dashboard'],
   ['put', '/settings/dashboard'],
+  ['get', '/settings/dashboard/health-bands'],
+  ['put', '/settings/dashboard/health-bands'],
   ['get', '/settings/goals'],
   ['put', '/settings/goals'],
   ['get', '/goals/progress'],
@@ -681,6 +706,7 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/daily-plans/:date/regions/:regionId/claim'],
   ['post', '/daily-plans/:date/regions/:regionId/triage'],
   ['get', '/warehouse/items/:id/history'],
+  ['post', '/daily-plans/import'],
   ['post', '/daily-plans/:date/regions/:regionId/sites'],
   ['patch', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
   ['delete', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
@@ -721,6 +747,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/settings/data-reset/requests/:id/cancel'],
   ['post', '/settings/data-reset/requests/:id/run'],
   ['post', '/settings/data-reset/requests/:id/retry-files'],
+  ['post', '/settings/data-reset/requests/:id/archive'],
+  ['get', '/settings/data-reset/requests/:id/archive/download'],
   // Contract 0.15.70 (migration 0151; apps/api: library): Library > Forms and Archive, Settings > Documents > Form templates and Archive (W5).
   ['get', '/library/forms'],
   ['post', '/library/forms/:id/preview'],
@@ -739,6 +767,16 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/library-archive'],
   ['get', '/settings/document-marks'],
   ['put', '/settings/document-marks/:code'],
+  // Contract 0.15.401 (migration 0560): structure proposals, the change of a register's columns made from a modified template.
+  ['get', '/settings/structure-policy'],
+  ['put', '/settings/structure-policy'],
+  ['get', '/structure-proposals'],
+  ['post', '/structure-proposals'],
+  ['post', '/structure-proposals/upload'],
+  ['get', '/structure-proposals/:id'],
+  ['get', '/structure-proposals/:id/differences'],
+  ['post', '/structure-proposals/:id/decision'],
+  ['post', '/structure-proposals/:id/revert'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

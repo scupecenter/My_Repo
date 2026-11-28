@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { headersMatchWithAliases } from './header-aliases';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
@@ -148,6 +149,12 @@ interface ErrorReportRow {
 
 @Injectable()
 export class ImportService {
+  /** 0640: the alternative names of the columns of a register, by column code (empty when none has any). */
+  private async aliasesOf(registerKey: string): Promise<Map<string, string[]>> {
+    const rows = await this.db.tx.$queryRaw<{ code: string; import_aliases: string[] }[]>`SELECT code, import_aliases FROM register_fields WHERE register_key = ${registerKey} AND cardinality(import_aliases) > 0`;
+    return new Map(rows.map((r) => [r.code, r.import_aliases]));
+  }
+
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
@@ -265,7 +272,10 @@ export class ImportService {
     for (let i = cols.length + 1; i <= Math.max(ws.getRow(1).cellCount, cols.length + 1); i++) if (this.text(ws.getRow(1).getCell(i))) extra = true;
     const sum = sha256(headers.join(unitSeparator));
     const claimed = kv.get('header_checksum');
-    if (extra || sum !== issued.header_checksum || (claimed !== undefined && claimed !== issued.header_checksum)) {
+    // 0640: a header that is an alternative name of its column is that column (the labels were not changed, only the way a person wrote them)
+    const viaAlias = !extra && sum !== issued.header_checksum && (claimed === undefined || claimed === issued.header_checksum) && current.kind === 'register' && !!current.register_key
+      && headersMatchWithAliases(cols, headers, await this.aliasesOf(current.register_key));
+    if (!viaAlias && (extra || sum !== issued.header_checksum || (claimed !== undefined && claimed !== issued.header_checksum))) {
       return this.reject(auth, requestId, 'checksum_mismatch', 'The header row of the file was changed. Use the template as it was issued, without adding, moving or renaming columns.', ctx);
     }
 
@@ -444,7 +454,7 @@ export class ImportService {
     const max = importMaxRows();
     const warnings: UploadWarning[] = [];
     const staged: { sheet: string; header_checksum: string; rows: unknown[] }[] = [];
-    const helper = new Set([TPL_SHEET, LISTS_SHEET, 'Instructions', 'Columns']);
+    const helper = new Set([TPL_SHEET, LISTS_SHEET, 'Instructions', 'Columns', 'Structure']);
     for (const ws of wb.worksheets) {
       if (helper.has(ws.name)) continue;
       const part = parts.find((p) => p.sheet === ws.name);
