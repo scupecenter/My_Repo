@@ -464,6 +464,9 @@ let dashState = {
   updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+/** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
+let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
+const bandsView = () => ({ ...bandsState });
 
 /** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
@@ -583,6 +586,22 @@ export const settingsHandlers = [
     const b = (await request.json()) as { targets: typeof dashState.targets; thresholds: typeof dashState.thresholds; tabs: typeof dashState.tabs };
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
+  }),
+  // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
+  http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
+  http.put(`${B}/settings/dashboard/health-bands`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, bandsState.version); if (p) return p;
+    const b = (await request.json()) as { green?: number; amber?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.green) || b.green! < 1 || b.green! > 100) errs.push({ path: '/green', code: 'invalid' });
+    if (!Number.isInteger(b.amber) || b.amber! < 0 || b.amber! > 99) errs.push({ path: '/amber', code: 'invalid' });
+    if (!errs.length && b.green! <= b.amber!) errs.push({ path: '/green', code: 'invalid_order' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    bandsState = { ...bandsState, version: bandsState.version + 1, green: b.green!, amber: b.amber!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(bandsView(), tag(bandsState.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),

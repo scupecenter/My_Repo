@@ -15,6 +15,7 @@ import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
+import { HealthBands } from "./HealthBands";
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -147,6 +148,8 @@ export function DashboardSettings() {
           {t("dashSettings.targets_derived")}
         </p>
       )}
+
+      <HealthBands />
 
       <fieldset
         className="space-y-2 rounded-md border border-line p-3"
