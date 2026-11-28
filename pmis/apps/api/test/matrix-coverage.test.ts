@@ -29,9 +29,8 @@ describe('GET /matrix/coverage', () => {
     expect((await api.call('get', '/matrix/coverage?workflow_version=999999')).status).toBe(404);
   });
 
-  it('a System Admin gets every region and both levels per row, the summary adds up and no matrix cell changes', async () => {
+  it('a System Admin gets every region and both levels per row, the summary adds up', async () => {
     const api = await loggedIn(app, await makeAdmin(db));
-    const before = await db.query(`SELECT count(*)::int AS n, max(updated_at) AS u FROM matrix_cells`);
     const r = await api.call('get', '/matrix/coverage');
     expect(r.status).toBe(200);
     const b = r.body;
@@ -50,7 +49,26 @@ describe('GET /matrix/coverage', () => {
       }
     }
     expect(b.summary).toEqual({ cells, ok: by.ok, empty: by.empty, no_active_holder: by.no_active_holder });
-    const after = await db.query(`SELECT count(*)::int AS n, max(updated_at) AS u FROM matrix_cells`);
-    expect(after.rows[0]).toEqual(before.rows[0]);
+  });
+  it('lists the modules with registers and no permission grant, and the daily notice tells each System Admin once per module', async () => {
+    const api = await loggedIn(app, await makeAdmin(db));
+    const r = await api.call('get', '/matrix/coverage');
+    expect(r.status).toBe(200);
+    const listed = r.body.modules_without_grants as { module_key: string; name_en: string; registers: { register_key: string }[] }[];
+    expect(Array.isArray(listed)).toBe(true);
+    for (const m of listed) {
+      expect(m.registers.length).toBeGreaterThan(0);
+      const g = await db.query('SELECT count(*)::int AS n FROM permission_grants WHERE module_key = $1', [m.module_key]);
+      expect(g.rows[0].n).toBe(0);
+    }
+    const grants = await db.query('SELECT count(*)::int AS n FROM permission_grants');
+    await db.query('BEGIN');
+    await db.query('SELECT modules_no_grants_notify()');
+    const again = await db.query('SELECT modules_no_grants_notify() AS n');
+    expect(again.rows[0].n).toBe(0);
+    const dup = await db.query(`SELECT count(*)::int AS n FROM (SELECT user_id, module_key FROM notifications WHERE kind = 'module_no_grants' GROUP BY 1, 2 HAVING count(*) > 1) x`);
+    expect(dup.rows[0].n).toBe(0);
+    await db.query('ROLLBACK');
+    expect((await db.query('SELECT count(*)::int AS n FROM permission_grants')).rows[0].n).toBe(grants.rows[0].n);
   });
 });

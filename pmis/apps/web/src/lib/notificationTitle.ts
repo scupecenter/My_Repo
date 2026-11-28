@@ -74,6 +74,7 @@ const PATTERNS: [RegExp, string][] = [
   [/^Reminder: (.+)$/, 'p_reminder'],
   [/^A site moved to your region: (.+)$/, 'p_site_moved_region'],
   [/^Absence recorded: (.+)$/, 'p_absence_recorded'],
+  [/^Module without permissions: (.+)$/, 'p_module_no_grants'],
   [/^Weekly summary, week of (.+)$/, 'p_weekly_summary'],
   [/^(.+) waits for your approval$/, 'p_waits_approval'],
   [/^(.+) was returned with a note$/, 'p_returned_note'],

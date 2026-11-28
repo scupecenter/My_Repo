@@ -10,6 +10,7 @@ import { ProblemException, problems } from '../common/problem';
 import { oneParam, Query } from '../common/query';
 import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { MODULES } from '../permissions/catalogue';
 import { accountStatus } from '../workflow/task-view.service';
 
 const reason = z.string().trim().min(3).max(1000);
@@ -59,6 +60,8 @@ export interface MatrixCoverageRow {
 export interface MatrixCoverageDto {
   workflow_version: number; as_of: string; regions: { id: number; code: string; name_en: string; name_ar: string | null }[];
   summary: { cells: number; ok: number; empty: number; no_active_holder: number }; rows: MatrixCoverageRow[];
+  /** 0702 (L8): modules with registers and no permission grant in any profile, so nobody can open them until an admin grants them. */
+  modules_without_grants: { module_key: string; name_en: string; registers: { register_key: string; name_en: string; name_ar: string | null }[] }[];
 }
 interface CoverageSqlRow { kind: string; code: string; name_en: string; name_ar: string | null; module: string; ord: number; region_id: number; level: number; source: 'region' | 'default' | 'none'; assignees: number; holders: number }
 export interface MatrixDto { workflow_version: number; version: number; stages: MatrixRowDto[] }
@@ -359,7 +362,9 @@ export class MatrixService {
       summary[status] += 1;
       byRow.set(key, row);
     }
-    return { workflow_version: wf.version, as_of: new Date().toISOString(), regions, summary, rows: [...byRow.values()] };
+    const bare = (await tx.$queryRaw<{ j: { module_key: string; registers: { register_key: string; name_en: string; name_ar: string | null }[] }[] }[]>(Prisma.sql`SELECT modules_without_grants_json() AS j`))[0]!.j;
+    const modules_without_grants = bare.map((m) => ({ module_key: m.module_key, name_en: MODULES.find((x) => x.key === m.module_key)?.name_en ?? m.module_key, registers: m.registers }));
+    return { workflow_version: wf.version, as_of: new Date().toISOString(), regions, summary, rows: [...byRow.values()], modules_without_grants };
   }
 
   /**

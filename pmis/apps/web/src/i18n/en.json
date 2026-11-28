@@ -3300,6 +3300,7 @@
     "t_holiday_dates_are_tentative": "Holiday dates are tentative",
     "p_site_moved_region": "A site moved to your region: {{x}}",
     "p_absence_recorded": "Absence recorded: {{x}}",
+    "p_module_no_grants": "Module without permissions: {{x}}",
     "p_weekly_summary": "Weekly summary, week of {{x}}",
     "p_waits_approval": "{{x}} waits for your approval",
     "p_returned_note": "{{x}} was returned with a note",
@@ -8237,6 +8238,11 @@
     "pattern_help": "Tokens {REGION}, {YYYY}, {YY} and {SEQ:n} (once). Characters A-Z 0-9 - / _ .",
     "next_help": "A whole number from 1. The database refuses a value that would repeat a number already issued.",
     "region_code": "Region code"
+  },
+  "noGrants": {
+    "title_one": "A module nobody can open yet:",
+    "title_other": "{{count}} modules nobody can open yet:",
+    "hint": "No permission profile grants anything on it. Grant it in the permission profiles; nothing is granted automatically."
   },
   "matrixCoverage": {
     "title": "Matrix coverage",

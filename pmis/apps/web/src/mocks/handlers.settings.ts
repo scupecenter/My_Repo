@@ -540,6 +540,7 @@ const MATRIX_COVERAGE = {
   as_of: '2026-11-27T12:00:00.000Z',
   regions: [{ id: 1, code: 'Tripoli', name_en: 'Tripoli', name_ar: null }, { id: 2, code: 'Middle', name_en: 'Middle', name_ar: null }],
   summary: { cells: 8, ok: 5, empty: 2, no_active_holder: 1 },
+  modules_without_grants: [{ module_key: 'invoices', name_en: 'Invoices', registers: [{ register_key: 'invoices', name_en: 'Invoices', name_ar: 'الفواتير' }] }],
   rows: [
     { kind: 'stage', code: 'MS1', name_en: 'Site acquisition', name_ar: null, module: 'sites', gaps: 1, cells: [
       { region_id: 1, level_code: 'L1', source: 'default', assignees: 1, holders: 2, status: 'ok' }, { region_id: 1, level_code: 'L2', source: 'default', assignees: 1, holders: 1, status: 'ok' },
