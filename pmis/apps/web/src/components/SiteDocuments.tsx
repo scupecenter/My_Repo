@@ -84,6 +84,7 @@ export function SiteDocuments({ siteId, stages }: { siteId: string; stages: Pipe
         <label className="flex items-center gap-1 text-sm"><input type="checkbox" data-testid="docs-filter-all-sites" checked={f.all} onChange={(e) => set('all', e.target.checked)} />{t('docs.f_all_sites')}</label>
         <div className="ms-auto flex flex-wrap gap-2">
           <button className="btn" data-testid="docs-zip-picked" disabled={busy || picked.size === 0} onClick={() => zip({ file_ids: [...picked], include_superseded: true })}><Archive size={14} />{t('docs.zip_picked', { count: picked.size })}</button>
+          {!f.all && <button className="btn" data-testid="docs-zip-acceptance" disabled={busy} title={t('docs.zip_acceptance_hint')} onClick={() => zip({ site_id: siteId, pack: 'acceptance', include_superseded: false })}><Archive size={14} />{t('docs.zip_acceptance')}</button>}
           <button className="btn btn-accent" data-testid="docs-zip-all" disabled={busy || !all} title={all ? undefined : t('docs.zip_scope_needed')} onClick={() => all && zip(all)}><Archive size={14} />{t('docs.zip_all')}</button>
         </div>
       </div>

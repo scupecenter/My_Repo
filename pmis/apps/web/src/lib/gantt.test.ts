@@ -16,3 +16,21 @@ describe('buildGantt', () => {
     expect(buildGantt(undefined)).toBeNull();
   });
 });
+
+describe('buildGantt dependencies and today', () => {
+  it('joins each dated row to the one before it and flags a row dated earlier', () => {
+    const m = buildGantt([n('A', 'done', undefined, undefined, '2026-02-10'), n('B', 'planned', undefined, '2026-03-01'), n('C', 'planned', undefined, '2026-02-20')])!;
+    expect(m.deps.map((d) => [d.from, d.to, d.conflict])).toEqual([['A', 'B', false], ['B', 'C', true]]);
+  });
+  it('skips a dependency across an undated stage and keeps order of the dated ones', () => {
+    const m = buildGantt([n('A', 'done', undefined, undefined, '2026-02-10'), n('B', 'planned'), n('C', 'planned', undefined, '2026-03-01')])!;
+    expect(m.deps.map((d) => [d.from, d.to])).toEqual([['A', 'C']]);
+  });
+  it('puts today on the span and widens it when today is outside', () => {
+    const m = buildGantt([n('A', 'done', undefined, undefined, '2026-02-10'), n('B', 'planned', undefined, '2026-02-20')], '2026-03-02')!;
+    expect(m.today).not.toBeNull();
+    expect(m.max).toBe(m.today);
+    expect(pos(m, m.today!)).toBe(100);
+    expect(buildGantt([n('A', 'done', undefined, undefined, '2026-02-10')])!.today).toBeNull();
+  });
+});
