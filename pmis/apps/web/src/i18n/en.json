@@ -4888,6 +4888,20 @@
     "lock_note": "The register stays readable. New records and changes (screen, upload, workflow step) are refused until it is unlocked; System Admins are exempt.",
     "restore_note": "The register is available again with all its records."
   },
+  "siteqr": {
+    "title": "QR code of site {{code}}",
+    "note": "Print this sheet and put it on the site cabinet or gate. Scanning opens the site page; anyone who is not signed in is asked to sign in first, and sees only what their rights allow.",
+    "qr_label": "QR code that opens site {{code}}",
+    "scan": "Scan to open this site",
+    "button_hint": "QR code of this site (print or copy the link)",
+    "close": "Close",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "copy_hint": "Copy the site address",
+    "copy_failed": "The link could not be copied. Select and copy it from the sheet.",
+    "print": "Print",
+    "print_hint": "Print the sheet (A4)"
+  },
   "custreg": {
     "title": "Custom registers",
     "note": "Create a register without code. Add its columns on the Register columns screen, then enable it: it gets a menu entry, an upload and download template and a permission module. Hiding keeps its records and grants; nothing is deleted.",
