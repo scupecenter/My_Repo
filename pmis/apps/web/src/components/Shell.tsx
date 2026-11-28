@@ -13,6 +13,7 @@ import { useOpenAlertCount } from '@/api/logs';
 import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
+import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
 import { API_BASE } from '@/api/client';
@@ -38,7 +39,12 @@ const ICONS_KEY = 'pmis.nav.icons';
 /** The menu hides by itself (a narrow rail that opens on hover) unless it is pinned; kept in the browser like the width and the icons-only choice. */
 const AUTO_KEY = 'pmis.nav.auto';
 
+/** The signed-in frame. The unsaved-changes guard (Decision 11) wraps everything inside it: links, the Back button and every screen's dirty state. */
 export function Shell() {
+  return <UnsavedGuardProvider><ShellFrame /></UnsavedGuardProvider>;
+}
+
+function ShellFrame() {
   const { t } = useTranslation();
   const me = useMe(true);
   const notes = useNotifications(true);
@@ -224,7 +230,7 @@ export function Shell() {
           <button className="btn min-w-60 justify-start font-normal text-mute" data-testid="topbar-search" onClick={() => setPalette(true)}>
             <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>
           </button>
-          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
+          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.centre')}</button>
           <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <QuickCreate me={me.data} allowed={allowed} />

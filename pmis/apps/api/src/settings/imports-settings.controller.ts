@@ -21,4 +21,19 @@ export class ImportsSettingsController {
     res.setHeader('ETag', etagHeader(r.version));
     return r;
   }
+
+  /** D49 part 3 (migration 0492): the upload policy of the imports, enforce or accept_incomplete. */
+  @Get('imports/upload-policy')
+  async getPolicy(@Res({ passthrough: true }) res: Response) {
+    const r = await this.svc.getPolicy();
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('imports/upload-policy')
+  async putPolicy(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.svc.putPolicy(ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
 }
