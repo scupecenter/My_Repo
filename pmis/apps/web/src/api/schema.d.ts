@@ -8347,6 +8347,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard/forecast-method": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The method of the dashboard forecast (0.15.474)
+         * @description 0.15.474. The setting `dashboard.forecast_method`: how the progress curve card takes the weekly pace of the saved snapshots for the forecast date: `mean` (the mean weekly gain over the last weeks, the default and the former fixed behaviour) or `linear` (the slope of a straight line fitted through the actual points of the same weeks). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getForecastMethod"];
+        /**
+         * Save the method of the dashboard forecast (reason, If-Match, audited)
+         * @description 0.15.474. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+         *     (`method` is `mean` or `linear`). One audit row with before and after values and the reason. Nothing stored is recomputed: the forecast is drawn from the saved snapshots when the card opens.
+         */
+        put: operations["setForecastMethod"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/dashboard/progress-rag": {
         parameters: {
             query?: never;
@@ -20626,6 +20651,20 @@ export interface components {
             default_green: number;
             /** @description The suggested amber (not stored). */
             default_amber: number;
+        };
+        /** @description 0.15.474. The setting dashboard.forecast_method (default mean). */
+        ForecastMethod: components["schemas"]["ForecastMethodInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ForecastMethodInput: {
+            /**
+             * @description How the forecast takes the weekly pace: the mean weekly gain or a fitted straight line.
+             * @enum {string}
+             */
+            method: "mean" | "linear";
         };
         /** @description 0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity. */
         ProgressRag: {
@@ -38807,6 +38846,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnapshotSchedule"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getForecastMethod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The method. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastMethod"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setForecastMethod: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["ForecastMethodInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastMethod"];
                 };
             };
             401: components["responses"]["Unauthorized"];

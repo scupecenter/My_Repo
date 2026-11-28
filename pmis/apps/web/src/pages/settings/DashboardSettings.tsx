@@ -17,6 +17,7 @@ import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
 import { ProgressRag } from "./ProgressRag";
+import { ForecastMethod } from "./ForecastMethod";
 import { SnapshotSchedule } from "./SnapshotSchedule";
 import { HealthBands } from "./HealthBands";
 
@@ -155,6 +156,7 @@ export function DashboardSettings() {
 
       <SnapshotSchedule />
       <ProgressRag />
+      <ForecastMethod />
       <HealthBands />
 
       <fieldset

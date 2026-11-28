@@ -337,4 +337,40 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
         spi: { enabled: false, green: 0.95, amber: 0.85 }, progress_gap: { enabled: false, green: -2, amber: -5 }, velocity: { enabled: false, green: 1.5, amber: 0.75 } } }), { "If-Match": now.headers.etag as string });
     }
   });
+
+  it("forecast method (contract 0.15.474): reads the default mean, admin-only write, value rule, audit, stored snapshots untouched", async () => {
+    const admin = await plainAdmin(app, db);
+    const g: Team = await team(app, db, "gecol", "gecol", 7);
+    const cur = await admin.api.call("get", "/settings/dashboard/forecast-method");
+    expect(cur.status).toBe(200);
+    expect(cur.body.method).toBe("mean");
+    const etag = cur.headers.etag as string;
+    const put = (b: object, h: Record<string, string> = { "If-Match": etag }) =>
+      admin.api.call("put", "/settings/dashboard/forecast-method", b, h);
+    const ok = { method: "linear", reason: "Owner chose the straight line fit" };
+
+    expect((await g.entry.api.call("put", "/settings/dashboard/forecast-method", ok, { "If-Match": etag })).status).toBe(403);
+    expect((await admin.api.call("put", "/settings/dashboard/forecast-method", ok)).status).toBe(428);
+    expect((await put(ok, { "If-Match": '"999"' })).status).toBe(412);
+    expect((await put({ method: "median", reason: "Value test" })).status).toBe(422);
+    expect((await put({ method: "linear", reason: "Extra key", other: 3 })).status).toBe(422);
+    expect((await put({ method: "linear", reason: "" })).status).toBe(422);
+
+    const snapBefore = await q(db, `SELECT count(*)::int AS n FROM site_snapshots`);
+    try {
+      const saved = await put(ok);
+      expect(saved.status).toBe(200);
+      expect(saved.body.method).toBe("linear");
+      expect(saved.body.version).toBeGreaterThan(0);
+      const v = await q<{ v: unknown }>(db, `SELECT value AS v FROM settings WHERE key = 'dashboard.forecast_method'`);
+      expect(v[0]!.v).toBe("linear");
+      const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'forecast_method_update' AND entity_id = 'dashboard.forecast_method'`);
+      expect(au.length).toBeGreaterThan(0);
+      const snapAfter = await q(db, `SELECT count(*)::int AS n FROM site_snapshots`);
+      expect(snapAfter[0]!.n).toBe(snapBefore[0]!.n);
+    } finally {
+      const now = await admin.api.call("get", "/settings/dashboard/forecast-method");
+      await admin.api.call("put", "/settings/dashboard/forecast-method", { method: "mean", reason: "test reset to the default" }, { "If-Match": now.headers.etag as string });
+    }
+  });
 });

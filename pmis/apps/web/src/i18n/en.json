@@ -5398,6 +5398,13 @@
     "range": "Numbers from {{min}} to {{max}}.",
     "order": "Green must not be below amber."
   },
+  "forecastMethod": {
+    "title": "Forecast method",
+    "note": "How the progress curve forecast takes the weekly pace from the saved weekly snapshots: the mean weekly gain of the last weeks (default), or the slope of a straight line fitted through the actual points of the same weeks, which is steadier when one week jumped. The forecast date and the dashed forecast line are drawn when the card opens, so nothing stored is recomputed or rewritten.",
+    "method": "Method",
+    "mean": "Mean weekly gain",
+    "linear": "Fitted straight line"
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
