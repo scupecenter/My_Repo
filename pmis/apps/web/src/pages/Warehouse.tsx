@@ -12,6 +12,7 @@ import { useItemColumns, type ItemColumn } from '@/api/warehouseColumns';
 import { HistoryDialog } from '@/components/HistoryDialog';
 import { useItemHistory } from '@/api/history';
 import { useConfigGaps, useRegionVendors, useSaveRegionVendor, type RegionVendor, useDeleteItem, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
+import { EntityColumnLocks, EntityLockButton } from '@/components/EntityLocks';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
@@ -127,10 +128,15 @@ function Items() {
       {x.is_active && <>
       <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>
       <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>
-      {x.deletable && <button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button>}</>}</span> : null },
+      {x.deletable && <button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button>}</>}
+      <EntityLockButton kind="wh_item" id={x.id} testid={`wh-lock-${x.code}`} /></span> : null },
   ];
   return (
     <div data-testid="wh-items">
+      {admin && <EntityColumnLocks kind="wh_item" testid="wh-column-locks" options={[
+        ...(['name_en', 'name_ar', 'uom', 'category', 'serial_tracked', 'code_source', 'manufacturer', 'contract_qty', 'planned_delivery_date', 'progress_item_code'] as const).map((c) => ({ code: c, label: t(`wh.${c === 'serial_tracked' ? 'serial' : c}`, { defaultValue: c }) })),
+        ...cols.map((c) => ({ code: c.code, label: colLabel(c) })),
+      ]} />}
       <StandardTable<WarehouseItem> headTestId={(id) => (id.startsWith('cv_') ? `wh-colh-${id.slice(3)}` : undefined)} screen="warehouse-items" testid="wh-item-table" cols={stdCols} rows={items} rowId={(x) => x.id} rowTestId={(x) => `wh-item-${x.code}`}
         loading={list.isLoading} error={list.isError} onRetry={() => void list.refetch()} empty={t('wh.empty')} exportName="warehouse-items" noun="items"
         query={q} onQuery={setQ} searchTestId="wh-search"

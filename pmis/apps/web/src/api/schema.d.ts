@@ -11130,6 +11130,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/entity-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open locks of the Warehouse and the Daily Plan (0.15.408) */
+        get: operations["listEntityLocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/entity-locks/columns/{kind}/{field}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "wh_item" | "wh_movement" | "daily_plan_row";
+                field: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock a column for every record of the kind (0.15.408)
+         * @description Administer in every region. A reason and step-up are required; audited. A locked column refuses a write that sets it (403 `register_locked`), except from a System Admin.
+         */
+        post: operations["lockEntityColumn"];
+        /** Unlock a column (0.15.408) */
+        delete: operations["unlockEntityColumn"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/entity-locks/{kind}/{target_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "wh_item" | "wh_movement" | "daily_plan" | "daily_plan_row";
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock one item, movement, plan or plan row (0.15.408)
+         * @description The administer right of the target (items and movements in the Warehouse, plans and rows in the Daily Plan region). A reason and step-up are required; audited. A locked target refuses changes (403 `register_locked`) except from a System Admin.
+         */
+        post: operations["lockEntity"];
+        /** Unlock one item, movement, plan or plan row (0.15.408) */
+        delete: operations["unlockEntity"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/warehouse/items/{item_id}/history": {
         parameters: {
             query?: never;
@@ -11165,8 +11230,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Delete an item that has no data (deactivate is the other way)
-         * @description Allowed only when no movement line, serial, site quantity or As-Built link points to the item (`deletable`). Otherwise 409 `item_in_use`; deactivate it instead.
+         * Hide an item (never deleted since 0.15.408)
+         * @description Since 0.15.408 (migration 0565) the item is hidden, not deleted (`is_active` false, version moves, reason and audit `warehouse_item_hide`). Its movements, serials and history stay. A locked item answers 403 `register_locked`.
          */
         delete: operations["deleteWarehouseItem"];
         options?: never;
@@ -44738,6 +44803,195 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listEntityLocks: {
+        parameters: {
+            query?: {
+                kind?: "wh_item" | "wh_movement" | "daily_plan" | "daily_plan_row";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The open record locks and column locks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        records: {
+                            /** Format: uuid */
+                            id: string;
+                            kind: string;
+                            /** Format: uuid */
+                            target_id: string;
+                            reason: string;
+                            locked_at: string;
+                            locked_by?: string | null;
+                            label?: string | null;
+                        }[];
+                        columns: {
+                            /** Format: uuid */
+                            id: string;
+                            kind: string;
+                            field: string;
+                            reason: string;
+                            locked_at: string;
+                            locked_by?: string | null;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    lockEntityColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "wh_item" | "wh_movement" | "daily_plan_row";
+                field: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Locked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kind: string;
+                        field: string;
+                        locked: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unlockEntityColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "wh_item" | "wh_movement" | "daily_plan_row";
+                field: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Unlocked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kind: string;
+                        field: string;
+                        locked: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    lockEntity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "wh_item" | "wh_movement" | "daily_plan" | "daily_plan_row";
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Locked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kind: string;
+                        /** Format: uuid */
+                        id: string;
+                        locked: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unlockEntity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "wh_item" | "wh_movement" | "daily_plan" | "daily_plan_row";
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Unlocked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kind: string;
+                        /** Format: uuid */
+                        id: string;
+                        locked: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getWarehouseItemHistory: {
         parameters: {
             query?: never;
@@ -44817,6 +45071,7 @@ export interface operations {
                         /** Format: uuid */
                         id: string;
                         deleted: boolean;
+                        hidden?: boolean;
                     };
                 };
             };
