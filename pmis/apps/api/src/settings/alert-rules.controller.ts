@@ -11,6 +11,11 @@ export class AlertRulesController {
     return this.svc.get();
   }
 
+  @Get('link-orphans')
+  linkOrphans() {
+    return this.svc.linkOrphans();
+  }
+
   @Post()
   create(@Body() body: unknown) {
     return this.svc.create(body);
