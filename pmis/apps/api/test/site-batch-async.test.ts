@@ -57,6 +57,40 @@ afterAll(async () => {
 
 const etag = (res: { headers: Record<string, unknown> }): string => String(res.headers.etag);
 
+/**
+ * Diagnostic (no behaviour change): the New sites check (site_new_clean) inserts a probe site in a rolled-back subtransaction and turns ANY error into
+ * "could not be checked against the scenario rules". While the background run is going, a second connection repeats the same probe insert every 40 ms and
+ * records the SQLSTATE and message of every failure, so a flaky short count shows the real cause in the failure output.
+ */
+function startProbeWatch(): { stop: () => Promise<{ n: number; errors: Record<string, number> }> } {
+  let run = true;
+  const errors: Record<string, number> = {};
+  let n = 0;
+  const loop = (async () => {
+    const c = await superDb();
+    try {
+      while (run) {
+        n += 1;
+        try {
+          await c.query('BEGIN');
+          const wf = await c.query('SELECT public.active_workflow_id() AS id');
+          await c.query(`INSERT INTO sites (site_code, name, region_id, workflow_version_id, delivery_scenario, updated_at) VALUES ($1, 'probe', $2, $3, 'new_build', now()) RETURNING id`,
+            [`PROBE-${randomBytes(6).toString('hex')}`, R, wf.rows[0].id]);
+        } catch (e) {
+          const err = e as { code?: string; message?: string };
+          const k = `${err.code ?? '?'} ${String(err.message ?? e).slice(0, 160)}`;
+          errors[k] = (errors[k] ?? 0) + 1;
+        }
+        await c.query('ROLLBACK').catch(() => undefined);
+        await new Promise((r) => setTimeout(r, 40));
+      }
+    } finally {
+      await c.end();
+    }
+  })();
+  return { stop: async () => { run = false; await loop; return { n, errors }; } };
+}
+
 /** A file of `count` valid rows (New Build, Hot Swap and Expansion mixed) uploaded by `who`. Returns the batch and the Site IDs. */
 async function bigBatch(who: Actor, count: number): Promise<{ id: string; tag: string; codes: string[] }> {
   const codes = Array.from({ length: count }, () => code());
@@ -210,8 +244,16 @@ describe('a big New sites batch: L1 sends (drafts), L2 approves all in the backg
     const ret = await l2.api.call('post', `/import-batches/${b.id}/decisions`, { action: 'reject', scope: 'all', note: 'no' }, { 'If-Match': etag(go) });
     expect(ret.status).toBe(409);
     expect(ret.body.code).toBe('batch_processing');
+    const probe = startProbeWatch();
     await jobs.process(await runOf(b.id));
+    const seen = await probe.stop();
     const done = await l2.api.call('get', `/import-batches/${b.id}`);
+    if ((done.body as { status?: string }).status !== 'approved') {
+      // diagnostics for a flaky short count: the real database errors of the probe insert while the run was going, and the rows left
+      const left = ((await l2.api.call('get', `/import-batches/${b.id}/rows?limit=200`)).body as { items?: Record<string, unknown>[] }).items ?? [];
+      const pend = left.filter((r) => r.status !== 'approved').slice(0, 6);
+      throw new Error(`approve-all left rows; counts ${JSON.stringify((done.body as { counts?: unknown }).counts)}; probe errors seen ${JSON.stringify(seen)}; rows ${JSON.stringify(pend)}`);
+    }
     expect(done.body).toMatchObject({ status: 'approved', counts: { approved: ROWS, pending: 0 }, progress: { state: 'done', approved: ROWS } });
     const sites = await sitesOf(b.codes);
     expect(sites).toHaveLength(ROWS);
