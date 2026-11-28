@@ -373,7 +373,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     if (who.api.csrf) t2.set('X-CSRF-Token', who.api.csrf);
     return t2.field('reason', reasonText).attach('file', buffer, { filename: 'edited.xlsx', contentType: 'application/octet-stream' });
   };
-  const version = async (): Promise<number> => Number((await q(db, `SELECT current_version FROM template_definitions WHERE template_id = 'TPL-GECOL'`))[0].current_version);
+  const version = async (): Promise<number> => Number((await q(db, `SELECT current_version FROM template_definitions WHERE template_id = 'TPL-GECOL'`))[0]!.current_version);
 
   beforeAll(async () => { second = await plainAdmin(app, db, true); });
 
@@ -406,7 +406,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     expect(res.body.summary).toMatchObject({ rename: 1, add: 1 });
     expect((await field('c_text'))?.label_en).toBe(before?.label_en);
     expect(await field('x_from_sheet')).toBeUndefined();
-    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_proposal_submit'`))[0].n).toBeGreaterThan(0);
+    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_proposal_submit'`))[0]!.n).toBeGreaterThan(0);
   });
 
   it('a sheet with no change is refused, and a file without the sheet is refused', async () => {
@@ -443,7 +443,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     expect(res.body.needs_two_people).toBe(true);
     const id = res.body.id as string;
     expect((await admin.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'my own proposal' })).status).toBe(403);
-    expect((await noStep.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'no step up' })).status).toBe(403);
+    expect((await noStep.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'no step up' })).status).toBe(401);
     const ok = await second.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'Second admin approves' });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect((await field('x_from_sheet'))?.is_active).toBe(false);
@@ -476,7 +476,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     const rv = await admin.api.call('post', `${SP}/${rename!.id}/revert`, { reason: 'Back to the earlier names' });
     expect(rv.status, JSON.stringify(rv.body)).toBe(201);
     expect(rv.body.reverts_id).toBe(rename!.id);
-    expect((await admin.api.call('post', `${SP}/${rv.body.id}/decision`, { action: 'approve', note: 'Undo reviewed' })).status).toBe(200);
+    expect((await second.api.call('post', `${SP}/${rv.body.id}/decision`, { action: 'approve', note: 'Undo reviewed' })).status).toBe(200);
     expect((await field('c_text'))?.label_en).not.toBe('Renamed from Excel');
     expect((await admin.api.call('get', `${SP}/${rename!.id}`)).body.status).toBe('reverted');
   });
@@ -489,7 +489,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     expect((await plain.api.call('get', PO)).status).toBe(200);
     const ifm = (v: number) => ({ 'If-Match': `"${v}"` });
     expect((await plain.api.call('put', PO, { reason: 'try it', max_items: 5 }, ifm(pol.body.version))).status).toBe(403);
-    expect((await noStep.api.call('put', PO, { reason: 'no step up', max_items: 5 }, ifm(pol.body.version))).status).toBe(403);
+    expect((await noStep.api.call('put', PO, { reason: 'no step up', max_items: 5 }, ifm(pol.body.version))).status).toBe(401);
     expect((await admin.api.call('put', PO, { reason: 'bad value', two_person: 'never' }, ifm(pol.body.version))).status).toBe(422);
     expect((await admin.api.call('put', PO, { reason: 'bad size', max_items: 501 }, ifm(pol.body.version))).status).toBe(422);
     const one = await admin.api.call('put', PO, { reason: 'one item only', max_items: 1, two_person: 'always' }, ifm(pol.body.version));
@@ -497,7 +497,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     expect(one.body).toMatchObject({ max_items: 1, two_person: 'always' });
     expect((await admin.api.call('put', PO, { reason: 'stale version', max_items: 2 }, ifm(pol.body.version))).status).toBe(412);
     expect((await admin.api.call('put', PO, { reason: 'same again', max_items: 1 }, ifm(one.body.version))).status).toBe(409);
-    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_policy_update'`))[0].n).toBeGreaterThan(0);
+    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_policy_update'`))[0]!.n).toBeGreaterThan(0);
     try {
       const two = await admin.api.call('post', SP, { register_key: 'gecol', reason: 'two items', rows: [{ code: 'x_pol_a', label_en: 'Pol A', type: 'text' }, { code: 'x_pol_b', label_en: 'Pol B', type: 'text' }] });
       expect(two.status).toBe(422);

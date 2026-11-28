@@ -5,6 +5,9 @@ import type { TFunction } from 'i18next';
 
 const EXACT: Record<string, string> = {
   "A new site was approved": "t_a_new_site_was_approved",
+  "Your structure proposal was rejected": "t_your_structure_proposal_was_rejected",
+  "Your structure proposal was applied": "t_your_structure_proposal_was_applied",
+  "A structure proposal waits for review": "t_a_structure_proposal_waits_for_review",
   "No holder for a task level": "t_no_holder_for_a_task_level",
   "No holder for a register level": "t_no_holder_for_a_register_level",
   "No holder for a snag level": "t_no_holder_for_a_snag_level",
