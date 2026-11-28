@@ -1287,6 +1287,10 @@
     "started": "Export started.",
     "view": "Export current view",
     "view_started": "Export of the current view started. Find it under Export.",
+    "pack": "Site pack",
+    "pack_hint": "Download this site as a zip: one workbook for each part you may export, with only the columns you may read.",
+    "pack_started": "Site pack started. Find it under Export.",
+    "kind_site_pack": "Site pack",
     "mine": "My exports",
     "none": "No exports yet.",
     "download": "Download",
@@ -1391,6 +1395,7 @@
     "section_registers_recycle": "Recycle bin",
     "section_registers_custom": "Custom registers",
     "section_data_structure": "Edit through templates",
+    "section_data_quality": "Data quality",
     "section_data_export": "Scheduled export",
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
@@ -1761,6 +1766,15 @@
     "end_task_layout_submitted_date": "Layout Submitted Date"
   },
   "wtSet": {
+    "diffTitle": "Changes against the set in force",
+    "diffNone": "No item differs from the set in force.",
+    "diff_added": "Added",
+    "diff_removed": "Removed",
+    "diff_changed": "Changed",
+    "diffField_name": "Name",
+    "diffField_weight": "Weight",
+    "diffField_unit": "Unit",
+    "diffField_measure_rule": "Measure rule",
     "rule": {
       "method": "How the item is counted",
       "m_off": "Not counted automatically",
@@ -2265,6 +2279,10 @@
     "grid": "Grid"
   },
   "registers": {
+    "new_more": "More ways to add",
+    "new_blank": "New blank record",
+    "new_import": "Import rows from the template",
+    "new_import_off": "This register has no template yet, so there is nothing to import.",
     "tab_asb_cw": "BOQ CW (civil works)",
     "tab_asb_te": "BOQ TE (equipment)",
     "tab_dis_cw": "Dismantle CW",
@@ -2467,6 +2485,11 @@
     "order_required": "Settings require this invoice to name its Procurement order.",
     "unknown_rule": "This register has no such rule.",
     "supplier_required": "Settings require an invoice to name its supplier company.",
+    "link_invalid": "This is not a record id of the linked register.",
+    "link_not_found": "The linked record does not exist, is not approved when that is required, or you may not see it.",
+    "link_other_site": "The linked record belongs to another site.",
+    "no_delete": "A link is switched off, never removed.",
+    "unknown_field": "Choose a text field of the source register.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -3466,6 +3489,9 @@
       "region": "Region",
       "cluster": "Cluster",
       "scenario": "Scenario",
+      "phase": "Phase",
+      "all_phases": "All phases",
+      "phase_hint": "Keep only the sites of one phase; every figure and card narrows to them.",
       "stream": "Stream",
       "all_clusters": "All clusters",
       "all_streams": "All streams",
@@ -3522,6 +3548,27 @@
       "draft_factor": "Draft",
       "draft_note": "A factor marked draft is not yet approved by the owner."
     },
+    "pst": {
+      "title": "Project Status detail",
+      "hint": "{{a}} activities, {{n}} items. Open a row to see its items.",
+      "expand": "Expand all",
+      "collapse": "Collapse all",
+      "expand_hint": "Open the items of every activity",
+      "collapse_hint": "Hide the items of every activity",
+      "col_name": "Activity / item",
+      "col_progress": "Progress",
+      "col_weight": "Weight",
+      "col_sites": "Sites done / in scope",
+      "progress_hint": "Weighted progress of the activity, or progress of the item",
+      "weight_hint": "Share of the project figure (items: share of the activity)",
+      "sites_hint": "Sites that finished the work out of the sites it applies to",
+      "open_row": "Show the {{n}} items",
+      "close_row": "Hide the {{n}} items",
+      "reason_not_weighted": "Not weighted in this set",
+      "reason_no_data": "No data yet",
+      "reason_central_hidden": "Project-wide item, outside this view",
+      "reason_not_applicable": "Does not apply here"
+    },
     "phase": {
       "manual": "typed (override)",
       "title": "Phase scope",
@@ -3548,7 +3595,10 @@
       "no_data": "no data yet",
       "central_line": "Central project-wide items, outside this figure: {{m}} of {{t}} have a value",
       "central_pct": "their weighted progress {{pct}}%",
-      "central_hint": "They count in the project-wide figure only."
+      "central_hint": "They count in the project-wide figure only.",
+      "by_phase": "By phase",
+      "by_phase_hint": "The same Project Status computed once per project phase.",
+      "phase_planned": "plan {{n}}%"
     },
     "streams": {
       "title": "Streams",
@@ -4833,6 +4883,22 @@
     "saved": "Rule saved",
     "change_title": "Change: {{rule}}"
   },
+  "links": {
+    "title": "Register links",
+    "note": "Settings for the links between registers (the D60 declaration). A link draws the picker of the record form, fills the Related records panel and, when Check on save is on, is checked on every save while the record is in entry. A link is switched off, never removed. Every change needs a reason and is audited.",
+    "from": "From register",
+    "field": "Field",
+    "to": "To register",
+    "enabled": "On",
+    "enforce": "Check on save",
+    "same_site": "Same site only",
+    "state": "Record state needed",
+    "saved": "Links saved",
+    "add": "Add a link",
+    "add_title": "Add a link between registers",
+    "choose": "Choose",
+    "toggle_title": "Change a link"
+  },
   "regstate": {
     "title": "Register state",
     "note": "Switch a whole register off (it is hidden everywhere; nothing is deleted and switching it on again restores everything) or lock it (readable, but no new record and no change, except by a System Admin). Every change needs a reason and is audited.",
@@ -5468,6 +5534,13 @@
     "suggest": "Suggested: {{green}} / {{amber}}",
     "range": "Numbers from {{min}} to {{max}}.",
     "order": "Green must not be below amber."
+  },
+  "forecastMethod": {
+    "title": "Forecast method",
+    "note": "How the progress curve forecast takes the weekly pace from the saved weekly snapshots: the mean weekly gain of the last weeks (default), or the slope of a straight line fitted through the actual points of the same weeks, which is steadier when one week jumped. The forecast date and the dashed forecast line are drawn when the card opens, so nothing stored is recomputed or rewritten.",
+    "method": "Method",
+    "mean": "Mean weekly gain",
+    "linear": "Fitted straight line"
   },
   "forecastWindow": {
     "title": "Forecast window",
@@ -7173,6 +7246,7 @@
     "display_wrap": "Wrap long text",
     "display_zebra": "Zebra rows",
     "display_groupbar": "Group summary: count and status bar on each group header",
+    "display_colors": "Value colours",
     "display_reset": "Back to the defaults",
     "display_settings": "Defaults in Settings",
     "size_sm": "Small",
@@ -7191,6 +7265,16 @@
     "display_pin": "Freeze the first columns"
   },
   "regviews": {
+    "board_drag_note": "Drag a card to another column to change its status. A refused drop says why.",
+    "drag_state": "The approval state moves only through the record's own actions.",
+    "drag_same": "Already in this column.",
+    "drag_locked": "This record is locked.",
+    "drag_field_locked": "This status field is locked.",
+    "drag_no_edit": "You cannot edit this record now.",
+    "drag_required": "This status cannot be empty.",
+    "moved": "Status changed.",
+    "preview_hint": "Space or Escape closes the preview.",
+    "preview_open": "Open the record",
     "group_record": "Record",
     "group_workflow": "Workflow",
     "record": "Record",
@@ -7879,10 +7963,14 @@
   },
   "gantt": {
     "title": "Timeline (read only)",
-    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. Dates change only through the normal change flow.",
+    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. A thin line joins each stage to the one it waits for (red when it is dated earlier). The vertical line is today. Dates change only through the normal change flow.",
     "baseline": "Baseline",
     "planned": "Planned",
-    "actual": "Actual"
+    "actual": "Actual",
+    "today": "Today",
+    "conflicts": "{{count}} order conflict(s)",
+    "dep_ok": "Waits for the stage before it",
+    "dep_conflict": "Dated before the stage it waits for"
   },
   "siteActivity": {
     "c_entity": "Entity",
@@ -8555,6 +8643,48 @@
     "state_rejected": "Rejected",
     "state_pending_evidence": "Awaiting evidence decision"
   },
+  "dq": {
+    "title": "Data quality",
+    "note": "A read-only report of data that looks wrong. It writes nothing and shows only your regions. Rows name what is wrong, never the value of a field.",
+    "enabled": "Show the report",
+    "checks": "Checks that run",
+    "fields": "Site fields that must be filled",
+    "fields_note": "Used by the check on required site fields.",
+    "max_rows": "Rows per check",
+    "readonly": "Only a System Admin or a delegate of settings edit can change this.",
+    "confirm": "Save the Data quality settings? One audit row is written with your reason.",
+    "report": "Report",
+    "pick_check": "Check",
+    "all_checks": "All checks",
+    "pick_region": "Region",
+    "all_regions": "All regions",
+    "off": "The report is switched off in the settings.",
+    "none_on": "No check is switched on.",
+    "clean": "Nothing found.",
+    "open_site": "Open site",
+    "truncated": "Only the first {{n}} rows are shown.",
+    "check_site_required_empty": "Required site fields empty",
+    "check_dates_out_of_order": "Task dates out of order",
+    "check_site_without_contractor": "Sites without a contractor",
+    "check_orphan_ids": "Orphan id columns",
+    "check_missing_photos": "Missing photos",
+    "check_site_required_empty_help": "Active sites where a field chosen above is empty.",
+    "check_dates_out_of_order_help": "Tasks whose planned or actual start is after the planned or actual date.",
+    "check_site_without_contractor_help": "Active sites where no task has an external party (contractor or team).",
+    "check_orphan_ids_help": "Id columns that point to a record that no longer exists (System Admin or settings viewer only).",
+    "check_missing_photos_help": "Slots whose type asks for a minimum number of photos (set in Settings > Documents) and have fewer.",
+    "field_name_ar": "Arabic name",
+    "field_latitude": "Latitude",
+    "field_longitude": "Longitude",
+    "field_address": "Address",
+    "field_site_type": "Site type",
+    "field_site_scenario": "Site scenario",
+    "field_sub_region": "Sub region",
+    "field_cluster_id": "Cluster",
+    "field_rf_survey_date": "RF survey date",
+    "field_acquisition_date": "Acquisition date",
+    "field_project_phase": "Project phase"
+  },
   "mediaSet": {
     "title": "Media gallery",
     "note": "What the Media tab of the library reads and how its thumbnails are made. Nothing is deleted: a switch only hides.",
@@ -8732,5 +8862,6 @@
     "note": "Note",
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
-  }
+  },
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
 }
