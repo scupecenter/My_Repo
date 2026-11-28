@@ -235,6 +235,17 @@ export const dashboardHandlers = [
         open_aging: { buckets: [{ key: 'd0_7', count: 2 }, { key: 'd8_14', count: 3 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 2 }], total: 9, oldest_days: 52 },
         achievement: { assignments: 8, completed: 3, completion_pct: 37.5, disbursed_on_completed: 48200, disbursed_on_open_work: 103300 },
       },
+      // 0.15.367: phase scope, synthetic figures
+      phase_scope: {
+        available: true,
+        phases: [
+          { phase: 'Phase 1', sites: 40, completed: 12, in_progress: 20, not_started: 6, on_hold: 2, on_air: 18, progress_pct: 45, target_sites: 40 },
+          { phase: 'Phase 2', sites: 60, completed: 4, in_progress: 30, not_started: 24, on_hold: 2, on_air: 9, progress_pct: 15, target_sites: 60 },
+          { phase: null, sites: 5, completed: 0, in_progress: 1, not_started: 4, on_hold: 0, on_air: 0, progress_pct: 0, target_sites: 5 },
+        ],
+        total: { phase: null, sites: 105, completed: 16, in_progress: 51, not_started: 34, on_hold: 4, on_air: 27, progress_pct: 25.7, target_sites: 105 },
+        monthly_on_air_auto: { value: 20, source: 'derived', derived: 20, remaining: 78, planned_end: '2027-03-15', months_left: 4 },
+      },
       // 0.15.205: change requests and overdue meeting actions, synthetic figures
       changes_meetings: {
         available: true,

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   ptwCheckGaps,
+  phaseScope,
+  autoMonthlyOnAir,
+  targetInForce,
   PTW_CHECK_KEYS,
   AGE_BUCKETS,
   ageBucket,
@@ -297,5 +300,30 @@ describe("item 9 rules: restricted financial summary (0.15.206)", () => {
     expect(r.advances.total).toBe(0);
     expect(r.amounts.disbursed).toBe(0);
     expect(r.achievement.completion_pct).toBeNull();
+
+describe('phase scope (0.15.367)', () => {
+  const row = (phase: string | null, sites: number, on_air: number) => ({ phase, sites, completed: 0, in_progress: sites - on_air, not_started: 0, on_hold: 0, on_air });
+  it('counts the sites per phase, derives the target from them and puts no phase last', () => {
+    const r = phaseScope([row(null, 4, 0), row('Phase 10', 10, 5), row('Phase 2', 20, 5)]);
+    expect(r.phases.map((p) => p.phase)).toEqual(['Phase 2', 'Phase 10', null]);
+    expect(r.phases[0]).toMatchObject({ sites: 20, target_sites: 20, progress_pct: 25 });
+    expect(r.total).toMatchObject({ sites: 34, target_sites: 34, on_air: 10, progress_pct: 29.4 });
+    expect(phaseScope([]).total).toMatchObject({ sites: 0, progress_pct: null });
+  });
+  it('spreads the sites not yet on air over the months left, never below one month', () => {
+    expect(autoMonthlyOnAir(30, '2027-03-01', '2026-11-27')).toEqual({ value: 8, months_left: 4 });
+    expect(autoMonthlyOnAir(30, '2026-11-01', '2026-11-27')).toEqual({ value: 30, months_left: 1 });
+    expect(autoMonthlyOnAir(30, null, '2026-11-27')).toEqual({ value: null, months_left: null });
+    expect(autoMonthlyOnAir(0, '2027-03-01', '2026-11-27')).toEqual({ value: null, months_left: null });
+  });
+});
+
+describe('target in force (0.15.367)', () => {
+  it('uses the typed number only while the manual override is on and the number is positive', () => {
+    expect(targetInForce(false, 4, 8)).toEqual({ value: 8, source: 'derived' });
+    expect(targetInForce(true, 4, 8)).toEqual({ value: 4, source: 'manual' });
+    expect(targetInForce(true, null, 8)).toEqual({ value: 8, source: 'derived' });
+    expect(targetInForce(true, 0, 8)).toEqual({ value: 8, source: 'derived' });
+    expect(targetInForce(false, null, null)).toEqual({ value: null, source: 'derived' });
   });
 });

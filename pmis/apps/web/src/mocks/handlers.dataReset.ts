@@ -20,12 +20,12 @@ const OTHER = { id: uid('9002'), display_name: 'Second Admin (synthetic)', emplo
 const me = () => ({ id: uid(viewer()?.employee_id ?? '1001'), display_name: viewer()?.name ?? 'Demo User 01', employee_id: viewer()?.employee_id ?? '1001' });
 const now = () => new Date().toISOString();
 
-interface St { request: DataResetRequest | null; last: DataResetRequest | null; settings: { request_expiry_minutes: number; backup_max_age_hours: number; version: number }; backupOk: boolean }
+interface St { request: DataResetRequest | null; last: DataResetRequest | null; settings: { request_expiry_minutes: number; backup_max_age_hours: number; cooloff_minutes: number; version: number }; backupOk: boolean }
 const states = new WeakMap<object, St>();
 function st(): St {
   const k = db() as unknown as object;
   let s = states.get(k);
-  if (!s) { s = { request: null, last: null, settings: { request_expiry_minutes: 30, backup_max_age_hours: 24, version: 1 }, backupOk: true }; states.set(k, s); }
+  if (!s) { s = { request: null, last: null, settings: { request_expiry_minutes: 30, backup_max_age_hours: 24, cooloff_minutes: 0, version: 1 }, backupOk: true }; states.set(k, s); }
   if (s.request && ['requested', 'approved'].includes(s.request.status) && new Date(s.request.expires_at).getTime() <= Date.now()) {
     s.last = { ...s.request, status: 'expired', expired: true, version: s.request.version + 1 };
     s.request = null;
@@ -109,6 +109,11 @@ function view(): DataResetState {
   };
 }
 
+/** The run waits for a ready archive (mode download: and downloaded once), as the database does. */
+const archiveOk = (r: DataResetRequest) => {
+  const m = r.archive?.mode ?? 'none', a = r.archive?.archive;
+  return m === 'none' || (a?.status === 'ready' && (m === 'keep_90' || (a.downloads ?? 0) > 0));
+};
 function admin() {
   const g = guard(); if (g) return g;
   if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin may use the project data reset.' });
@@ -116,14 +121,14 @@ function admin() {
 }
 /** The mock's binding hash: the scope's hash, or another one when the request runs without a backup (as the database does). */
 const bound = (parts: string[] | null, requireBackup: boolean) => (requireBackup ? scopeOf(parts).hash ?? null : hashOf([...(scopeOf(parts).parts ?? []), 'no-backup']));
-const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number, parts: string[] | null = null, requireBackup = true): DataResetRequest => ({
+const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number, parts: string[] | null = null, requireBackup = true, archive: 'none' | 'download' | 'keep_90' = 'none', cooloff = 0): DataResetRequest => ({
   id: crypto.randomUUID(), status: 'requested', version: 1, database_name: 'pmis', requested_by: by, requested_at: now(), request_reason: reason,
   expires_at: new Date(Date.now() + minutes * 60_000).toISOString(), expired: false, approved_by: null, approved_at: null, approve_reason: null, cancelled_by: null,
   cancelled_at: null, cancel_reason: null, run_by: null, run_started_at: null, db_committed_at: null, finished_at: null, stalled: false, backup: null,
   plan_at_request: { delete_rows: planOf(parts).delete_rows, files: planOf(parts).files, sites: 12,
     parts: Object.fromEntries(CATALOGUE.filter((c) => (scopeOf(parts).parts ?? []).includes(c[0])).map((c) => [c[0], c[5]])) },
-  scope: scopeOf(parts), scope_hash: bound(parts, requireBackup), approved_scope_hash: null, require_backup: requireBackup,
-  result: null, quarantine_dir: null, error: null,
+  scope: scopeOf(parts), scope_hash: bound(parts, requireBackup), approved_scope_hash: null, require_backup: requireBackup, archive: { mode: archive, archive: null },
+  result: null, quarantine_dir: null, error: null, cooloff: { minutes: cooloff, run_after: null, active: false, remaining_seconds: null },
   files: { total: 0, moved: 0, missing: 0, refused: 0, pending: 0, problems: [] },
 });
 const json = (r: DataResetRequest, status = 200) => HttpResponse.json(r, { status, headers: { ETag: `"${r.version}"` } });
@@ -138,8 +143,8 @@ const reason = (b: { reason?: string }, min: number) =>
 
 export const dataResetHandlers = [
   http.post(`${B}/__mock/data-reset/request-by-other`, async ({ request }) => {
-    const b = (await request.json().catch(() => ({}))) as { parts?: string[]; require_backup?: boolean } | null;
-    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null, b?.require_backup ?? true);
+    const b = (await request.json().catch(() => ({}))) as { parts?: string[]; require_backup?: boolean; archive?: 'none' | 'download' | 'keep_90' } | null;
+    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null, b?.require_backup ?? true, b?.archive ?? 'none', st().settings.cooloff_minutes);
     return HttpResponse.json(st().request);
   }),
   http.get(`${B}/settings/data-reset/plan`, ({ request }) => {
@@ -163,7 +168,7 @@ export const dataResetHandlers = [
   http.post(`${B}/settings/data-reset/requests`, async ({ request }) => {
     const g = admin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string; narrow?: Narrow };
+    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string; narrow?: Narrow; archive?: 'none' | 'download' | 'keep_90' };
     const bad = reason(b, 10); if (bad) return bad;
     if (b.parts && (b.parts.length === 0 || b.parts.some((p) => !CATALOGUE.some((c) => c[0] === p)))) {
       return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: b.parts.length ? 'unknown_part' : 'required' }] as never });
@@ -175,14 +180,14 @@ export const dataResetHandlers = [
     }
     const s = st();
     if (s.request) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'Another data reset request is open.' });
-    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null, need);
+    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null, need, b.archive ?? 'none', s.settings.cooloff_minutes);
     if (b.narrow) { s.request.scope = scopeOf(b.parts ?? null, b.narrow); s.request.scope_hash = s.request.scope.hash ?? null; }
     return json(s.request, 201);
   }),
   http.post(`${B}/settings/data-reset/requests/:id/approve`, async ({ params, request }) => {
     const g = admin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const r = st().request;
+    const s = st(), r = s.request;
     if (!r || r.id !== params.id) return problem(404, 'not_found', 'Not found');
     const v = version(request, r); if (v) return v;
     const body = await request.json() as { reason?: string; scope_hash?: string };
@@ -191,6 +196,12 @@ export const dataResetHandlers = [
     if (r.requested_by.id === me().id) return problem(403, 'self_approval_forbidden', 'You may not approve this yourself', { detail: 'A different System Admin must approve the reset.' });
     if (r.status !== 'requested') return problem(409, 'invalid_transition', 'Not possible now');
     Object.assign(r, { status: 'approved', version: r.version + 1, approved_by: me(), approved_at: now(), approve_reason: 'approved', approved_scope_hash: r.scope_hash });
+    const cool = r.cooloff;
+    if (cool && cool.minutes > 0) {
+      const at = Date.now() + cool.minutes * 60_000;
+      r.cooloff = { minutes: cool.minutes, run_after: new Date(at).toISOString(), active: true, remaining_seconds: cool.minutes * 60 };
+      r.expires_at = new Date(at + s.settings.request_expiry_minutes * 60_000).toISOString();
+    }
     return json(r);
   }),
   http.post(`${B}/settings/data-reset/requests/:id/cancel`, async ({ params, request }) => {
@@ -213,6 +224,8 @@ export const dataResetHandlers = [
     const v = version(request, r); if (v) return v;
     if ((await request.json() as { confirm_text?: string }).confirm_text !== PHRASE) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match');
     if (r.status !== 'approved') return problem(409, 'invalid_transition', 'Not possible now');
+    if (r.cooloff?.run_after && new Date(r.cooloff.run_after).getTime() > Date.now()) return problem(409, 'cooloff_active', 'The waiting period is not over');
+    if (!archiveOk(r)) return problem(409, 'archive_required', 'The archive of this reset is not ready', { detail: 'Make the archive first (mode download: and download it once).' });
     if ((r.require_backup ?? true) && !s.backupOk) return problem(409, 'backup_missing', 'No recent successful database backup', { detail: 'No successful database backup in the last 24 hours.' });
     const t0 = now();
     s.last = { ...r, status: 'completed', version: r.version + 3, run_by: me(), run_started_at: t0, db_committed_at: t0, finished_at: t0,
@@ -222,6 +235,25 @@ export const dataResetHandlers = [
     s.request = null;
     return json({ ...r, status: 'running', version: r.version + 1, run_by: me(), run_started_at: t0 }, 202);
   }),
+  http.post(`${B}/settings/data-reset/requests/:id/archive`, ({ params }) => {
+    const g = admin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const r = st().request;
+    if (!r || r.id !== params.id) return problem(404, 'not_found', 'Not found');
+    if (r.status !== 'approved' || (r.archive?.mode ?? 'none') === 'none') return problem(409, 'invalid_transition', 'Not possible now');
+    const t0 = now(), keep = r.archive?.mode === 'keep_90' ? 90 : 7;
+    r.archive = { mode: r.archive?.mode ?? 'none', archive: { id: crypto.randomUUID(), status: 'ready', bytes: 482_113, sha256: 'a'.repeat(64), error: null, created_at: t0, ready_at: t0,
+      keep_until: new Date(Date.now() + keep * 86_400_000).toISOString(), downloads: 0, first_downloaded_at: null, entries: { records: 128, files: 31, files_bytes: 3_204_551, registers: [{ register: 'procurement', rows: 96 }, { register: 'issue_log', rows: 32 }] } } };
+    return json(r, 202);
+  }),
+  http.get(`${B}/settings/data-reset/requests/:id/archive/download`, ({ params }) => {
+    const g = admin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const r = st().request, a = r?.archive?.archive;
+    if (!r || r.id !== params.id || !a || a.status !== 'ready') return problem(404, 'not_found', 'Not found');
+    a.downloads = (a.downloads ?? 0) + 1; a.first_downloaded_at ??= now();
+    return new HttpResponse('PK-synthetic-archive', { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="GSDN_DataReset_Archive_20261127.zip"' } });
+  }),
   http.post(`${B}/settings/data-reset/requests/:id/retry-files`, () => admin() ?? problem(409, 'invalid_transition', 'Not possible now')),
   http.put(`${B}/settings/data-reset/settings`, async ({ request }) => {
     const g = admin(); if (g) return g;
@@ -230,12 +262,13 @@ export const dataResetHandlers = [
     const h = request.headers.get('If-Match');
     if (!h) return problem(428, 'precondition_required', 'If-Match is required');
     if (h.replace(/"/g, '') !== String(s.settings.version)) return problem(412, 'precondition_failed', 'The resource changed');
-    const b = await request.json() as { reason?: string; request_expiry_minutes?: number; backup_max_age_hours?: number };
+    const b = await request.json() as { reason?: string; request_expiry_minutes?: number; backup_max_age_hours?: number; cooloff_minutes?: number };
     const errs: { path: string; code: string }[] = [];
     if (!Number.isInteger(b.request_expiry_minutes) || b.request_expiry_minutes! < 5 || b.request_expiry_minutes! > 240) errs.push({ path: '/request_expiry_minutes', code: 'out_of_range' });
     if (!Number.isInteger(b.backup_max_age_hours) || b.backup_max_age_hours! < 1 || b.backup_max_age_hours! > 72) errs.push({ path: '/backup_max_age_hours', code: 'out_of_range' });
+    if (b.cooloff_minutes !== undefined && (!Number.isInteger(b.cooloff_minutes) || b.cooloff_minutes < 0 || b.cooloff_minutes > 43200)) errs.push({ path: '/cooloff_minutes', code: 'out_of_range' });
     if (errs.length) return problem(422, 'validation_failed', 'Validation failed', { errors: errs as never });
-    s.settings = { request_expiry_minutes: b.request_expiry_minutes!, backup_max_age_hours: b.backup_max_age_hours!, version: s.settings.version + 1 };
+    s.settings = { request_expiry_minutes: b.request_expiry_minutes!, backup_max_age_hours: b.backup_max_age_hours!, cooloff_minutes: b.cooloff_minutes ?? s.settings.cooloff_minutes, version: s.settings.version + 1 };
     return HttpResponse.json(s.settings, { headers: { ETag: `"${s.settings.version}"` } });
   }),
 ];

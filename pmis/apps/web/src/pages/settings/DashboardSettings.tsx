@@ -1,4 +1,7 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { TargetPolicyPanel } from "./TargetPolicyPanel";
+import { useDashboardTargetPolicy } from "@/api/settings";
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -8,11 +11,13 @@ import {
   type DashboardSettingsInput,
   type DashboardTab,
 } from "@/api/dashboardSettings";
+import { usePartialCredit, useSetPartialCredit } from "@/api/partialCredit";
 import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
 import { FinanceReadersPanel } from "./FinanceReadersPanel";
+import { HealthBands } from "./HealthBands";
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -47,6 +52,7 @@ export function DashboardSettings() {
   const toast = useToast();
   const q = useDashboardSettings();
   const set = useSetDashboardSettings();
+  const policy = useDashboardTargetPolicy();
   const [draft, setDraft] = useState<ReturnType<typeof fromSettings> | null>(
     null,
   );
@@ -95,6 +101,7 @@ export function DashboardSettings() {
   });
 
   return (
+    <>
     <section
       className="card space-y-4 p-4"
       data-testid="page-dashboard-settings"
@@ -106,36 +113,46 @@ export function DashboardSettings() {
         {draft && <span className="chip ms-2">{t("scopeMatch.unsaved")}</span>}
       </p>
 
-      <fieldset
-        className="space-y-2 rounded-md border border-line p-3"
-        data-testid="dsettings-targets"
-      >
-        <legend className="px-1 text-sm font-semibold">
-          {t("dashSettings.targets")}
-        </legend>
-        <label className="block text-sm">
-          {t("dashSettings.sites_per_batch")}
-          <input
-            type="number"
-            min={0}
-            className="input mt-1 w-32"
-            data-testid="dsettings-sites-per-batch"
-            value={cur.targets.sites_per_batch ?? ""}
-            onChange={(e) => setTarget("sites_per_batch", e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          {t("dashSettings.monthly_on_air")}
-          <input
-            type="number"
-            min={0}
-            className="input mt-1 w-32"
-            data-testid="dsettings-monthly-on-air"
-            value={cur.targets.monthly_on_air ?? ""}
-            onChange={(e) => setTarget("monthly_on_air", e.target.value)}
-          />
-        </label>
-      </fieldset>
+      <TargetPolicyPanel />
+
+      {policy.data?.manual_override ? (
+        <fieldset
+          className="space-y-2 rounded-md border border-line p-3"
+          data-testid="dsettings-targets"
+        >
+          <legend className="px-1 text-sm font-semibold">
+            {t("dashSettings.targets")}
+          </legend>
+          <label className="block text-sm">
+            {t("dashSettings.sites_per_batch")}
+            <input
+              type="number"
+              min={0}
+              className="input mt-1 w-32"
+              data-testid="dsettings-sites-per-batch"
+              value={cur.targets.sites_per_batch ?? ""}
+              onChange={(e) => setTarget("sites_per_batch", e.target.value)}
+            />
+          </label>
+          <label className="block text-sm">
+            {t("dashSettings.monthly_on_air")}
+            <input
+              type="number"
+              min={0}
+              className="input mt-1 w-32"
+              data-testid="dsettings-monthly-on-air"
+              value={cur.targets.monthly_on_air ?? ""}
+              onChange={(e) => setTarget("monthly_on_air", e.target.value)}
+            />
+          </label>
+        </fieldset>
+      ) : (
+        <p className="rounded-md border border-line p-3 text-sm text-mute" data-testid="dsettings-targets-derived">
+          {t("dashSettings.targets_derived")}
+        </p>
+      )}
+
+      <HealthBands />
 
       <fieldset
         className="space-y-2 rounded-md border border-line p-3"
@@ -289,6 +306,7 @@ export function DashboardSettings() {
           {t("dashSettings.invalid")}
         </p>
       )}
+      <UnsavedGuard scope="settings" dirty={!!draft && !invalid} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: s.version, body: { ...toInput(cur), reason } }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }))} />
       <button
         className="btn btn-accent"
         data-testid="dsettings-save"
@@ -313,6 +331,57 @@ export function DashboardSettings() {
                   toast(t("settings.audited"));
                   setOpen(false);
                   setDraft(null);
+                },
+              },
+            )
+          }
+        />
+      )}
+    </section>
+    <PartialCreditCard />
+    </>
+  );
+}
+
+/** Migration 0543: the partial-credit switch of the progress calculation (off by default). A separate setting with its own audited save. */
+function PartialCreditCard() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const q = usePartialCredit();
+  const set = useSetPartialCredit();
+  const [open, setOpen] = useState(false);
+  if (!q.data)
+    return (
+      <section className="card p-4" data-testid="partial-credit-card">
+        <QueryFallback queries={[q]} testid="partial-credit-loading" />
+      </section>
+    );
+  const s = q.data;
+  return (
+    <section className="card space-y-2 p-4" data-testid="partial-credit-card">
+      <h2 className="font-bold">{t("dashSettings.partial_credit_title")}</h2>
+      <p className="text-sm text-mute">{t("dashSettings.partial_credit_note")}</p>
+      <p className="text-sm" data-testid="partial-credit-state">
+        {s.enabled ? t("dashSettings.partial_credit_on") : t("dashSettings.partial_credit_off")}
+      </p>
+      <button className="btn" data-testid="partial-credit-change" onClick={() => setOpen(true)}>
+        {s.enabled ? t("dashSettings.partial_credit_turn_off") : t("dashSettings.partial_credit_turn_on")}
+      </button>
+      {open && (
+        <FormDialog
+          open
+          onClose={() => setOpen(false)}
+          testid="partial-credit-dialog"
+          title={t("dashSettings.partial_credit_title")}
+          busy={set.isPending}
+          error={set.isError ? errText(set.error, t) : null}
+          onSubmit={(reason) =>
+            set.mutate(
+              { version: s.version, body: { enabled: !s.enabled, reason } },
+              {
+                onSuccess: () => {
+                  toast(t("settings.audited"));
+                  setOpen(false);
                 },
               },
             )
