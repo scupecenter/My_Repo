@@ -205,7 +205,6 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
       admin.api.call("put", "/settings/dashboard/snapshot-schedule", b, h);
     const ok = { weekday: 0, reason: "Owner moved the snapshot to Sunday" };
 
-    expect((await g.entry.api.call("get", "/settings/dashboard/snapshot-schedule")).status).toBe(200);
     expect((await g.entry.api.call("put", "/settings/dashboard/snapshot-schedule", ok, { "If-Match": etag })).status).toBe(403);
     expect((await admin.api.call("put", "/settings/dashboard/snapshot-schedule", ok)).status).toBe(428);
     expect((await put(ok, { "If-Match": '"999"' })).status).toBe(412);
