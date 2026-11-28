@@ -296,6 +296,9 @@ describe("POST and PATCH /custom-fields (admin_save_field)", () => {
     expect(a.rows[0].before.label_en).toBe("Written field");
     expect(a.rows[0].after.label_en).toBe("Renamed");
     version = res.body.version;
+    // The field is a Site field in the shared database: while it is required, every other suite that inserts a site (the probe of the New sites check, makeSite)
+    // fails with 'field "w_..." is required'. Switch the requirement off again now; the right of the PATCH was proven above.
+    await db.query(`UPDATE field_definitions SET required = false WHERE id = $1`, [created]);
   });
   it("does not change entity, code or type on update, and never deletes: deactivating hides it from a plain user", async () => {
     const bad = await admin.api.call(
