@@ -35,13 +35,13 @@ afterAll(async () => {
 const etag = (res: { headers: Record<string, unknown> }): string => String(res.headers.etag);
 const codes = (res: { body: any }): string[] => (res.body.errors ?? []).map((e: { path: string; code: string }) => `${e.path}:${e.code}`).sort();
 const put = (who: Actor, body: unknown, tag?: string) => who.api.call('put', '/settings/table-display', body, tag === undefined ? {} : { 'If-Match': tag });
-const GOOD = { size: 'lg', align: 'center', density: 'normal', wrap: true, zebra: false };
+const GOOD = { size: 'lg', align: 'center', density: 'normal', wrap: true, zebra: false, groupbar: false };
 
 describe('W8: Settings > Display (table display defaults)', () => {
   it('every signed-in user reads the defaults (the seed before any save) with an ETag', async () => {
     const res = await plain.api.call('get', '/settings/table-display');
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body.defaults).sort()).toEqual(['align', 'density', 'size', 'wrap', 'zebra']);
+    expect(Object.keys(res.body.defaults).sort()).toEqual(['align', 'density', 'groupbar', 'size', 'wrap', 'zebra']);
     expect(etag(res)).toBe(`"${res.body.version}"`);
   });
 
@@ -72,6 +72,22 @@ describe('W8: Settings > Display (table display defaults)', () => {
     expect(back.status).toBe(200);
   });
 
+  it('Item 9: groupbar is optional in a PUT (an older client), reads as on when missing, and must be true or false', async () => {
+    const cur = await admin.api.call('get', '/settings/table-display');
+    expect(cur.body.defaults.groupbar).toBe(true);
+    const bad = await put(admin, { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: 'yes' }, reason: 'Bad value' }, etag(cur));
+    expect(bad.status).toBe(422);
+    expect(codes(bad)).toEqual(['/defaults/groupbar:invalid']);
+    const old = await put(admin, { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true }, reason: 'Older client without groupbar' }, etag(cur));
+    expect(old.status).toBe(200);
+    expect(old.body.defaults.groupbar).toBe(true);
+    const off = await put(admin, { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: false }, reason: 'Group summary off' }, etag(old));
+    expect(off.status).toBe(200);
+    expect(off.body.defaults.groupbar).toBe(false);
+    const back = await put(admin, { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true }, reason: 'Back to the default' }, etag(off));
+    expect(back.status).toBe(200);
+  });
+
   it('the setting cannot be written around its door (the app role changes nothing; the guard trigger refuses)', async () => {
     const before = (await db.query("SELECT value FROM settings WHERE key = 'table.display'")).rows[0]?.value;
     try { await db.query("SET ROLE pmis_app; UPDATE settings SET value = '{}' WHERE key = 'table.display'"); } catch { /* refused */ }
@@ -84,10 +100,10 @@ describe('W8: Settings > Display (table display defaults)', () => {
   });
 
   it('a saved view keeps the Display options and the middle density; unknown Display keys are refused', async () => {
-    const ok = await plain.api.call('post', '/saved-views', { screen_key: 'sites', name: 'W8 display', filters: {}, columns: { density: 'normal', display: { size: 'sm', align: 'center', wrap: true, zebra: false } } });
+    const ok = await plain.api.call('post', '/saved-views', { screen_key: 'sites', name: 'W8 display', filters: {}, columns: { density: 'normal', display: { size: 'sm', align: 'center', wrap: true, zebra: false, groupbar: false } } });
     expect(ok.status).toBe(201);
     const got = await plain.api.call('get', `/saved-views/${ok.body.id}`);
-    expect(got.body.columns).toMatchObject({ density: 'normal', display: { size: 'sm', align: 'center', wrap: true, zebra: false } });
+    expect(got.body.columns).toMatchObject({ density: 'normal', display: { size: 'sm', align: 'center', wrap: true, zebra: false, groupbar: false } });
     const bad = await plain.api.call('post', '/saved-views', { screen_key: 'sites', name: 'W8 bad', columns: { display: { font: 'x' } } });
     expect(bad.status).toBe(422);
   });

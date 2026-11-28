@@ -32,6 +32,7 @@ const columnsSchema = z.object({
     align: z.enum(['start', 'center']).optional(),
     wrap: z.boolean().optional(),
     zebra: z.boolean().optional(),
+    groupbar: z.boolean().optional(),
   }).strict().optional(),
 }).strict();
 const sortSchema = z.array(z.object({ id: colId, dir: z.enum(['asc', 'desc']) }).strict()).max(5);
@@ -158,6 +159,18 @@ export class SavedViewsService {
   async get(_auth: AuthContext, id: string): Promise<SavedViewDto> {
     if (!uuidSchema.safeParse(id).success) throw problems.notFound();
     return this.scrub(await this.run<SavedViewDto>(Prisma.sql`SELECT sv_get(${id}::uuid) AS r`));
+  }
+
+  // ------------------------------------------------------------------ default view per screen (0.15.582, migration 0655)
+  /** Make a view the caller's default for its screen, or clear it. Personal; the database re-checks that the caller may read the view. */
+  async setDefault(_auth: AuthContext, id: string, on: boolean): Promise<{ view_id: string; screen_key: string | null; is_default: boolean }> {
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound();
+    return this.run(Prisma.sql`SELECT ${on ? Prisma.sql`default_view_set` : Prisma.sql`default_view_clear`}(${id}::uuid) AS r`);
+  }
+
+  /** The caller's default views, one per screen (inactive or unreadable views drop out). */
+  async defaultViews(): Promise<{ items: { screen_key: string; view_id: string; name: string }[] }> {
+    return { items: await this.run<{ screen_key: string; view_id: string; name: string }[]>(Prisma.sql`SELECT default_views() AS r`) };
   }
 
   // ------------------------------------------------------------------ home pins (0.15.245, item 16)
