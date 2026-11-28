@@ -10,6 +10,7 @@ import { Who } from '@/components/logs/bits';
 import { LogTable } from '@/components/logs/LogTable';
 import { SavedViews } from '@/components/logs/SavedViews';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { ActiveChips, ColumnMenu, useTablePrefs, type Chip } from '@/components/TableKit';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
@@ -189,7 +190,7 @@ export function SystemLog() {
         filters={<SavedViews screen="system-log" value={f} onApply={setF} empty={EMPTY_SYS_FILTER} table={tbl} />}
         count={<span className="text-sm text-mute" data-testid="syslog-count">{t('syslog.shown', { count: q.items.length })}</span>}
         tools={<>
-          <ColumnMenu api={tbl} label={(id) => t(`syslog.c_${id}`)} />
+          <LayoutPanel testid="system-log-layout" table={tbl} /><ColumnMenu density={false} api={tbl} label={(id) => t(`syslog.c_${id}`)} />
           {canExport && <button className="btn" data-testid="syslog-export" disabled={!q.items.length || gate.exportLocked} title={gate.note(gate.exportLocked)} onClick={doExport}><Download size={14} />{t('syslog.export')}</button>}
         </>} />
       <Filters f={f} set={setF} />

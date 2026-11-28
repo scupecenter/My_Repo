@@ -90,6 +90,8 @@
       }
     }
   },
+  "tileMap": {"zoom_in": "Zoom in", "zoom_out": "Zoom out", "show_outline": "Outline map", "show_tiles": "Map tiles", "missing": "The map tiles could not be loaded. Check the tile address and that the tiles are installed on the server."},
+  "maps": {"title": "Map", "note": "The site map on real map tiles. Off by default. The tiles come from your own server, so no other website is contacted. When this is off or the address is empty, the outline map is shown.", "enabled": "Show the site map on map tiles", "tile_url": "Tile address", "tile_url_note": "A path on this server with {z}, {x} and {y}, for example /tiles/{z}/{x}/{y}.png. Leave empty for no tiles.", "tile_url_bad": "Empty, or a path on this server with {z}, {x} and {y}. Another website is not allowed.", "min_zoom": "Smallest zoom", "max_zoom": "Largest zoom", "default_zoom": "Start zoom", "zoom_bad": "The largest zoom cannot be below the smallest.", "center_lat": "Start latitude", "center_lon": "Start longitude", "attribution": "Credit line", "attribution_note": "Shown in the corner of the map, for example the source of the map data."},
   "fhs": {
     "title": "Finance hub settings",
     "widgets_title": "Cards of the page",
@@ -1388,6 +1390,7 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
+    "section_screens_map": "Map",
     "section_screens_data-hub": "Data hub",
     "section_screens_finance-hub": "Finance hub",
     "section_screens_goals": "Goals",
@@ -3860,6 +3863,7 @@
   "docs": {
     "signed": "Signed",
     "stamped": "Stamped",
+    "photos_missing": "Photos missing: {{n}} of {{min}} required. Upload them; nothing is blocked.",
     "awaiting_signed": "Awaiting the signed and stamped copy: upload it as the next version.",
     "mark_signed": "This file is the signed copy",
     "mark_stamped": "This file is the stamped copy",
@@ -5451,6 +5455,24 @@
     "event_absence_alert": "Absence alert",
     "event_import_batch": "Import batch"
   },
+  "oldVersions": {
+    "archived_title": "Deleted versions (archived)",
+    "restore": "Restore version",
+    "restore_aria": "Restore version {{version}}",
+    "restore_title": "Restore version {{version}}",
+    "restore_hint": "The version comes back published, as it was (same number, milestones, gates, tasks, links and SLA rules), in one step. It is refused, and nothing changes, if the version number or an id exists again.",
+    "restored": "Version restored.",
+    "title": "Old published versions",
+    "note": "A published version that is not in force and that no site uses can be deleted. A full snapshot of it is archived first, so it can be restored. Needs the publish right, your password, a reason and the typed version number.",
+    "sites": "{{count}} sites",
+    "has_sites": "A site is on this version, so it cannot be deleted.",
+    "delete": "Delete version",
+    "delete_aria": "Delete version {{version}}",
+    "dialog_title": "Delete version {{version}}",
+    "hint": "The version, its milestones, gates, tasks, links, SLA rules and views are archived as one snapshot, then removed. Nothing a site uses is touched; the server refuses the delete if a site, a site task or a site migration still depends on it.",
+    "confirm": "Type v{{version}} to confirm",
+    "deleted": "Version deleted; its snapshot is archived."
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
@@ -5688,6 +5710,10 @@
   "savedViews": {
     "label": "Saved views",
     "default": "Default view",
+    "set_default": "Make this my default view",
+    "clear_default": "Stop using this as my default",
+    "default_set": "Default view set",
+    "default_cleared": "Default view cleared",
     "mine": "My views",
     "shared_with_me": "Shared with me",
     "shared_mark": "shared",
@@ -7836,6 +7862,13 @@
     "prev": "Previous month",
     "next": "Next month",
     "undated": "{{n}} tasks have no date"
+  },
+  "dv": {
+    "title": "Default views",
+    "hint": "The saved view each screen opens on. Choose it with the star next to the views on that screen.",
+    "none": "No default views yet.",
+    "reset": "Reset",
+    "reset_hint": "The screen opens on its built-in view again"
   },
   "tour": {
     "step": "Step {{i}} of {{n}}",

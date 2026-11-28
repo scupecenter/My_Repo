@@ -105,7 +105,8 @@ export class OutboundService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** GET /settings/integrations/outbound */
-  async overview(_auth: AuthContext) {
+  async overview(auth: AuthContext) {
+    void auth;
     await this.access.requireAdmin("admin.settings", "view");
     const r = await this.db.tx.$queryRaw<{ j: OverviewJson }[]>`SELECT admin_outbound_overview() AS j`;
     return r[0]!.j;
@@ -149,7 +150,8 @@ export class OutboundService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** GET /settings/integrations/outbound/deliveries */
-  async deliveries(_auth: AuthContext) {
+  async deliveries(auth: AuthContext) {
+    void auth;
     await this.access.requireAdmin("admin.settings", "view");
     const r = await this.db.tx.$queryRaw<{ j: unknown }[]>`SELECT admin_outbound_deliveries(100::int) AS j`;
     return { items: r[0]!.j };

@@ -44,6 +44,23 @@ export class SavedViewsController {
     return this.svc.import(auth, body);
   }
 
+  @Get('me/default-views')
+  defaultViews() {
+    return this.svc.defaultViews();
+  }
+
+  @Post('saved-views/:id/set-default')
+  @HttpCode(200)
+  setDefault(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.svc.setDefault(auth, id, true);
+  }
+
+  @Post('saved-views/:id/clear-default')
+  @HttpCode(200)
+  clearDefault(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.svc.setDefault(auth, id, false);
+  }
+
   @Get('me/home-pins')
   homePins() {
     return this.svc.homePins();
