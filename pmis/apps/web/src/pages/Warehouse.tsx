@@ -1,5 +1,5 @@
 import { Lock, Pencil, Plus } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
@@ -15,6 +15,7 @@ import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
 import { SavedViews } from '@/components/SavedViews';
+import { StandardTable, type StdCol } from '@/components/StandardTable';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { useToast } from '@/components/Toast';
@@ -109,35 +110,31 @@ function Items() {
     </label>
   );
 
+  const stdCols: StdCol<WarehouseItem>[] = [
+    { id: 'code', label: t('wh.code'), w: 170, pinned: true, text: (x) => x.code,
+      cell: (x) => <span className="mono font-bold">{x.code}{x.code_source === 'internal_provisional' && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-provisional-${x.code}`} title={t('wh.code_source')}>{t('wh.cs_internal_provisional')}</span>}</span> },
+    { id: 'name', label: t('wh.name'), w: 260, multi: true, text: (x) => name(x),
+      cell: (x) => <>{name(x)}{(() => { const pend = (x.need_rules ?? []).filter((r) => r.status !== 'confirmed').length; return pend > 0 ? <span className="chip ms-2 bg-waitBg text-waitInk" data-testid={`wh-need-pending-${x.code}`}>{t('wh.need_pending_n', { count: pend })}</span> : null; })()}</> },
+    { id: 'uom', label: t('wh.uom'), w: 90, text: (x) => x.uom ?? '', cell: (x) => x.uom },
+    { id: 'category', label: t('wh.category'), w: 140, text: (x) => x.category ?? '', cell: (x) => x.category ?? '—' },
+    { id: 'serial', label: t('wh.serial'), w: 90, text: (x) => (x.serial_tracked ? t('wh.yes') : t('wh.no')), cell: (x) => (x.serial_tracked ? t('wh.yes') : t('wh.no')) },
+    ...cols.map((c): StdCol<WarehouseItem> => ({ id: `cv_${c.code}`, label: colLabel(c), w: 140, text: (x) => showVal(c, (x.custom ?? {})[c.code]), cell: (x) => <span data-testid={`wh-cv-${x.code}-${c.code}`}>{showVal(c, (x.custom ?? {})[c.code])}</span> })),
+    { id: 'status', label: t('wh.status'), w: 110, text: (x) => t(x.is_active ? 'wh.active' : 'wh.inactive'), cell: (x) => <span className={`chip ${x.is_active ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{t(x.is_active ? 'wh.active' : 'wh.inactive')}</span> },
+    { id: 'actions', label: '', w: 260, action: true, multi: true, text: () => '', cell: (x) => admin ? <span className="flex flex-wrap justify-end gap-1">
+      <button className="btn" data-testid={`wh-history-${x.code}`} onClick={() => setHist(x)}>{t('history.open')}</button>
+      {x.is_active && <>
+      <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>
+      <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>
+      {x.deletable && <button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button>}</>}</span> : null },
+  ];
   return (
     <div data-testid="wh-items">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SavedViews<Record<string, unknown>> screen="warehouse-items" value={{ q, inactive }} empty={{ q: '', inactive: false }} onApply={(v) => { setQ(String(v.q ?? '')); setInactive(v.inactive === true); }} />
-        <input className="input max-w-64" data-testid="wh-search" placeholder={t('wh.search')} aria-label={t('wh.search')} value={q} onChange={(e) => setQ(e.target.value)} />
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="wh-show-inactive" checked={inactive} onChange={(e) => setInactive(e.target.checked)} />{t('wh.show_inactive')}</label>
-        {admin && <button className="btn btn-primary ms-auto" data-testid="wh-new" onClick={() => open({ mode: 'new' })}><Plus size={16} />{t('wh.new_item')}</button>}
-      </div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-start text-mute">{['code', 'name', 'uom', 'category', 'serial', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}{cols.map((c) => <th key={c.code} className="px-3 py-2 text-start font-semibold" data-testid={`wh-colh-${c.code}`}>{colLabel(c)}</th>)}<th /></tr></thead>
-          <tbody data-testid="wh-item-list">
-            {items.map((x) => (
-              <tr key={x.id} data-testid={`wh-item-${x.code}`} className="border-b border-line">
-                <td className="mono px-3 py-2 font-bold">{x.code}{x.code_source === 'internal_provisional' && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-provisional-${x.code}`} title={t('wh.code_source')}>{t('wh.cs_internal_provisional')}</span>}</td>
-                <td className="px-3 py-2">{name(x)}{(() => { const pend = (x.need_rules ?? []).filter((r) => r.status !== 'confirmed').length; return pend > 0 ? <span className="chip ms-2 bg-waitBg text-waitInk" data-testid={`wh-need-pending-${x.code}`}>{t('wh.need_pending_n', { count: pend })}</span> : null; })()}</td><td className="px-3 py-2">{x.uom}</td><td className="px-3 py-2">{x.category ?? '—'}</td>
-                <td className="px-3 py-2">{x.serial_tracked ? t('wh.yes') : t('wh.no')}</td>
-                {cols.map((c) => <td key={c.code} className="px-3 py-2" data-testid={`wh-cv-${x.code}-${c.code}`}>{showVal(c, (x.custom ?? {})[c.code])}</td>)}
-                <td className="px-3 py-2"><span className={`chip ${x.is_active ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{t(x.is_active ? 'wh.active' : 'wh.inactive')}</span></td>
-                <td className="px-3 py-2 text-end">{admin && <><button className="btn" data-testid={`wh-history-${x.code}`} onClick={() => setHist(x)}>{t('history.open')}</button>{' '}</>}{admin && x.is_active && <>
-                  <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>{' '}
-                  <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>{x.deletable && <>{' '}<button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button></>}</>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {list.isSuccess && !items.length && <p className="p-6 text-center text-mute" data-testid="wh-empty">{t('wh.empty')}</p>}
-        {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
-      </div>
+      <StandardTable<WarehouseItem> headTestId={(id) => (id.startsWith('cv_') ? `wh-colh-${id.slice(3)}` : undefined)} screen="warehouse-items" testid="wh-item-table" cols={stdCols} rows={items} rowId={(x) => x.id} rowTestId={(x) => `wh-item-${x.code}`}
+        loading={list.isLoading} error={list.isError} onRetry={() => void list.refetch()} empty={t('wh.empty')} exportName="warehouse-items" noun="items"
+        query={q} onQuery={setQ} searchTestId="wh-search"
+        views={<SavedViews<Record<string, unknown>> screen="warehouse-items" value={{ q, inactive }} empty={{ q: '', inactive: false }} onApply={(v) => { setQ(String(v.q ?? '')); setInactive(v.inactive === true); }} />}
+        extra={<label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="wh-show-inactive" checked={inactive} onChange={(e) => setInactive(e.target.checked)} />{t('wh.show_inactive')}</label>}
+        primary={admin ? <button className="btn btn-primary" data-testid="wh-new" onClick={() => open({ mode: 'new' })}><Plus size={16} />{t('wh.new_item')}</button> : undefined} />
       {hist && <HistoryDialog testid="wh-history-dialog" title={t('history.title_item', { code: hist.code })} entries={histQ.data} loading={histQ.isLoading} onClose={() => setHist(null)}
         onRestore={(e) => {
           // Restore = the old values through the normal writer (PATCH items/:id): rights, locks, reason and audit as for any edit
@@ -219,41 +216,30 @@ function Movements() {
   const [reversing, setReversing] = useState<string | null>(null);
   // DN and RN, and the quarantine exits (Q270); the other documents (PL, OPEN, ADJ) have no site and are kept in the register.
   const items = (list.data?.items ?? []).filter((m) => m.kind === 'issue' || m.kind === 'return' || m.kind === 'quarantine_exit');
+  const stdCols: StdCol<StockMovement>[] = [
+    { id: 'doc_no', label: t('wh.doc_no'), w: 150, pinned: true, text: (m) => m.doc_no ?? '', cell: (m) => <span className="mono font-bold">{m.register_record_id ? <Link className="underline" to={`/registers/warehouse?record=${m.register_record_id}`}>{m.doc_no ?? '—'}</Link> : (m.doc_no ?? '—')}</span> },
+    { id: 'type', label: t('wh.type'), w: 220, multi: true, text: (m) => (m.record_type ?? m.kind).toUpperCase(),
+      cell: (m) => <>{(m.record_type ?? m.kind).toUpperCase()}{m.exit_kind && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-mv-exit-${m.doc_no ?? m.id}`} title={m.exit_reason ?? undefined}>{t(`wh.qx_${m.exit_kind}`)}</span>}{m.doc_no_locked && <Lock size={12} className="ms-1 inline text-mute" aria-label={t('wh.locked_hint')} data-testid={`wh-mv-locked-${m.doc_no ?? m.id}`} />}</> },
+    { id: 'site', label: t('wh.site'), w: 120, text: (m) => m.site_code ?? '', cell: (m) => m.site_code ?? '—' },
+    { id: 'qty', label: t('wh.qty'), w: 90, text: (m) => String(m.lines.reduce((a, l) => a + l.qty, 0)), cell: (m) => m.lines.reduce((a, l) => a + l.qty, 0) },
+    { id: 'status', label: t('wh.status'), w: 120, multi: true, text: (m) => t(`wh.st_${m.status}`), cell: (m) => <span className={`chip ${TONE[m.status]}`} data-testid={`wh-mv-status-${m.doc_no ?? m.id}`}>{t(`wh.st_${m.status}`)}</span> },
+    { id: 'actions', label: '', w: 280, action: true, multi: true, text: () => '', cell: (m) => <span className="flex flex-wrap justify-end gap-1">{m.register_record_id && (m.status === 'pending'
+        ? <button className="btn" data-testid={`wh-mv-edit-open-${m.doc_no ?? m.id}`} onClick={() => setEditing(m.id)}><Pencil size={14} />{t('wh.mv_edit')}</button>
+        : <span className="inline-flex items-center gap-1 text-xs text-mute" data-testid={`wh-mv-lock-${m.doc_no ?? m.id}`} title={t(`wh.mv_locked_${m.status}`, { defaultValue: '' })}><Lock size={12} />{t(m.status === 'posted' ? 'wh.mv_locked_posted' : 'wh.mv_locked_cancelled')}</span>)}
+        {m.status === 'posted' && m.site_id && COUNTERPART[m.record_type ?? ''] && <button className="btn" data-testid={`wh-mv-reverse-open-${m.doc_no ?? m.id}`} onClick={() => setReversing(m.id)}>{t('wh.mv_reverse')}</button>}</span> },
+  ];
   return (
     <div data-testid="wh-movements">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SavedViews<Record<string, unknown>> screen="warehouse-movements" value={{ status, ...(decodeFilter(adv) ? { advanced: decodeFilter(adv) } : {}) }} empty={{ status: '' }}
-          onApply={(v) => { setStatus(String(v.status ?? '')); setAdv(encodeFilter((v as { advanced?: FilterTree }).advanced)); }} />
-        <select className="input w-auto" aria-label={t('wh.status')} data-testid="wh-filter-status" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">{t('wh.all_statuses')}</option>{['pending', 'posted', 'cancelled'].map((s) => <option key={s} value={s}>{t(`wh.st_${s}`)}</option>)}
-        </select>
-        <UnifiedFilter screen="warehouse-movements" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />
-      </div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-mute">{['doc_no', 'type', 'site', 'qty', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}<th className="px-3 py-2" /></tr></thead>
-          <tbody data-testid="wh-movement-list">
-            {items.map((m) => (
-              <Fragment key={m.id}>
-              <tr data-testid={`wh-mv-${m.doc_no ?? m.id}`} data-status={m.status} className="border-b border-line">
-                <td className="mono px-3 py-2 font-bold">{m.register_record_id ? <Link className="underline" to={`/registers/warehouse?record=${m.register_record_id}`}>{m.doc_no ?? '—'}</Link> : (m.doc_no ?? '—')}</td>
-                <td className="px-3 py-2">{(m.record_type ?? m.kind).toUpperCase()}{m.exit_kind && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-mv-exit-${m.doc_no ?? m.id}`} title={m.exit_reason ?? undefined}>{t(`wh.qx_${m.exit_kind}`)}</span>}{m.doc_no_locked && <Lock size={12} className="ms-1 inline text-mute" aria-label={t('wh.locked_hint')} data-testid={`wh-mv-locked-${m.doc_no ?? m.id}`} />}</td><td className="px-3 py-2">{m.site_code ?? '—'}</td>
-                <td className="px-3 py-2">{m.lines.reduce((a, l) => a + l.qty, 0)}</td>
-                <td className="px-3 py-2"><span className={`chip ${TONE[m.status]}`} data-testid={`wh-mv-status-${m.doc_no ?? m.id}`}>{t(`wh.st_${m.status}`)}</span></td>
-                <td className="px-3 py-2 text-end">{m.register_record_id && (m.status === 'pending'
-                  ? <button className="btn" data-testid={`wh-mv-edit-open-${m.doc_no ?? m.id}`} onClick={() => setEditing(m.id)}><Pencil size={14} />{t('wh.mv_edit')}</button>
-                  : <span className="inline-flex items-center gap-1 text-xs text-mute" data-testid={`wh-mv-lock-${m.doc_no ?? m.id}`} title={t(`wh.mv_locked_${m.status}`, { defaultValue: '' })}><Lock size={12} />{t(m.status === 'posted' ? 'wh.mv_locked_posted' : 'wh.mv_locked_cancelled')}</span>)}
-                  {m.status === 'posted' && m.site_id && COUNTERPART[m.record_type ?? ''] && <button className="btn ms-2" data-testid={`wh-mv-reverse-open-${m.doc_no ?? m.id}`} onClick={() => setReversing(m.id)}>{t('wh.mv_reverse')}</button>}</td>
-              </tr>
-              {editing === m.id && m.register_record_id && <tr><td colSpan={6} className="p-2"><MovementEdit recordId={m.register_record_id} doc={m.doc_no ?? ''} onClose={() => setEditing(null)} /></td></tr>}
-              {reversing === m.id && <tr><td colSpan={6} className="p-2"><ReverseMovement m={m} onClose={() => setReversing(null)} /></td></tr>}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-        {list.isSuccess && !items.length && <p className="p-6 text-center text-mute" data-testid="wh-mv-empty">{t('wh.empty')}</p>}
-        {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
-      </div>
+      <StandardTable<StockMovement> screen="warehouse-movements" testid="wh-movement-table" cols={stdCols} rows={items} rowId={(m) => m.id} rowTestId={(m) => `wh-mv-${m.doc_no ?? m.id}`} rowAttrs={(m) => ({ 'data-status': m.status })}
+        loading={list.isLoading} error={list.isError} onRetry={() => void list.refetch()} empty={t('wh.empty')} exportName="warehouse-movements" noun="documents"
+        views={<SavedViews<Record<string, unknown>> screen="warehouse-movements" value={{ status, ...(decodeFilter(adv) ? { advanced: decodeFilter(adv) } : {}) }} empty={{ status: '' }}
+          onApply={(v) => { setStatus(String(v.status ?? '')); setAdv(encodeFilter((v as { advanced?: FilterTree }).advanced)); }} />}
+        filter={<UnifiedFilter screen="warehouse-movements" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />}
+        extra={<select className="input w-auto" aria-label={t('wh.status')} data-testid="wh-filter-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">{t('wh.all_statuses')}</option>{['pending', 'posted', 'cancelled'].map((x) => <option key={x} value={x}>{t(`wh.st_${x}`)}</option>)}
+        </select>}
+        rowExpand={(m) => editing === m.id && m.register_record_id ? <div role="row" className="border-b border-line p-2"><MovementEdit recordId={m.register_record_id} doc={m.doc_no ?? ''} onClose={() => setEditing(null)} /></div>
+          : reversing === m.id ? <div role="row" className="border-b border-line p-2"><ReverseMovement m={m} onClose={() => setReversing(null)} /></div> : null} />
     </div>
   );
 }
@@ -360,31 +346,22 @@ function Stock() {
   const list = useStock(q);
   const items = list.data?.items ?? [];
   const cols = ['on_hand', 'reserved', 'pending_issue', 'pending_return', 'available', 'quarantine'] as const;
+  const stdCols: StdCol<StockLevel>[] = [
+    { id: 'code', label: t('wh.code'), w: 260, pinned: true, text: (s) => `${s.item_code} ${s.item_name}`, cell: (s) => <><b className="mono">{s.item_code}</b> {s.item_name}</> },
+    { id: 'uom', label: t('wh.uom'), w: 90, text: (s) => s.uom ?? '', cell: (s) => s.uom },
+    ...cols.map((c): StdCol<StockLevel> => ({ id: c, label: t(`wh.${c}`), w: 120, multi: c === 'quarantine', text: (s) => String(s[c] ?? 0),
+      cell: (s) => <span data-testid={`wh-stock-${s.item_code}-${c}`} className={c === 'quarantine' && (s[c] ?? 0) > 0 ? 'text-lateInk' : ''} title={c === 'quarantine' ? t('wh.quarantine_hint') : undefined}>
+        {(s[c] ?? 0).toLocaleString(i18n.language)}
+        {c === 'quarantine' && (s.quarantine_pending ?? 0) > 0 && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-stock-${s.item_code}-qx-pending`}>{t('wh.qx_pending_n', { count: s.quarantine_pending })}</span>}
+      </span> })),
+    { id: 'actions', label: '', w: 150, action: true, multi: true, text: () => '', cell: (s) => canExit && (s.quarantine ?? 0) - (s.quarantine_pending ?? 0) > 0 ? <button className="btn" data-testid={`wh-qx-open-${s.item_code}`} onClick={() => setExit(s)}>{t('wh.qx_action')}</button> : null },
+  ];
   return (
     <div data-testid="wh-stock">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SavedViews<Record<string, unknown>> screen="warehouse-stock" value={{ q }} empty={{ q: '' }} onApply={(v) => setQ(String(v.q ?? ''))} />
-        <input className="input max-w-64" data-testid="wh-stock-search" placeholder={t('wh.search')} aria-label={t('wh.search')} value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-mute"><th className="px-3 py-2 text-start font-semibold">{t('wh.code')}</th><th className="px-3 py-2 text-start font-semibold">{t('wh.uom')}</th>{cols.map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}<th /></tr></thead>
-          <tbody>
-            {items.map((s) => (
-              <tr key={s.item_id} data-testid={`wh-stock-${s.item_code}`} className="border-b border-line">
-                <td className="px-3 py-2"><b className="mono">{s.item_code}</b> {s.item_name}</td><td className="px-3 py-2">{s.uom}</td>
-                {cols.map((c) => <td key={c} data-testid={`wh-stock-${s.item_code}-${c}`} className={`px-3 py-2 ${c === 'quarantine' && (s[c] ?? 0) > 0 ? 'text-lateInk' : ''}`} title={c === 'quarantine' ? t('wh.quarantine_hint') : undefined}>
-                  {(s[c] ?? 0).toLocaleString(i18n.language)}
-                  {c === 'quarantine' && (s.quarantine_pending ?? 0) > 0 && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-stock-${s.item_code}-qx-pending`}>{t('wh.qx_pending_n', { count: s.quarantine_pending })}</span>}
-                </td>)}
-                <td className="px-3 py-2 text-end">{canExit && (s.quarantine ?? 0) - (s.quarantine_pending ?? 0) > 0 && <button className="btn" data-testid={`wh-qx-open-${s.item_code}`} onClick={() => setExit(s)}>{t('wh.qx_action')}</button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {list.isSuccess && !items.length && <p className="p-6 text-center text-mute">{t('wh.empty')}</p>}
-        {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
-      </div>
+      <StandardTable<StockLevel> screen="warehouse-stock" testid="wh-stock-table" cols={stdCols} rows={items} rowId={(s) => s.item_id} rowTestId={(s) => `wh-stock-${s.item_code}`}
+        loading={list.isLoading} error={list.isError} onRetry={() => void list.refetch()} empty={t('wh.empty')} exportName="warehouse-stock" noun="items"
+        query={q} onQuery={setQ} searchTestId="wh-stock-search"
+        views={<SavedViews<Record<string, unknown>> screen="warehouse-stock" value={{ q }} empty={{ q: '' }} onApply={(v) => setQ(String(v.q ?? ''))} />} />
       {exit && <ExitDialog row={exit} onClose={() => setExit(null)} />}
     </div>
   );
@@ -396,34 +373,19 @@ function Dispatch() {
   const [status, setStatus] = useState('');
   const list = useDispatchList(status);
   const items = list.data?.items ?? [];
+  const stdCols: StdCol<(typeof items)[number]>[] = [
+    { id: 'site', label: t('wh.site'), w: 220, pinned: true, multi: true, text: (d) => d.site_code, cell: (d) => <span className="mono font-bold"><Link className="underline" to={`/sites/${d.site_id}?tab=warehouse`}>{d.site_code}</Link>{d.router_only && <span className="chip ms-2 bg-lockBg font-normal text-lockInk">{t('wh.router_only')}</span>}</span> },
+    { id: 'dispatch_date', label: t('wh.dispatch_date'), w: 160, text: (d) => d.te_dispatch_complete_date ?? '', cell: (d) => <span className="mono" data-testid={`wh-dispatch-date-${d.site_code}`}>{d.te_dispatch_complete_date ?? '—'}</span> },
+    { id: 'need_status', label: t('wh.need_status'), w: 180, multi: true, text: (d) => t(`wh.ns_${d.need_status}`), cell: (d) => <span className={`chip ${NEED_TONE[d.need_status]}`} data-testid={`wh-dispatch-status-${d.site_code}`}>{t(`wh.ns_${d.need_status}`)}</span> },
+  ];
   return (
     <div data-testid="wh-dispatch">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SavedViews<Record<string, unknown>> screen="warehouse-dispatch" value={{ status }} empty={{ status: '' }} onApply={(v) => setStatus(String(v.status ?? ''))} />
-        <select className="input w-auto" aria-label={t('wh.need_status')} data-testid="wh-dispatch-filter" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">{t('wh.all_statuses')}</option>{['complete', 'short', 'pending_configuration'].map((s) => <option key={s} value={s}>{t(`wh.ns_${s}`)}</option>)}
-        </select>
-      </div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-mute">
-            <th className="px-3 py-2 text-start font-semibold">{t('wh.site')}</th>
-            <th className="px-3 py-2 text-start font-semibold" title={t('wh.dispatch_date_hint')}>{t('wh.dispatch_date')}</th>
-            <th className="px-3 py-2 text-start font-semibold" title={t('wh.need_status_hint')}>{t('wh.need_status')}</th>
-          </tr></thead>
-          <tbody data-testid="wh-dispatch-list">
-            {items.map((d) => (
-              <tr key={d.site_id} data-testid={`wh-dispatch-${d.site_code}`} className="border-b border-line">
-                <td className="mono px-3 py-2 font-bold"><Link className="underline" to={`/sites/${d.site_id}?tab=warehouse`}>{d.site_code}</Link>{d.router_only && <span className="chip ms-2 bg-lockBg font-normal text-lockInk">{t('wh.router_only')}</span>}</td>
-                <td className="mono px-3 py-2" data-testid={`wh-dispatch-date-${d.site_code}`}>{d.te_dispatch_complete_date ?? '—'}</td>
-                <td className="px-3 py-2"><span className={`chip ${NEED_TONE[d.need_status]}`} data-testid={`wh-dispatch-status-${d.site_code}`}>{t(`wh.ns_${d.need_status}`)}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {list.isSuccess && !items.length && <p className="p-6 text-center text-mute">{t('wh.empty')}</p>}
-        {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
-      </div>
+      <StandardTable<(typeof items)[number]> screen="warehouse-dispatch" testid="wh-dispatch-table" cols={stdCols} rows={items} rowId={(d) => d.site_id} rowTestId={(d) => `wh-dispatch-${d.site_code}`}
+        loading={list.isLoading} error={list.isError} onRetry={() => void list.refetch()} empty={t('wh.empty')} exportName="warehouse-dispatch" noun="items"
+        views={<SavedViews<Record<string, unknown>> screen="warehouse-dispatch" value={{ status }} empty={{ status: '' }} onApply={(v) => setStatus(String(v.status ?? ''))} />}
+        extra={<select className="input w-auto" aria-label={t('wh.need_status')} data-testid="wh-dispatch-filter" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">{t('wh.all_statuses')}</option>{['complete', 'short', 'pending_configuration'].map((x) => <option key={x} value={x}>{t(`wh.ns_${x}`)}</option>)}
+        </select>} />
     </div>
   );
 }
