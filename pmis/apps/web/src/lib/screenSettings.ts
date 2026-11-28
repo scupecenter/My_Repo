@@ -12,6 +12,7 @@ export const SCREEN_SETTINGS = {
   inbox: { tab: 'alerts', section: 'policy' },
   approvals: { tab: 'workflow', section: 'editor' },
   sites: { tab: 'workflow', section: 'columns' },
+  site_locks: { tab: 'workflow', section: 'sequence' },
   register: { tab: 'registers', section: 'columns' },
   register_gecol: { tab: 'registers', section: 'gecol' },
   register_issues: { tab: 'registers', section: 'issue-map' },
