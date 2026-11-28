@@ -68,6 +68,16 @@ async function bigBatch(who: Actor, count: number): Promise<{ id: string; tag: s
   expect(up.body.counts.create).toBe(count);
   return { id: up.body.id as string, tag: etag(up), codes };
 }
+/** The run may be taken by the resume job of another test app on the shared database (it is "busy" for this process), so process() can return while rows are still
+ *  being done: wait until the batch is no longer processing (at most 60 s) before reading it. */
+const settle = async (batchId: string): Promise<void> => {
+  const end = Date.now() + 60_000;
+  for (;;) {
+    const s = (await q<{ s: string }>(db, 'SELECT status AS s FROM import_batches WHERE id = $1', [batchId]))[0]?.s;
+    if (s !== 'processing' || Date.now() > end) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+};
 const runOf = async (batchId: string): Promise<PendingJob> => {
   const all = await jobs.pending(0);
   const j = all.find((x) => x.batch_id === batchId);
@@ -162,6 +172,7 @@ describe('a big New sites batch is sent in the background (self-approval, B5)', 
     const sent = await both.api.call('post', `/import-batches/${b.id}/submit`, undefined, { 'If-Match': b.tag });
     expect(sent.status).toBe(202);
     await jobs.process(await runOf(b.id));
+    await settle(b.id);
     const done = await both.api.call('get', `/import-batches/${b.id}`);
     expect(done.body.progress).toMatchObject({ state: 'done', submitted: ROWS - 1, failed: 1 });
     expect(done.body.counts).toMatchObject({ approved: ROWS - 1, error: 1 });
@@ -179,6 +190,7 @@ describe('a big New sites batch: L1 sends (drafts), L2 approves all in the backg
     const sent = await l1.api.call('post', `/import-batches/${b.id}/submit`, undefined, { 'If-Match': b.tag });
     expect(sent.status).toBe(202);
     await jobs.process(await runOf(b.id));
+    await settle(b.id);
     const waiting = await l2.api.call('get', `/import-batches/${b.id}`);
     expect(waiting.body).toMatchObject({ status: 'in_approval', counts: { pending: ROWS, approved: 0 } });
     expect(await sitesOf(b.codes)).toHaveLength(0);
@@ -205,6 +217,7 @@ describe('a big New sites batch: L1 sends (drafts), L2 approves all in the backg
     expect(ret.status).toBe(409);
     expect(ret.body.code).toBe('batch_processing');
     await jobs.process(await runOf(b.id));
+    await settle(b.id);
     const done = await l2.api.call('get', `/import-batches/${b.id}`);
     expect(done.body).toMatchObject({ status: 'approved', counts: { approved: ROWS, pending: 0 }, progress: { state: 'done', approved: ROWS } });
     const sites = await sitesOf(b.codes);
