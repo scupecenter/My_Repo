@@ -3,12 +3,6 @@ import { Prisma } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { AccessService } from "../access/access.service";
-import {
-  LOGIN_IP_BASE_SECONDS,
-  LOGIN_IP_MAX_SECONDS,
-  LOGIN_IP_WINDOW_MS,
-  LOGIN_LIMIT_PER_IP,
-} from "../auth/auth.service";
 import type { AuthContext } from "../auth/auth.types";
 import { PasswordService } from "../auth/password.service";
 import {
@@ -17,6 +11,7 @@ import {
   passwordPolicyErrors,
 } from "../auth/password.policy";
 import { RateLimiter } from "../auth/rate-limiter";
+import { loginLimits } from "../ops/ops-limits";
 import { StepUpService } from "../auth/step-up.service";
 import {
   decodeTypedCursor,
@@ -397,17 +392,17 @@ export class InvitationsService {
     const key = `invite:ip:${ip ?? "unknown"}`;
     const wait = this.limiter.progressiveWait(
       key,
-      LOGIN_LIMIT_PER_IP,
-      LOGIN_IP_WINDOW_MS,
-      LOGIN_IP_BASE_SECONDS,
-      LOGIN_IP_MAX_SECONDS,
+      loginLimits().perIp,
+      loginLimits().windowMs,
+      loginLimits().baseSeconds,
+      loginLimits().maxSeconds,
     );
     if (wait) throw problems.rateLimited(wait);
     const release = this.limiter.progressiveBegin(key);
     try {
       const r = await fn();
       if (r === null) {
-        this.limiter.progressiveFail(key, LOGIN_IP_WINDOW_MS);
+        this.limiter.progressiveFail(key, loginLimits().windowMs);
         throw InvitationsService.invalid();
       }
       return r;
