@@ -33,7 +33,7 @@ export function importSites(idx: number[], gapsOnly: boolean): SiteImportStatus[
   return idx.map((i) => {
     const m = siteMeta(i), id = m.id;
     return { site_id: id, site_code: m.code, name: m.name, region_id: m.region_id as SiteImportStatus['region_id'], overall_status: m.status as SiteImportStatus['overall_status'], workflow_locks: locksOf(id),
-      current_stream: 'CW', current_milestone: 'MS1', next_milestone: 'MS2', done_tasks: 6 + (i % 5), total_tasks: 40, warnings: i % 3 === 0 ? 3 : 0, errors: i % 5 === 4 ? 1 : 0, data_gaps: gapsOf(i) };
+      current_stream: 'CW', current_milestone: 'MS1', next_milestone: 'MS2', done_tasks: 6 + (i % 5), total_tasks: 40, warnings: i % 3 === 0 ? 3 : 0, errors: i % 5 === 4 ? 1 : 0, data_gaps: gapsOf(i), data_gap_items: gapsOf(i) > 0 ? [{ kind: 'missing_actual_date' as const, task_code: 'CW-1', successor_code: 'CW-2' }] : [] };
   }).filter((r) => !gapsOnly || r.warnings > 0 || r.data_gaps > 0);
 }
 

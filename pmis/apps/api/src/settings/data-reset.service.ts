@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { promises as fs } from 'node:fs';
 import { z } from 'zod';
@@ -11,7 +11,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { applyContext, type RequestContext } from '../logs/context';
-import { makeQuarantine, quarantineFiles } from './data-reset-files';
+import { makeQuarantine, quarantineFiles, thumbKeysFor } from './data-reset-files';
 import { MaintenanceService } from './maintenance.service';
 
 type Json = Record<string, unknown>;
@@ -20,15 +20,26 @@ const confirm = z.string().max(200);
 /** A part code of the catalogue (`data_reset_parts`); the database decides which exist and adds the dependent parts. */
 const partCode = z.string().regex(/^[a-z_]{2,40}$/);
 /** Contract 0.15.72: `require_backup` (absent = true, as before) and, when false, the typed phrase `NO BACKUP` in `no_backup_confirm` (the database checks it). */
+/** Contract 0.15.265 (migration 0370): a narrowing of the chosen register parts to regions, import batches and a first-created period (all must match). */
+const narrowSchema = z.object({
+  regions: z.array(z.number().int().positive()).max(50).optional(), batches: z.array(z.string().uuid()).max(50).optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).strict();
 const requestBody = z.object({
   reason: z.string().max(2000), confirm_text: confirm, parts: z.array(partCode).max(64).optional(),
-  require_backup: z.boolean().optional(), no_backup_confirm: confirm.optional(),
+  require_backup: z.boolean().optional(), no_backup_confirm: confirm.optional(), narrow: narrowSchema.optional(),
+  archive: z.enum(['none', 'download', 'keep_90']).optional(),
 }).strict();
+const idList = (n: number) => z.string().regex(/^[0-9a-f-]{1,36}(,[0-9a-f-]{1,36}){0,49}$/).transform((v) => v.split(',')).pipe(z.array(z.string()).max(n));
+const narrowQuery = z.object({
+  regions: z.string().regex(/^\d{1,6}(,\d{1,6}){0,49}$/).optional(), batches: idList(50).optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).passthrough();
 const reasonBody = z.object({ reason: z.string().max(2000) }).strict();
 const approveBody = z.object({ reason: z.string().max(2000), scope_hash: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict();
 const partsQuery = z.string().regex(/^[a-z_]{2,40}(,[a-z_]{2,40}){0,63}$/).optional();
 const runBody = z.object({ confirm_text: confirm }).strict();
-const settingsBody = z.object({ reason: z.string().max(2000), request_expiry_minutes: z.unknown(), backup_max_age_hours: z.unknown() }).passthrough();
+const settingsBody = z.object({ reason: z.string().max(2000), request_expiry_minutes: z.unknown(), backup_max_age_hours: z.unknown(), cooloff_minutes: z.unknown().optional() }).passthrough();
 
 /** How long the database part of a run may take (one transaction). */
 const RUN_TIMEOUT_MS = 60 * 60 * 1000;
@@ -42,9 +53,10 @@ const RUN_TIMEOUT_MS = 60 * 60 * 1000;
  * commit, recorded on the request.
  */
 @Injectable()
-export class DataResetService {
+export class DataResetService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly log = new Logger('DataReset');
   /** One file move at a time in this process (a retry never runs beside the first move). */
+  private cooloffTimer: NodeJS.Timeout | null = null;
   private moving: Promise<void> = Promise.resolve();
   /** Background runs of this process (the tests wait for them). */
   readonly running = new Set<Promise<void>>();
@@ -73,16 +85,52 @@ export class DataResetService {
     return v;
   }
 
+  /** The notice before the run (P6, contract 0.15.268): the page calls it with the state, a one-minute timer calls it when jobs are on. Never throws into the caller. */
+  async notifyCooloff(): Promise<number> {
+    try {
+      const rows = await this.db.client.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT data_reset_cooloff_notify() AS n`);
+      return rows[0]?.n ?? 0;
+    } catch (e) {
+      this.log.warn(`cooloff notice failed: ${e instanceof Error ? e.message : 'error'}`);
+      return 0;
+    }
+  }
+
+  onApplicationBootstrap(): void {
+    if (!this.config.jobsEnabled) return;
+    this.cooloffTimer = setInterval(() => { void this.notifyCooloff(); }, 60 * 1000);
+    this.cooloffTimer.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.cooloffTimer) clearInterval(this.cooloffTimer);
+    this.cooloffTimer = null;
+  }
+
   async state(): Promise<Json> {
+    await this.notifyCooloff();
     const r = await this.one(Prisma.sql`SELECT data_reset_state_json() AS r`);
     return { ...r, storage: this.storage() };
   }
 
   /** The dry run of a chosen scope (contract 0.15.71): counts per part and per table, the closure and its hash. No parts: everything. */
-  plan(rawParts: unknown): Promise<Json> {
+  plan(rawParts: unknown, rawNarrow: unknown = {}): Promise<Json> {
     const q = parse(partsQuery, typeof rawParts === 'string' && rawParts !== '' ? rawParts : undefined);
     const parts = q ? q.split(',') : null;
-    return this.one(Prisma.sql`SELECT data_reset_dry_run(${parts}::text[]) AS r`);
+    const nq = parse(narrowQuery, rawNarrow ?? {});
+    const narrow: z.infer<typeof narrowSchema> = {};
+    if (nq.regions) narrow.regions = nq.regions.split(',').map(Number);
+    if (nq.batches) narrow.batches = nq.batches;
+    if (nq.from) narrow.from = nq.from;
+    if (nq.to) narrow.to = nq.to;
+    const n = Object.keys(narrow).length > 0 ? JSON.stringify(narrow) : null;
+    return this.one(Prisma.sql`SELECT data_reset_dry_run(${parts}::text[], ${n}::jsonb) AS r`);
+  }
+
+  /** What the picker offers for narrowing (regions, recent import batches of the part); System Admin only (the database decides). */
+  narrowOptions(rawPart: unknown): Promise<Json> {
+    const part = parse(partCode.optional(), typeof rawPart === 'string' && rawPart !== '' ? rawPart : undefined) ?? null;
+    return this.one(Prisma.sql`SELECT data_reset_narrow_options(${part}::text) AS r`);
   }
 
   get(rawId: string): Promise<Json> {
@@ -97,8 +145,9 @@ export class DataResetService {
     const parts = b.parts ?? null;
     // no require_backup = a recent backup is required (as before 0.15.72); the choice is bound into the request's scope hash by the database
     const requireBackup = b.require_backup ?? true;
+    const narrow = b.narrow && Object.keys(b.narrow).length > 0 ? JSON.stringify(b.narrow) : null;
     return this.one(Prisma.sql`SELECT admin_data_reset_request(${b.reason}::text, ${b.confirm_text}::text, ${parts}::text[], ${requireBackup}::boolean,
-      ${b.no_backup_confirm ?? null}::text) AS r`);
+      ${b.no_backup_confirm ?? null}::text, ${narrow}::jsonb, ${b.archive ?? 'none'}::text) AS r`);
   }
 
   async approve(auth: AuthContext, rawId: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
@@ -231,6 +280,9 @@ export class DataResetService {
       const qdir = typeof claim.quarantine_dir === 'string' ? claim.quarantine_dir : '';
       if (keys.length === 0 || !qdir) return;
       const results = await quarantineFiles(this.config.storage.localDir, qdir, keys);
+      // the derived thumbnails of those files go to the same quarantine (not recorded as rows: they are not in the database)
+      const thumbs = await thumbKeysFor(this.config.storage.localDir, keys).catch(() => [] as string[]);
+      if (thumbs.length > 0) await quarantineFiles(this.config.storage.localDir, qdir, thumbs).catch(() => undefined);
       for (let i = 0; i < results.length; i += 500) {
         const chunk = results.slice(i, i + 500);
         await this.side(rc, () => this.one(Prisma.sql`SELECT admin_data_reset_files_record(${id}::uuid, ${JSON.stringify(chunk)}::jsonb) AS r`));

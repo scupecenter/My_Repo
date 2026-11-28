@@ -23,6 +23,11 @@ const slaRuleBody = z.object({
 const weightBody = z.object({
   counts_in_weight: z.boolean(), weight_value: z.number().min(0).max(100).optional(), weight_group: z.string().trim().max(20).nullable().optional(), reason,
 }).strict();
+/** Migration 0542: estimated man-days and an optional planned duration of a task (draft only); they feed the suggested weight in the editor. */
+const estimateBody = z.object({
+  est_man_days: z.number().min(0).max(100000).nullable(), planned_duration_days: z.number().int().min(1).max(3650).nullable().optional(), reason,
+}).strict();
+const lockModeBody = z.object({ lock_mode: z.enum(['strict', 'open']), reason }).strict();
 const confirmImpact = z.string().max(200).optional();
 const code = z.string().trim().min(1).max(40);
 const nameEn = z.string().trim().min(1).max(200);
@@ -78,6 +83,8 @@ const migrateBody = z.object({ preview_hash: z.string().min(8).max(100), selecti
 const revertBody = z.object({ reason }).strict();
 const removeBody = z.object({ kind: z.enum(['task', 'milestone', 'gate']), code, reason }).strict();
 const discardBody = z.object({ reason }).strict();
+const restoreBody = z.object({ reason }).strict();
+const deleteVersionBody = z.object({ reason, confirm_text: z.string().max(200) }).strict();
 const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
 const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
 type Json = Record<string, unknown>;
@@ -148,6 +155,34 @@ export class WorkflowEditorService {
     const b = parse(discardBody, raw);
     const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_discard_draft(${version}::int, ${etag}::int, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0575 (contract 0.15.436): delete an old published version after its full snapshot is archived. The publish right (workflow_versions administer), a step-up, the typed confirmation `v<version>`, a reason and an audit row. */
+  async deleteVersion(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(deleteVersionBody, raw);
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    if (b.confirm_text !== `v${version}`) {
+      throw new ProblemException(422, 'confirmation_mismatch', { detail: `Type v${version} to confirm.`, errors: [{ path: '/confirm_text', code: 'confirmation_mismatch' }] });
+    }
+    const etag = await this.gate(auth, 'workflow_versions', 'administer', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_delete_version(${version}::int, ${etag}::int, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0575: the archived versions (no snapshot body). The publish right. */
+  async archiveList(): Promise<Json> {
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    return { items: (await this.one(Prisma.sql`SELECT workflow_archive_json() AS r`)) as unknown as Json[] };
+  }
+
+  /** Migration 0575: put an archived version back, as it was (published, same version number and ids), in one transaction. Same right, step-up and reason as the delete. */
+  async restoreVersion(auth: AuthContext, archiveId: string, raw: unknown): Promise<Json> {
+    const b = parse(restoreBody, raw);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(archiveId)) {
+      throw new ProblemException(404, 'not_found', { detail: 'The archived version does not exist.' });
+    }
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    await this.stepUp.require(auth);
+    return this.one(Prisma.sql`SELECT admin_wf_restore_version(${archiveId}::uuid, ${b.reason}::text) AS r`);
   }
 
   async updateTask(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
@@ -269,12 +304,27 @@ export class WorkflowEditorService {
     return this.one(Prisma.sql`SELECT admin_sla_rule_remove(${version}::int, ${etag}::int, ${task}::text, ${rule}::uuid, ${b.reason}::text) AS r`);
   }
 
+  /** Migration 0491: the lock mode of a draft version (strict by default). The right of the publish door; no site is changed. */
+  async setLockMode(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(lockModeBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'administer', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_lock_mode(${version}::int, ${etag}::int, ${b.lock_mode}::text, ${b.reason}::text) AS r`);
+  }
+
   /** Migration 0109: counts in project weight, the percent and the weight group of a task (draft only; the draft shows the totals, publishing blocks them). */
   async setWeight(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
     const b = parse(weightBody, raw);
     const etag = await this.gate(auth, 'weights', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_task_weight(${version}::int, ${etag}::int, ${task}::text, ${b.counts_in_weight}::boolean, ${b.weight_value ?? 0}::numeric,
       ${b.weight_group ?? null}::text, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0542: estimated man-days and planned duration of a task (draft only). The suggested weight they produce is advice, never auto-applied. */
+  async setEstimate(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(estimateBody, raw);
+    const etag = await this.gate(auth, 'weights', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_estimate(${version}::int, ${etag}::int, ${task}::text, ${b.est_man_days ?? null}::numeric,
+      ${b.planned_duration_days ?? null}::int, ${b.reason}::text) AS r`);
   }
 
   async publish(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {

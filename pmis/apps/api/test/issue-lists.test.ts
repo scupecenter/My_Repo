@@ -26,7 +26,10 @@ describe('issue lists and fields (0168)', () => {
       { code: 'IssueCategory', status: 'pending', critical: false, allow_other: false },
     ]);
     const n = await db.query(`SELECT catalogue_code, count(*)::int AS n FROM list_values WHERE catalogue_code IN ('IssueCategory','BlockerReason') GROUP BY 1 ORDER BY 1`);
-    expect(n.rows).toEqual([{ catalogue_code: 'BlockerReason', n: 11 }, { catalogue_code: 'IssueCategory', n: 10 }]);
+    // later migrations add values (0554 daily delay): at least the first ones are there
+    expect(n.rows.map((r) => r.catalogue_code)).toEqual(['BlockerReason', 'IssueCategory']);
+    expect(n.rows[0].n).toBeGreaterThanOrEqual(11);
+    expect(n.rows[1].n).toBeGreaterThanOrEqual(10);
     const u = await db.query(`SELECT 1 FROM list_values WHERE catalogue_code = 'BlockerReason' AND code = 'Uplink Site Not Ready'`);
     expect(u.rowCount).toBe(1);
   });

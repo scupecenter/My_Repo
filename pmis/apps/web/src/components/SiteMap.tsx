@@ -9,6 +9,9 @@ import { useRegions, useSite, useSiteTasks } from '@/api/sites';
 import type { TaskSummary } from '@/api/types';
 import { DrawerFrame } from './DrawerFrame';
 import { EChart } from './EChart';
+import { ScreenSettingsLink } from './ScreenSettingsLink';
+import { TileMap } from './TileMap';
+import { tilesOn, useMapSettings } from '@/api/mapSettings';
 import { Holders } from './HolderChip';
 import { EmptyState } from './States';
 import { QuickFilter } from './TableKit';
@@ -89,7 +92,14 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
   const reduced = useReducedMotion();
   const [full, setFull] = useState(false);
   const [layout, setLayout] = useState<'map' | 'list'>('map');
+  // the tile layer (Settings > Screens > Map): on when the switch is on and a same-origin tile address is set; a person can switch back to the outline
+  const mapCfg = useMapSettings();
+  const tiles = tilesOn(mapCfg);
+  const [outline, setOutline] = useState(false);
+  const onTiles = tiles && !outline;
   const [viewKey, setViewKey] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const listActive = LIST_KEYS.some((k) => f[k].length > 0);
   const [open, setOpen] = useState<string | null>(null);
   const d = q.data;
   const items = useMemo(() => d?.items ?? [], [d]);
@@ -174,7 +184,9 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-layout" aria-pressed={layout === 'list'} onClick={() => setLayout(layout === 'map' ? 'list' : 'map')}>
             {layout === 'map' ? <><List size={14} />{t('siteMap.as_list')}</> : <><MapIcon size={14} />{t('siteMap.as_map')}</>}
           </button>
+          {layout === 'map' && tiles && <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-base" aria-pressed={onTiles} onClick={() => setOutline(!outline)}><MapIcon size={14} />{onTiles ? t('tileMap.show_outline') : t('tileMap.show_tiles')}</button>}
           {layout === 'map' && <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-reset-view" onClick={() => setViewKey((k) => k + 1)}><RotateCcw size={14} />{t('siteMap.reset_view')}</button>}
+          <ScreenSettingsLink screen="site_map" />
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-full" aria-pressed={full} onClick={() => setFull(!full)}>
             {full ? <><Minimize2 size={14} />{t('siteMap.exit_full')}</> : <><Maximize2 size={14} />{t('siteMap.full')}</>}
           </button>
@@ -184,7 +196,13 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
       {/* filters (in the URL) */}
       <div role="toolbar" aria-label={t('siteMap.filters')} className="mb-2 flex flex-wrap items-center gap-2" data-testid="map-filters">
         <input className="input w-48 py-1 text-sm" data-testid="map-search" placeholder={t('siteMap.search')} aria-label={t('siteMap.search')} value={f.q} onChange={(e) => set({ q: e.target.value })} />
-        {LIST_KEYS.map((k) => <FilterChip key={k} id={k} label={t(`siteMap.f.${k}`)} options={opts(k)} value={f[k]} onChange={(v) => set({ [k]: v } as Partial<MapFilters>)} />)}
+        {/* P2: the map card keeps the Site ID search and Late only; the other chips open with More filters (hidden, not removed; open while one is set) */}
+        <button type="button" className="btn px-2 py-0.5 text-xs" data-testid="map-more-filters" aria-expanded={moreOpen || listActive} onClick={() => setMoreOpen(!moreOpen)}>
+          {t('siteMap.more_filters')}{listActive ? ` (${LIST_KEYS.filter((k) => f[k].length > 0).length})` : ''}
+        </button>
+        <span className={`${moreOpen || listActive ? 'contents' : 'hidden'}`} data-testid="map-more-panel">
+          {LIST_KEYS.map((k) => <FilterChip key={k} id={k} label={t(`siteMap.f.${k}`)} options={opts(k)} value={f[k]} onChange={(v) => set({ [k]: v } as Partial<MapFilters>)} />)}
+        </span>
         <QuickFilter testid="map-late" on={f.late} onClick={() => set({ late: !f.late })}>{t('siteMap.late_only')}</QuickFilter>
         {nActive > 0 && <button type="button" className="btn px-2 py-0.5 text-xs" data-testid="map-clear" onClick={clear}>{t('states.clear_filters')}</button>}
       </div>
@@ -212,8 +230,10 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
 
       {q.isLoading ? <div className="animate-pulse rounded bg-lockBg" style={{ height }} data-testid="map-loading" /> : layout === 'map' ? (
         <div className="overflow-hidden rounded border border-line" style={{ background: 'var(--map-sea)' }}>
-          <EChart build={build} renderer="canvas" height={full ? 'calc(100vh - 220px)' : height} label={summary} testid="map-chart"
-            onClick={(p) => { const id = (p.data as { site?: string } | undefined)?.site; if (id) setOpen(id); }} />
+          {onTiles
+            ? <TileMap marks={ms} cfg={mapCfg} height={full ? 'calc(100vh - 220px)' : height} label={summary} resetKey={viewKey} tip={(m) => tip(m.site)} onOpen={setOpen} />
+            : <EChart build={build} renderer="canvas" height={full ? 'calc(100vh - 220px)' : height} label={summary} testid="map-chart"
+              onClick={(p) => { const id = (p.data as { site?: string } | undefined)?.site; if (id) setOpen(id); }} />}
         </div>
       ) : (
         <div className="overflow-auto rounded border border-line" style={{ maxHeight: full ? 'calc(100vh - 220px)' : height }}>
@@ -243,7 +263,7 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
 
       <p className="mt-2 text-sm text-mute" data-testid="map-no-coords">
         {noCoords > 0
-          ? <Link className="text-link hover:underline" to="/sites?coordinates=missing" data-testid="map-no-coords-link">{t('siteMap.no_coords', { count: noCoords })}</Link>
+          ? <Link className="text-link underline" to="/sites?coordinates=missing" data-testid="map-no-coords-link">{t('siteMap.no_coords', { count: noCoords })}</Link>
           : t('siteMap.all_coords')}
         {' · '}{t('siteMap.offline_note')}
       </p>

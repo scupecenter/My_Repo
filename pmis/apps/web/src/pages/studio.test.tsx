@@ -171,6 +171,35 @@ describe('Workflow Studio', () => {
     });
   }, 60_000);
 
+  it('sets the lock mode of the draft to Open in the review screen and keeps Strict as the default (D49)', async () => {
+    const u = userEvent.setup();
+    await open({ lift: true });
+    await u.click(await waitForEnabled('studio-review-btn'));
+    const sel = await screen.findByTestId('studio-lock-mode');
+    expect(sel).toHaveValue('strict');
+    await u.selectOptions(sel, 'open');
+    await reasonAndSave(u);
+    await waitFor(async () => {
+      const v2 = await api.get<{ lock_mode?: string }>('/workflow/versions/2');
+      expect(v2.lock_mode).toBe('open');
+    });
+  }, 60_000);
+
+  it('moves a gate to other milestones without replacing the structure by hand (D53)', async () => {
+    const u = userEvent.setup();
+    await open({ lift: true });
+    await u.click(screen.getByTestId('studio-gate-G1'));
+    expect(await screen.findByTestId('studio-gate-move-save')).toBeDisabled();
+    await u.selectOptions(screen.getByTestId('studio-gate-from'), 'MS2');
+    await u.selectOptions(screen.getByTestId('studio-gate-to'), 'MS1');
+    await u.click(await waitForEnabled('studio-gate-move-save'));
+    await reasonAndSave(u);
+    await waitFor(async () => {
+      const v2 = await api.get<{ gates: { from_milestone: string; to_milestone: string }[] }>('/workflow/versions/2');
+      expect(v2.gates[0]).toMatchObject({ from_milestone: 'MS2', to_milestone: 'MS1' });
+    });
+  }, 60_000);
+
   it('reviews the changes with a Light badge, keeps Publish off until the reason and v2 are typed, and publishes', async () => {
     const u = userEvent.setup();
     await open({ lift: true });
@@ -184,6 +213,8 @@ describe('Workflow Studio', () => {
     const ch = await screen.findByTestId('studio-change-ms_renamed:MS2');
     expect(within(ch).getByTestId('studio-badge-light')).toHaveTextContent('Light');
     expect(await screen.findByTestId('studio-impact')).toHaveTextContent('1 open sites');
+    // D53: a milestone with tasks but no closing task is a warning, never a block
+    expect(screen.getByTestId('studio-review-no-closing')).toHaveTextContent('no closing task');
     expect(screen.getByTestId('studio-opt-sla')).toBeDisabled();
     expect(screen.getByTestId('studio-opt-new_only')).toBeChecked();
     expect(screen.getByTestId('studio-stepup-note')).toBeInTheDocument();

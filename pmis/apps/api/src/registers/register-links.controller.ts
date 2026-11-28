@@ -5,7 +5,7 @@ import { RegisterLinksService } from './register-links.service';
 
 type Json = Record<string, unknown>;
 
-/** Migration 0431: the link catalogue (Settings > Register links). Read by every signed-in user, edited by the System Admin. */
+/** Migration 0713: the link catalogue (table register_links, D60) (Settings > Register links). Read by every signed-in user, edited by the System Admin. */
 @Controller('settings/register-links')
 export class RegisterLinksController {
   constructor(private readonly links: RegisterLinksService) {}

@@ -1,8 +1,10 @@
-import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw, Share2 } from "lucide-react";
+import { loadPref, savePref } from "@/lib/localPref";
 import { useDownloadGate } from '@/lib/downloadGate';
-import { useMemo, useState, type ReactNode, Fragment } from "react";
+import { useEffect, useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { fmtDate } from "@/lib/time";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "@/api/hooks";
 import {
@@ -40,13 +42,17 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { OpsPhaseCard } from "./dashboardPhase";
+import { PinnedViewsCard } from "./dashboardPins";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
 import { OpsScorecardCard } from "./dashboardScorecard";
 import { OpsQualityCard } from "./dashboardQuality";
 import { OpsApprovalsCard } from "./dashboardApprovals";
-import { useDashboardSettings } from "@/api/dashboardSettings";
+import { OpsChangesCard } from "./dashboardChanges";
+import { useDashboardSettings, useProgressRag } from "@/api/dashboardSettings";
+import { RAG_CLASS, ragTone } from "@/lib/progressRag";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
@@ -560,6 +566,7 @@ export function Dashboard() {
     tabsAllowed,
   );
   const dashSettings = useDashboardSettings();
+  const rag = useProgressRag().data?.items;
   const q: DashboardQuery = {
     ref_date: sp.get("ref_date") ?? "",
     region_id: sp.get("region_id") ?? "",
@@ -579,7 +586,17 @@ export function Dashboard() {
   const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [format, setFormat] = useState<ExportFormat>("xlsx");
+  const [format, setFormat] = useState<ExportFormat>(() => (loadPref<string>("dash.exportFormat", "xlsx") === "csv" ? "csv" : "xlsx"));
+  const [shareOpen, setShareOpen] = useState(false);
+  // the Share / Export menu closes on Escape and on a click outside it
+  useEffect(() => {
+    if (!shareOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShareOpen(false); };
+    const onDown = (e: MouseEvent) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-testid="dash-share-wrap"]')) setShareOpen(false); };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onDown); };
+  }, [shareOpen]);
   // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
   const [preview, setPreview] = useState<"A" | "B" | null>(null);
   const canExport =
@@ -1043,6 +1060,10 @@ export function Dashboard() {
     region_name_ar?: string | null;
   }) => (ar && r.region_name_ar ? r.region_name_ar : r.region_name);
   const ps = d?.headline.project_status;
+  // contract 0.15.432: the colours of the SPI and of the progress against plan, only for the figures an admin turned on (`rag` is read at the top of the component)
+  const spiValue = ps?.progress_vs_plan_index ?? ps?.spi ?? null;
+  const spiTone = ragTone(rag, "spi", spiValue === null ? null : Number(spiValue));
+  const gapTone = ragTone(rag, "progress_gap", ps?.progress_pct != null && ps?.planned_pct != null ? ps.progress_pct - ps.planned_pct : null);
   const fc = d?.headline.final_closure;
   const basis = d?.basis;
   /** The data basis of a card. The headline, pipeline and stream figures come from a snapshot when one exists; SLA, issues, delay and health are computed as of the date. */
@@ -1254,69 +1275,97 @@ export function Dashboard() {
               {t("dash.reset")}
             </button>
           )}
-          <Link className="btn" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
-            <MonitorPlay size={16} />
-            {t("dash.tv")}
-          </Link>
-          <button
-            className="btn"
-            data-testid="dash-copy-link"
-            title={t("dash.copy_link_hint")}
-            onClick={() => {
-              // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
-              void navigator.clipboard?.writeText(window.location.href).then(() => {
-                setLinkCopied(true);
-                window.setTimeout(() => setLinkCopied(false), 2000);
-              });
-            }}
-          >
-            {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
-            {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
-          </button>
-          <Link
-            className="btn"
-            to="/dashboard/manual-items"
-            data-testid="dash-manual-link"
-          >
-            <PencilLine size={16} />
-            {t("dash.manual_link")}
-          </Link>
-          {canExport && (
-            <span className="flex items-center gap-1">
-              <select
-                className="input w-auto"
-                aria-label={t("dash.export_format")}
-                data-testid="dash-export-format"
-                value={format}
-                onChange={(e) => setFormat(e.target.value as ExportFormat)}
-              >
-                {(["xlsx", "csv"] as const).map((f) => (
-                  <option key={f} value={f}>
-                    {t(`dash.format.${f}`)}
-                  </option>
-                ))}
-              </select>
+          {/* P2: the six output buttons live in one menu; the controls and their test ids are unchanged, only closed (hidden, not removed) */}
+          <span className="relative print:hidden" data-testid="dash-share-wrap">
+            <button
+              type="button"
+              className="btn"
+              data-testid="dash-share"
+              aria-haspopup="true"
+              aria-expanded={shareOpen}
+              onClick={() => setShareOpen((o) => !o)}
+            >
+              <Share2 size={16} />
+              {t("dash.share_menu")}
+              <ChevronDown size={14} aria-hidden />
+            </button>
+            <div
+              role="group"
+              aria-label={t("dash.share_menu")}
+              data-testid="dash-share-panel"
+              className={`${shareOpen ? "flex" : "hidden"} absolute end-0 top-full z-30 mt-1 min-w-56 flex-col gap-1 rounded-lg border border-line bg-surface p-2 shadow-lg`}
+            >
+              <Link className="btn justify-start" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
+                <MonitorPlay size={16} />
+                {t("dash.tv")}
+              </Link>
               <button
-                className="btn print:hidden"
-                data-testid="dash-print"
-                disabled={gate.exportLocked}
-                title={gate.note(gate.exportLocked)}
-                onClick={() => window.print()}
+                className="btn justify-start"
+                data-testid="dash-copy-link"
+                title={t("dash.copy_link_hint")}
+                onClick={() => {
+                  // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
+                  void navigator.clipboard?.writeText(window.location.href).then(() => {
+                    setLinkCopied(true);
+                    window.setTimeout(() => setLinkCopied(false), 2000);
+                  });
+                }}
               >
-                <Printer size={16} />
-                {t("dash.print")}
+                {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
+                {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
               </button>
-              <button
-                className="btn btn-primary"
-                data-testid="dash-export"
-                disabled={exporting || !d}
-                onClick={doExport}
+              <Link
+                className="btn justify-start"
+                to="/dashboard/manual-items"
+                data-testid="dash-manual-link"
               >
-                <Download size={16} />
-                {t("dash.export")}
-              </button>
-            </span>
-          )}
+                <PencilLine size={16} />
+                {t("dash.manual_link")}
+              </Link>
+              {canExport && (
+                <>
+                  <label className="flex items-center justify-between gap-2 px-1 text-sm text-mute">
+                    {t("dash.export_format")}
+                    <select
+                      className="input w-auto"
+                      aria-label={t("dash.export_format")}
+                      data-testid="dash-export-format"
+                      value={format}
+                      onChange={(e) => {
+                        setFormat(e.target.value as ExportFormat);
+                        savePref("dash.exportFormat", e.target.value);
+                      }}
+                    >
+                      {(["xlsx", "csv"] as const).map((f) => (
+                        <option key={f} value={f}>
+                          {t(`dash.format.${f}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="btn justify-start print:hidden"
+                    data-testid="dash-print"
+                    disabled={gate.exportLocked}
+                    title={gate.note(gate.exportLocked)}
+                    onClick={() => window.print()}
+                  >
+                    <Printer size={16} />
+                    {t("dash.print")}
+                  </button>
+                  <button
+                    className="btn btn-primary justify-start"
+                    data-testid="dash-export"
+                    disabled={exporting || !d}
+                    onClick={doExport}
+                  >
+                    <Download size={16} />
+                    {t("dash.export")}
+                  </button>
+                </>
+              )}
+            </div>
+          </span>
         </span>
         {!!basis?.snapshot_dates?.length && (
           <div
@@ -1416,6 +1465,12 @@ export function Dashboard() {
                 </>
               ),
 
+              pinned_views: (
+                <>
+                  {/* 0.15.245 (owner request 2026-11-27, research item 16): the caller's pinned views with counters */}
+                  <PinnedViewsCard />
+                </>
+              ),
               ops_scurve: (
                 <>
                   {/* owner approval 2026-11-26, item 2: planned vs actual of the saved weekly snapshots, weekly velocity and the 100% forecast */}
@@ -1458,6 +1513,20 @@ export function Dashboard() {
                 </>
               ),
 
+              ops_phase: (
+                <>
+                  {/* 0.15.367: sites per project phase with progress; targets derived from the scope */}
+                  <OpsPhaseCard ops={ops.data} />
+                </>
+              ),
+
+              ops_changes: (
+                <>
+                  {/* 0.15.205 (owner approval 2026-11-26, item 8): pending change requests and overdue meeting actions */}
+                  <OpsChangesCard ops={ops.data} />
+                </>
+              ),
+
               headline: (
                 <>
                   {/* needs-attention strip: only counts the dashboard already returned, each linking to its list; nothing new is read */}
@@ -1493,8 +1562,9 @@ export function Dashboard() {
                           {pct(ps?.progress_pct)}
                         </span>
                         <span
-                          className="chip border border-line"
+                          className={`chip border border-line ${gapTone ? RAG_CLASS[gapTone] : ""}`}
                           data-testid="dash-planned"
+                          data-rag={gapTone ?? undefined}
                         >
                           {t("dash.kpi.planned")}:{" "}
                           {ps?.planned_pct === null ||
@@ -1503,8 +1573,9 @@ export function Dashboard() {
                             : pct(ps.planned_pct)}
                         </span>
                         <span
-                          className="chip border border-line"
+                          className={`chip border border-line ${spiTone ? RAG_CLASS[spiTone] : ""}`}
                           data-testid="dash-spi"
+                          data-rag={spiTone ?? undefined}
                           title={t("dash.kpi.not_evm")}
                         >
                           {t("dash.kpi.spi")}:{" "}
@@ -2557,6 +2628,9 @@ export function Dashboard() {
                               {t("dash.regions.progress")}
                             </th>
                             <th className="px-2 text-end">
+                              {t("dash.regions.forecast")}
+                            </th>
+                            <th className="px-2 text-end">
                               {t("dash.regions.health")}
                             </th>
                           </tr>
@@ -2598,6 +2672,9 @@ export function Dashboard() {
                                     {pct(r.progress_pct)}
                                   </span>
                                 </div>
+                              </td>
+                              <td className="px-2 text-end tnum" data-testid={`dash-region-forecast-${r.region_id}`}>
+                                {fmtDate(r.forecast_date, i18n.language) || "–"}
                               </td>
                               <td className="px-2 text-end tnum">
                                 {r.health_score == null

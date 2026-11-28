@@ -10,7 +10,9 @@ import { FieldInput, showValue } from '@/components/RegisterFields';
 import { ColumnDialog, type Place } from '@/components/ColumnDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
+import { useStructureProposals } from '@/api/structureProposals';
 import { ItemColumns } from './ItemColumns';
+import { StructureChangesTab } from './StructureByTemplate';
 import { RegisterStatePanel } from './RegisterStatePanel';
 import { RegisterLinksPanel } from './RegisterLinksPanel';
 import { RegisterRulesPanel } from './RegisterRulesPanel';
@@ -28,7 +30,29 @@ export function RegisterColumns() {
   const [sp] = useSearchParams();
   const k = sp.get('register') || 'gecol';
   if (k === ITEMS_KEY) return <ItemsPage />;
-  return isStreamKey(k) ? <StreamPage menu={k.slice(STREAM_PREFIX.length) as StreamMenu} /> : <RegisterColumnsOf />;
+  if (isStreamKey(k)) return <StreamPage menu={k.slice(STREAM_PREFIX.length) as StreamMenu} />;
+  return <RegisterColumnsTabs register={k} />;
+}
+
+/** Two tabs for a register: its columns, and its structure changes (the proposals made from a modified template, reviewed and approved here; 0.15.401 and 0.15.403). */
+function RegisterColumnsTabs({ register }: { register: string }) {
+  const { t } = useTranslation();
+  const [sp, setSp] = useSearchParams();
+  const tab = sp.get('tab') === 'structure' ? 'structure' : 'columns';
+  const props = useStructureProposals();
+  const pending = (props.data ?? []).filter((p) => p.register_key === register && p.status === 'pending').length;
+  const go = (x: 'columns' | 'structure') => setSp(x === 'structure' ? { register, tab: 'structure' } : { register }, { replace: true });
+  return (
+    <div className="space-y-3">
+      <div role="tablist" aria-label={t('regcols.title')} className="flex gap-1 border-b border-line">
+        <button type="button" role="tab" aria-selected={tab === 'columns'} className={`btn btn-ghost rounded-b-none ${tab === 'columns' ? 'border-b-2 border-accent font-bold' : ''}`} data-testid="regcols-tab-columns" onClick={() => go('columns')}>{t('struct.tab_columns')}</button>
+        <button type="button" role="tab" aria-selected={tab === 'structure'} className={`btn btn-ghost rounded-b-none ${tab === 'structure' ? 'border-b-2 border-accent font-bold' : ''}`} data-testid="regcols-tab-structure" onClick={() => go('structure')}>
+          {t('struct.tab_structure')}{pending > 0 && <span className="ms-1 chip" data-testid="regcols-tab-structure-n">{pending}</span>}
+        </button>
+      </div>
+      {tab === 'structure' ? <StructureChangesTab register={register} /> : <RegisterColumnsOf />}
+    </div>
+  );
 }
 
 const ITEMS_KEY = 'wh:items';
@@ -174,7 +198,7 @@ function RegisterColumnsOf() {
           <table className="w-full text-sm" data-testid="regcols-table">
             <thead className="text-mute"><tr>
               <th className="p-2 text-start">{t('regcols.code')}</th><th className="p-2 text-start">{t('regcols.label_en')}</th><th className="p-2 text-start">{t('regcols.type')}</th>
-              <th className="p-2 text-start">{t('regcols.section')}</th><th className="p-2 text-start">{t('regcols.default_value')}</th><th className="p-2 text-start">{t('regcols.usage')}</th><th className="p-2 text-start">{t('lists.status')}</th><th className="p-2" />
+              <th className="p-2 text-start">{t('regcols.section')}</th><th className="p-2 text-start">{t('regcols.import_aliases')}</th><th className="p-2 text-start">{t('regcols.default_value')}</th><th className="p-2 text-start">{t('regcols.usage')}</th><th className="p-2 text-start">{t('lists.status')}</th><th className="p-2" />
             </tr></thead>
             <tbody>
               {fields.map((c, i) => (
@@ -188,6 +212,10 @@ function RegisterColumnsOf() {
                     ? <InlineCell kind="select" value={c.type} display={t(`regcols.type_${c.type}`)} options={SIMPLE.map((x) => ({ value: x, label: t(`regcols.type_${x}`) }))} label={t('regcols.type')} testid={`regcols-cell-type-${c.code}`} onCommit={(v) => saveCol(c, { field_type: v as RegisterColumnType })} />
                     : t(`regcols.type_${c.type}`)}</td>
                   <td className="p-2"><InlineCell kind="select" value={c.section ?? ''} display={secName(c.section)} options={[{ value: '', label: '—' }, ...sections.map((x) => ({ value: x.name_en, label: (lang === 'ar' && x.name_ar) || x.name_en }))]} label={t('regcols.section')} testid={`regcols-cell-section-${c.code}`} onCommit={(v) => saveCol(c, { section: v || null })} /></td>
+                  <td className="p-2" data-testid={`regcols-aliases-${c.code}`}>
+                    <InlineCell value={((c as { import_aliases?: string[] }).import_aliases ?? []).join('; ')} display={((c as { import_aliases?: string[] }).import_aliases ?? []).join('; ') || '—'} label={t('regcols.import_aliases')} testid={`regcols-cell-aliases-${c.code}`}
+                      onCommit={(v) => saveCol(c, { import_aliases: v.split(/[;\u061B|]/).map((x) => x.trim()).filter((x) => x !== '') })} />
+                  </td>
                   <td className="p-2" data-testid={`regcols-default-${c.code}`}>
                     {(() => { const rf = regDefs.data?.find((d) => d.register_key === key)?.fields.find((x) => x.code === c.code);
                       const dv = (c as { default_value?: unknown }).default_value;

@@ -227,7 +227,31 @@ export const dashboardHandlers = [
         ncrs: { open: 6, closed: 41, avg_close_days: 14.2 },
         first_pass_pct: 92.4,
       },
-      // 0.15.204: pending approvals bottleneck, synthetic figures
+      // 0.15.367: phase scope, synthetic figures
+      phase_scope: {
+        available: true,
+        phases: [
+          { phase: 'Phase 1', sites: 40, completed: 12, in_progress: 20, not_started: 6, on_hold: 2, on_air: 18, progress_pct: 45, target_sites: 40 },
+          { phase: 'Phase 2', sites: 60, completed: 4, in_progress: 30, not_started: 24, on_hold: 2, on_air: 9, progress_pct: 15, target_sites: 60 },
+          { phase: null, sites: 5, completed: 0, in_progress: 1, not_started: 4, on_hold: 0, on_air: 0, progress_pct: 0, target_sites: 5 },
+        ],
+        total: { phase: null, sites: 105, completed: 16, in_progress: 51, not_started: 34, on_hold: 4, on_air: 27, progress_pct: 25.7, target_sites: 105 },
+        monthly_on_air_auto: { value: 20, source: 'derived', derived: 20, remaining: 78, planned_end: '2027-03-15', months_left: 4 },
+      },
+      // 0.15.205: change requests and overdue meeting actions, synthetic figures
+      changes_meetings: {
+        available: true,
+        changes: {
+          available: true, pending: 7, approved_not_applied: 2,
+          by_kind: [{ kind: 'scope_change', count: 4 }, { kind: 'date_change', count: 2 }, { kind: 'suspension', count: 1 }],
+          pending_aging: { buckets: [{ key: 'd0_7', count: 3 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 1 }, { key: 'over_30', count: 1 }], total: 7, oldest_days: 38 },
+        },
+        actions: {
+          available: true, open: 19, overdue: 8, no_due_date: 3,
+          overdue_aging: { buckets: [{ key: 'd0_7', count: 3 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 1 }], total: 8, oldest_days: 41 },
+        },
+      },
+            // 0.15.204: pending approvals bottleneck, synthetic figures
       approvals: {
         available: true, total: 23, review: 14, approve: 9, unassigned: 3,
         waiting: { buckets: [{ key: 'd0_7', count: 9 }, { key: 'd8_14', count: 6 }, { key: 'd15_30', count: 5 }, { key: 'over_30', count: 3 }], total: 23, oldest_days: 47 },

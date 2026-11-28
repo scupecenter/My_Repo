@@ -48,11 +48,15 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | HLC record | Procurement records of the site | register link, many (`hlc_pr_links`, Q150) | `pr_no`, `hlc_approval_date`, `procurement_record_id` | derived |
 | Dismantle part (outsourced) | Procurement order | register link | `procurement_order_id`, contractor | contractor derived from the order |
 | Register records, task instances, task delay periods, contractor teams and contracts | Contractor company (`external_parties`) | foreign key | `external_party_id`, `party_id` | chosen |
-| Procurement, snags, quality inspections, issues | Contractor company | id column, no constraint | `party_id`, `responsible_party_id` | chosen |
-| Procurement | Contractor team (`external_teams`) | id column, no constraint | `team_id` | chosen |
-| Quality inspection | Snag | id column, no constraint | `quality_inspections.snag_id` | not checked in the catalogue |
+| Procurement, snags, quality inspections, issues | Contractor company | foreign key (0182, `_idfk`) | `party_id`, `responsible_party_id` | chosen |
+| Procurement | Contractor team (`external_teams`) | foreign key (0182, `_idfk`) | `team_id` | chosen |
+| Quality inspection | Snag | foreign key (0182, `_idfk`, ON DELETE SET NULL) | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
 | Financial advances (expense, settlement) | Advance | register link | `advance_id` | checked in entry (approved advance of the same site, 0407); disbursed rule at submit; picker `advance-options` |
+| Financial advances (advance page) | Expense / settlement draft | prefilled create (D59) | `advance_id`, site, today, balance to return | web buttons on an approved, disbursed advance; the draft goes through the normal create and the 0407 check |
+| Alert rules (Settings > Security > Alerts) | Advances, invoices | notification kinds (0408) | `advance_unsettled`, `invoice_due_soon` | weekly per open advance, once per invoice and due date; days default to the Finance hub `settle_warn_days` |
+| Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); picker `invoices/order-options`; listed in `record_related` |
+| Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; picker `invoices/supplier-options` |
 | Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); PR No. and PO / WO No. read from the order (`order_pr_no`, `order_po_wo_no`, 0430); required when Settings > Register rules says so (`order_required`); picker `invoices/order-options`; listed in `record_related` |
 | Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; required when Settings > Register rules says so (`supplier_required`, 0430); picker `invoices/supplier-options` |
 | HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |
@@ -63,6 +67,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Issues | Task | text field filled by a task picker | `blocked_gate_or_task` (the task code) | chosen |
 | Register decisions, task approvals, snags | Notifications | `x_notify_watchers`, policy in setting `notifications.policy` | `notifications` | derived |
 
+**Declared links (0409, D60 phase 1).** Every register link field is declared once in `register_links` (register, field, target register, target record type, same site, label fields, `enforce`). `record_related()` reads the declaration, `GET /registers/{key}/links` and `GET /registers/{key}/link-options/{field}` serve the web (generic `RecordLinkSelect`, used for any declared field without a hand-coded picker), and a link with `enforce = true` is checked in entry (the id is a current approved record of the target that the caller can see, of the same site when `same_site`). The links above are declared with the check off (declared only, so no old row is refused); `register_link_orphans()` reports the ids that point nowhere, to decide when to switch a link on. A new link is one row. Phase 2 (0410) adds the filters `data_in` and `data_not_like` and the label tokens (`a|b`, `field>key`, `@party`), so the generic picker replaces the hand-coded order and advance pickers in the drawer (the Dismantle order and RN pickers, the risk picker and the supplier picker stay: they filter by part, by status or read another table).
+
 ## 4. Gaps and proposals
 
 1. **Warehouse receipt to Procurement order.** A PL / OPEN receipt (stock coming in) names no order, so what arrived against a PO is not visible in
@@ -72,10 +78,10 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 3. **Car dispatcher and Financial advances to Procurement.** `procurement_record_id` is a typed text field; a picker over the orders of the site would
    remove the typing.
 4. **Contract end.** *(done, migration 0212)* `external_party_contracts` is the single source of the contract dates; `external_parties.contract_start` / `contract_end` are a mirror the database rebuilds on every contract change (earliest start, latest end of the active contracts; an open-ended contract leaves the end empty). The performance view reads the contracts first.
-5. **Constraints.** The id columns without a `REFERENCES` constraint (dotted in section 2) rely on the writing function. Adding the constraints is additive but needs a data check first (orphan ids), so it is a proposal for a later migration, not part of this document.
+5. **Constraints.** *(done, migration 0182)* The six id columns that had no `REFERENCES` constraint got one after an orphan check (added NOT VALID, then validated when the column holds no orphan; `fk_orphan_report()` re-checks later). Still without a constraint: `team_scope_checks.team_id`, a snapshot of the team that matched when the check ran, kept as history.
 6. **Notifications.** Each module raises its own notice; no single function applies the policy (channel, digest, escalation).
 
-7. **One link catalogue.** *(done, 0431)* The setting `registers.links` is the single list of the links (from register, field, to register, picker, check on save, same site, approved only, on or off). It draws the form picker of any link field, feeds the Related records panel and drives one blocking check on write for every register. A later link is added in Settings or with `register_link_add()`; HLC's many-to-many `hlc_pr_links` stays its own mechanism.
+7. **One link catalogue.** *(done, D60 0409/0410, screen 0713)* The table `register_links` is the single list of the links (register, field, target register and record type, required state, same site, check on save, on or off). It draws the form picker of any link field, feeds the Related records panel, drives the check on save (entry only) and the orphan report. Settings > Register links (0713) switches a link on or off, sets the check and same site, and declares a new link, with a reason and the audit; nothing is deleted and the register, field and target of a link never change. HLC's many-to-many `hlc_pr_links` stays its own mechanism.
 
 ## 5. Appendix: every foreign key (parent, then children)
 

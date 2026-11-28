@@ -71,25 +71,37 @@ export class P4cService {
     return { items };
   }
 
-  /** GET /registers/{key}/link-options?field=&site_id= : the candidates of one link field of the catalogue (the database applies the view right of the target and the link rules). */
-  async linkOptions(auth: AuthContext, key: string, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
-    if (!/^[a-z][a-z0-9_]{0,63}$/.test(key)) throw problems.validation([{ path: '/register_key', code: 'invalid', message: 'Not a register key.' }]);
-    const field = oneParam(q, 'field');
-    if (!field || !/^[a-z][a-z0-9_]{0,63}$/.test(field)) throw problems.validation([{ path: '/field', code: 'invalid', message: 'field is a field code.' }]);
-    const site = oneParam(q, 'site_id');
-    if (site && !uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
-    await this.access.requireRegions(key, 'view');
-    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT register_link_options(${key}::text, ${field}::text, ${site ?? null}::uuid) AS r`);
-    return { items };
-  }
-
-
   /** GET /registers/financial_advances/advance-options?site_id= : the advances an expense or settlement may name (row-level security applies). */
   async advanceOptions(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
     await this.access.requireRegions('financial_advances', 'view');
     const site = oneParam(q, 'site_id');
     if (site && !uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
     const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT fa_advance_options(${site ?? null}::uuid) AS r`);
+    return { items };
+  }
+
+  /** GET /registers/{key}/links (D60): the declared links of the register (field, target register, check on or off). Needs the register view. */
+  async registerLinks(auth: AuthContext, key: string): Promise<{ items: unknown[] }> {
+    if (!/^[a-z][a-z0-9_]{0,40}$/.test(key)) throw problems.validation([{ path: '/key', code: 'invalid', message: 'A register key.' }]);
+    await this.access.requireRegions(key, 'view');
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT register_links_of(${key}::text) AS r`);
+    return { items };
+  }
+
+  /** GET /registers/{key}/link-options/{field}?site_id=&q= (D60): the one generic picker of a declared link; needs the view of the target register. */
+  async registerLinkOptions(auth: AuthContext, key: string, field: string, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
+    if (!/^[a-z][a-z0-9_]{0,40}$/.test(key)) throw problems.validation([{ path: '/key', code: 'invalid', message: 'A register key.' }]);
+    if (!/^[a-z][a-z0-9_]{0,40}$/.test(field)) throw problems.validation([{ path: '/field', code: 'invalid', message: 'A field code.' }]);
+    const site = oneParam(q, 'site_id');
+    if (site && !uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
+    const text = oneParam(q, 'q');
+    if (text && text.length > 100) throw problems.validation([{ path: '/q', code: 'invalid', message: 'q is up to 100 characters.' }]);
+    await this.access.requireRegions(key, 'view');
+    const links = await this.registers.call<{ field: string; target_register: string }[]>(auth, Prisma.sql`SELECT register_links_of(${key}::text) AS r`);
+    const link = links.find((l) => l.field === field);
+    if (!link) throw problems.notFound('link');
+    await this.access.requireRegions(link.target_register, 'view');
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT register_link_options(${key}::text, ${field}::text, ${site ?? null}::uuid, ${text ?? null}::text) AS r`);
     return { items };
   }
 

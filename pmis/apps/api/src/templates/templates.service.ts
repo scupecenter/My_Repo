@@ -4,10 +4,13 @@ import ExcelJS from 'exceljs';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { ProblemException, problems } from '../common/problem';
-import { boolParam, oneParam } from '../common/query';
+import { boolParam, isCalendarDate, oneParam } from '../common/query';
+import { importMaxRows } from './upload.interceptor';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { SitesService } from '../sites/sites.service';
+import { writeStructureSheet, type StructureField } from './structure-sheet';
+import { limit } from '../ops/ops-limits';
 
 /** One column of a template (the JSON that tpl_columns() stores with every version). */
 export interface TplColumn {
@@ -87,9 +90,9 @@ export const TPL_SHEET = '_tpl';
 export const LISTS_SHEET = '_lists';
 /** Rows below the pre-filled ones that are formatted and validated for typing. */
 const BLANK_ROWS = 300;
-const MAX_PREFILL_ROWS = 5000;
+const maxPrefillRows = (): number => limit('prefill.max_rows');
 /** The most sites a filter-based pre-fill reads (one row per site in a stream template). */
-const MAX_PREFILL_SITES = 5000;
+const maxPrefillSites = (): number => limit('prefill.max_sites');
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isoToDate = (s: string): Date => new Date(`${s}T00:00:00.000Z`);
@@ -156,6 +159,14 @@ export class TemplatesService {
     }
     // 0105 (F17): the values of a list, only for those who may edit the lists (fields)
     if (t.kind === 'list_values') return this.access.hasGrant(auth, 'fields', 'edit');
+    // 0564 (3b): the Daily Plan, for those who see it (view on Daily Plan or on Sites in a region; the database decides what a row may change)
+    if (t.kind === 'daily_plan') {
+      for (const m of ['daily_plan', 'sites']) {
+        const regs = await this.access.regions(m, 'view');
+        if (regs === null || regs.length > 0) return true;
+      }
+      return false;
+    }
     // 0145 (B12): the holidays, only for those who may change the calendar
     if (t.kind === 'holidays') return this.access.isAdmin('calendars', 'edit');
     return false;
@@ -192,14 +203,38 @@ export class TemplatesService {
     return { items };
   }
 
+  // ------------------------------------------------------------------ GET /templates/{id}/changes (P3)
+  /** What changed between two versions: columns added, removed or renamed (by column code). Read only. */
+  async changes(auth: AuthContext, templateId: string, fromQ: number | null, toQ: number | null): Promise<unknown> {
+    const t = await this.current(templateId);
+    if (!t || !t.is_active || !(await this.usable(t, auth))) throw problems.notFound('This template does not exist.');
+    const to = toQ ?? t.current_version;
+    const rows = await this.db.tx.$queryRaw<{ version: number; columns: { code: string; label: string }[]; published_at: Date; reason: string | null }[]>(Prisma.sql`
+      SELECT v.version, v.columns, v.published_at, v.reason FROM template_versions v WHERE v.template_def_id = ${t.id}::uuid AND v.version IN (${to}, ${fromQ ?? to - 1})`);
+    const b = rows.find((r) => r.version === to);
+    if (!b) throw problems.notFound('This version does not exist.');
+    const a = fromQ === null && to === 1 ? undefined : rows.find((r) => r.version === (fromQ ?? to - 1));
+    if (fromQ !== null && !a) throw problems.notFound('This version does not exist.');
+    const cols = (x?: { columns: { code: string; label: string }[] }) => (Array.isArray(x?.columns) ? x!.columns : []);
+    const prev = new Map(cols(a).map((c) => [c.code, c.label]));
+    const next = new Map(cols(b).map((c) => [c.code, c.label]));
+    return {
+      template_id: templateId, from: a?.version ?? null, to, issued_at: b.published_at, reason: b.reason,
+      added: a ? [...next].filter(([c]) => !prev.has(c)).map(([code, label]) => ({ code, label })) : [],
+      removed: a ? [...prev].filter(([c]) => !next.has(c)).map(([code, label]) => ({ code, label })) : [],
+      renamed: a ? [...next].filter(([c, l]) => prev.has(c) && prev.get(c) !== l).map(([code, l]) => ({ code, from_label: prev.get(code)!, to_label: l })) : [],
+    };
+  }
+
   // ------------------------------------------------------------------ GET /templates/{id}/download
   async download(auth: AuthContext, templateId: string, ip: string | null, q: Record<string, unknown>): Promise<{ buffer: Buffer; fileName: string }> {
     const t = await this.current(templateId);
     if (!t || !t.is_active) throw problems.notFound('This template does not exist.');
     if (t.kind === 'stream' || t.kind === 'master') return this.downloadSite(auth, t, q);
     if (t.kind === 'sites') return this.downloadNewSites(auth, t);
-    if (t.kind === 'list_values') return this.downloadListValues(auth, t);
+    if (t.kind === 'list_values') return this.downloadListValues(auth, t, q);
     if (t.kind === 'holidays') return this.downloadHolidays(auth, t);
+    if (t.kind === 'daily_plan') return this.downloadDailyPlan(auth, t, q);
     if (t.kind !== 'register' || !t.register_key || !t.module_key) throw problems.notFound('This template cannot be downloaded yet.');
     const regs = await this.access.requireRegions(t.module_key, 'view');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
@@ -235,7 +270,13 @@ export class TemplatesService {
 
     const me = await this.db.tx.$queryRaw<{ employee_id: string | null; display_name: string }[]>(Prisma.sql`SELECT employee_id, display_name FROM users WHERE id = ${auth.user.id}::uuid`);
     const issuedAt = new Date();
-    const buffer = await this.build(t, cols, rows, { prefill, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt });
+    // 0560: who may edit the columns gets the Structure sheet, written from the live definition at the moment of the download
+    let structure: StructureField[] | undefined;
+    if (await this.access.isAdmin('fields', 'edit')) {
+      const sj = await this.db.tx.$queryRaw<{ r: { fields: StructureField[] } }[]>(Prisma.sql`SELECT reg_fields_admin_json(${t.register_key}::text) AS r`);
+      structure = sj[0]?.r.fields;
+    }
+    const buffer = await this.build(t, cols, rows, { prefill, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt, structure });
 
     // migration 0045: pmis_app writes no log row itself; the ip and the device come from the request context
     void ip;
@@ -261,14 +302,59 @@ export class TemplatesService {
   }
 
   /** 0105 (F17): the approved template of a list's values. One row per value; the import reads it back (list-catalogues service). */
-  private async downloadListValues(auth: AuthContext, t: TemplateRow): Promise<{ buffer: Buffer; fileName: string }> {
+  /**
+   * The list values template. Empty (structure only) by default. With `list=<code>` (D54, D55) it is filled with the current active values of that list,
+   * in the columns of the template, so the admin downloads, edits and uploads it again (`POST /list-catalogues/{code}/values/import`).
+   */
+  private async downloadListValues(auth: AuthContext, t: TemplateRow, q: Record<string, unknown>): Promise<{ buffer: Buffer; fileName: string }> {
     await this.access.requireAdmin('fields', 'edit');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
+    const list = oneParam(q, 'list');
+    let rows: Record<string, unknown>[] = [];
+    if (list !== undefined) {
+      if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(list)) throw problems.validation([{ path: '/list', code: 'invalid', message: 'list is the code of a dropdown list.' }]);
+      const cat = await this.db.tx.$queryRaw<{ code: string }[]>(Prisma.sql`SELECT code FROM list_catalogues WHERE code = ${list}`);
+      if (!cat[0]) throw problems.notFound('The list does not exist.');
+      const vals = await this.db.tx.$queryRaw<{ code: string; label_en: string; label_ar: string | null; aliases: string[]; colour: string | null; parent_code: string | null; sort_order: number }[]>(Prisma.sql`
+        SELECT v.code, v.label_en, v.label_ar, v.aliases, v.colour, p.code AS parent_code, v.sort_order
+        FROM list_values v LEFT JOIN list_values p ON p.id = v.parent_value_id
+        WHERE v.catalogue_code = ${list} AND v.is_active ORDER BY v.sort_order, v.code COLLATE "C" LIMIT 5000`);
+      rows = vals.map((v) => ({ code: v.code, label_en: v.label_en, label_ar: v.label_ar, aliases: (v.aliases ?? []).join(';'), colour: v.colour, parent_code: v.parent_code, sort_order: v.sort_order }));
+    }
     const issuedAt = new Date();
-    const buffer = await this.build(t, t.columns, [], { prefill: false, employeeId: null, issuedAt });
+    const buffer = await this.build(t, t.columns, rows, { prefill: list !== undefined, employeeId: null, issuedAt });
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
-        ${JSON.stringify({ version: t.current_version, prefill: false, rows: 0, kind: t.kind })}::jsonb, NULL)`);
-    return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
+        ${JSON.stringify({ version: t.current_version, prefill: list !== undefined, rows: rows.length, kind: t.kind, list: list ?? null })}::jsonb, NULL)`);
+    return { buffer, fileName: `${t.template_id}${list ? `_${list}` : ''}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
+  }
+
+  /**
+   * 0564 (3b): TPL-DAILY-PLAN. Blank, or with `date` (and optional `region_id`) filled with the plan of that day as the actor sees it: one row per site, the
+   * value now shown in each column. Site name and Region are grey (never read). The import is POST /daily-plans/import.
+   */
+  private async downloadDailyPlan(auth: AuthContext, t: TemplateRow, q: Record<string, unknown>): Promise<{ buffer: Buffer; fileName: string }> {
+    if (!(await this.usable(t, auth))) throw problems.notFound('This template does not exist.');
+    if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
+    const date = oneParam(q, 'date');
+    let rows: Record<string, unknown>[] = [];
+    if (date !== undefined) {
+      if (!isCalendarDate(date)) throw problems.validation([{ path: '/date', code: 'invalid', message: 'A date YYYY-MM-DD.' }]);
+      const rid = oneParam(q, 'region_id');
+      if (rid !== undefined && !/^[1-9][0-9]{0,2}$/.test(rid)) throw problems.validation([{ path: '/region_id', code: 'invalid', message: 'region_id is a region number.' }]);
+      const day = await this.db.tx.$queryRaw<{ j: { rows: { site_code: string; values: Record<string, string | null>; reason: string | null; remark: string | null; frozen: boolean }[] } }[]>(Prisma.sql`
+        SELECT daily_plan_json(${date}::date, ${rid === undefined ? null : [Number(rid)]}::integer[]) AS j`);
+      rows = (day[0]?.j.rows ?? []).slice(0, importMaxRows()).map((r) => ({
+        plan_date: date, site_code: r.site_code, site_name: r.values.site_name, region: r.values.region,
+        tower_owner: r.values.tower_owner, owner_id: r.values.owner_id, latitude: r.values.latitude, longitude: r.values.longitude, site_type: r.values.site_type,
+        sow: r.values.sow, contractor: r.values.contractor, aat_se: r.values.aat_se, access_valid: r.values.access_valid, planned_work: r.values.planned_work,
+        actual_work: r.values.actual_work, reason: r.reason, remark: r.remark, remove: '',
+      }));
+    }
+    const issuedAt = new Date();
+    const buffer = await this.build(t, t.columns, rows, { prefill: date !== undefined, employeeId: null, issuedAt });
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
+        ${JSON.stringify({ version: t.current_version, prefill: date !== undefined, rows: rows.length, kind: t.kind, date: date ?? null })}::jsonb, NULL)`);
+    return { buffer, fileName: `${t.template_id}${date ? `_${date}` : ''}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
   /** 0145 (B12, ADR 0011): the empty TPL-HOLIDAYS workbook, for a System Admin or a delegate of the calendar. */
@@ -282,7 +368,7 @@ export class TemplatesService {
     return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
-  /** The ids of the sites the Sites list shows for these filters (JSON object of the list's query), at most MAX_PREFILL_SITES. */
+  /** The ids of the sites the Sites list shows for these filters (JSON object of the list's query), at most the prefill.max_sites limit. */
   private async siteIdsFromFilters(auth: AuthContext, raw: string): Promise<string[]> {
     let parsed: unknown;
     try { parsed = JSON.parse(raw); } catch { throw problems.validation([{ path: '/filters', code: 'invalid', message: 'filters is a JSON object.' }]); }
@@ -298,9 +384,9 @@ export class TemplatesService {
       const r = (await this.sitesSvc.list(auth, { ...base, limit: '200', ...(cursor ? { cursor } : {}) })) as { items: { id: string }[]; page: { next_cursor: string | null } };
       for (const it of r.items) if (typeof it.id === 'string') ids.push(it.id);
       cursor = r.page.next_cursor;
-      if (!cursor || ids.length >= MAX_PREFILL_SITES) break;
+      if (!cursor || ids.length >= maxPrefillSites()) break;
     }
-    return ids.slice(0, MAX_PREFILL_SITES);
+    return ids.slice(0, maxPrefillSites());
   }
 
   private siteIds(q: Record<string, unknown>): string[] {
@@ -323,7 +409,7 @@ export class TemplatesService {
         ${region !== null ? Prisma.sql`AND r.region_id = ${region}` : Prisma.empty}
       ORDER BY r.entity_id, r.is_current DESC, r.version_no DESC`);
     rows.sort((a, b) => (a.site_code ?? '').localeCompare(b.site_code ?? '', 'en') || a.entity_id.localeCompare(b.entity_id));
-    const page = rows.slice(0, MAX_PREFILL_ROWS);
+    const page = rows.slice(0, maxPrefillRows());
 
     // ids that the file shows as names / employee IDs
     const teamIds = new Set<string>(), userIds = new Set<string>();
@@ -478,7 +564,7 @@ export class TemplatesService {
         ${region !== null ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}
         AND EXISTS (SELECT 1 FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id
                     WHERE ti.site_id = s.id AND td.workflow_id = s.workflow_version_id AND td.code = ANY(${codes}::text[]) AND NOT ti.is_na)
-      ORDER BY s.site_code COLLATE "C" LIMIT ${MAX_PREFILL_ROWS}`);
+      ORDER BY s.site_code COLLATE "C" LIMIT ${maxPrefillRows()}`);
     if (sites.length === 0) return [];
     const ids = sites.map((s) => s.id);
     const tasks = await this.db.tx.$queryRaw<TaskCell[]>(Prisma.sql`
@@ -561,7 +647,7 @@ export class TemplatesService {
     return s;
   }
 
-  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }): Promise<Buffer> {
+  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void; structure?: StructureField[] }): Promise<Buffer> {
     return this.buildBook(t, [{ sheet: DATA_SHEET, cols, rows }], meta, []);
   }
 
@@ -627,7 +713,7 @@ export class TemplatesService {
 
   /** The approved-template workbook: the data sheet(s), an instructions sheet, a Columns sheet for the Site Register templates, the hidden lists and the hidden `_tpl`. */
   async buildBook(
-    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }, extraKv: [string, string | number][],
+    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void; structure?: StructureField[] }, extraKv: [string, string | number][],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'GSDN Workspace';
@@ -641,6 +727,7 @@ export class TemplatesService {
     });
     const ins = wb.addWorksheet('Instructions', { properties: { tabColor: { argb: 'FF2E7D90' } } });
     const colsSheet = isSite ? wb.addWorksheet('Columns') : null;
+    if (meta.structure) writeStructureSheet(wb, meta.structure);   // 0560: the Structure sheet of a register template (System Admin or fields.edit only)
     const lists = wb.addWorksheet(LISTS_SHEET);
     const tpl = wb.addWorksheet(TPL_SHEET);
 

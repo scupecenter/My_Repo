@@ -21,7 +21,7 @@ function useWrite<I, O>(version: number, etag: number, run: (input: I, etag: num
   const qc = useQueryClient();
   return useMutation<O, ApiError, I>({
     mutationFn: (input) => run(input, etag),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wf-version', version] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['task-definitions'] }); void qc.invalidateQueries({ queryKey: ['wf-sla-weight'] }); void qc.invalidateQueries({ queryKey: ['wf-weight-totals'] }); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wf-version', version] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['wf-archive'] }); void qc.invalidateQueries({ queryKey: ['task-definitions'] }); void qc.invalidateQueries({ queryKey: ['wf-sla-weight'] }); void qc.invalidateQueries({ queryKey: ['wf-weight-totals'] }); },
   });
 }
 
@@ -46,6 +46,8 @@ export const useReorderTasks = (v: number, etag: number) => useWrite<{ stage: st
 export const useMilestoneLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/milestones/${code}`, { body, version: e }));
 export const useGateLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/gates/${code}`, { body, version: e }));
 export const usePublish = (v: number, etag: number) => useWrite<{ reason: string; confirm_text: string; confirm_master_impact?: string }, WorkflowVersion>(v, etag, (body, e) => api.post(`${base(v)}/publish`, { body, version: e }));
+/** 0.15.321 (migration 0491): the sequence lock mode of a draft version (strict or open); the per-site switch stays the override. */
+export const useSetLockMode = (v: number, etag: number) => useWrite<{ lock_mode: 'strict' | 'open'; reason: string }, unknown>(v, etag, (body, e) => api.put(`${base(v)}/lock-mode`, { body, version: e }));
 /** 0.15.16 (migration 0096): the task that closes its milestone, chosen in a draft. */
 export const useSetClosing = (v: number, etag: number) => useWrite<{ code: string; closing: boolean; reason: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/closing`, { body, version: e }));
 export type InsertInput = TaskCreateInput & { successors?: string[]; remove_direct_links?: boolean; add_to_open_sites?: boolean };
@@ -89,6 +91,17 @@ export type { Wrap };
 
 export type RemoveResult = { outcome: 'deleted' | 'deactivated'; why: string[] };
 export const useRemoveItem = (v: number, etag: number) => useWrite<{ kind: 'task' | 'milestone' | 'gate'; code: string; reason: string }, RemoveResult>(v, etag, (body, e) => api.post(`${base(v)}/remove`, { body, version: e }));
+/** 0.15.436 (migration 0575): delete an old published version after the server archived a full snapshot of it. */
+export const useDeleteVersion = (v: number, etag: number) => useWrite<{ reason: string; confirm_text: string }, { version: number; deleted: boolean; archive_id: string }>(v, etag, (body, e) => api.post(`${base(v)}/delete`, { body, version: e }));
+export type ArchivedVersion = { id: string; version: number; archived_at: string; reason?: string; effective_from?: string | null; stages?: number; tasks?: number; restored_at?: string | null };
+export const useVersionArchive = (enabled = true) => useQuery({ queryKey: ['wf-archive'], enabled, retry: false, queryFn: () => api.get<{ items: ArchivedVersion[] }>('/workflow/version-archive') });
+export const useRestoreVersion = () => {
+  const qc = useQueryClient();
+  return useMutation<{ version: number; restored: boolean; archive_id: string }, ApiError, { id: string; reason: string }>({
+    mutationFn: ({ id, ...body }) => api.post(`/workflow/version-archive/${id}/restore`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wf-archive'] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['wf-version'] }); },
+  });
+};
 export const useDiscardDraft = (v: number, etag: number) => useWrite<{ reason: string }, unknown>(v, etag, (body, e) => api.post(`${base(v)}/discard`, { body, version: e }));
 
 /** The SLA (target and limit in working days) of each task in force today, read-only here: the SLA rules are a versioned set with its own publishing (Settings, SLA). */
@@ -130,13 +143,60 @@ export const useRemoveSlaRule = (v: number, etag: number) =>
 export type WeightInput = { counts_in_weight: boolean; weight_value?: number; weight_group?: string | null; reason: string };
 export const useSetWeight = (v: number, etag: number) =>
   useWrite<WeightInput & { code: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/weight`, { body, version: e }));
+/** Migration 0542: estimated man-days and an optional planned duration of a task (draft only); the suggested weight they imply is advice only. */
+export type EstimateInput = { est_man_days?: number | null; planned_duration_days?: number | null; reason: string };
+export const useSetEstimate = (v: number, etag: number) =>
+  useWrite<EstimateInput & { code: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/estimate`, { body, version: e }));
 export type WeightTotal = { group: string; total: number; tasks: number; ok: boolean };
 /** Live totals of the weight groups of a version (warns in the draft; publishing is refused while a group is not 100). */
 export const useWeightTotals = (v: number | null) =>
   useQuery({ queryKey: ['wf-weight-totals', v], enabled: v !== null, retry: false, queryFn: () => api.get<{ items: WeightTotal[] }>(`/workflow/versions/${v}/weight-totals`) });
 /** Migration 0110: the SLA rule and the weight of every task of a version (drafts included). */
 export type SlaWeightItem = { task_code: string; counts_in_weight: boolean; weight_value: number; weight_group: string | null;
+  est_man_days?: number | null; planned_duration_days?: number | null; suggested_weight?: number | null;
   sla: { id: string; min_working_days: number; max_working_days: number; start_event: string; unit: 'working' | 'calendar'; calendar_code: string; warning_pct: number | null;
     breach_owner_role: string | null; escalation_role: string | null; pause_on_client_wait: boolean } | null };
 export const useSlaWeight = (v: number | null) =>
   useQuery({ queryKey: ['wf-sla-weight', v], enabled: v !== null, retry: false, queryFn: () => api.get<{ items: SlaWeightItem[] }>(`/workflow/versions/${v}/sla-weight`) });
+
+/**
+ * The inline edits of the Studio lists (tables of tasks, milestones and gates): every changed row is one write, one after the other, each with the version
+ * ETag read just before it (so the writes of one batch never collide with each other), one reason for the batch. Stops at the first refusal and says how many
+ * were done; the rest stays as edits on the screen. The guards are the server's own (reason, step-up, If-Match, frozen days, draft only).
+ */
+export type StudioBatch = {
+  reason: string;
+  tasks: { code: string; patch?: Omit<TaskPatchInput, 'reason'>; weight?: Omit<WeightInput, 'reason'>; sla?: Omit<SlaRuleInput, 'reason'> }[];
+  milestones: { code: string; patch: Omit<LightInput, 'reason'> }[];
+  gates: { code: string; patch: Omit<LightInput, 'reason'> }[];
+  order: { stage: string; task_codes: string[] }[];
+};
+export function useStudioBatch(version: number, etag: number) {
+  const qc = useQueryClient();
+  return useMutation<{ done: number }, ApiError, StudioBatch>({
+    mutationFn: async (b) => {
+      let tag = etag, done = 0;
+      /** Every write is sent with the ETag the previous answer returned; an answer without one is followed by a read of the version. */
+      const step = async (run: (e: number) => Promise<{ version_etag?: number } | null | undefined>) => {
+        const r = await run(tag);
+        tag = typeof r?.version_etag === 'number' ? r.version_etag : (await api.get<{ version_etag?: number }>(base(version))).version_etag ?? tag;
+        done += 1;
+      };
+      try {
+        for (const x of b.milestones) await step((e) => api.patch(`${base(version)}/milestones/${x.code}`, { body: { ...x.patch, reason: b.reason }, version: e }));
+        for (const x of b.gates) await step((e) => api.patch(`${base(version)}/gates/${x.code}`, { body: { ...x.patch, reason: b.reason }, version: e }));
+        for (const x of b.tasks) {
+          if (x.patch) await step((e) => api.patch(`${base(version)}/tasks/${x.code}`, { body: { ...x.patch, reason: b.reason }, version: e }));
+          if (x.sla) await step((e) => api.put(`${base(version)}/tasks/${x.code}/sla-rule`, { body: { ...x.sla, reason: b.reason }, version: e }));
+          if (x.weight) await step((e) => api.put(`${base(version)}/tasks/${x.code}/weight`, { body: { ...x.weight, reason: b.reason }, version: e }));
+        }
+        for (const x of b.order) await step((e) => api.put(`${base(version)}/milestones/${x.stage}/task-order`, { body: { task_codes: x.task_codes, reason: b.reason }, version: e }));
+      } catch (e) {
+        if (e instanceof Error) Object.assign(e, { done });
+        throw e;
+      }
+      return { done };
+    },
+    onSettled: () => { for (const k of [['wf-version', version], ['wf-versions'], ['task-definitions'], ['wf-sla-weight'], ['wf-weight-totals']]) void qc.invalidateQueries({ queryKey: k }); },
+  });
+}

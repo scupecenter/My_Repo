@@ -2,12 +2,12 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
-import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
+import { useHandoverOpenCounts, useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { EditingNotice } from './EditingNotice';
-import { useAddRegisterComment, useRegisterComments } from '@/api/x';
+import { useAddRegisterComment, useCommentReaction, useCommentResolved, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
@@ -17,19 +17,18 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { FieldInput, fieldLabel, issueText, showValue, SiteCodeField, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
-import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
+import { DrawerFrame, DrawerTabs, panelProps, useDrawerSettled, useReportDirty } from './DrawerFrame';
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { RelatedRecords } from './RelatedRecords';
 import { SiteTaskField } from './SiteTaskField';
 import { SiteGateField } from './SiteGateField';
-import { RegisterLinkSelect } from './RegisterLinkSelect';
-import { useRegisterLinks } from '@/api/registerLinks';
-import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect, AdvanceSelect, SupplierSelect } from './P4cPanels';
+import { useRegisterLinks } from '@/api/p4c';
+import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, RecordLinkSelect, SupplierSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
-import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
+import { AdvanceChildren, Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
 import { LegacyConversion } from './LegacyConversion';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -133,31 +132,41 @@ function TriageDialog({ open, op, registerKey, selfId, onClose, onSend }: { open
   );
 }
 
-function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
+/** The record form, tabs and actions of a register record: the body of the drawer, and (decision V5) the body of the full record page. */
+export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const key = rawDef.register_key;
   const lang = i18n.language;
   const rk = key;
+  const declaredLinks = useRegisterLinks(key).data;
   const session = useSession().data;
   const matrix = useMatrix().data;
   const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), cancelSnag = useCancelSnagRecord(), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key), triageOp = useRecordTriage(key);
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
+  const reactComment = useCommentReaction(['register-comments', key, record?.id ?? '']);
+  const resolveComment = useCommentResolved(['register-comments', key, record?.id ?? '']);
   // 0.12.5: a register with a file field reads the record's slots too (the slots of a record without a site come with Q228)
   const hasFile = rawDef.fields.some((f) => f.type === 'file');
-  const links = useRegisterLinks();
   const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
   const ctx = { refs: record?.refs, files: (recSlots.data?.items ?? []).flatMap((sl) => sl.files.filter((f) => !f.superseded_by).map((f) => ({ id: f.id, name: f.original_name }))) };
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
-  const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
+  // A10: a shortage row of the dashboard opens a new Procurement record with the site, the request type and a remark that names the item; nothing is saved until the person submits
+  const [shortageSp] = useSearchParams();
+  const fromShortage = !record && rawDef.register_key === 'procurement' && shortageSp.get('from') === 'shortage';
+  const [data, setData] = useState<Data>(() => {
+    const base = record?.data ?? defaultsFor(rawDef.register_key, rawDef);
+    const remark = shortageSp.get('remark');
+    return fromShortage && remark ? { ...base, remark: remark.slice(0, 500) } : base;
+  });
   // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement picks it, GECOL and HLC show it read-only)
   const hasContractor = ['procurement', 'gecol', 'hlc', 'issues', 'quality'].includes(rawDef.register_key);
   const [party, setParty] = useState<string>(record?.external_party?.id ?? '');
   const companies = useContractorCompanies(rawDef.register_key === 'procurement');
-  const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
-  const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
+  const [site, setSite] = useState<SiteSel>(fromShortage && shortageSp.get('site') ? { id: shortageSp.get('site') as string, code: shortageSp.get('site_code') ?? '' } : record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
+  const [rtype, setRtype] = useState<string>(record?.record_type ?? (fromShortage ? 'pr' : ''));
   // 0.15.103: the columns prefilled from the admin's defaults on a new record; a column leaves the set when the person edits it
   const [prefilled, setPrefilled] = useState<Set<string>>(() => (record ? new Set() : new Set(Object.keys(columnDefaults(rawDef)))));
   const [dirty, setDirty] = useState(false);
@@ -169,6 +178,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const [cancelling, setCancelling] = useState(false);
   const [tab, setTab] = useState('data');
   useReportDirty(dirty);
+  const settle = useDrawerSettled();
 
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
@@ -221,13 +231,18 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     onSuccess: () => { toast(t(o === 'void' ? 'registers.voided' : 'approvals.done')); setRejecting(false); setVoiding(false); },
     onError: (e) => { setRejecting(false); setVoiding(false); fail(e); },
   });
+  /** A8: the readiness handover asks for a confirmation when snags, issues or quality records are still open on the site (a warning, never a block). */
+  const handover = useHandoverOpenCounts(site?.id, key === 'readiness_handover' && (!record || record.state === 'entry'));
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const submit = () => {
     setTried(true);
     if (issueList.length) return;
+    if (key === 'readiness_handover' && handover.total > 0 && !confirmOpen) { setConfirmOpen(true); return; }
+    setConfirmOpen(false);
     if (!record) {
       create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
-        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); onCreated(r.id); }, onError: (e) => { fail(e); onCreated(r.id); } }),
+        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); settle(); onCreated(r.id); }, onError: (e) => { fail(e); settle(); onCreated(r.id); } }),
         onError: fail,
       });
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
@@ -342,7 +357,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           )}
           {sections.map((s) => (
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
-              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
+              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: (lang === 'ar' && s.title_ar) || s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {s.fields.filter((f) => !(rk === 'warehouse' && f.code === 'procurement_order_id' && (!rtype || rtype === 'adj')) && !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
@@ -367,20 +382,10 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <SiteTaskField id={`reg-field-${f.code}`} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} disabled={!editable} invalid={!!show} />
                         : key === 'deliverables' && f.code === 'gate_code'
                         ? <SiteGateField id={`reg-field-${f.code}`} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} disabled={!editable} invalid={!!show} />
-                        : (key === 'issues' || key === 'quality' || key === 'change_control') && f.code === 'procurement_order_id'
-                        ? <WarehouseOrderSelect registerKey={key} field="procurement_order_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : (key === 'car_dispatcher' || key === 'financial_advances') && f.code === 'procurement_record_id'
-                        ? <WarehouseOrderSelect registerKey={key} field="procurement_record_id" siteId={key === 'financial_advances' ? site?.id : null} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : key === 'invoices' && f.code === 'procurement_record_id'
-                        ? <WarehouseOrderSelect registerKey="invoices" field="procurement_record_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'invoices' && f.code === 'supplier_party_id'
                         ? <SupplierSelect value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : key === 'financial_advances' && f.code === 'advance_id'
-                        ? <AdvanceSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : key === 'warehouse' && f.code === 'procurement_order_id'
-                        ? <WarehouseOrderSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : (links.data?.links ?? []).some((l) => l.from_register === rk && l.field === f.code && l.enabled !== false)
-                        ? <RegisterLinkSelect registerKey={rk} field={f.code} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key !== 'hlc' && declaredLinks?.some((l) => l.field === f.code)
+                        ? <RecordLinkSelect registerKey={key} field={f.code} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} targetLabel={declaredLinks.find((l) => l.field === f.code)?.target_register} />
                         : editable && !(key === 'dismantle' && f.code === 'closing_rn_ref' && data.closing_rn_id) ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
                         : f.type === 'child_list' ? <FieldInput field={f} value={data[f.code]} onChange={() => undefined} disabled ctx={ctx} />
                         : <div className="font-semibold whitespace-pre-line" data-testid={`reg-view-${f.code}`}>{showValue(f, data[f.code], lang, t, ctx)}</div>}
@@ -420,6 +425,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         {record && <RelatedRecords registerKey={rk} entityId={record.entity_id as string} />}
         {record && rk === 'financial_advances' && <Balance record={record} />}
         {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}
+        {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && ['disbursed', 'settlement_in_progress'].includes(String((record.data as { advance_state?: string }).advance_state)) && <AdvanceChildren record={record} onDone={onCreated} />}
         {record && rk === 'car_dispatcher' && record.record_type === 'booking' && record.state === 'approved' && <ExtendBooking record={record} onDone={onCreated} />}
         </div>
 
@@ -433,7 +439,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             {/* a global record (no region) has no thread yet: the server answers 422, so the box is not offered */}
             {record.region_id ? (
               <CommentsPanel items={comments.data?.items} loaded={comments.isSuccess} pending={addComment.isPending} error={addComment.isError ? registerErrorMessage(t, addComment.error) : null}
-                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
+                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })}
+                onReact={(commentId, emoji, on) => reactComment.mutate({ commentId, emoji, on })}
+                onToggleResolved={(commentId, resolved) => resolveComment.mutate({ commentId, resolved })} />
             ) : <p className="text-mute" data-testid="reg-comments-global">{t('registers.comments_global')}</p>}
           </div>
         )}
@@ -453,6 +461,17 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         {editable && (!record || act('submit')) && (finalSelf || skipTo) && <p className="text-sm text-waitInk" data-testid="reg-skip-note">{finalSelf ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: skipTo })}</p>}
         {docsMissing.length > 0 && (!record || act('submit')) && <p className="text-sm text-lateInk" data-testid="reg-docs-missing">{t('recDocs.missing', { list: docsMissing.join(', ') })}</p>}
         {editable && tried && issueList.length > 0 && <p className="text-sm text-lateInk" data-testid="reg-missing">{t('registers.fix_list', { list: issueList.map((c) => (c === 'site_id' ? t('registers.site') : labelOf(c))).join(', ') })}</p>}
+        {confirmOpen && handover.total > 0 && (
+          <div role="alertdialog" aria-label={t('handoverWarn.title')} className="space-y-2 rounded-md border border-waitInk bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-handover-warn">
+            <p className="font-semibold">{t('handoverWarn.title')}</p>
+            <p data-testid="reg-handover-counts">{t('handoverWarn.counts', { snags: handover.snags, issues: handover.issues, quality: handover.quality })}</p>
+            <p>{t('handoverWarn.ask')}</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn" data-testid="reg-handover-cancel" onClick={() => setConfirmOpen(false)}>{t('handoverWarn.cancel')}</button>
+              <button type="button" className="btn btn-primary" data-testid="reg-handover-confirm" disabled={busy} onClick={submit}>{t('handoverWarn.confirm')}</button>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           {record && act('new_version') && <button className="btn" data-testid="reg-new-version" disabled={busy} onClick={() => newVersion.mutate(record, { onSuccess: (r) => { toast(t('registers.version_created')); onCreated(r.id); }, onError: fail })}><FilePlus2 size={16} />{t('registers.new_version')}</button>}
           {record && act('transfer') && <button className="btn" data-testid="reg-transfer" disabled={busy} onClick={() => transfer.mutate({ record }, { onSuccess: () => toast(t('registers.transferred')), onError: fail })}><ArrowRightLeft size={16} />{t('registers.transfer')}</button>}
@@ -483,8 +502,8 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
   const q = useRegisterRecord(def.register_key, isNew ? null : recordId);
   return (
     <DrawerFrame name="register" testid="register-drawer" wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
-      {isNew ? <Body key="new" def={def} record={null} onCreated={onOpen} />
-        : q.data ? <Body key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
+      {isNew ? <RegisterRecordBody key="new" def={def} record={null} onCreated={onOpen} />
+        : q.data ? <RegisterRecordBody key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
           : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>
   );

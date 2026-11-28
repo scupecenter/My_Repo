@@ -15,3 +15,7 @@
 
 - وحدة الواجهة: `lib/sidebarPrefs.test.ts` (الترشيح والترتيب والتراكب)؛ مكوّن: `sidebar.test.tsx` (إخفاء/ترتيب/تثبيت/شارة نقطة/انتقال المفضلات).
 - الخادم: `ui-identity.test.ts` (حفظ وتدقيق واستقلال عن الأبعاد، الرفضات، القفل)؛ والباب تحقق محليًا على PostgreSQL حقيقي قبل الرفع.
+
+## Addendum: menu mode (migration 0527)
+
+`ui_prefs.sidebar.mode` is `pinned` (default, not stored) or `autohide`. Order of precedence in the Shell: the click on the pin button in this session, the profile mode, the pin kept in this browser, the menu style of the appearance profile. The pin button now also saves the mode in the profile. Auto-hide opens on hover, focus, Ctrl+B (not while typing in a field) and touch; Escape or a touch elsewhere closes it. Profile > Sidebar has the selector.

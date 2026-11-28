@@ -80,10 +80,16 @@ export class P4cController {
     return this.p4c.invoiceSupplierOptions(auth);
   }
 
-  /** 0431: the picker of any link field of the catalogue (the records of the target register the caller may see; a Procurement link is the order picker). */
-  @Get(':key/link-options')
-  linkOptions(@Auth() auth: AuthContext, @Param('key') key: string, @Query() q: Record<string, unknown>) {
-    return this.p4c.linkOptions(auth, key, q);
+  /** D60: the declared links of a register (the generic link declaration, table register_links). */
+  @Get(':key/links')
+  registerLinks(@Auth() auth: AuthContext, @Param('key') key: string) {
+    return this.p4c.registerLinks(auth, key);
+  }
+
+  /** D60: the generic picker of a declared link field. */
+  @Get(':key/link-options/:field')
+  registerLinkOptions(@Auth() auth: AuthContext, @Param('key') key: string, @Param('field') field: string, @Query() q: Record<string, unknown>) {
+    return this.p4c.registerLinkOptions(auth, key, field, q);
   }
 
   @Get('issues/risk-options')

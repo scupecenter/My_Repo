@@ -9,7 +9,7 @@ import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { matchRanges } from './search-text';
 
-export const SEARCH_TYPES = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors', 'tasks', 'warehouse_items'] as const;
+export const SEARCH_TYPES = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors', 'tasks', 'warehouse_items', 'snags'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchHit {
@@ -218,8 +218,22 @@ export class SearchService {
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT i.id::text AS id, i.item_code || ' - ' || i.name AS title, i.item_group AS subtitle, NULL::int AS region_id,
           '/warehouse' AS href, (COUNT(*) OVER())::int AS total
         FROM warehouse_items i
-        WHERE i.is_active AND search_norm(i.item_code || ' ' || i.name || ' ' || coalesce(i.name_ar, '')) LIKE ${pattern}
+        WHERE i.is_active AND search_norm(i.item_code || ' ' || i.name || ' ' || coalesce(i.name_ar, '') || ' ' || i.item_group) LIKE ${pattern}
         ORDER BY i.item_code COLLATE "C" LIMIT ${limit}`);
+    }
+    if (type === 'snags') {
+      // QC snags: the Quality module in the snag's region and the Site Register right of the site's region (the same two checks as the snag list and photo download).
+      // The hit opens the Snags section of the site page. Text: type code and names, description, severity, scope, status and the site.
+      const sitesR = await this.access.regions('sites', 'view');
+      const qualityR = await this.access.regions('quality', 'view');
+      if ((sitesR !== null && sitesR.length === 0) || (qualityR !== null && qualityR.length === 0)) return null;
+      const reach = [sitesR, qualityR].filter((r): r is number[] => r !== null).map((r) => Prisma.sql`AND sg.region_id = ANY(${r}::int[])`);
+      return tx.$queryRaw<Row[]>(Prisma.sql`SELECT sg.id::text AS id, st.code || ' - ' || st.name_en || ' - ' || left(sg.description, 80) AS title,
+          si.site_code || ' - ' || sg.status::text AS subtitle, sg.region_id, concat('/sites/', sg.site_id::text, '?tab=snags') AS href, (COUNT(*) OVER())::int AS total
+        FROM snags sg JOIN snag_types st ON st.id = sg.snag_type_id JOIN sites si ON si.id = sg.site_id
+        WHERE si.is_active AND search_norm(st.code || ' ' || st.name_en || ' ' || coalesce(st.name_ar, '') || ' ' || sg.description || ' ' || coalesce(sg.severity, '') || ' ' || sg.scope || ' ' || sg.status::text || ' ' || si.site_code) LIKE ${pattern}
+          ${reach.length ? Prisma.join(reach, ' ') : Prisma.empty}
+        ORDER BY sg.raised_at DESC, sg.id LIMIT ${limit}`);
     }
     // contractors
     if (!(await this.access.hasGrant(auth, 'contractors', 'view'))) return null;

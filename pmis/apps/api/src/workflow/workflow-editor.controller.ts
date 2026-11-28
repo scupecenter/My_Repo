@@ -44,6 +44,23 @@ export class WorkflowEditorController {
     return this.editor.removeItem(auth, version, ifMatch, body);
   }
 
+  @Post('versions/:version/delete')
+  @HttpCode(200)
+  async deleteVersion(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.deleteVersion(auth, version, ifMatch, body);
+  }
+
+  @Get('version-archive')
+  async archiveList(): Promise<Json> {
+    return this.editor.archiveList();
+  }
+
+  @Post('version-archive/:id/restore')
+  @HttpCode(200)
+  async restoreVersion(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Json> {
+    return this.editor.restoreVersion(auth, id, body);
+  }
+
   @Post('versions/:version/discard')
   @HttpCode(200)
   async discardDraft(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
@@ -119,6 +136,18 @@ export class WorkflowEditorController {
   @Put('versions/:version/tasks/:task/weight')
   async setWeight(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
     return this.tag(res, await this.editor.setWeight(auth, version, task, ifMatch, body));
+  }
+
+  /** Migration 0542: estimated man-days and planned duration of a task in a draft. */
+  @Put('versions/:version/tasks/:task/estimate')
+  async setEstimate(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setEstimate(auth, version, task, ifMatch, body));
+  }
+
+  /** Migration 0491: the lock mode (strict or open) of a draft version. The per-site switch (0085) stays the override. */
+  @Put('versions/:version/lock-mode')
+  async setLockMode(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setLockMode(auth, version, ifMatch, body));
   }
 
   @Put('versions/:version/tasks/:task/closing')

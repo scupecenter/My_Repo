@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import { useSaveTableDisplay, useTableDisplaySetting } from '@/api/display';
 import { useMe } from '@/api/hooks';
@@ -46,6 +47,7 @@ export function DisplaySettings() {
       {radio('density', DENSITIES, v.density, (x) => setF({ ...v, density: x }), (x) => t(`table.${x}`))}
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can} data-testid="display-default-wrap" checked={v.wrap} onChange={(e) => setF({ ...v, wrap: e.target.checked })} />{t('tstd.display_wrap')}</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can} data-testid="display-default-zebra" checked={v.zebra} onChange={(e) => setF({ ...v, zebra: e.target.checked })} />{t('tstd.display_zebra')}</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can} data-testid="display-default-groupbar" checked={v.groupbar} onChange={(e) => setF({ ...v, groupbar: e.target.checked })} />{t('tstd.display_groupbar')}</label>
       {/* a small sample drawn with the chosen options */}
       <div className="card gx overflow-hidden" {...displayAttrs(v)} data-testid="display-preview">
         {['TR101', 'MI102', 'WM103'].map((code, i) => (
@@ -63,6 +65,7 @@ export function DisplaySettings() {
           <button type="button" className="btn" data-testid="display-discard" disabled={!f} onClick={() => setF(null)}>{t('common.cancel')}</button>
         </div>
       ) : <p className="text-sm text-mute" data-testid="display-read-only">{t('tstd.settings_read_only')}</p>}
+      <UnsavedGuard scope="settings" dirty={!!f} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => save.mutate({ defaults: v, reason, version: q.data.version }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="display-dialog" title={t('tstd.settings_title')} busy={save.isPending} error={save.isError && !Object.keys(errs).length ? errText(save.error, t) : null}
           onSubmit={(reason) => save.mutate({ defaults: v, reason, version: q.data.version }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setF(null); } })} />

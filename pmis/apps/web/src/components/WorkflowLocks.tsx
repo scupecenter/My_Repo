@@ -6,6 +6,7 @@ import { useImportSites, useSetWorkflowLocks, type LocksTarget } from '@/api/sit
 import type { SiteDataGap } from '@/api/types';
 import { errText, FormDialog } from './FormDialog';
 import { useToast } from './Toast';
+import { ScreenSettingsLink } from './ScreenSettingsLink';
 
 /**
  * Contract 0.15.4 (migration 0085): the per-site workflow locks. Locked (the default) = a task waits for its predecessors and for the gate in front of its
@@ -34,10 +35,16 @@ export function LocksChip({ siteId, locked, canManage }: { siteId: string; locke
       <span className={`chip ${locked ? 'bg-lockBg text-lockInk' : 'bg-waitBg text-waitInk'}`} data-testid="site-locks-chip" data-locked={locked} title={t(locked ? 'locks.on_title' : 'locks.off_title')}>
         {locked ? <Lock size={12} className="me-1" aria-hidden /> : <LockOpen size={12} className="me-1" aria-hidden />}{t(locked ? 'locks.on' : 'locks.off')}
       </span>
+      <ScreenSettingsLink screen="site_locks" />
       {canManage && <button type="button" className="btn px-2 py-0.5 text-xs" data-testid="site-locks-toggle" onClick={() => setOpen(true)}>{t(locked ? 'locks.open' : 'locks.lock')}</button>}
       {open && <LocksDialog target={{ site_id: siteId }} locked={!locked} onClose={() => setOpen(false)} testid="site-locks-dialog" />}
     </span>
   );
+}
+
+/** One line per missing value (the title of the chip and the list of the import status page). */
+function gapLines(t: (k: string, o?: Record<string, unknown>) => string, items: SiteDataGap[] | undefined): string[] {
+  return (items ?? []).map((g) => (g.kind === 'missing_actual_date' ? t('locks.gap_task', { task: g.task_code, next: g.successor_code }) : t('locks.gap_field', { field: t(`locks.field_${g.field}`, { defaultValue: g.field ?? '' }) })));
 }
 
 /** "Data gaps": the missing required values of a site (the title lists them). */
@@ -78,7 +85,10 @@ export function ImportSitesPanel({ source, id, canManage }: { source: 'run' | 'b
               <td className="px-2">{s.next_milestone ? t(`stage.${s.next_milestone}`, { defaultValue: s.next_milestone }) : '—'}</td>
               <td className="mono px-2">{s.done_tasks}/{s.total_tasks}</td>
               <td className="px-2" data-testid={`import-site-locks-${s.site_code}`}>{t(s.workflow_locks ? 'locks.on' : 'locks.off')}</td>
-              <td className="px-2" data-testid={`import-site-missing-${s.site_code}`}>{s.warnings + s.data_gaps > 0 ? <span className="chip bg-lateBg text-lateInk">{t('locks.missing_n', { warnings: s.warnings, gaps: s.data_gaps })}</span> : '—'}</td>
+              <td className="px-2" data-testid={`import-site-missing-${s.site_code}`}>{s.warnings + s.data_gaps > 0 ? <>
+                <span className="chip bg-lateBg text-lateInk" title={gapLines(t, s.data_gap_items).join('\n') || undefined}>{t('locks.missing_n', { warnings: s.warnings, gaps: s.data_gaps })}</span>
+                {(s.data_gap_items ?? []).length > 0 && <ul className="mt-1 list-disc ps-4 text-xs text-mute" data-testid={`import-site-gaps-${s.site_code}`}>{gapLines(t, s.data_gap_items).map((l) => <li key={l}>{l}</li>)}</ul>}
+              </> : '—'}</td>
             </tr>
           ))}</tbody>
         </table>

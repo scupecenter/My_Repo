@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -67,6 +67,46 @@ describe('Settings, data reset', () => {
     expect(screen.getByTestId('dr-result-quarantine')).toHaveTextContent('/var/lib/gsdn-pmis/files/.pre-reset-20261124-101500');
     expect(screen.getByTestId('dr-restore')).toHaveTextContent('cp -a -n /var/lib/gsdn-pmis/files/.pre-reset-20261124-101500/.');
     expect(screen.getByTestId('dr-restore')).toHaveTextContent('db-restore.sh');
+  });
+
+  it('archive before delete (0.15.266): the form offers three modes (download once is the default); the run waits for the archive, which is made, downloaded once, then the run is open', async () => {
+    await signIn('pm'); await stepUpDone();
+    await api.post('/__mock/data-reset/request-by-other', { body: { archive: 'download' } });
+    const u = userEvent.setup();
+    page();
+    expect(await screen.findByTestId('dr-request-archive')).toHaveAttribute('data-mode', 'download');
+    expect(screen.getByTestId('dr-archive-state')).toHaveTextContent(en.dr.archive_after_approval);
+    await u.click(screen.getByTestId('dr-approve'));
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+    expect(screen.getByTestId('dr-archive-state')).toHaveTextContent(en.dr.archive_not_made);
+    expect(screen.getByTestId('dr-run')).toBeDisabled();                          // the run waits for the archive
+    const make = screen.getByTestId('dr-archive-make');
+    expect(make).toHaveAttribute('aria-label', en.dr.archive_make);
+    expect(make).toHaveAttribute('title', en.dr.archive_make_hint);
+    await u.click(make);
+    await waitFor(() => expect(screen.getByTestId('dr-request-archive')).toHaveAttribute('data-status', 'ready'));
+    expect(screen.getByTestId('dr-archive-need-download')).toBeInTheDocument();    // mode download: once is required
+    expect(screen.getByTestId('dr-run')).toBeDisabled();
+    const dl = screen.getByTestId('dr-archive-download-btn');
+    expect(dl).toHaveAttribute('aria-label', en.dr.archive_download_btn);
+    expect(dl).toHaveAttribute('title', en.dr.archive_download_btn_hint);
+    await u.click(dl);
+    await waitFor(() => expect(screen.getByTestId('dr-run')).toBeEnabled());
+    expect(screen.queryByTestId('dr-archive-need-download')).not.toBeInTheDocument();
+  });
+
+  it('archive before delete: the new request form carries the choice (EN and AR), download once by default, none is sent as chosen', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page({ locale: 'ar' });
+    expect(await screen.findByTestId('dr-archive-choice')).toHaveAttribute('data-mode', 'download');
+    expect(screen.getByTestId('dr-archive-choice')).toHaveTextContent(ar.dr.archive_choice);
+    expect(screen.getByTestId('dr-archive-restore-note')).toHaveTextContent(ar.dr.archive_restore_note);
+    await u.click(screen.getByTestId('dr-archive-none-option'));
+    expect(screen.getByTestId('dr-archive-choice')).toHaveAttribute('data-mode', 'none');
+    expect(en.dr.archive_download_btn_hint).not.toEqual(ar.dr.archive_download_btn_hint);
   });
 
   it('without a recent backup the run button is disabled and says why', async () => {
@@ -215,11 +255,61 @@ describe('Settings, data reset', () => {
     expect(screen.getByTestId('settings-section-data-imports')).toBeInTheDocument();
   });
 
+  it('waiting period (0.15.268): set in the settings, inherited by the request, shown to the approver, a live countdown disables the run until run_after (EN and AR)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-settings-edit'));
+    await u.selectOptions(screen.getByTestId('dr-cooloff'), '30');
+    await u.type(screen.getByTestId('dr-settings-dialog-reason'), 'Thirty minutes of waiting');
+    await u.click(screen.getByTestId('dr-settings-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-settings-cooloff')).toHaveTextContent('30 minutes'));
+    await api.post('/__mock/data-reset/request-by-other');
+    cleanup(); page();
+    await waitFor(() => expect(screen.getByTestId('dr-cooloff-view')).toHaveTextContent('30 minutes'));
+    await u.click(screen.getByTestId('dr-approve'));
+    expect(screen.getByTestId('dr-approve-cooloff')).toHaveTextContent('waits 30 minutes');
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+    expect(screen.getByTestId('dr-cooloff-view')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('dr-cooloff-clock')).toHaveTextContent(/^0:(29|30):\d\d$/);
+    expect(screen.getByTestId('dr-run')).toBeDisabled();
+    expect(screen.getByTestId('dr-cancel')).toBeEnabled();
+  });
+
   it('has every text in English and Arabic', () => {
     expect(Object.keys(ar.dr).sort()).toEqual(Object.keys(en.dr).sort());
     for (const k of ['single_admin', 'backup_missing', 'request_expired', 'reset_running', 'storage_not_supported', 'maintenance', 'scope_changed'] as const) {
       expect(en.errors[k]).toBeTruthy();
       expect(ar.errors[k]).toBeTruthy();
     }
+  });
+  it('narrowing (0.15.265): the picker appears for narrowable parts only, the filter reaches the request and the approver view, a clear button resets it', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-scope-custom'));
+    expect(screen.getByTestId('dr-narrow-whole')).toHaveTextContent(en.dr.narrow_whole);
+    await u.click(screen.getByTestId('dr-part-sites'));
+    expect(screen.queryByTestId('dr-narrow')).not.toBeInTheDocument();       // sites go whole
+    await u.click(screen.getByTestId('dr-part-sites'));
+    await u.click(screen.getByTestId('dr-part-procurement'));
+    expect(await screen.findByTestId('dr-narrow')).toBeInTheDocument();
+    await u.click(await screen.findByTestId('dr-narrow-region-1'));
+    expect(screen.getByTestId('dr-narrow-active')).toBeInTheDocument();
+    expect(screen.getByTestId('dr-narrow-clear')).toHaveAccessibleName(en.dr.narrow_clear);
+    await u.click(screen.getByTestId('dr-narrow-clear'));
+    expect(screen.queryByTestId('dr-narrow-active')).not.toBeInTheDocument();
+    await u.click(screen.getByTestId('dr-narrow-region-1'));
+    await u.type(screen.getByTestId('dr-reason'), 'Owner decision: only Tripoli orders');
+    await u.type(screen.getByTestId('dr-phrase'), 'RESET pmis');
+    await u.click(screen.getByTestId('dr-submit'));
+    await screen.findByTestId('dr-request-narrow');
+    await waitFor(() => expect(screen.getByTestId('dr-request-narrow')).toHaveTextContent('Tripoli'));
+  });
+
+  it('the narrowing strings exist in English and Arabic', () => {
+    for (const k of Object.keys(en.dr).filter((x) => x.startsWith('narrow_'))) expect((ar.dr as Record<string, string>)[k]).toBeTruthy();
   });
 });

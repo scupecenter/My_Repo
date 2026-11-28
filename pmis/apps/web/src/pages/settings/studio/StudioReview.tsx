@@ -45,6 +45,8 @@ export function StudioReview({ c, parent, parentSw, draftSw, frozen, onBack, onP
   // 0.15.85: a warning only (never a block): tasks of this draft whose SLA is not decided yet.
   const slaTasks = useSlaTasks();
   const undecidedHere = (slaTasks.data?.items ?? []).filter((i) => i.in_draft && i.workflow_version === c.v.version && i.mode === 'undecided').map((i) => i.task_code);
+  // D53: a warning only (never a block): an active milestone with tasks but no closing task is done only when all its tasks are.
+  const noClosing = c.milestones.filter((m) => m.is_active !== false && c.placements.some((p) => p.stage_code === m.code && p.is_active !== false) && !c.placements.some((p) => p.stage_code === m.code && p.is_active !== false && p.is_milestone_task)).map((m) => m.code);
   const blocked = !c.v.can_publish || frozen || problems.length > 0 || !!cycle || c.v.validation?.valid === false;
   const ready = !blocked && reason.trim().length >= 3 && typed === `v${c.v.version}` && (!phrase || master === phrase) && !busy;
   const n = pv ? impactCounts(pv) : null;
@@ -75,8 +77,18 @@ export function StudioReview({ c, parent, parentSw, draftSw, frozen, onBack, onP
       <header><h2 className="text-lg font-bold">{t('studio.review_title')}</h2><p className="text-sm text-mute">{t('studio.review_sub', { from: c.v.parent_version ?? '-', to: c.v.version })}</p></header>
       {blocked && <p role="alert" className="rounded-lg border border-line bg-lockBg p-3 text-sm text-lockInk" data-testid="studio-review-blocked">{frozen ? t('wfe.frozen_why', { date: '' }) : !c.v.can_publish ? t('wfe.readonly') : cycle ? t('wfe.cycle_found', { path: cycle.join(arrow) }) : problems.join('; ')}</p>}
       {undecidedHere.length > 0 && <p role="status" className="text-sm text-waitInk" data-testid="studio-review-sla-undecided">{t('studio.sla_undecided_warning', { codes: undecidedHere.join(', ') })}</p>}
+      {noClosing.length > 0 && <p role="status" className="text-sm text-waitInk" data-testid="studio-review-no-closing">{t('studio.no_closing_warning', { codes: noClosing.join(', ') })}</p>}
       {warnings.length > 0 && <ul className="list-disc ps-5 text-sm text-waitInk" data-testid="studio-review-warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
+      <StudioCard title={t('studio.lock_mode')} testid="studio-review-lock-mode">
+        <p className="text-sm text-mute">{t('studio.lock_mode_hint')}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select className="input min-h-11" data-testid="studio-lock-mode" disabled={!c.v.can_publish || frozen} value={(c.v as { lock_mode?: string }).lock_mode ?? 'strict'}
+            onChange={(e) => { const lock_mode = e.target.value as 'strict' | 'open'; c.askReason({ title: t('studio.lock_mode'), run: (reason, cb) => c.W.lockMode.mutate({ lock_mode, reason }, cb) }); }}>
+            <option value="strict">{t('studio.lock_strict')}</option><option value="open">{t('studio.lock_open')}</option>
+          </select>
+        </div>
+      </StudioCard>
       <StudioCard title={t('studio.changes_title', { count: changes.length })} testid="studio-review-changes">
         {!parentS && <p className="text-sm text-mute">{t('wfe.loading')}</p>}
         {parentS && changes.length === 0 && <p className="text-sm text-mute" data-testid="studio-review-none">{t('wfe.prev.none')}</p>}

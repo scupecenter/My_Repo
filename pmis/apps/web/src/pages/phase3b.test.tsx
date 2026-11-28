@@ -299,7 +299,7 @@ describe('users: deactivate, delete, restore', () => {
     await u.click(await screen.findByTestId('user-delete-1305'));
     await reasonAndSave(u, 'user-act-dialog', 'Duplicate account');
     await waitFor(() => expect(screen.queryByTestId('user-row-1305')).toBeNull());
-    await u.click(screen.getByTestId('users-tab-deleted'));
+    await u.selectOptions(screen.getByTestId('users-filter-status'), 'deleted');
     const row = await screen.findByTestId('deleted-row-1305');
     expect(within(row).getByText('Duplicate account')).toBeInTheDocument();
     expect(screen.getByTestId('user-restore-9001')).toBeDisabled();
@@ -512,6 +512,7 @@ describe('weight sets', () => {
     expect(screen.getByTestId('weights-publish-error--activities-0-items')).toBeInTheDocument();
     // Fix both levels: the sums turn to 100% before anything is saved.
     await u.click(within(screen.getByTestId('weights-publish-dialog')).getByRole('button', { name: 'Cancel' }));
+    await u.click(await screen.findByTestId('unsaved-discard')); // Decision 11: the typed reason asks before the dialog closes
     await setNum(u, 'weights-weight-h2', '50');
     await setNum(u, 'weights-item-weight-h1_2', '30');
     expect(screen.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'true');

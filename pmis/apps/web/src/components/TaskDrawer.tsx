@@ -12,6 +12,7 @@ import { DocSlots } from './DocSlots';
 import { DraftBar, useDraft } from './DraftBar';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
 import { EditingNotice } from './EditingNotice';
+import { useCommentReaction, useCommentResolved } from '@/api/x';
 import { CommentsPanel } from './Comments';
 import { DelayPeriodsPanel } from './DelayPeriods';
 import { Holders } from './HolderChip';
@@ -29,9 +30,12 @@ import { DateInput } from '@/components/DateInput';
 function Comments({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
   const c = useComments(task.id), add = useAddComment(task.id);
+  const react = useCommentReaction(['task-comments', task.id]), resolve = useCommentResolved(['task-comments', task.id]);
   return (
     <CommentsPanel items={c.data?.items} loaded={c.isSuccess} pending={add.isPending} error={add.isError ? errText(add.error, t) : null}
-      onSend={(body, ids) => add.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
+      onSend={(body, ids) => add.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })}
+      onReact={(commentId, emoji, on) => react.mutate({ commentId, emoji, on })}
+      onToggleResolved={(commentId, resolved) => resolve.mutate({ commentId, resolved })} />
   );
 }
 
@@ -74,6 +78,8 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
     onError: (e) => { if (o === 'reject') setRejecting(false); fail(e); },
   });
   const [draft, setDraft] = useState({ planned_date: task.planned_date ?? '', actual_start: task.actual_start ?? '', actual_date: task.actual_date ?? '' });
+  /* 0.15.269: on workflow version 2+ a milestone task's date is the date of its last linked task, set automatically — never typed. */
+  const msAuto = task.is_milestone_task === true && (task.workflow_version ?? 1) >= 2;
   const dirty = (['planned_date', 'actual_start', 'actual_date'] as const).filter((k) => (draft[k] || null) !== (task[k] ?? null));
   const layout0 = typeof task.values?.layout_submitted_date === 'string' ? task.values.layout_submitted_date : '';
   const [layout, setLayout] = useState(layout0);
@@ -128,7 +134,8 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
           {([['planned_date', 'plan', 'grid.plan'], ['actual_start', 'start', 'drawer.actual_start'], ['actual_date', 'actual', 'grid.actual']] as const).map(([f, id, label]) => (
             <div key={f}>
               <label className="block"><span className="text-mute">{t(label)}</span>
-                <DateInput className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                <DateInput className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit || (f === 'actual_date' && msAuto)} value={f === 'actual_date' && msAuto ? (task.actual_date ?? '') : draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                {f === 'actual_date' && msAuto && <span className="block text-xs text-mute" data-testid="drawer-ms-auto-date">{t('drawer.ms_auto_date')}</span>}
               </label>
               <FieldHistory entityType="task" entityId={task.id} field={f} label={t(label)} />
             </div>

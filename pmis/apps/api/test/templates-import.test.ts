@@ -101,6 +101,24 @@ describe('catalogue and download', () => {
     expect(au[0]!.after).toMatchObject({ version: gecol.current_version, prefill: false });
   });
 
+  it('P3: says what changed between two versions of a template (added, removed, renamed columns by code), read only and in scope only', async () => {
+    const t = await tplTeam(app, db, 'gecol', 'gecol', R);
+    const cur = (await t.entry.api.call('get', '/templates')).body.items[0].current_version as number;
+    const now = await t.entry.api.call('get', '/templates/TPL-GECOL/changes');
+    expect(now.status).toBe(200);
+    expect(now.body).toMatchObject({ template_id: 'TPL-GECOL', to: cur });
+    for (const k of ['added', 'removed', 'renamed']) expect(Array.isArray(now.body[k])).toBe(true);
+    expect(now.body.from).toBe(cur > 1 ? cur - 1 : null);
+    if (cur === 1) expect([now.body.added, now.body.removed, now.body.renamed]).toEqual([[], [], []]);
+    // a version that was never issued, a malformed id and a malformed version
+    expect((await t.entry.api.call('get', `/templates/TPL-GECOL/changes?to=${cur + 50}`)).status).toBe(404);
+    expect((await t.entry.api.call('get', '/templates/nope/changes')).status).toBe(404);
+    expect((await t.entry.api.call('get', '/templates/TPL-GECOL/changes?from=abc')).status).toBe(422);
+    // somebody who holds no register module does not see the template
+    const nobody = await actor(app, db, { grants: G('templates', 'view'), regions: [R], modules: null });
+    expect((await nobody.api.call('get', '/templates/TPL-GECOL/changes')).status).toBe(404);
+  });
+
   it('keeps the list fields as drop-downs and refuses a caller without the right (permission denied)', async () => {
     const t = await tplTeam(app, db, 'procurement', 'procurement', R);
     const dl = await downloadTemplate(t.entry.api, 'TPL-PROCUREMENT');
@@ -781,5 +799,59 @@ describe('Procurement template carries the assignment members (Q519)', () => {
     // a caller without the import right cannot upload the file
     const viewer = await actor(app, db, { grants: [...G('procurement', 'view'), ...G('templates', 'view')], regions: [R], modules: null });
     expect((await uploadFile(viewer.api, filled, 'members.xlsx')).status).toBe(403);
+  });
+});
+
+/** 0432: "last row wins" for a record that is in a file twice (setting imports.duplicate_rows, off by default). */
+describe('duplicate rows in one file: last row wins', () => {
+  it('is off by default, is set through the door with a reason, and then the later row is staged and the earlier one is listed as overridden, never lost', async () => {
+    const t = await tplTeam(app, db, 'gecol', 'gecol', R);
+    const admin = await plainAdmin(app, db);
+    const get = await admin.api.call('get', '/settings/duplicate-rows');
+    expect(get.status).toBe(200);
+    expect(get.body).toMatchObject({ default: 'first', registers: {}, can_edit: true });
+    const restore = async (): Promise<void> => {
+      const cur = await admin.api.call('get', '/settings/duplicate-rows');
+      if (cur.body.default !== 'first' || Object.keys(cur.body.registers).length) {
+        expect((await admin.api.call('put', '/settings/duplicate-rows', { reason: 'test restore', default: 'first', registers: {} }, { 'If-Match': `"${cur.body.version}"` })).status).toBe(200);
+      }
+    };
+    await restore();
+    // a register that does not exist is refused; a caller without the right may read but not write
+    const v0 = (await admin.api.call('get', '/settings/duplicate-rows')).body.version;
+    expect((await admin.api.call('put', '/settings/duplicate-rows', { reason: 'bad key', default: 'first', registers: { no_such_register: 'last' } }, { 'If-Match': `"${v0}"` })).status).toBe(422);
+    expect((await t.entry.api.call('put', '/settings/duplicate-rows', { reason: 'no right', default: 'last', registers: {} }, { 'If-Match': `"${v0}"` })).status).toBe(403);
+    try {
+      const s2 = await makeSite(db, R, { prefix: 'TPL' });
+      const dl = await downloadTemplate(t.entry.api, 'TPL-GECOL');
+      const filled = await fillTemplate(dl.buffer, [
+        { [H.site]: s2.code, [H.pr]: 'GP-2', [H.req]: day('2026-01-06') },
+        { [H.site]: s2.code, [H.pr]: 'GP-2B', [H.req]: day('2026-01-07') },
+      ]);
+      await db.query(`UPDATE sites SET scope_gecol_power = 'yes' WHERE id = $1`, [s2.id]);
+      const first = await uploadFile(t.entry.api, filled, 'dup-first.xlsx');
+      expect(first.status).toBe(202);
+      expect(first.body.counts).toMatchObject({ create: 1, error: 1, duplicate: 1 });
+      expect(first.body.counts.overridden ?? 0).toBe(0);
+      const rf = await rowsOf(t.entry.api, first.body.id);
+      expect(rf.find((r) => r.action === 'create')!.diff.pr_no.new).toBe('GP-2');
+
+      const on = await admin.api.call('put', '/settings/duplicate-rows', { reason: 'last row wins', default: 'last', registers: {} }, { 'If-Match': `"${(await admin.api.call('get', '/settings/duplicate-rows')).body.version}"` });
+      expect(on.status).toBe(200);
+      expect(on.body.default).toBe('last');
+      expect((await q(db, `SELECT 1 FROM audit_log WHERE action = 'imp_duplicate_policy_update'`)).length).toBeGreaterThan(0);
+
+      const second = await uploadFile(t.entry.api, filled, 'dup-last.xlsx');
+      expect(second.status).toBe(202);
+      expect(second.body.counts).toMatchObject({ create: 1, error: 1, overridden: 1, duplicate: 0 });
+      const rl = await rowsOf(t.entry.api, second.body.id);
+      expect(rl.find((r) => r.action === 'create')!.diff.pr_no.new).toBe('GP-2B');                      // the later row won
+      const lost = rl.find((r) => r.action === 'error')!;
+      expect(lost.errors[0]).toMatchObject({ code: 'overridden_by_later_row' });                         // visible, with its reason
+      const rep = await getBinary(t.entry.api, `/import-batches/${second.body.id}/error-report`);
+      expect(rep.status).toBe(200);
+    } finally {
+      await restore();
+    }
   });
 });

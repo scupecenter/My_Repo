@@ -8,13 +8,16 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useMenuCounts, useUnreadTotal } from '@/api/msg';
+import { useUiIdentity } from '@/api/settings';
 import { useOpenAlertCount } from '@/api/logs';
 import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
+import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
-import { sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { API_BASE } from '@/api/client';
+import { PALETTE_HIDDEN_KEY, sanitizeUiNav, withoutHidden, type UiNav } from '@/lib/sidebarPrefs';
 import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
@@ -31,11 +34,17 @@ import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter
 
 export { NAV };
 const WIDTH_KEY = 'pmis.nav.width';
+const LOGO_KEY = 'pmis.identity.logo';
 const ICONS_KEY = 'pmis.nav.icons';
 /** The menu hides by itself (a narrow rail that opens on hover) unless it is pinned; kept in the browser like the width and the icons-only choice. */
 const AUTO_KEY = 'pmis.nav.auto';
 
+/** The signed-in frame. The unsaved-changes guard (Decision 11) wraps everything inside it: links, the Back button and every screen's dirty state. */
 export function Shell() {
+  return <UnsavedGuardProvider><ShellFrame /></UnsavedGuardProvider>;
+}
+
+function ShellFrame() {
   const { t } = useTranslation();
   const me = useMe(true);
   const notes = useNotifications(true);
@@ -49,7 +58,9 @@ export function Shell() {
   const [compactOwn, setCompact] = useState<boolean | null>(null);
   const [autoOwn, setAuto] = useState<boolean | null>(null);
   const compact = compactOwn ?? loadPref<boolean | null>(ICONS_KEY, null) ?? (menuStyle === 'rail');
-  const auto = autoOwn ?? loadPref<boolean | null>(AUTO_KEY, null) ?? (menuStyle === 'autohide');
+  // 0527: the personal choice in the profile (sidebar.mode) comes first, then this browser's pin, then the appearance profile's menu style
+  const profileMode = sanitizeUiNav(me.data?.user.ui_prefs?.sidebar ?? {}).mode;
+  const auto = autoOwn ?? (profileMode ? profileMode === 'autohide' : null) ?? loadPref<boolean | null>(AUTO_KEY, null) ?? (menuStyle === 'autohide');
   const [hover, setHover] = useState(false);
   const [width, setWidth] = useState<number>(() => { const w = Number(loadPref(WIDTH_KEY, SIDEBAR_DEFAULT)); return Number.isFinite(w) ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)) : SIDEBAR_DEFAULT; });
   // The drawer is tied to the page it was opened on, so it closes by itself on navigation.
@@ -73,6 +84,16 @@ export function Shell() {
   useEffect(() => { if (userBrand) applyBrand(userBrand); }, [userBrand]);
   // 0241: the appearance profile follows the signed-in user (own choices, else the organization defaults)
   const userAppearance = me.data?.user.appearance;
+  // 0243: the workspace logo of the identity replaces the built-in badge; nothing changes without an enabled logo.
+  // ui_identity_state is readable by every signed-in user; the last seen state is cached so a reload does not flash the badge.
+  const ident = useUiIdentity();
+  useEffect(() => {
+    if (ident.data) storePref(LOGO_KEY, ident.data.logo?.enabled ? { version: ident.data.logo.version } : null);
+  }, [ident.data]);
+  const logo: { version: number } | null = ident.data ? (ident.data.logo?.enabled ? { version: ident.data.logo.version } : null) : loadPref(LOGO_KEY, null);
+  const brandMark = logo
+    ? <img src={`${API_BASE}/ui/assets/logo?v=${logo.version}`} alt="" data-testid="sidebar-logo" className="h-8 w-8 shrink-0 rounded-md object-contain" />
+    : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>;
   useEffect(() => { if (userAppearance) applyAppearance(userAppearance); }, [userAppearance]);
 
   // 0242 (proposal item 4): the personal sidebar of the profile. The pins of a browser that had them only locally
@@ -113,7 +134,9 @@ export function Shell() {
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
   const sideItems = visibleNavItems(me.data);
-  const paletteItems = permittedNavItems(me.data);
+  // the search box follows the personal menu: screens the person hid are left out unless they turned on "also search hidden screens" (Profile, My sidebar)
+  const paletteAll = loadPref<boolean>(PALETTE_HIDDEN_KEY, false) === true;
+  const paletteItems = paletteAll ? permittedNavItems(me.data) : withoutHidden(permittedNavItems(me.data), side);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
@@ -123,7 +146,25 @@ export function Shell() {
   };
 
   const resize = (w: number) => { setWidth(w); storePref(WIDTH_KEY, w); };
-  const togglePin = () => { storePref(AUTO_KEY, !auto); setAuto(!auto); setHover(false); };
+  const togglePin = () => {
+    storePref(AUTO_KEY, !auto); setAuto(!auto); setHover(false);
+    const v = me.data?.user.version;
+    if (v !== undefined) updateProfile.mutate({ version: Number(v), patch: { ui_prefs: { sidebar: { ...side, mode: auto ? 'pinned' : 'autohide' } } } });
+  };
+  // auto-hide: Ctrl+B opens or closes the rail (not while typing in a field); a touch on the rail opens it, a touch elsewhere closes it (no hover on touch screens)
+  useEffect(() => {
+    if (!auto) return;
+    const key = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); setHover((h) => !h); }
+      else if (e.key === 'Escape') setHover(false);
+    };
+    const touch = (e: PointerEvent) => { if (e.pointerType === 'touch' && !asideRef.current?.contains(e.target as Node | null)) setHover(false); };
+    window.addEventListener('keydown', key);
+    window.addEventListener('pointerdown', touch);
+    return () => { window.removeEventListener('keydown', key); window.removeEventListener('pointerdown', touch); };
+  }, [auto]);
   /** the rail shows icons only; it opens over the page (no push) while the pointer or the keyboard is in it */
   const open = !auto || hover;
   const rail = compact || !open;
@@ -142,7 +183,7 @@ export function Shell() {
   const groupFirst = current ? sideItems.find((i) => i.group === current.group) : undefined;
   const brand = (
     <div className="flex items-center gap-2 px-4 py-4 font-bold">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>{!rail && t('app.name')}
+      {brandMark}{!rail && t('app.name')}
       {!rail && <button className="btn ms-auto hidden min-h-8 min-w-8 md:inline-flex" data-testid="sidebar-pin" aria-pressed={!auto} aria-label={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} title={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} onClick={togglePin}>{auto ? <PinOff size={16} aria-hidden /> : <Pin size={16} aria-hidden />}</button>}
     </div>
   );
@@ -172,7 +213,7 @@ export function Shell() {
     <div className="flex min-h-screen">
       {auto && <div className="hidden shrink-0 md:block" style={{ width: 56 }} aria-hidden />}
       <aside ref={asideRef} data-testid="sidebar" data-auto={auto ? 'true' : 'false'} aria-label={t('nav.sidebar_label')} style={{ width: rail ? 56 : width }}
-        onMouseEnter={auto ? () => setHover(true) : undefined} onMouseLeave={auto ? () => setHover(false) : undefined}
+        onPointerDown={auto ? (e) => { if (e.pointerType === 'touch') setHover(true); } : undefined} onMouseEnter={auto ? () => setHover(true) : undefined} onMouseLeave={auto ? () => setHover(false) : undefined}
         onFocus={auto ? () => setHover(true) : undefined} onBlur={auto ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); } : undefined}
         className={`side-scope ${auto ? 'fixed start-0 z-40' : 'sticky'} top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex`}>
         {brand}
@@ -186,7 +227,7 @@ export function Shell() {
           <button className="absolute inset-0 bg-scrim" aria-label={t('nav.close_menu')} tabIndex={-1} onClick={() => setDrawer(false)} />
           <div role="dialog" aria-modal="true" aria-label={t('nav.sidebar_label')} data-testid="sidebar-drawer" className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col border-e border-line bg-card">
             <div className="flex items-center justify-between pe-2">
-              <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
+              <div className="flex items-center gap-2 px-4 py-4 font-bold">{brandMark}{t('app.name')}</div>
               <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
             </div>
             <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} side={side} onPinsChange={savePins} />
@@ -211,14 +252,14 @@ export function Shell() {
           <button className="btn min-w-60 justify-start font-normal text-mute" data-testid="topbar-search" onClick={() => setPalette(true)}>
             <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>
           </button>
-          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
-          <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
+          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.centre')}</button>
+          <button className="btn" data-testid="topbar-lang" aria-label={`${t('top.language')}: ${lang === 'en' ? 'ع' : 'EN'}`} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <QuickCreate me={me.data} allowed={allowed} />
           <NotificationBell count={pending} />
           <Popover.Root>
             <Popover.Trigger asChild>
-              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" aria-label={t('top.account')}>
+              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" title={t('top.account')}>
                 <Avatar name={me.data?.user.display_name} size="sm" />
                 {me.data?.user.display_name}
               </button>
@@ -230,10 +271,10 @@ export function Shell() {
                 {session.data?.auth_method === 'local'
                   ? <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-change-password" onClick={() => nav('/change-password')}><Lock size={14} />{t('top.change_password')}</button></Popover.Close>
                   : <p className="p-2 text-sm text-mute">{t('top.no_password')}</p>}
+                <Popover.Close asChild><button className="btn mt-1 w-full justify-start border-t border-line" data-testid="user-menu-signout" onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={14} aria-hidden />{t('top.sign_out')}</button></Popover.Close>
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
-          <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={16} /></button>
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
         <AutoHints />

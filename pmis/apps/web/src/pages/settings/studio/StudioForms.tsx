@@ -52,6 +52,7 @@ export function slaProps(it: SlaWeightItem | undefined) {
     sla: it?.sla ? { min: it.sla.min_working_days, max: it.sla.max_working_days, rule_id: it.sla.id, unit: it.sla.unit, start_event: it.sla.start_event, calendar_code: it.sla.calendar_code, warning_pct: it.sla.warning_pct,
       breach_owner_role: it.sla.breach_owner_role, escalation_role: it.sla.escalation_role, pause_on_client_wait: it.sla.pause_on_client_wait } : undefined,
     weight: { counts: !!it?.counts_in_weight, value: Number(it?.weight_value ?? 0), group: it?.weight_group ?? null },
+    estimate: { man_days: it?.est_man_days != null ? Number(it.est_man_days) : null, duration: it?.planned_duration_days ?? null, suggested: it?.suggested_weight != null ? Number(it.suggested_weight) : null },
   };
 }
 export function baseOf(it: SlaWeightItem | undefined) {
@@ -193,12 +194,19 @@ export function GateForm({ c, code }: { c: Ctx; code: string }) {
   const [mn, setMn] = useState(String(g?.sla_min_wd ?? ''));
   const [mx, setMx] = useState(String(g?.sla_max_wd ?? ''));
   const [conds, setConds] = useState<GateCondition[]>(g?.conditions ?? []);
+  const [mvFrom, setMvFrom] = useState(g?.from_milestone ?? ''), [mvTo, setMvTo] = useState(g?.to_milestone ?? '');
   if (!g) return null;
   const dis = !c.can.edit;
   const next = c.milestones.find((m) => m.code === g.to_milestone) ?? nextMilestone(c.milestones, g.from_milestone);
   const from = c.milestones.find((m) => m.code === g.from_milestone);
   const opens = c.placements.filter((p) => p.stage_code === next?.code && p.is_active !== false && !(p.predecessors ?? []).some((x) => c.placements.find((k) => k.task_code === x)?.stage_code === next?.code));
   const clean = conds.filter((x) => x.type === 'stop_work_blocks' || (x.ref ?? '').trim());
+  const active = c.milestones.filter((m) => m.is_active !== false);
+  const freeFrom = (code: string) => code === g.from_milestone || !c.gates.some((x) => x.code !== g.code && x.is_active !== false && x.from_milestone === code);
+  const moved = (mvFrom !== g.from_milestone || mvTo !== g.to_milestone) && !!mvFrom && !!mvTo && mvFrom !== mvTo;
+  const move = () => c.askReason({ title: `${t('studio.gate_move')}: ${code}`, run: (reason, cb) => c.W.replace.mutate({
+    milestones: c.milestones.map((m) => ({ code: m.code, is_active: m.is_active !== false })),
+    gates: c.gates.map((x) => (x.code === code ? { code: x.code, is_active: x.is_active !== false, from_milestone: mvFrom, to_milestone: mvTo } : { code: x.code, is_active: x.is_active !== false })), reason }, cb) });
   return (
     <div className="space-y-4" data-testid="studio-gate-form" data-code={code}>
       <Header crumbs={<><Diamond size={16} aria-hidden className="me-2 inline text-mute" />{c.nm(g)}</>} />
@@ -216,6 +224,11 @@ export function GateForm({ c, code }: { c: Ctx; code: string }) {
         </fieldset>
       </StudioCard>
       <StudioCard title={t('studio.gate_opens')} testid="studio-card-opens">
+        <div className="grid gap-3 sm:grid-cols-2" data-testid="studio-gate-move">
+          <label className={lbl}>{t('studio.gate_after')}<select className={field} data-testid="studio-gate-from" disabled={!c.can.struct} value={mvFrom} onChange={(e) => setMvFrom(e.target.value)}>{active.filter((m) => freeFrom(m.code)).map((m) => <option key={m.code} value={m.code}>{m.code} {c.nm(m)}</option>)}</select></label>
+          <label className={lbl}>{t('studio.gate_to')}<select className={field} data-testid="studio-gate-to" disabled={!c.can.struct} value={mvTo} onChange={(e) => setMvTo(e.target.value)}>{active.filter((m) => m.code !== mvFrom).map((m) => <option key={m.code} value={m.code}>{m.code} {c.nm(m)}</option>)}</select></label>
+          <button type="button" className="btn min-h-11 sm:col-span-2" data-testid="studio-gate-move-save" disabled={!c.can.struct || !moved} title={!c.can.struct ? c.can.why ?? undefined : undefined} onClick={move}>{t('studio.gate_move')}</button>
+        </div>
         <p className="text-sm text-mute">{from && next ? t('studio.gate_between', { from: c.nm(from), to: c.nm(next) }) : ''}</p>
         <div className="flex flex-wrap gap-2" data-testid="studio-gate-opens">
           {opens.length === 0 && <span className="text-sm text-mute">{t('wfe.none')}</span>}

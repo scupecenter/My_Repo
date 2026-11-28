@@ -9,6 +9,8 @@ import { downloadTemplate, useBatches, useTemplates } from '@/api/registers';
 import { batchPath, type ImportBatch, type Template } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
+import { WhatChangedButton } from '@/components/TemplateChanges';
+import { ExportLog } from '@/components/ExportLog';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { useToast } from '@/components/Toast';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -21,7 +23,7 @@ const dateOf = (iso?: string) => (iso ? iso.slice(0, 10) : '—');
 /** The kind of a template: the whole Master, a Site Register stream template (Q73), or the template of a register (a file from before 0.11.5 has no `template_kind`). */
 const kindOf = (x: Template): NonNullable<Template['template_kind']> => x.template_kind ?? (x.stream ? 'stream' : x.register_key ? 'register' : 'master');
 /** 0.15.61: the list values (TPL-LISTVALUES) and the holidays (TPL-HOLIDAYS) are uploaded on their own screens (Lists, Settings > Calendar), not as an import batch. */
-const ownScreen = (k: ReturnType<typeof kindOf>): k is 'list_values' | 'holidays' => k === 'list_values' || k === 'holidays';
+const ownScreen = (k: ReturnType<typeof kindOf>): k is 'list_values' | 'holidays' | 'daily_plan' => k === 'list_values' || k === 'holidays' || k === 'daily_plan';
 
 /**
  * The Templates page (CLAUDE.md "Approved templates only"): the approved templates to download (blank or pre-filled) and upload, and the batches of the uploads.
@@ -37,6 +39,7 @@ export function TemplatesPage() {
   const templates = useTemplates();
   const batches = useBatches({ status, template_id: '', register_key: register, stream });
   const [uploadFor, setUploadFor] = useState<Template | null>(null);
+  const tab = sp.get('tab') === 'exports' ? 'exports' : 'templates';
   const lang = i18n.language;
   const me = useMe(true);
   const nameOf = (x: { name_en: string; name_ar?: string | null }) => (lang === 'ar' && x.name_ar) || x.name_en;
@@ -55,10 +58,16 @@ export function TemplatesPage() {
     <div data-testid="page-templates">
       <PageHeader title={t('tpl.title')} subtitle={t('tpl.subtitle')} settings="templates" context={
         <span className="ms-auto flex flex-wrap gap-1">
-          <Link className="btn px-2 py-1 text-xs" to="/templates/mapping" data-testid="tpl-mapping-link">{t('tmap.title')}</Link>
+          <Link className="btn px-2 py-1 text-xs" to="/admin/settings/data/mapping" data-testid="tpl-mapping-link">{t('tmap.title')}</Link>
           {isAdmin(me.data) && <Link className="btn px-2 py-1 text-xs" to="/templates/master-import" data-testid="tpl-master-import-link">{t('mi.title')}</Link>}
         </span>} />
-      <section aria-labelledby="tpl-cat" className="mb-6">
+      <div role="tablist" aria-label={t('tpl.title')} className="mb-4 flex gap-1 border-b border-line" data-testid="tpl-tabs">
+        {(['templates', 'exports'] as const).map((k) => (
+          <button key={k} role="tab" type="button" aria-selected={tab === k} data-testid={`tpl-tab-${k}`} className={`px-3 py-2 text-sm font-semibold ${tab === k ? 'border-b-2 border-accent text-ink' : 'text-mute'}`}
+            onClick={() => set('tab', k === 'templates' ? '' : k)}>{t(`tpl.tab_${k}`)}</button>
+        ))}
+      </div>
+      {tab === 'templates' && <section aria-labelledby="tpl-cat" className="mb-6">
         <h2 id="tpl-cat" className="mb-2 text-lg font-bold">{t('tpl.catalogue')}</h2>
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm" data-testid="tpl-table">
@@ -73,13 +82,14 @@ export function TemplatesPage() {
                   <tr className="border-t border-line" data-testid={`tpl-row-${x.template_id}`} data-register={x.register_key ?? ''} data-kind={kind} data-stream={x.stream ?? ''}>
                     <td className="p-2 font-semibold">
                       {nameOf(x)}
-                      {kind !== 'register' && <span className="chip ms-2 bg-card2 text-mute" data-testid={`tpl-kind-${x.template_id}`}>{kind === 'master' ? t('tpl.kind_master') : kind === 'sites' ? t('tpl.kind_sites') : kind === 'holidays' ? t('tpl.kind_holidays') : kind === 'list_values' ? t('tpl.kind_list_values') : t('tpl.kind_stream')}</span>}
+                      {kind !== 'register' && <span className="chip ms-2 bg-card2 text-mute" data-testid={`tpl-kind-${x.template_id}`}>{kind === 'master' ? t('tpl.kind_master') : kind === 'sites' ? t('tpl.kind_sites') : kind === 'holidays' ? t('tpl.kind_holidays') : kind === 'list_values' ? t('tpl.kind_list_values') : kind === 'daily_plan' ? t('tpl.kind_daily_plan') : t('tpl.kind_stream')}</span>}
                     </td>
                     <td className="mono p-2">{x.template_id}</td>
                     <td className="p-2"><span className="chip bg-accentSoft text-accentText" data-testid={`tpl-version-${x.template_id}`}>v{x.current_version}</span></td>
                     <td className="p-2 text-mute">{dateOf(x.issued_at)}</td>
                     <td className="p-2">
                       <span className="flex flex-wrap gap-1">
+                        {kind === 'register' && <WhatChangedButton templateId={x.template_id} version={x.current_version} />}
                         <button className="btn px-2 py-1 text-xs" data-testid={`tpl-download-${x.template_id}`} disabled={gate.templatesLocked} title={gate.note(gate.templatesLocked)} onClick={() => void down(x, false)}><FileDown size={14} />{t('registers.template_download')}</button>
                         {!ownScreen(kind) && <button className="btn px-2 py-1 text-xs" data-testid={`tpl-prefill-${x.template_id}`} disabled={gate.templatesLocked} title={gate.note(gate.templatesLocked)} onClick={() => void down(x, true)}><FileSpreadsheet size={14} />{t('registers.template_prefill')}</button>}
                         {!ownScreen(kind) && <button className="btn px-2 py-1 text-xs" data-testid={`tpl-upload-${x.template_id}`} onClick={() => setUploadFor(x)}><FileUp size={14} />{t('registers.template_upload')}</button>}
@@ -96,9 +106,10 @@ export function TemplatesPage() {
           {templates.isError && <ErrorState onRetry={() => void templates.refetch()} />}
         </div>
         <p className="mt-2 text-sm text-mute" data-testid="tpl-streams-note">{t('tpl.streams_note')}</p>
-      </section>
+      </section>}
 
-      <section aria-labelledby="tpl-batches">
+      {tab === 'exports' && <ExportLog canSchedule={isAdmin(me.data)} />}
+      {tab === 'templates' && <section aria-labelledby="tpl-batches">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <h2 id="tpl-batches" className="text-lg font-bold">{t('tpl.batches')}</h2>
           <select className="input ms-auto w-auto" aria-label={t('tpl.col_status')} data-testid="batches-filter-status" value={status} onChange={(e) => set('status', e.target.value)}>
@@ -137,7 +148,7 @@ export function TemplatesPage() {
           {batches.isSuccess && !items.length && <EmptyState testid="batches-empty" title={t('tpl.no_batches')} />}
           {batches.isError && <ErrorState onRetry={() => void batches.refetch()} />}
         </div>
-      </section>
+      </section>}
       {uploadFor && <TemplateUploadDialog open onClose={() => setUploadFor(null)} templateId={uploadFor.template_id} templateName={`${nameOf(uploadFor)} · v${uploadFor.current_version}`}
         kind={((k) => (ownScreen(k) ? undefined : k))(kindOf(uploadFor))} onDone={(b) => { setUploadFor(null); toast(t('grid.uploaded')); nav(batchPath(b, uploadFor.register_key)); }} />}
     </div>

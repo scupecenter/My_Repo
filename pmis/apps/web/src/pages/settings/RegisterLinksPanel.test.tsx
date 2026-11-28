@@ -5,12 +5,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { resetRegisterLinks } from '@/mocks/handlers.registerLinks';
 import { renderApp, signIn } from '@/test/utils';
 import { RegisterLinksPanel } from './RegisterLinksPanel';
-import { RegisterLinkSelect } from '@/components/RegisterLinkSelect';
 
 const page = () => renderApp(<Routes><Route path="/x" element={<RegisterLinksPanel />} /></Routes>, { route: '/x' });
 beforeEach(() => resetRegisterLinks());
 
-describe('register link catalogue (0431)', () => {
+describe('register link catalogue (0713)', () => {
   it('switches a link off with a reason, and nothing is removed', async () => {
     await signIn('pm');
     page();
@@ -29,11 +28,5 @@ describe('register link catalogue (0431)', () => {
     page();
     expect(await screen.findByTestId('link-enabled-warehouse-procurement_order_id')).toBeDisabled();
     expect(screen.queryByTestId('links-add')).toBeNull();
-  });
-
-  it('draws the generic picker of a link field', async () => {
-    await signIn('pm');
-    renderApp(<RegisterLinkSelect registerKey="issues" field="risk_entity_id" siteId={null} value={null} onChange={() => undefined} editable />);
-    expect(await screen.findByRole('option', { name: /risks sample/ })).toBeInTheDocument();
   });
 });
