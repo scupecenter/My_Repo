@@ -12,6 +12,7 @@
 | [05-training-ar.md](05-training-ar.md) | مادة التدريب | Arabic training material per role |
 | [06-admin-guide-ar.md](06-admin-guide-ar.md) | دليل مدير النظام | Arabic administrator guide |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
+| [07-reorder-limits-and-supplier-returns.md](07-reorder-limits-and-supplier-returns.md) | حدود إعادة الطلب ومرتجعات الموردين | Reorder limits and supplier returns (tracking only, no stock effect) |
 
 ## وثائق مخططة لاحقاً | Planned later
 
