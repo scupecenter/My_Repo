@@ -28,4 +28,14 @@ describe('Settings, automation centre', () => {
     await u.click(await screen.findByTestId('au-use-issue-stuck'));
     expect(await screen.findByTestId('au-dialog')).toHaveTextContent('tpl-issue-stuck');
   });
+
+  it('previews a rule without sending and shows its log', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    await u.click(await screen.findByTestId('au-dry-weekly-status-missing'));
+    expect(await screen.findByTestId('au-dry-out-weekly-status-missing')).toHaveTextContent('Nothing was sent');
+    await u.click(screen.getByTestId('au-log-weekly-status-missing'));
+    expect(await screen.findByTestId('au-log-out-weekly-status-missing')).toHaveTextContent('issues.risk_entity_id');
+  });
 });

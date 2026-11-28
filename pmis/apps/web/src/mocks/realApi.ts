@@ -238,6 +238,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/alert-rules'],
   ['get', '/settings/alert-rules/link-orphans'],
   ['get', '/settings/alert-rules/runs'],
+  ['get', '/settings/alert-rules/:id/dry-run'],
+  ['get', '/settings/alert-rules/:id/log'],
   ['post', '/settings/alert-rules'],
   ['put', '/settings/alert-rules/:id'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.

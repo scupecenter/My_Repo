@@ -117,6 +117,20 @@ export class AlertRulesService {
     return { runs: (await this.db.tx.$queryRaw<{ j: unknown[] }[]>(Prisma.sql`SELECT alert_rule_runs_json(50) AS j`))[0]!.j };
   }
 
+  /** GET /settings/alert-rules/{id}/dry-run (0.15.486, migration 0627): what the rule would send now, evaluated in a sub-transaction that is rolled back. System Admin. */
+  async dryRun(id: string) {
+    await this.requireAdmin();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw problems.validation([{ path: '/id', code: 'invalid', message: 'The rule id.' }]);
+    return (await this.db.tx.$queryRaw<{ j: unknown }[]>(Prisma.sql`SELECT alert_rule_dry_run_json(${id}::uuid) AS j`))[0]!.j;
+  }
+
+  /** GET /settings/alert-rules/{id}/log (0.15.486, migration 0627): the last runs and firings of one rule. System Admin. */
+  async log(id: string) {
+    await this.requireAdmin();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw problems.validation([{ path: '/id', code: 'invalid', message: 'The rule id.' }]);
+    return (await this.db.tx.$queryRaw<{ j: unknown }[]>(Prisma.sql`SELECT alert_rule_log_json(${id}::uuid, 50) AS j`))[0]!.j;
+  }
+
   /** GET /settings/alert-rules/link-orphans (0.15.510, migration 0650): the dangling-link report with example ids, System Admin. */
   async linkOrphans() {
     await this.requireAdmin();
