@@ -27,3 +27,31 @@ export function useSetDashboardSettings() {
       void qc.invalidateQueries({ queryKey: ["dashboardSettings"] }),
   });
 }
+
+/** 0.15.435 (settings review gap 8): the health index bands, green and amber. Kept in the setting dashboard.health_bands. */
+export type HealthBands = S["HealthBands"];
+
+export const useHealthBands = () =>
+  useQuery({
+    queryKey: ["healthBands"],
+    queryFn: () => api.get<HealthBands>("/settings/dashboard/health-bands"),
+  });
+
+export function useSetHealthBands() {
+  const qc = useQueryClient();
+  return useMutation<
+    HealthBands,
+    ApiError,
+    {
+      version: number;
+      body: { green: number; amber: number; reason: string };
+    }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/health-bands", { version, body }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["healthBands"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}

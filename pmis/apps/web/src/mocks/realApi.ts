@@ -225,6 +225,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractor-performance'],
   ['get', '/settings/contractor-performance'],
   ['put', '/settings/contractor-performance'],
+  // Contract 0.15.269: the manual partial-credit entries of the progress editor (apps/api: settings; migration 0543).
+  ['get', '/settings/partial-credit'],
+  ['put', '/settings/partial-credit'],
   // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
   ['get', '/settings/alert-rules'],
   ['post', '/settings/alert-rules'],
@@ -239,6 +242,14 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/me/push'],
   ['post', '/me/push/subscribe'],
   ['post', '/me/push/unsubscribe'],
+  // Contract 0.15.531: personal notification settings (apps/api: notifications; migration 0583).
+  ['get', '/me/notification-prefs'],
+  ['put', '/me/notification-prefs'],
+  ['post', '/me/notification-prefs/snooze'],
+  ['post', '/me/notification-prefs/test'],
+  ['get', '/me/notification-prefs/decisions'],
+  ['get', '/admin/notification-personal'],
+  ['put', '/admin/notification-personal'],
   ['get', '/admin/web-push'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
@@ -584,6 +595,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/workflow/versions/:version/weight-totals'],
   ['put', '/workflow/versions/:version/tasks/:task/sla-rule'],
   ['post', '/workflow/versions/:version/tasks/:task/sla-rules/:rule/remove'],
+  // Contract 0.15.269: estimated man-days and planned duration of a task in a draft (migration 0542).
+  ['put', '/workflow/versions/:version/tasks/:task/estimate'],
   ['put', '/workflow/versions/:version/tasks/:task/weight'],
   ['put', '/workflow/versions/:version/tasks/:task/closing'],
   ['put', '/workflow/versions/:version/tasks/:task/successors'],
@@ -604,6 +617,8 @@ export const REAL_API_AUTH_USERS = [
   // (warehouse, as-built items, My Work, dashboard extras and settings, documents grid, fleet actions, invitations, admin overrides).
   ['get', '/settings/dashboard'],
   ['put', '/settings/dashboard'],
+  ['get', '/settings/dashboard/health-bands'],
+  ['put', '/settings/dashboard/health-bands'],
   ['get', '/settings/goals'],
   ['put', '/settings/goals'],
   ['get', '/goals/progress'],
