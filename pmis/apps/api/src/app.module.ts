@@ -33,6 +33,8 @@ import { ListCataloguesService } from './registers/list-catalogues.service';
 import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
 import { PresenceController } from './presence/presence.controller';
+import { LabelsController } from './labels/labels.controller';
+import { LabelsService } from './labels/labels.service';
 import { SavedViewsController } from './views/saved-views.controller';
 import { SavedViewsService } from './views/saved-views.service';
 import { FilterCatalogService } from './views/filter-catalog.service';
@@ -276,6 +278,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       ContractorsController,
       PresenceController,
       SavedViewsController,
+      LabelsController, // 0.15.620 (personal labels)
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
       AbsencesController, ReassignmentController, // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
@@ -314,6 +317,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       ContractorsService,
       ContractorPerformanceService,
       SavedViewsService, FilterCatalogService,
+      LabelsService, // 0.15.620
       SearchService, // 0.15.17 (F4)
       MasterExportService, ExportSchedulesService, // 0.15.34
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)

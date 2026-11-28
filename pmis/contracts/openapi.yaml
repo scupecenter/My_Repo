@@ -140,6 +140,7 @@ info:
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
     - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
     - 0.15.436 (2026-11-28): an old published workflow version can be deleted after a full snapshot is archived (owner request relayed 2026-11-27; migration 0575, mirror `db/sql/574_workflow_version_delete.sql`). Additive. `POST /workflow/versions/{version}/delete` (`deleteWorkflowVersion`): `workflow_versions` administer for all regions (the publish right), a reason, `If-Match`, a password step-up and the typed confirmation `v<version>`; audited as `workflow_version_delete`. Allowed only for a published version that is not the one in force, has started, has no site, no site task and no site migration (409 `invalid_transition` with `reasons`: `current`, `not_started`, `sites`, `site_tasks`, `migrations`). The version and all its milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views are written first as one snapshot (`workflow_version_archive`, kept on a data reset); the delete runs in the same transaction. `GET /workflow/version-archive` (`listWorkflowVersionArchive`, `administer`) lists the archived versions (no snapshot body); `POST /workflow/version-archive/{id}/restore` (`restoreWorkflowVersion`, `administer`, reason, step-up) puts one back as it was (published, same version number, same ids) in one transaction and answers 409 `invalid_transition` without changing anything when the version number or an id exists again, it was already restored, or a row it points to is gone. Drafts are still discarded with `/discard`; a published version stays immutable and tasks are still deactivated, not deleted.
+    - 0.15.620 (2026-11-28): personal coloured labels on records (migration 0740, mirror `db/sql/739_personal_labels.sql`). Additive, personal. `GET /labels`, `POST /labels`, `PATCH /labels/{id}`, `POST /labels/{id}/archive` (hidden, never deleted), `POST /labels/{id}/assign` and `/unassign` (a label on a `site` or `register_record`), `GET /labels/links?kind=` (the caller's labels per record, for the filter and the chips). A label and its links belong to the person who made them; nobody else sees or uses them (another person's id answers 404). At most 30 active labels, 1 to 40 characters, unique per person among the active ones (409 `duplicate`), colour from a fixed palette (422 `validation_failed`). No grant, role or permission change.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.376 (2026-11-27): the daily delay log (migration 0554). Additive, data only. The Issues register gets the type value `Daily Delay` (list IssueCategory), the optional date field `delay_date`, and four more values of the list BlockerReason (Weather, Permit Pending, Delivery Delay, Safety Stop); no endpoint or schema changes. The delay reasons are edited in Settings > Registers > Lists and show in the dashboard issue breakdown (`by_category`, `by_reason`) and in the register export.
@@ -419,6 +420,8 @@ tags:
     description: "Dashboard KPIs (P3 shapes, refined against the legacy dashboard)."
   - name: project-status
     description: "Project Status with the weight-set version, and weekly snapshots."
+  - name: labels
+    description: "Personal coloured labels on sites and register records (0.15.620). Each person sees only their own."
   - name: saved-views
     description: "Saved views of the list screens, shared with roles, groups, users or everyone (Q117), and the caller's server-side drafts (Q115)."
 
@@ -19754,6 +19757,166 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /labels:
+    get:
+      tags: [labels]
+      operationId: listLabels
+      summary: The caller's own labels (0.15.620)
+      responses:
+        '200':
+          description: Active labels of the caller, by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Label'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      tags: [labels]
+      operationId: createLabel
+      summary: Make a label (0.15.620)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LabelInput'}
+      responses:
+        '201':
+          description: The new label.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Label'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /labels/links:
+    get:
+      tags: [labels]
+      operationId: listLabelLinks
+      summary: The caller's labels on records of one kind (0.15.620)
+      parameters:
+        - {name: kind, in: query, required: true, schema: {type: string, enum: [site, register_record]}}
+        - {name: ref_id, in: query, required: false, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: One entry per labelled record, active labels only.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [ref_id, context, label_ids]
+                      additionalProperties: false
+                      properties:
+                        ref_id: {type: string, format: uuid}
+                        context: {type: [string, 'null'], description: The register key of a register record, else null.}
+                        label_ids: {type: array, items: {type: string, format: uuid}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /labels/{id}:
+    patch:
+      tags: [labels]
+      operationId: updateLabel
+      summary: Rename or recolour a label (0.15.620)
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LabelPatch'}
+      responses:
+        '200':
+          description: The label.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Label'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /labels/{id}/archive:
+    post:
+      tags: [labels]
+      operationId: archiveLabel
+      summary: Hide a label (0.15.620)
+      description: The label and its links stay stored and drop out of every list. Never deleted.
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The hidden label.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Label'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /labels/{id}/assign:
+    post:
+      tags: [labels]
+      operationId: assignLabel
+      summary: Put a label on a record (0.15.620)
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LabelLink'}
+      responses:
+        '200':
+          description: Done (repeating it changes nothing).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [label_id, kind, ref_id, 'on', context]
+                properties:
+                  context: {type: [string, 'null']}
+                  label_id: {type: string, format: uuid}
+                  kind: {type: string, enum: [site, register_record]}
+                  ref_id: {type: string, format: uuid}
+                  'on': {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /labels/{id}/unassign:
+    post:
+      tags: [labels]
+      operationId: unassignLabel
+      summary: Take a label off a record (0.15.620)
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LabelLink'}
+      responses:
+        '200':
+          description: Done (repeating it changes nothing).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [label_id, kind, ref_id, 'on', context]
+                properties:
+                  context: {type: [string, 'null']}
+                  label_id: {type: string, format: uuid}
+                  kind: {type: string, enum: [site, register_record]}
+                  ref_id: {type: string, format: uuid}
+                  'on': {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /me/default-views:
     get:
       tags: [saved-views]
@@ -20235,6 +20398,41 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    Label:
+      type: object
+      required: [id, name, colour, is_active, link_count]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string, minLength: 1, maxLength: 40}
+        colour: {$ref: '#/components/schemas/LabelColour'}
+        is_active: {type: boolean}
+        link_count: {type: integer, minimum: 0}
+    LabelColour:
+      type: string
+      enum: [red, orange, amber, green, teal, blue, purple, pink, grey]
+    LabelInput:
+      type: object
+      required: [name, colour]
+      additionalProperties: false
+      properties:
+        name: {type: string, minLength: 1, maxLength: 40}
+        colour: {$ref: '#/components/schemas/LabelColour'}
+    LabelPatch:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name: {type: string, minLength: 1, maxLength: 40}
+        colour: {$ref: '#/components/schemas/LabelColour'}
+    LabelLink:
+      type: object
+      required: [kind, ref_id]
+      additionalProperties: false
+      properties:
+        kind: {type: string, enum: [site, register_record]}
+        ref_id: {type: string, format: uuid}
+        context: {type: string, pattern: '^[a-z][a-z0-9_-]{0,80}$', description: The register key; only for a register_record.}
     StructurePolicy:
       type: object
       description: 'The setting `registers.structure_change` (0.15.403).'

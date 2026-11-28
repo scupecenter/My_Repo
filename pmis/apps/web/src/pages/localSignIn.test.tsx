@@ -347,6 +347,8 @@ describe('hybrid mode list', () => {
       'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin',
       // contract 0.15.582 (0655): a default saved view per screen
       'GET /me/default-views', 'POST /saved-views/:id/set-default', 'POST /saved-views/:id/clear-default',
+      // contract 0.15.620 (0740): personal coloured labels on records
+      'GET /labels', 'POST /labels', 'GET /labels/links', 'PATCH /labels/:id', 'POST /labels/:id/archive', 'POST /labels/:id/assign', 'POST /labels/:id/unassign',
       'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
