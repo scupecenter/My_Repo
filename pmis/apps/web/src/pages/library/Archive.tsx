@@ -74,7 +74,7 @@ export function LibraryArchive() {
 
 const COLS: ColDef[] = [ROWNO_COL, { id: 'site', w: 120, min: 90, pinned: true }, { id: 'site_name', w: 200, min: 120 }, { id: 'region', w: 110, min: 80 }, { id: 'cluster', w: 110, min: 80 },
   { id: 'doc_type', w: 220, min: 120 }, { id: 'doc_number', w: 170, min: 110 }, { id: 'version', w: 80, min: 60 }, { id: 'status', w: 160, min: 110 }, { id: 'task', w: 200, min: 120 },
-  { id: 'uploaded_by', w: 170, min: 110 }, { id: 'uploaded_at', w: 120, min: 100 }, { id: 'approved_by', w: 170, min: 110 }, { id: 'approved_at', w: 120, min: 100 }, { id: 'actions', w: 150, min: 120 }];
+  { id: 'uploaded_by', w: 170, min: 110 }, { id: 'uploaded_at', w: 120, min: 100 }, { id: 'approved_by', w: 170, min: 110 }, { id: 'approved_at', w: 120, min: 100 }, { id: 'signed', w: 110, min: 90 }, { id: 'stamped', w: 110, min: 90 }, { id: 'actions', w: 150, min: 120 }];
 const EMPTY = { q: '', superseded: '' };
 
 /** The preview of an uploaded file (from the existing audited download): images and PDFs in a sandboxed frame, nothing else. */
@@ -130,6 +130,14 @@ function VersionHistory({ row, onClose }: { row: LibraryArchiveRow; onClose: () 
   );
 }
 
+/** 0474: the signed or stamped marker of the current version; "Needed" when the document type asks for it and no version carries it. Informs only. */
+function MarkChip({ yes, needed, label, id }: { yes?: boolean | null; needed?: boolean; label: string; id: string }) {
+  const { t } = useTranslation();
+  if (yes) return <span className="chip bg-doneBg text-doneInk" data-testid={`lib-mark-${id}`}>{label}</span>;
+  if (needed && yes !== null && yes !== undefined) return <span className="chip bg-waitBg text-waitInk" data-testid={`lib-mark-needed-${id}`}>{t('lib.mark_needed')}</span>;
+  return <Empty />;
+}
+
 /** One row of the Archive list. */
 function Row({ r, n, tbl, onPreview, onHistory }: { r: LibraryArchiveRow; n: number; tbl: TableApi; onPreview: (r: LibraryArchiveRow) => void; onHistory: (r: LibraryArchiveRow) => void }) {
   const gate = useDownloadGate();
@@ -152,6 +160,8 @@ function Row({ r, n, tbl, onPreview, onHistory }: { r: LibraryArchiveRow; n: num
       case 'uploaded_at': return r.uploaded_at ? String(r.uploaded_at).slice(0, 10) : <Empty />;
       case 'approved_by': return r.approved_by ? <Trunc text={r.approved_by.display_name} /> : <Empty />;
       case 'approved_at': return r.approved_at ?? <Empty />;
+      case 'signed': return <MarkChip yes={r.signed} needed={r.needs_signature} label={t('docs.signed')} id={`signed-${r.key}`} />;
+      case 'stamped': return <MarkChip yes={r.stamped} needed={r.needs_stamp} label={t('docs.stamped')} id={`stamped-${r.key}`} />;
       default: return (
         <span className="flex items-center gap-1">
           {r.file_id && <Tip text={t('lib.preview_file')}><button type="button" className="btn px-1.5 py-0.5" aria-label={t('lib.preview_file')} data-testid={`lib-row-preview-${r.key}`} onClick={() => onPreview(r)}><Eye size={14} /></button></Tip>}
@@ -205,6 +215,7 @@ export function ArchiveList() {
         site: r.site_code, site_name: r.site_name ?? '', region: r.region_name ?? '', cluster: r.cluster ?? '', doc_type: `${r.doc_code} ${r.doc_name_en}`, doc_number: r.doc_number ?? '',
         version: r.version ? String(r.version) : '', status: t(`lib.status.${r.status}`), task: r.task_code ?? r.register_key ?? '', uploaded_by: r.uploaded_by?.display_name ?? '',
         uploaded_at: r.uploaded_at ? String(r.uploaded_at).slice(0, 10) : '', approved_by: r.approved_by?.display_name ?? '', approved_at: r.approved_at ?? '',
+        signed: r.signed ? t('common.yes') : '', stamped: r.stamped ? t('common.yes') : '',
       } as Record<string, string>)[id] ?? '';
       const blob = new Blob(['\ufeff', toCsv(['#', ...cols.map((c) => label(c.id))], all.map((r, i) => [i + 1, ...cols.map((c) => val(r, c.id))]))], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
