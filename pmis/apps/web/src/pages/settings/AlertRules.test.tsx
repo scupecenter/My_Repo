@@ -118,4 +118,15 @@ describe('Settings, alert rules', () => {
     await u.selectOptions(screen.getByTestId('ar-register'), 'issues');
     expect(screen.getByTestId('ar-field-code')).toBeInTheDocument();
   });
+
+  it('offers the SLA breach kind with a party type, the minimum days late and the minimum late snags', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    await u.click(await screen.findByTestId('ar-new'));
+    await u.selectOptions(screen.getByTestId('ar-kind'), 'sla_breach');
+    expect(screen.getByTestId('ar-min-late-days')).toHaveValue(1);
+    expect(screen.getByTestId('ar-min-snags')).toHaveValue(1);
+    expect(screen.getByTestId('ar-party-type')).toHaveValue('');
+  });
 });

@@ -220,6 +220,30 @@ describe('alert rules (0342)', () => {
   });
 });
 
+describe('sla_breach alert rules (0672)', () => {
+  it('checks its params and fires once per party and week for late snags, with no amount in the text', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const fails = async (run: () => Promise<unknown>, re: RegExp) => { await db.query('SAVEPOINT s'); await expect(run()).rejects.toThrow(re); await db.query('ROLLBACK TO s'); };
+    await fails(() => save(rule(`${PREFIX}-sb1`, { kind: 'sla_breach', params: { party_type: 'nope_type' } }), 'bad'), /party_type/);
+    await fails(() => save(rule(`${PREFIX}-sb2`, { kind: 'sla_breach', params: { min_late_days: 0 } }), 'bad'), /min_late_days/);
+    await fails(() => save(rule(`${PREFIX}-sb3`, { kind: 'sla_breach', params: { min_snags: 'x' } }), 'bad'), /min_snags/);
+    await fails(() => save(rule(`${PREFIX}-sb4`, { kind: 'sla_breach', params: { days: 3 } }), 'bad'), /params/);
+    const party = (await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', true) RETURNING id`, [`${PREFIX} late party`])).rows[0].id as string;
+    const site = await makeSite(db, REGION, { prefix: PREFIX.toUpperCase() });
+    const type = (await db.query('SELECT id FROM snag_types WHERE is_active ORDER BY code LIMIT 1')).rows[0].id as string;
+    await db.query(
+      `INSERT INTO snags (site_id, region_id, snag_type_id, scope, description, raised_by, responsible_party_id, target_date)
+       VALUES ($1, $2, $3, 'TE', 'late one', $4, $5, CURRENT_DATE - 5)`, [site.id, REGION, type, adminId, party]);
+    const r = await save(rule(`${PREFIX}-sla`, { kind: 'sla_breach', params: { party_type: 'cw_contractor', min_late_days: 3, min_snags: 1 }, title_en: 'Late: {{party}}', body_en: '{{snags}} snags, {{days}} days' }), 'add the rule');
+    await db.query(`SELECT alert_rules_run('2031-03-21'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', party)).toBe(1);
+    await db.query(`SELECT alert_rules_run('2031-03-22'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', party)).toBe(1);
+    await db.query('ROLLBACK');
+  });
+});
+
 describe('kpi_threshold alert rules (0348)', () => {
   const kpiRule = (code: string, over: Record<string, unknown> = {}): Record<string, unknown> => rule(code, {
     kind: 'kpi_threshold', params: { kpi: 'sla_breach', op: 'above', value: 5 },
