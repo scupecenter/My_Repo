@@ -314,6 +314,7 @@
   },
   "toast": {
     "done": "Done",
+    "copied": "Copied",
     "close": "Close the message"
   },
   "top": {
@@ -8255,6 +8256,8 @@
     "extras_note": "These switches affect only this browser. Nothing is saved on the server.",
     "extra_copy_link": "Copy-link button in drawers",
     "extra_copy_link_hint": "Shows a button in a task or record drawer that copies the address of that record.",
+    "extra_copy_toast": "\"Copied\" notice on any copy",
+    "extra_copy_toast_hint": "Shows a short \"Copied\" notice when you copy selected text or a cell with Ctrl+C or right-click > Copy. The copied content is not changed.",
     "guard_title": "Unsaved changes",
     "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
     "guard_enabled": "Ask before leaving unsaved changes",

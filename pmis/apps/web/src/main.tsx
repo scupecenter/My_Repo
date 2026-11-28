@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { StepUpProvider } from './components/StepUp';
 import { ToastProvider } from './components/Toast';
+import { CopyToast } from './components/CopyToast';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from './i18n';
 import { applyAppearance, savedAppearance } from './lib/appearance';
 import { applyBrand, savedBrand } from './lib/brands';
@@ -35,6 +36,7 @@ async function boot() {
         <BrowserRouter useTransitions={false}>
           <ToastProvider>
             <StepUpProvider>
+              <CopyToast />
               <App />
             </StepUpProvider>
           </ToastProvider>
