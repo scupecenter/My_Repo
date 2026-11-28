@@ -5459,6 +5459,11 @@
     "range": "Numbers from {{min}} to {{max}}.",
     "order": "Green must not be below amber."
   },
+  "forecastWindow": {
+    "title": "Forecast window",
+    "note": "How many of the last real weeks the progress curve forecast averages the weekly gain over (2 to 12, default 4). A longer window smooths the forecast, a shorter one follows the recent pace. The forecast is drawn from the saved snapshots when the card opens, so nothing stored is recomputed. Own save, reason and audit row.",
+    "weeks": "Weeks averaged"
+  },
   "oldVersions": {
     "archived_title": "Deleted versions (archived)",
     "restore": "Restore version",
