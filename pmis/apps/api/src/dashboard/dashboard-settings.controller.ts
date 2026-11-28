@@ -31,4 +31,26 @@ export class DashboardSettingsController {
     res.setHeader("ETag", etagHeader(r.version));
     return r;
   }
+
+  @Get("dashboard/health-bands")
+  async getBands(
+    @Auth() auth: AuthContext,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.svc.getHealthBands(auth);
+    res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+
+  @Put("dashboard/health-bands")
+  async putBands(
+    @Auth() auth: AuthContext,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.svc.putHealthBands(auth, ifMatch, body);
+    res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
 }

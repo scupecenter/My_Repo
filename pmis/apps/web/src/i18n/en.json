@@ -5290,6 +5290,14 @@
       "weekly_digest": "Weekly digest"
     }
   },
+  "healthBands": {
+    "title": "Health index bands",
+    "note": "The score from which the health index is green and the score from which it is amber. Below amber it is red. The change colours the live index from the save on; the stored weekly and month-end snapshots are not rewritten. Own save, reason and audit row.",
+    "green": "Green from",
+    "amber": "Amber from",
+    "red": "Red below {{amber}}",
+    "invalid": "Green is a whole number from 1 to 100, amber a whole number from 0 to 99, and green must be above amber."
+  },
   "dashSettings": {
     "title": "Dashboard",
     "note": "Global settings of the dashboard: targets, KPI thresholds, and the cards each tab shows and their order. Every save needs a reason, is audited and is versioned. Each user's own layout and saved filters stay in the browser.",

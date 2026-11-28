@@ -7988,6 +7988,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard/health-bands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The health index bands, green and amber (0.15.435)
+         * @description 0.15.435. The setting `dashboard.health_bands`: the score from which the health index is green, the score from which it is amber, red below. Default 85 and 70.
+         *     `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getHealthBands"];
+        /**
+         * Save the health index bands (reason, If-Match, audited)
+         * @description 0.15.435. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field errors (422 `validation_failed`):
+         *     `invalid` (`green` is a whole number from 1 to 100, `amber` from 0 to 99) and `invalid_order` (green must be above amber). One audit row with before and after values and the reason.
+         *     The stored weekly and month-end snapshots are not rewritten.
+         */
+        put: operations["setHealthBands"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/goals": {
         parameters: {
             query?: never;
@@ -19785,6 +19812,19 @@ export interface components {
             };
             /** @description 0.15.29 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value. */
             stale_idle_days?: number;
+        };
+        HealthBandsInput: {
+            /** @description Green from this score. */
+            green: number;
+            /** @description Amber from this score, red below. Must be below green. */
+            amber: number;
+        };
+        /** @description 0.15.435. The setting dashboard.health_bands (default 85 and 70). */
+        HealthBands: components["schemas"]["HealthBandsInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
         };
         /** @description 0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order. */
         DashboardSettings: components["schemas"]["DashboardSettingsInput"] & {
@@ -37196,6 +37236,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getHealthBands: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bands. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthBands"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setHealthBands: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["HealthBandsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthBands"];
                 };
             };
             401: components["responses"]["Unauthorized"];
