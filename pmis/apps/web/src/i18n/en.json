@@ -7876,7 +7876,16 @@
     "critical_finish": "{{count}} open stage(s) set the finish date, {{date}}.",
     "critical_late": "{{days}} day(s) after the baseline finish.",
     "critical_ontime": "{{days}} day(s) ahead of or on the baseline finish.",
-    "critical_driver": "Most delay added by {{name}} ({{days}} day(s))."
+    "critical_driver": "Most delay added by {{name}} ({{days}} day(s)).",
+    "whatif": "What if",
+    "whatif_tip": "Move a stage by some days to see the effect on the finish date. A picture only: nothing is saved and no date changes.",
+    "whatif_stage": "Stage",
+    "whatif_days": "Move by (days)",
+    "whatif_reset": "Reset",
+    "whatif_result": "{{count}} stage(s) move; the finish moves {{shift}} day(s) to {{date}}.",
+    "whatif_conflicts": "{{count}} stage(s) would be dated before the one they wait for.",
+    "whatif_note": "Not saved.",
+    "whatif_ghost": "Where this stage would be"
   },
   "siteActivity": {
     "c_entity": "Entity",

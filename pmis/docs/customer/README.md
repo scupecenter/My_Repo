@@ -28,3 +28,4 @@
 المصادر: `CLAUDE.md`، `CHANGELOG.md`، `docs/adr/`، `docs/spec/`، `db/erd.md`، `contracts/openapi.yaml`، `HANDOVER.md`. الإضافات المقترحة غير المؤكدة مكتوبة فيها «يُؤكَّد لاحقاً».
 | [shortage-draft-purchase-request.md](shortage-draft-purchase-request.md) | Draft purchase request from a material shortage line |
 | [gantt-critical-path.md](gantt-critical-path.md) | Critical path and finish date on the site timeline |
+| [gantt-what-if.md](gantt-what-if.md) | What-if date move on the site timeline (not saved) |

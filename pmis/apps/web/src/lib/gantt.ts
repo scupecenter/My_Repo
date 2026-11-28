@@ -79,3 +79,47 @@ export function pos(model: GanttModel, d: number): number {
   const span = Math.max(model.max - model.min, 1);
   return ((d - model.min) / span) * 100;
 }
+
+export interface WhatIf {
+  code: string;
+  delta: number;
+  /** New day of every row that moves (the chosen stage and the open stages after it). */
+  moved: Record<string, number>;
+  /** The finish day after the move, the days it shifted, and the variance against the last baseline after the move. */
+  finish: number | null;
+  finishShift: number;
+  varianceDays: number | null;
+  /** Codes dated before the stage they wait for after the move (a new order conflict). */
+  conflicts: string[];
+}
+
+/**
+ * What if this stage moved by `delta` days? The stage and every open stage after it move by the same days (each keeps its own duration); a stage that
+ * already has an actual date stays where it is and ends the push. Only a picture on the screen: nothing is saved and no date is changed.
+ */
+export function whatIf(model: GanttModel, code: string, delta: number): WhatIf | null {
+  const i = model.rows.findIndex((r) => r.code === code);
+  const start = model.rows[i];
+  if (!start || rowDay(start) === null || start.actual !== null) return null;
+  const moved: Record<string, number> = {};
+  for (let k = i; k < model.rows.length; k += 1) {
+    const r = model.rows[k]!;
+    const d = rowDay(r);
+    if (d === null) continue;
+    if (r.actual !== null) break;
+    moved[r.code] = d + delta;
+  }
+  const dayOf = (r: GanttRow): number | null => moved[r.code] ?? rowDay(r);
+  const dated = model.rows.filter((r) => dayOf(r) !== null);
+  const last = dated[dated.length - 1];
+  const finish = last ? dayOf(last) : null;
+  const conflicts: string[] = [];
+  for (let k = 1; k < dated.length; k += 1) if (dayOf(dated[k]!)! < dayOf(dated[k - 1]!)!) conflicts.push(dated[k]!.code);
+  const base = model.critical.baselineFinish;
+  return {
+    code, delta, moved, finish,
+    finishShift: finish !== null && model.critical.finish !== null ? finish - model.critical.finish : 0,
+    varianceDays: finish !== null && base !== null ? finish - base : null,
+    conflicts,
+  };
+}

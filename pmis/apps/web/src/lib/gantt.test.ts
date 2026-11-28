@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGantt, pos } from './gantt';
+import { buildGantt, pos, whatIf } from './gantt';
 
 const n = (code: string, state: string, b?: string, p?: string, a?: string) => ({ code, kind: 'milestone', name_en: code, state, baseline_date: b, planned_date: p, actual_date: a }) as never;
 
@@ -58,5 +58,33 @@ describe('critical path', () => {
     expect(c.codes).toEqual([]);
     expect(c.driver).toBeNull();
     expect(c.varianceDays).toBeNull();
+  });
+});
+
+describe('what if', () => {
+  const m = buildGantt([
+    n('A', 'done', '2026-01-01', undefined, '2026-01-05'),
+    n('B', 'planned', '2026-01-10', '2026-01-25'),
+    n('C', 'planned', '2026-01-20', '2026-02-01'),
+    n('D', 'planned', '2026-02-10', '2026-02-12'),
+  ])!;
+  it('moves the stage and the open stages after it by the same days and shifts the finish', () => {
+    const w = whatIf(m, 'B', 7)!;
+    expect(Object.keys(w.moved)).toEqual(['B', 'C', 'D']);
+    expect(w.finishShift).toBe(7);
+    expect(w.varianceDays).toBe(9);
+    expect(w.conflicts).toEqual([]);
+  });
+  it('pulls the finish earlier with a negative move', () => {
+    expect(whatIf(m, 'C', -5)!.finishShift).toBe(-5);
+  });
+  it('a stage already done cannot be moved, and a done stage after the chosen one stops the push', () => {
+    expect(whatIf(m, 'A', 3)).toBeNull();
+    const m2 = buildGantt([n('B', 'planned', undefined, '2026-01-25'), n('C', 'done', undefined, undefined, '2026-02-01'), n('D', 'planned', undefined, '2026-02-12')])!;
+    expect(Object.keys(whatIf(m2, 'B', 4)!.moved)).toEqual(['B']);
+  });
+  it('flags a new order conflict when a stage is moved past the one after a finished stage', () => {
+    const m3 = buildGantt([n('B', 'planned', undefined, '2026-01-25'), n('C', 'done', undefined, undefined, '2026-02-01')])!;
+    expect(whatIf(m3, 'B', 10)!.conflicts).toEqual(['C']);
   });
 });
