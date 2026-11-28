@@ -144,6 +144,8 @@ import { ExportLockInterceptor } from './security/export-lock';
 import { UiIdentityService } from './settings/ui-identity.service';
 import { LoginPageController } from './settings/login-page.controller';
 import { LoginPageService } from './settings/login-page.service';
+import { DataQualityController } from './data-quality/data-quality.controller';
+import { DataQualityService } from './data-quality/data-quality.service';
 import { MediaController } from './media/media.controller';
 import { MediaService } from './media/media.service';
 import { SettingsScreensController } from './settings/settings-screens.controller';
@@ -254,6 +256,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
 DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController, OpsLimitsController,
       PartialCreditController, // 0.15.269 progress standards
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
+      DataQualityController, // 0.15.538
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
       PasskeySettingController, PasskeyController, // S4
@@ -289,6 +292,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
 DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
       PartialCreditService, // 0.15.269 progress standards
       MediaService, // 0.15.292
+      DataQualityService, // 0.15.538
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)
       PasskeyService, // S4

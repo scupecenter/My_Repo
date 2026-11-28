@@ -443,6 +443,10 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/ops-limits'],
   ['get', '/settings/login-page/public'],
   // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
+  // Contract 0.15.538 (migration 0476): the Data quality report and its settings.
+  ['get', '/settings/data-quality'],
+  ['put', '/settings/data-quality'],
+  ['get', '/reports/data-quality'],
   ['get', '/media/settings'],
   ['put', '/media/settings'],
   ['get', '/media/items'],

@@ -32,6 +32,7 @@ info:
 
     ## Versions
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.538 (2026-11-28): the read-only Data quality report (D3; migration 0476, mirror `db/sql/475_data_quality_report.sql`): `GET /reports/data-quality` (five checks: required site fields empty, task dates out of order, sites without a contractor on any task, orphan id columns, missing photo slots) and `GET`/`PUT /settings/data-quality` (setting `data_quality.report`, audited `data_quality_update`). It writes nothing, reads with the regions of the caller and returns no field values. Additive: one setting, four functions, no table, no reset-plan change.
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
     - 0.15.407 (2026-11-27): the Daily Plan template, hardening layer 3b (migration 0564, mirror `db/sql/563_daily_plan_template.sql`). Additive. (1) `Template.template_kind` lists `daily_plan`: `TPL-DAILY-PLAN`, downloaded with `GET /templates/TPL-DAILY-PLAN/download` (blank, or with `date` and `region_id` filled with the plan as the caller sees it). (2) `POST /daily-plans/import` (`importDailyPlan`): the template only, applied at once and all or nothing through the doors of the screen (`dp_add_site`, `dp_save_row`, `dp_remove_site`), so rights, region, lock and audit apply per row; one refused row refuses the file (`errors[]` at `/rows/<line>/<field>`); other files are 422 `template_rejected`. The editable parts are the manual values, Reason, Remark, sites added or removed by hand; Site name and Region are ignored. The Permits sub-streams and Procurement-HLC are covered by the existing templates (round-trip tests added).
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
@@ -10647,6 +10648,68 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/data-quality:
+    get:
+      tags: [settings]
+      operationId: getDataQualitySettings
+      summary: The Data quality report settings (0.15.538)
+      description: Every signed-in user may read them (the report screen uses them). `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit.
+      x-db-path: data_quality_state
+      responses:
+        '200':
+          description: The settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataQualitySettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setDataQualitySettings
+      summary: Set the Data quality report settings (reason, step-up, If-Match, audited) (0.15.538)
+      description: A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and values outside the closed lists are 422. One audit row `data_quality_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_data_quality
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DataQualitySettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataQualitySettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /reports/data-quality:
+    get:
+      tags: [reports]
+      operationId: getDataQualityReport
+      summary: The read-only Data quality report (0.15.538)
+      description: Needs the `sites` view and reads only the regions of the caller. Writes nothing. Rows name the site and what is wrong, never a field value. The `orphan_ids` check (constraint names and counts) needs a settings viewer, else 403. Each check is switched on in the settings; `max_rows` caps the rows of a check and `truncated` says more exist.
+      parameters:
+      - {name: check, in: query, schema: {type: string, enum: [site_required_empty, dates_out_of_order, site_without_contractor, orphan_ids, missing_photos]}}
+      - {name: region_id, in: query, schema: {type: integer}}
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataQualityReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /media/items:
     get:
       tags: [media]
@@ -26702,6 +26765,47 @@ components:
         quality: { type: integer, minimum: 40, maximum: 95 }
         format: { type: string, enum: [webp, jpeg] }
         max_source_mb: { type: integer, minimum: 1, maximum: 200 }
+    DataQualitySettings:
+      type: object
+      description: '0.15.538. Setting `data_quality.report` (migration 0476).'
+      required: [enabled, checks, required_site_fields, max_rows, version, can_edit]
+      properties:
+        enabled: { type: boolean }
+        checks: { type: array, items: { type: string, enum: [site_required_empty, dates_out_of_order, site_without_contractor, orphan_ids, missing_photos] } }
+        required_site_fields: { type: array, items: { type: string, enum: [name_ar, latitude, longitude, address, site_type, site_scenario, sub_region, cluster_id, rf_survey_date, acquisition_date, project_phase] } }
+        max_rows: { type: integer, minimum: 10, maximum: 500 }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    DataQualitySettingsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [enabled, checks, required_site_fields, max_rows]
+          additionalProperties: false
+          properties:
+            reason: { type: string }
+            enabled: { type: boolean }
+            checks: { type: array, items: { type: string } }
+            required_site_fields: { type: array, items: { type: string } }
+            max_rows: { type: integer }
+    DataQualityReport:
+      type: object
+      required: [enabled, max_rows, checks]
+      properties:
+        enabled: { type: boolean }
+        max_rows: { type: integer }
+        checks:
+          type: array
+          items:
+            type: object
+            required: [check, count, truncated, rows]
+            properties:
+              check: { type: string, enum: [site_required_empty, dates_out_of_order, site_without_contractor, orphan_ids, missing_photos] }
+              count: { type: integer }
+              truncated: { type: boolean }
+              rows: { type: array, items: { type: object, additionalProperties: true } }
     MediaSettings:
       type: object
       description: '0.15.292. Setting `media.gallery` (migration 0396).'
