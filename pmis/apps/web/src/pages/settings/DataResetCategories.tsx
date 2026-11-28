@@ -30,9 +30,15 @@ export function CategoryPicker({ catalogue, chosen, setChosen }: { catalogue: Da
   const regs = registerParts(catalogue);
   const toggleMany = (codes: string[], on: boolean) => setChosen(on ? [...new Set([...chosen, ...codes])] : chosen.filter((c) => !codes.includes(c)));
   const regsChosen = regs.filter((p) => chosen.includes(p.code));
+  // Select all: every category and every register of the dropdown (never the audit log; master data parts are not in the dropdown, so they stay off unless ticked)
+  const allCodes = [...new Set([...regs.map((p) => p.code), ...CATEGORIES.flatMap((c) => inCategory(c, catalogue))])];
+  const allOn = allCodes.length > 0 && allCodes.every((x) => chosen.includes(x));
   return (
     <div className="space-y-2 rounded-md bg-card2 p-3" data-testid="dr-cats">
       <h4 className="text-sm font-semibold">{t('dr.cats_title')}</h4>
+      <label className="flex items-center gap-2 text-sm font-semibold" data-testid="dr-cat-all-row">
+        <input type="checkbox" data-testid="dr-cat-all" checked={allOn} onChange={(e) => toggleMany(allCodes, e.target.checked)} />{t('dr.cat_all')}
+      </label>
       <details className="rounded-md border border-line bg-card p-2" data-testid="dr-cat-registers">
         <summary className="cursor-pointer text-sm font-semibold" data-testid="dr-cat-registers-summary">
           {t('dr.cat_registers')}{regsChosen.length > 0 ? ` (${t('dr.cat_registers_n', { count: regsChosen.length })})` : ''}

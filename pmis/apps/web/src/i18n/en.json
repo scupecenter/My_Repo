@@ -7115,6 +7115,7 @@
     "cat_alerts_notifications": "Alerts and notification log",
     "cat_alerts_notifications_hint": "Notifications in the inbox and follows.",
     "cat_other": "Other parts",
+    "cat_all": "Select all categories (not the audit log)",
     "cat_audit": "Audit log",
     "cat_audit_locked": "Never deleted by a reset. The audit log and the security log are kept as tamper-proof evidence, and every reset is recorded in them (who, when, what).",
     "confirm_title": "Confirm the reset",

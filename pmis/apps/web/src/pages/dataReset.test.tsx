@@ -326,6 +326,11 @@ describe('Settings, data reset, categories (owner request 2026-11-28)', () => {
     await u.click(await screen.findByTestId('dr-scope-custom'));
     expect(screen.getByTestId('dr-cat-audit')).toHaveTextContent(en.dr.cat_audit_locked);
     expect(screen.queryByTestId('dr-cat-audit')?.querySelector('input')).toBeNull();   // never a choice
+    await u.click(screen.getByTestId('dr-cat-all'));
+    expect(screen.getByTestId('dr-cat-daily_status')).toBeChecked();
+    expect(screen.getByTestId('dr-cat-reg-issues')).toBeChecked();
+    await u.click(screen.getByTestId('dr-cat-all'));
+    expect(screen.getByTestId('dr-cat-daily_status')).not.toBeChecked();
     await u.click(screen.getByTestId('dr-cat-daily_status'));
     expect(screen.getByTestId('dr-part-daily_plan')).toBeChecked();
     expect(screen.getByTestId('dr-part-kpi')).toBeChecked();
