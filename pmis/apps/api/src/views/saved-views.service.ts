@@ -32,6 +32,7 @@ const columnsSchema = z.object({
     align: z.enum(['start', 'center']).optional(),
     wrap: z.boolean().optional(),
     zebra: z.boolean().optional(),
+    groupbar: z.boolean().optional(),
   }).strict().optional(),
 }).strict();
 const sortSchema = z.array(z.object({ id: colId, dir: z.enum(['asc', 'desc']) }).strict()).max(5);
