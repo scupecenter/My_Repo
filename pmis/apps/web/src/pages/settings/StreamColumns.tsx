@@ -48,7 +48,7 @@ export function StreamColumns({ menu }: { menu: StreamMenu }) {
               {cols.map((col) => (
                 <tr key={col.ord} className={`border-t border-line ${col.is_active ? '' : 'opacity-60'}`} data-testid={`stream-col-row-${col.letter}`}>
                   <td className="mono p-2" dir="ltr">{col.letter}</td>
-                  <td className="p-2">{colName(col, ar)}{col.is_protected && <span className="chip ms-2" title={col.protected_reason ?? undefined}>{t('studio.columns.protected')}</span>}</td>
+                  <td className="p-2">{colName(col, ar)}{col.is_protected && <span className="chip ms-2" title={col.protected_reason ?? t('studio.columns.protected_why')}>{t('studio.columns.protected')}</span>}</td>
                   <td className="p-2">{t(`studio.columns.type_${col.value_type}`)}</td>
                   <td className="p-2">{col.value_type === 'list' ? listName(col.list_catalogue) : ''}</td>
                   <td className="p-2">{t(col.is_active ? 'regcols.active' : 'regcols.inactive')}</td>
