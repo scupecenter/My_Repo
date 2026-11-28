@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { headersMatchWithAliases } from './header-aliases';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
@@ -71,7 +72,7 @@ interface BatchRow {
   historical_marked_by: string | null;
   historical_marked_at: Date | null;
   import_notes: { code: string; count: number }[] | null;
-  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint; c_admin_approved: bigint; c_incomplete: bigint; c_duplicate: bigint;
+  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint; c_admin_approved: bigint; c_incomplete: bigint; c_duplicate: bigint; c_overridden: bigint;
   progress: Record<string, unknown> | null;
   ts: string;
 }
@@ -148,6 +149,12 @@ interface ErrorReportRow {
 
 @Injectable()
 export class ImportService {
+  /** 0640: the alternative names of the columns of a register, by column code (empty when none has any). */
+  private async aliasesOf(registerKey: string): Promise<Map<string, string[]>> {
+    const rows = await this.db.tx.$queryRaw<{ code: string; import_aliases: string[] }[]>`SELECT code, import_aliases FROM register_fields WHERE register_key = ${registerKey} AND cardinality(import_aliases) > 0`;
+    return new Map(rows.map((r) => [r.code, r.import_aliases]));
+  }
+
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
@@ -265,7 +272,10 @@ export class ImportService {
     for (let i = cols.length + 1; i <= Math.max(ws.getRow(1).cellCount, cols.length + 1); i++) if (this.text(ws.getRow(1).getCell(i))) extra = true;
     const sum = sha256(headers.join(unitSeparator));
     const claimed = kv.get('header_checksum');
-    if (extra || sum !== issued.header_checksum || (claimed !== undefined && claimed !== issued.header_checksum)) {
+    // 0640: a header that is an alternative name of its column is that column (the labels were not changed, only the way a person wrote them)
+    const viaAlias = !extra && sum !== issued.header_checksum && (claimed === undefined || claimed === issued.header_checksum) && current.kind === 'register' && !!current.register_key
+      && headersMatchWithAliases(cols, headers, await this.aliasesOf(current.register_key));
+    if (!viaAlias && (extra || sum !== issued.header_checksum || (claimed !== undefined && claimed !== issued.header_checksum))) {
       return this.reject(auth, requestId, 'checksum_mismatch', 'The header row of the file was changed. Use the template as it was issued, without adding, moving or renaming columns.', ctx);
     }
 
@@ -444,7 +454,7 @@ export class ImportService {
     const max = importMaxRows();
     const warnings: UploadWarning[] = [];
     const staged: { sheet: string; header_checksum: string; rows: unknown[] }[] = [];
-    const helper = new Set([TPL_SHEET, LISTS_SHEET, 'Instructions', 'Columns']);
+    const helper = new Set([TPL_SHEET, LISTS_SHEET, 'Instructions', 'Columns', 'Structure']);
     for (const ws of wb.worksheets) {
       if (helper.has(ws.name)) continue;
       const part = parts.find((p) => p.sheet === ws.name);
@@ -699,7 +709,7 @@ export class ImportService {
         (k.cnt ->> 'c_create')::bigint AS c_create, (k.cnt ->> 'c_update')::bigint AS c_update, (k.cnt ->> 'c_unchanged')::bigint AS c_unchanged,
         (k.cnt ->> 'c_error')::bigint AS c_error, (k.cnt ->> 'c_pending')::bigint AS c_pending, (k.cnt ->> 'c_approved')::bigint AS c_approved,
         (k.cnt ->> 'c_rejected')::bigint AS c_rejected, (k.cnt ->> 'c_held')::bigint AS c_held, (k.cnt ->> 'c_saved')::bigint AS c_saved,
-        (k.cnt ->> 'c_admin_approved')::bigint AS c_admin_approved, coalesce((k.cnt ->> 'c_duplicate')::bigint, 0) AS c_duplicate, (k.cnt ->> 'c_incomplete')::bigint AS c_incomplete,
+        (k.cnt ->> 'c_admin_approved')::bigint AS c_admin_approved, coalesce((k.cnt ->> 'c_duplicate')::bigint, 0) AS c_duplicate, coalesce((k.cnt ->> 'c_overridden')::bigint, 0) AS c_overridden, (k.cnt ->> 'c_incomplete')::bigint AS c_incomplete,
         imp_batch_job_json(p.id::uuid) AS progress
       FROM (
         SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, b.uploaded_by::text AS uploaded_by, b.created_at,
@@ -742,7 +752,7 @@ export class ImportService {
         counts: {
           create: Number(r.c_create), update: Number(r.c_update), unchanged: Number(r.c_unchanged), error: Number(r.c_error),
           pending: Number(r.c_pending), approved: Number(r.c_approved), rejected: Number(r.c_rejected), held: Number(r.c_held), saved: Number(r.c_saved),
-          admin_approved: Number(r.c_admin_approved), incomplete: Number(r.c_incomplete), duplicate: Number(r.c_duplicate),
+          admin_approved: Number(r.c_admin_approved), incomplete: Number(r.c_incomplete), duplicate: Number(r.c_duplicate), overridden: Number(r.c_overridden),
         },
         mode: r.mode,
         file_template_version: r.file_template_version,

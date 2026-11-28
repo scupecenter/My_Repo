@@ -28,11 +28,16 @@ interface Form {
   body_ar: string;
   link: string;
   enabled: boolean;
+  kpi: string;
+  op: string;
+  value: string;
+  locked: boolean;
 }
 
 const EMPTY: Form = {
   id: null, version: 0, code: '', kind: 'weekly_status_missing', register_key: '', state: '', days: '7',
   audience: 'system_admin', module: '', title_en: '', title_ar: '', body_en: '', body_ar: '', link: '', enabled: true,
+  kpi: '', op: 'above', value: '', locked: false,
 };
 
 const toForm = (r: AlertRule): Form => ({
@@ -40,16 +45,20 @@ const toForm = (r: AlertRule): Form => ({
   register_key: String(r.params.register_key ?? ''), state: String(r.params.state ?? ''), days: String(r.params.days ?? '7'),
   audience: String(r.audience.type ?? 'system_admin'), module: String(r.audience.module ?? ''),
   title_en: r.title_en, title_ar: r.title_ar, body_en: r.body_en, body_ar: r.body_ar, link: r.link ?? '', enabled: r.enabled,
+  kpi: String(r.params.kpi ?? ''), op: String(r.params.op ?? 'above'), value: r.params.value === undefined ? '' : String(r.params.value), locked: r.locked,
 });
 
 const toBody = (f: Form): AlertRuleInput => ({
   code: f.code.trim(),
   kind: f.kind as AlertRuleInput['kind'],
-  params: f.kind === 'record_idle' ? { register_key: f.register_key, state: f.state.trim(), days: Number(f.days) } : {},
+  params: f.kind === 'record_idle' ? { register_key: f.register_key, state: f.state.trim(), days: Number(f.days) }
+    : (f.kind === 'advance_unsettled' || f.kind === 'invoice_due_soon') && f.days.trim() !== '' ? { days: Number(f.days) }
+    : f.kind === 'kpi_threshold' ? { kpi: f.kpi, op: f.op, value: Number(f.value) } : {},
   audience: f.audience === 'module' ? { type: 'module', module: f.module } : { type: 'system_admin' },
   title_en: f.title_en.trim(), title_ar: f.title_ar.trim(), body_en: f.body_en.trim(), body_ar: f.body_ar.trim(),
   link: f.link.trim() === '' ? null : f.link.trim(),
   enabled: f.enabled,
+  locked: f.locked,
 });
 
 export function AlertRules() {
@@ -69,13 +78,16 @@ export function AlertRules() {
   const kindDef = catalogue.kinds.find((k) => k.kind === v?.kind);
   const bad = !v || v.code.trim().length < 2
     || (v.kind === 'record_idle' && (v.register_key === '' || v.state.trim() === '' || !/^[0-9]+$/.test(v.days) || Number(v.days) < 1 || Number(v.days) > 3650))
+    || ((v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && v.days.trim() !== '' && (!/^[0-9]+$/.test(v.days) || Number(v.days) > 365 || (v.kind === 'advance_unsettled' && Number(v.days) < 1)))
+    || (v.kind === 'kpi_threshold' && (v.kpi === '' || v.value.trim() === '' || isNaN(Number(v.value)) || Number(v.value) < 0 || Number(v.value) > 100000))
     || (v.audience === 'module' && v.module === '')
     || v.title_en.trim() === '' || v.title_ar.trim() === '' || v.body_en.trim() === '' || v.body_ar.trim() === '';
   const fe = (p: string) => errs[p] ? <p role="alert" className="text-xs text-lateInk">{t(`fieldError.${errs[p]}`, { defaultValue: errs[p] })}</p> : null;
   const save = (reason: string) => {
     if (!v) return;
-    if (v.id) update.mutate({ id: v.id, version: v.version, body: { ...toBody(v), reason } }, { onSuccess: () => { toast(t('settings.audited')); setAskReason(false); setF(null); } });
-    else create.mutate({ ...toBody(v), reason }, { onSuccess: () => { toast(t('settings.audited')); setAskReason(false); setF(null); } });
+    // on a field error the dialog closes so the error shows at its field in the form (a modal would hide it)
+    if (v.id) update.mutate({ id: v.id, version: v.version, body: { ...toBody(v), reason } }, { onSuccess: () => { toast(t('settings.audited')); setAskReason(false); setF(null); }, onError: () => setAskReason(false) });
+    else create.mutate({ ...toBody(v), reason }, { onSuccess: () => { toast(t('settings.audited')); setAskReason(false); setF(null); }, onError: () => setAskReason(false) });
   };
   return (
     <section className="card space-y-3 p-4" data-testid="page-alert-rules">
@@ -87,6 +99,7 @@ export function AlertRules() {
           <th className="p-1 text-start">{t('alertRules.col_kind')}</th>
           <th className="p-1 text-start">{t('alertRules.col_title')}</th>
           <th className="p-1 text-start">{t('alertRules.col_enabled')}</th>
+          <th className="p-1 text-start">{t('alertRules.col_locked')}</th>
           <th className="p-1" />
         </tr></thead>
         <tbody>
@@ -96,10 +109,11 @@ export function AlertRules() {
               <td className="p-1">{t(`alertRules.kind_${r.kind}`)}</td>
               <td className="p-1">{i18n.language === 'ar' ? r.title_ar : r.title_en}</td>
               <td className="p-1">{r.enabled ? t('common.yes') : t('common.no')}</td>
+              <td className="p-1">{r.locked ? t('common.yes') : t('common.no')}</td>
               <td className="p-1"><button className="btn" data-testid={`ar-edit-${r.code}`} onClick={() => setF(toForm(r))}>{t('common.edit')}</button></td>
             </tr>
           ))}
-          {rules.length === 0 && <tr><td colSpan={5} className="p-2 text-center text-mute" data-testid="ar-empty">{t('alertRules.empty')}</td></tr>}
+          {rules.length === 0 && <tr><td colSpan={6} className="p-2 text-center text-mute" data-testid="ar-empty">{t('alertRules.empty')}</td></tr>}
         </tbody>
       </table>
       {!v && <button className="btn btn-accent" data-testid="ar-new" onClick={() => setF(EMPTY)}>{t('alertRules.new')}</button>}
@@ -140,6 +154,26 @@ export function AlertRules() {
                 <input type="number" min={1} max={3650} className="input mt-1 w-28 font-normal" data-testid="ar-days" value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
             </div>
           )}
+          {(v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && (
+            <label className="block text-sm font-semibold">{t('alertRules.days')}
+              <input type="number" min={v.kind === 'advance_unsettled' ? 1 : 0} max={365} className="input mt-1 w-28 font-normal" data-testid="ar-days" placeholder={v.kind === 'advance_unsettled' ? t('alertRules.days_hub') : '7'} value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
+          )}
+          {v.kind === 'kpi_threshold' && (
+            <div className="flex flex-wrap gap-3">
+              <label className="text-sm font-semibold">{t('alertRules.kpi')}
+                <select className="input mt-1 font-normal" data-testid="ar-kpi" value={v.kpi} onChange={(e) => setF({ ...v, kpi: e.target.value })}>
+                  <option value="">{t('registers.choose')}</option>
+                  {catalogue.kpis.map((k) => <option key={k.code} value={k.code}>{i18n.language === 'ar' ? k.label_ar : k.label_en} ({k.unit})</option>)}
+                </select></label>
+              <label className="text-sm font-semibold">{t('alertRules.op')}
+                <select className="input mt-1 font-normal" data-testid="ar-op" value={v.op} onChange={(e) => setF({ ...v, op: e.target.value })}>
+                  <option value="above">{t('alertRules.op_above')}</option>
+                  <option value="below">{t('alertRules.op_below')}</option>
+                </select></label>
+              <label className="text-sm font-semibold">{t('alertRules.value')}
+                <input type="number" min={0} max={100000} step="any" className="input mt-1 w-28 font-normal" data-testid="ar-value" value={v.value} onChange={(e) => setF({ ...v, value: e.target.value })} /></label>
+            </div>
+          )}
           {kindDef && <p className="text-xs text-mute">{t(`alertRules.kind_${v.kind}_help`)}</p>}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-sm font-semibold">{t('alertRules.title_en')}
@@ -156,8 +190,10 @@ export function AlertRules() {
               <input className="input mt-1 w-64 font-normal" data-testid="ar-link" dir="ltr" placeholder="/registers/issues" value={v.link} onChange={(e) => setF({ ...v, link: e.target.value })} /></label>
             <label className="mt-5 flex items-center gap-2 text-sm font-semibold">
               <input type="checkbox" data-testid="ar-enabled" checked={v.enabled} onChange={(e) => setF({ ...v, enabled: e.target.checked })} />{t('alertRules.enabled')}</label>
+            <label className="mt-5 flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" data-testid="ar-locked" checked={v.locked} onChange={(e) => setF({ ...v, locked: e.target.checked })} />{t('alertRules.locked')}</label>
           </div>
-          {['/code', '/kind', '/params/register_key', '/params/state', '/params/days', '/audience', '/title_en', '/title_ar', '/body_en', '/body_ar', '/link'].map((p) => <span key={p}>{fe(p)}</span>)}
+          {['/code', '/kind', '/params/register_key', '/params/state', '/params/days', '/params/kpi', '/params/op', '/params/value', '/audience', '/title_en', '/title_ar', '/body_en', '/body_ar', '/link', '/locked'].map((p) => <span key={p}>{fe(p)}</span>)}
           <div className="flex gap-2">
             <button className="btn btn-accent" data-testid="ar-save" disabled={bad || busy} onClick={() => setAskReason(true)}>{t('common.save')}</button>
             <button className="btn" data-testid="ar-cancel" onClick={() => setF(null)}>{t('common.cancel')}</button>
