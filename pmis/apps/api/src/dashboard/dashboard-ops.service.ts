@@ -595,7 +595,7 @@ export class DashboardOpsService {
              proc.id AS assignment_id, coalesce(proc.done, false) AS assignment_done,
              coalesce(adv.data ->> 'amounts_hidden', 'false') = 'true' AS amounts_hidden
       FROM adv CROSS JOIN num LEFT JOIN proc ON proc.id = adv.data ->> 'procurement_record_id'`);
-    // 0.15.369: the invoices register (latest approved version of each invoice), in the same regions
+    // 0.15.532: the invoices register (latest approved version of each invoice), in the same regions
     const inv = await this.db.tx.$queryRaw<InvoiceRow[]>(Prisma.sql`
       SELECT i.data ->> 'invoice_state' AS state,
              CASE WHEN i.data ->> 'invoice_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN (CURRENT_DATE - (i.data ->> 'invoice_date')::date)::int END AS days_since_invoice,

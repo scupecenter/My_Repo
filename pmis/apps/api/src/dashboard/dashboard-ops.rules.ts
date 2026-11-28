@@ -375,7 +375,7 @@ export interface FinanceSummary {
   advances: { total: number; open: number; hidden_amounts: number };
   amounts: { approved: number; disbursed: number; returned: number; open_disbursed: number };
   open_aging: AgeBuckets;
-  /** 0.15.369: the invoices register, when it has records. */
+  /** 0.15.532: the invoices register, when it has records. */
   invoices: InvoiceAges | null;
   achievement: {
     assignments: number;
