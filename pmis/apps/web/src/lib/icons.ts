@@ -1,5 +1,5 @@
 import { Archive, FileSignature, CalendarCheck, Activity, BellRing, ClipboardList, GitCommitHorizontal, History, PackageCheck, BadgeCheck, BarChart3, Bell, Flag, Gauge, Cable, CalendarDays, CircleAlert, Eye, FileText, GitPullRequest, HardHat, Home, Inbox, KeyRound, Mail, ShieldAlert, Landmark, LayoutGrid, Megaphone, MessageSquare, Radio, Link2, Wallet, Rocket, Ruler, ScrollText, Settings, ShieldCheck, ShoppingCart, Table2, TriangleAlert, Users, Users2, UsersRound, UserX, Warehouse, Wrench, Zap, type LucideIcon } from 'lucide-react';
-import { Columns3, Database, DatabaseZap, Download, FileDown, FileSpreadsheet, FileUp, GitCompare, HeartPulse, Hourglass, Layers, List, Lock, RefreshCw, Rows3, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Camera, Columns3, Database, DatabaseZap, Download, FileDown, FileSpreadsheet, FileUp, GitCompare, HeartPulse, Hourglass, Layers, List, Lock, RefreshCw, Rows3, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 /** One Lucide icon per concept (plan 2.12). Screens ask for a concept, never import an icon ad hoc. */
 export const ICONS = {
@@ -8,6 +8,7 @@ export const ICONS = {
   contractor: Users2, quality: BadgeCheck, issue: CircleAlert, change: GitPullRequest, handover: Rocket, asbuilt: Ruler, meeting: CalendarDays, rf: Radio, acquisition: Landmark,
   forms: FileSignature, archive: Archive, dailyPlan: CalendarCheck, inbox: Bell, workload: Gauge, weekly: Flag, people: Users, role: KeyRound, group: UsersRound, delegation: ShieldCheck, absence: UserX, matrix: Table2, settings: Settings, securityLog: ScrollText, online: Activity, audit: Eye, fieldChanges: History, alerts: BellRing, jobRuns: GitCommitHorizontal, deployments: PackageCheck, report: ClipboardList, integrity: ShieldAlert, mail: Mail,
   // the Data hub (owner decision 2026-11-27)
+  camera: Camera,
   dataHub: Database, template: FileSpreadsheet, upload: FileUp, downloadFile: FileDown, exportData: Download, columnMap: Columns3, compare: GitCompare, dataReset: DatabaseZap,
   recycleBin: Trash2, dataHealth: HeartPulse, batches: Layers, waiting: Hourglass, locked: Lock, templateChanged: RefreshCw, viewCards: LayoutGrid, viewRows: Rows3, viewTable: Table2,
   viewCompact: List, tune: SlidersHorizontal,

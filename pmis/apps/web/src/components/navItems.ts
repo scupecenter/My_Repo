@@ -51,6 +51,8 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'wor
   { key: 'admin.groups', to: '/admin/groups', icon: 'group', group: 'admin' },
   { key: 'admin.delegation', to: '/admin/delegation', icon: 'delegation', group: 'admin' },
   { key: 'absence', to: '/absence', icon: 'absence', group: 'work' },
+  // 0411: Work > Field mode (the narrow offline screen of the site teams; the entry shows only while the setting is on)
+  { key: 'field', to: '/field', icon: 'camera', group: 'work' },
   { key: 'admin.matrix', to: '/admin/matrix', icon: 'matrix', group: 'admin' },
   { key: 'admin.settings', to: '/admin/settings', icon: 'settings', group: 'admin' },
   { key: 'admin.online', to: '/admin/online', icon: 'online', group: 'admin' },
@@ -73,7 +75,7 @@ export const BY_GRANT: Record<string, string> = {
   'admin.security_log': 'view_security_log', 'admin.online': 'manage_users', audit: 'view_audit', 'logs.field_changes': 'view_audit', 'logs.activity_report': 'view_audit',
 };
 /** Entries shown when the caller may use any one of these modules (0.12.9, P4b: the contractors reports and the read-only match table, Q147). */
-export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'], data_hub: ['templates'], finance_hub: ['financial_advances', 'invoices'], column_mapping: ['templates'] };
+export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'], data_hub: ['templates'], finance_hub: ['financial_advances', 'invoices'], column_mapping: ['templates'], field: ['my_work'] };
 /**
  * Entries opened by `view` on a module that is not a screen of the server's module list (the rule of the API: a System Admin, or view on the module; a full
  * delegation holds view on every module). The System Log (owner request 2026-11-09): GET /system-log answers 403 to anyone else (log_can_read_ops).

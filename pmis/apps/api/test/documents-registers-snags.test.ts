@@ -367,6 +367,24 @@ describe('Q132: QC snag photos', () => {
     expect((await q(`SELECT 1 FROM audit_log WHERE action = 'snag_photo_upload' AND entity_id = $1`, [id]))).toHaveLength(3);
   });
 
+  it('0411 field PWA: a queued photo replayed with the same Idempotency-Key returns the first answer (one photo); another body under that key is refused', async () => {
+    const { e, a, site } = await snagTeam();
+    const r = await a.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, scope: 'CW', title: 'Replay check', severity: 'MINOR' });
+    expect(r.status).toBe(201);
+    const id = r.body.id as string;
+    const buf = jpegWithExif(null);
+    const key = 'field-replay-key-0001';
+    const first = await photo(e, id, buf, 'wide').set('Idempotency-Key', key);
+    expect(first.status).toBe(201);
+    const again = await photo(e, id, buf, 'wide').set('Idempotency-Key', key);
+    expect(again.status).toBe(201);
+    expect(again.body.id).toBe(first.body.id);
+    expect((await q(`SELECT 1 FROM snag_photos WHERE snag_id = $1`, [id]))).toHaveLength(1);
+    const other = await photo(e, id, buf, 'close').set('Idempotency-Key', key);
+    expect(other.status).toBe(422);
+    expect((await photo(e, id, buf, 'close').set('Idempotency-Key', 'short')).status).toBe(422);
+  });
+
   it('an open CW snag blocks CW PAC; L2 rejects with a note (back to L1), L1 resubmits, L2 approval closes the snag and the PAC is no longer blocked', async () => {
     const { e, a, site } = await snagTeam();
     const pac = await makeTask(db, site, 'B13', 'entry', { actualDate: '2026-01-05' });

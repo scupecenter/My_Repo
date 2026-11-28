@@ -1620,6 +1620,13 @@ export const settingsHandlers = [
           if (!['templates', 'uploads', 'exports', 'master_import'].includes(k)) errs.push({ path: `${path}/default_view/${k}`, code: 'unknown_key' });
           else if (!['cards', 'rows', 'table', 'compact'].includes(String(v[k]))) errs.push({ path: `${path}/default_view/${k}`, code: 'invalid' });
         }
+      } else if (name === 'field_pwa') {
+        for (const k of Object.keys(o)) if (!['enabled', 'cache_hours', 'max_queue', 'max_photo_mb', 'sync_seconds'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });
+        for (const [k, lo, hi] of [['cache_hours', 1, 168], ['max_queue', 5, 200], ['max_photo_mb', 1, 25], ['sync_seconds', 15, 600]] as const) {
+          const n = o[k];
+          if (typeof n !== 'number' || !Number.isInteger(n) || n < lo || n > hi) errs.push({ path: `${path}/${k}`, code: 'invalid' });
+        }
       } else if (name === 'map') {
         for (const k of Object.keys(o)) if (!['enabled', 'tile_url', 'min_zoom', 'max_zoom', 'attribution', 'center_lat', 'center_lon', 'default_zoom'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });

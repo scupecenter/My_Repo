@@ -12,6 +12,7 @@
 | [05-training-ar.md](05-training-ar.md) | مادة التدريب | Arabic training material per role |
 | [06-admin-guide-ar.md](06-admin-guide-ar.md) | دليل مدير النظام | Arabic administrator guide |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
+| [05-field-mode.md](05-field-mode.md) | وضع الميدان (دون اتصال)، المرحلة 1 | Field mode (offline), phase 1: what is stored, the queue, sync and conflict rules |
 | [09-handover-open-items-warning.md](09-handover-open-items-warning.md) | تحذير البنود المفتوحة عند تسليم الجاهزية | Readiness handover: open items warning |
 | [07-reorder-limits-and-supplier-returns.md](07-reorder-limits-and-supplier-returns.md) | حدود إعادة الطلب ومرتجعات الموردين | Reorder limits and supplier returns (tracking only, no stock effect) |
 | [06-site-map-tiles.md](06-site-map-tiles.md) | خريطة المواقع على بلاطات من خادمك | Site map on map tiles served from your own server (off by default) |

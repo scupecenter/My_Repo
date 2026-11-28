@@ -18,6 +18,7 @@ export const UI_FEATURES_SEED: UiFeatures = {
   finance_hub: { widgets: { advances: true, invoices: true, quick_links: true, templates: true }, settle_warn_days: 30, aging_days: [30, 60] },
   inbox: { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] },
   panel: { mode: 'popover', width: 'medium', show_tabs: true },
+  field_pwa: { enabled: false, cache_hours: 24, max_queue: 50, max_photo_mb: 8, sync_seconds: 60 },
   map: { enabled: false, tile_url: '', min_zoom: 0, max_zoom: 18, attribution: '', center_lat: 32.9, center_lon: 13.2, default_zoom: 6 },
   unsaved_guard: { enabled: true, settings: true, dialogs: true, drawers: true, inline: true, composers: true, navigation: true },
 };

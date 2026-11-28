@@ -10,6 +10,9 @@ import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useMenuCounts, useUnreadTotal } from '@/api/msg';
 import { useUiIdentity } from '@/api/settings';
 import { useOpenAlertCount } from '@/api/logs';
+import { useFieldPwaSettings } from '@/api/fieldPwa';
+import { fieldPendingCount } from '@/lib/fieldOutbox';
+import { wipeFieldData } from '@/lib/fieldPwa';
 import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
@@ -133,10 +136,12 @@ function ShellFrame() {
   const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
-  const sideItems = visibleNavItems(me.data);
+  // Field mode (0411): its menu entry shows only while a System Admin has turned it on
+  const fieldOn = useFieldPwaSettings().enabled;
+  const sideItems = visibleNavItems(me.data).filter((n) => n.key !== 'field' || fieldOn);
   // the search box follows the personal menu: screens the person hid are left out unless they turned on "also search hidden screens" (Profile, My sidebar)
   const paletteAll = loadPref<boolean>(PALETTE_HIDDEN_KEY, false) === true;
-  const paletteItems = paletteAll ? permittedNavItems(me.data) : withoutHidden(permittedNavItems(me.data), side);
+  const paletteItems = (paletteAll ? permittedNavItems(me.data) : withoutHidden(permittedNavItems(me.data), side)).filter((n) => n.key !== 'field' || fieldOn);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
@@ -271,7 +276,7 @@ function ShellFrame() {
                 {session.data?.auth_method === 'local'
                   ? <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-change-password" onClick={() => nav('/change-password')}><Lock size={14} />{t('top.change_password')}</button></Popover.Close>
                   : <p className="p-2 text-sm text-mute">{t('top.no_password')}</p>}
-                <Popover.Close asChild><button className="btn mt-1 w-full justify-start border-t border-line" data-testid="user-menu-signout" onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={14} aria-hidden />{t('top.sign_out')}</button></Popover.Close>
+                <Popover.Close asChild><button className="btn mt-1 w-full justify-start border-t border-line" data-testid="user-menu-signout" onClick={() => { void (async () => { const n = await fieldPendingCount(me.data?.user.id); if (n > 0 && !window.confirm(t('field.signout_warn', { count: n }))) return; logout.mutate(undefined, { onSuccess: () => { void wipeFieldData(); void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } }); })(); }}><LogOut size={14} aria-hidden />{t('top.sign_out')}</button></Popover.Close>
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>

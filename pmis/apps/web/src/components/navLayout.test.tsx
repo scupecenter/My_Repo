@@ -27,7 +27,7 @@ describe('the layout model (lib/navLayout)', () => {
     expect(d.headings.map((h) => h.id)).toEqual(['home', 'work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs']);
     expect(d.headings[0]!.children).toEqual(['dashboard']); // Dashboard is the first main entry on its own (owner, 2026-11-25)
     expect(d.headings[2]).toMatchObject({ name_en: 'Site Master', name_ar: 'سجل المواقع', children: ['sites'] });
-    expect(d.headings[1]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'messages', 'absence']);
+    expect(d.headings[1]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'messages', 'absence', 'field']);
     expect(resolveLayout(null)).toEqual(d);
   });
 
@@ -36,9 +36,9 @@ describe('the layout model (lib/navLayout)', () => {
     const list = /unnest\(\s*ARRAY\[([^\]]+)\]/.exec(read('0081_nav_layout'))![1]!.match(/'([^']+)'/g)!.map((s) => s.slice(1, -1));
     // Later releases add their screens in their own migration (0082: the System Log), one INSERT ... VALUES row per key: (key, default group, ord, added_in).
     // 0149: My Work > Daily Plan; 0151 (W5): Library > Forms and Archive (two rows of one INSERT)
-    const added = ['0082_nav_system_log', '0149_daily_plan', '0151_library', '0183_incidents_register', '0184_lessons_learned_register', '0185_invoices_register', '0326_deliverables_register', '0597_tools_equipment_register', '0400_data_hub', '0406_finance_hub', '0592_custom_registers'].flatMap((m) => [...read(m).matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES([^;]*);/g)]
+    const added = ['0082_nav_system_log', '0149_daily_plan', '0151_library', '0183_incidents_register', '0184_lessons_learned_register', '0185_invoices_register', '0326_deliverables_register', '0597_tools_equipment_register', '0400_data_hub', '0406_finance_hub', '0411_field_pwa', '0592_custom_registers'].flatMap((m) => [...read(m).matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES([^;]*);/g)]
       .flatMap((x) => [...x[1]!.matchAll(/\('([^']+)',\s*'([^']+)'/g)].map((y) => ({ key: y[1]!, group: y[2]! }))));
-    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }, { key: 'daily_plan', group: 'work' }, { key: 'library.forms', group: 'library' }, { key: 'library.archive', group: 'library' }, { key: 'incidents', group: 'registers' }, { key: 'lessons_learned', group: 'registers' }, { key: 'invoices', group: 'registers' }, { key: 'deliverables', group: 'registers' }, { key: 'tools_equipment', group: 'registers' }, { key: 'data_hub', group: 'data' }, { key: 'master_import', group: 'data' }, { key: 'column_mapping', group: 'data' }, { key: 'data_reset', group: 'data' }, { key: 'recycle_bin', group: 'data' }, { key: 'finance_hub', group: 'registers' }, { key: 'registers.custom', group: 'registers' }]);
+    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }, { key: 'daily_plan', group: 'work' }, { key: 'library.forms', group: 'library' }, { key: 'library.archive', group: 'library' }, { key: 'incidents', group: 'registers' }, { key: 'lessons_learned', group: 'registers' }, { key: 'invoices', group: 'registers' }, { key: 'deliverables', group: 'registers' }, { key: 'tools_equipment', group: 'registers' }, { key: 'data_hub', group: 'data' }, { key: 'master_import', group: 'data' }, { key: 'column_mapping', group: 'data' }, { key: 'data_reset', group: 'data' }, { key: 'recycle_bin', group: 'data' }, { key: 'finance_hub', group: 'registers' }, { key: 'field', group: 'work' }, { key: 'registers.custom', group: 'registers' }]);
     expect([...list, ...added.map((a) => a.key)].sort()).toEqual(NAV_SIDE.map((n) => n.key).sort());
     for (const a of added) expect(NAV_SIDE.find((n) => n.key === a.key)?.group).toBe(a.group);
     expect(cleanNavLayout(defaultLayout()).errors).toEqual([]);
@@ -70,12 +70,12 @@ describe('the layout model (lib/navLayout)', () => {
   it('moves with the keyboard: into and out of a sub-heading, across main headings, and stops at the ends', () => {
     let l: Layout = addSub(defaultLayout(), 'work', { name_en: 'Talk', name_ar: 'تواصل', icon: null });
     const sub = (l.headings[1]!.children.at(-1) as { id: string }).id;
-    l = keyMove(l, itemRef('absence'), 1)!; // the last item steps into the sub-heading below it
-    expect(l.headings[1]!.children.at(-1)).toMatchObject({ id: sub, children: ['absence'] });
-    l = keyMove(l, itemRef('absence'), 1)!; // out of the sub-heading, after it
-    expect(l.headings[1]!.children.at(-1)).toBe('absence');
-    l = keyMove(l, itemRef('absence'), 1)!; // into the next main heading, first
-    expect(l.headings[2]!.children[0]).toBe('absence');
+    l = keyMove(l, itemRef('field'), 1)!; // the last item steps into the sub-heading below it
+    expect(l.headings[1]!.children.at(-1)).toMatchObject({ id: sub, children: ['field'] });
+    l = keyMove(l, itemRef('field'), 1)!; // out of the sub-heading, after it
+    expect(l.headings[1]!.children.at(-1)).toBe('field');
+    l = keyMove(l, itemRef('field'), 1)!; // into the next main heading, first
+    expect(l.headings[2]!.children[0]).toBe('field');
     expect(keyMove(l, headRef('home'), -1)).toBeNull();
     expect(keyMove(l, headRef('logs'), 1)).toBeNull();
     expect(keyMove(l, headRef('logs'), -1)!.headings.map((h) => h.id).slice(-2)).toEqual(['logs', 'admin']);
@@ -207,13 +207,13 @@ describe('the side menu with a shared layout', () => {
     expect(screen.getByTestId('nav-editor')).toBeInTheDocument();
     expect(editItems('work').slice(0, 4)).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals']);
     key('i:approvals', ' ');
-    expect(live()).toMatch(/Approvals picked up: position 4 of 8 in Work/);
+    expect(live()).toMatch(/Approvals picked up: position 4 of 9 in Work/);
     key('i:approvals', 'ArrowUp');
     key('i:approvals', 'ArrowUp');
     key('i:approvals', 'ArrowUp');
-    expect(live()).toMatch(/Approvals: position 1 of 8 in Work/);
+    expect(live()).toMatch(/Approvals: position 1 of 9 in Work/);
     key('i:approvals', ' ');
-    expect(live()).toMatch(/Approvals dropped at position 1 of 8 in Work/);
+    expect(live()).toMatch(/Approvals dropped at position 1 of 9 in Work/);
     expect(editItems('work').slice(0, 4)).toEqual(['approvals', 'my_work', 'daily_plan', 'inbox']);
     expect(screen.getByTestId('nav-edit-handle-i:approvals')).toHaveFocus();
     // Escape puts a move back

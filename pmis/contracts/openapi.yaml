@@ -74,6 +74,7 @@ info:
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
     - 0.15.342 (2026-11-27): logistics depth, phase 3 (migration 0413, mirror `db/sql/412_logistics_rma.sql`). Additive. Reorder limits: `GET /warehouse/reorder-limits` (optional `below=true`) and `PUT /warehouse/reorder-limits/{item_id}` (System Admin or a delegate of warehouse.items.edit for all regions, a reason, audited; null level clears). Supplier returns (RMA): `GET /warehouse/rma`, `POST /warehouse/rma` (needs the warehouse create right) and `POST /warehouse/rma/{rma_id}/status`; tracking only, the stock still leaves quarantine through the existing returned-to-supplier exit. New schemas `ReorderLimit` and `WarehouseRma`. No permission change.
+    - 0.15.340 (2026-11-27): field mode, phase 1 (migration 0411, mirror `db/sql/410_field_pwa.sql`). Additive: `UiFeatures` and `UiFeaturesPatch` gain `field_pwa` (`UiFieldPwa`: the switch, off by default, the read-cache hours, the queue size, the largest photo, the retry interval); `POST /snags/{snag_id}/photos` and `POST /snags/{snag_id}/submit` accept `Idempotency-Key` (a replay of a queued action returns the first answer; kept in the API process for 24 h). No permission change; the server checks the rights again when a queued action is sent.
     - 0.15.341 (2026-11-27): the site map on real tiles, field mode phase 2 (migration 0412, mirror `db/sql/411_map_tiles.sql`; design note approved, option C). Additive: `UiFeatures` and `UiFeaturesPatch` gain `map` (`UiMap`: the switch, off by default; a same-origin tile URL template, empty by default; zoom range, attribution, start view). Only a path on this server is accepted, never another host, so the Content-Security-Policy is unchanged; tiles are served by the customer server. No endpoint, no permission change.
     - 0.15.244 (2026-11-27): list-value colours reach the register fields (item 15 of the improvement research, owner request 2026-11-27; no migration; CHANGELOG ListCellDisplay). Additive. `RegisterField.options[]` (and the child-list column options) gain the optional `colour` of the list value as set in Settings, Lists (#RRGGBB; absent when none). Display only: no permission, visibility, validation or stored-data change; a value keeps storing its code.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 improvement research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
@@ -17715,6 +17716,8 @@ paths:
       summary: Upload a fresh photo of the fix
       x-db-path: qc_attach_photo
       description: By L1 (Data Entry of the Quality register row, or Quality - TE for a TE snag) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date (read in Africa/Tripoli) is before the raise by more than the tolerance (setting `exif_tolerance_hours`, default 24); a date in the future beyond the tolerance is stored as `pending_evidence` (0.12.4, Q232), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
         required: true
         content:
@@ -17774,6 +17777,7 @@ paths:
       x-db-path: qc_transition_snag
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
       responses:
         '200':
           description: Transition applied.
@@ -25524,6 +25528,17 @@ components:
         mode: { type: string, enum: [popover, side_panel] }
         width: { type: string, enum: [narrow, medium, wide] }
         show_tabs: { type: boolean }
+    UiFieldPwa:
+      type: object
+      description: '0.15.340. Field mode (the installable app for site teams that keeps working without a connection). `enabled` is the switch (off by default); `cache_hours` how long the read cache of a signed-in user lives on the device; `max_queue` the most actions waiting to sync; `max_photo_mb` the largest photo the device queues; `sync_seconds` the retry interval.'
+      required: [enabled, cache_hours, max_queue, max_photo_mb, sync_seconds]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        cache_hours: { type: integer, minimum: 1, maximum: 168 }
+        max_queue: { type: integer, minimum: 5, maximum: 200 }
+        max_photo_mb: { type: integer, minimum: 1, maximum: 25 }
+        sync_seconds: { type: integer, minimum: 15, maximum: 600 }
     UiMap:
       type: object
       description: '0.15.341. The site map on real tiles (Settings > Screens > Map). `enabled` is the switch (off by default); `tile_url` is empty (no tiles, the outline map stays) or a path on this server with {z}, {x} and {y}, such as /tiles/{z}/{x}/{y}.png: never another host, so the Content-Security-Policy is unchanged. Tiles are served by the customer server (self-hosted); no external account or key.'
@@ -25554,12 +25569,13 @@ components:
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge, inbox, panel, data_hub, map, unsaved_guard, finance_hub]
+      required: [avatars, new_badge, inbox, panel, data_hub, field_pwa, map, unsaved_guard, finance_hub]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
+        field_pwa: { $ref: '#/components/schemas/UiFieldPwa' }
         map: { $ref: '#/components/schemas/UiMap' }
         finance_hub: { $ref: '#/components/schemas/UiFinanceHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
@@ -25572,6 +25588,7 @@ components:
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
+        field_pwa: { $ref: '#/components/schemas/UiFieldPwa' }
         map: { $ref: '#/components/schemas/UiMap' }
         finance_hub: { $ref: '#/components/schemas/UiFinanceHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
