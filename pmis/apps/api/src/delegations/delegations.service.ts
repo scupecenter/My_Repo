@@ -10,6 +10,7 @@ import { oneParam, Query, TS_TEXT } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { DELEGABLE_RIGHTS, grantsFromRights, rightsFromGrants, TOP_LEVEL_KEYS } from '../permissions/catalogue';
+import { customModuleKeys } from '../permissions/custom-modules';
 
 const STATES = ['active', 'scheduled', 'expired', 'revoked', 'all'] as const;
 const reason = z.string().trim().min(3).max(1000);
@@ -117,7 +118,8 @@ export class DelegationsService {
     const validTo = b.valid_to ? new Date(b.valid_to) : null;
     if (validTo && validTo <= validFrom) errors.push({ path: '/valid_to', code: 'invalid', message: 'valid_to must be after valid_from.' });
     if (b.module_codes.length > 0) {
-      b.module_codes.forEach((m, i) => { if (!TOP_LEVEL_KEYS.has(m)) errors.push({ path: `/module_codes/${i}`, code: 'unknown_module', message: `Unknown module ${m}.` }); });
+      const custom = await customModuleKeys(this.db);
+      b.module_codes.forEach((m, i) => { if (!TOP_LEVEL_KEYS.has(m) && !custom.has(m)) errors.push({ path: `/module_codes/${i}`, code: 'unknown_module', message: `Unknown module ${m}.` }); });
       errors.push({ path: '/module_codes', code: 'not_supported', message: 'A delegation cannot be limited to modules yet: the database stores rights and regions only.' });
     }
     if (new Set(b.region_codes).size !== b.region_codes.length) errors.push({ path: '/region_codes', code: 'duplicate', message: 'A region appears twice.' });

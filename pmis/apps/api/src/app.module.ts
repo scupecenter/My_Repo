@@ -23,6 +23,8 @@ import { RegisterColumnsController, RegisterStateController, StructurePolicyCont
 import { RegisterRulesController } from './registers/register-rules.controller';
 import { RegisterRulesService } from './registers/register-rules.service';
 import { RegisterColumnsService } from './registers/register-columns.service';
+import { CustomRegistersController } from './custom-registers/custom-registers.controller';
+import { CustomRegistersService } from './custom-registers/custom-registers.service';
 import { StructureProposalsService } from './registers/structure-proposals.service';
 import { RegistersService } from './registers/registers.service';
 // P5 (migration 0057): the list catalogue
@@ -92,6 +94,8 @@ import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controll
 import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
 import { ProgressRagController } from './dashboard/progress-rag.controller';
 import { ProgressRagService } from './dashboard/progress-rag.service';
+import { ForecastWindowController } from './dashboard/forecast-window.controller';
+import { ForecastWindowService } from './dashboard/forecast-window.service';
 import { GoalsController } from './dashboard/goals.controller';
 import { GoalsService } from './dashboard/goals.service';
 import { SiteMapService } from './dashboard/site-map.service';
@@ -247,6 +251,7 @@ import { DuplicateRowsSettingsService } from './settings/duplicate-rows-settings
 export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
+      CustomRegistersController,
       InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
@@ -259,6 +264,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
+      ForecastWindowController, // 0.15.431 (own line)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
       CspReportController, // SEC-3
@@ -281,6 +287,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       FinanceHubController, // 0.15.361 (0406): Finance hub landing page
     ],
     providers: [
+      CustomRegistersService,
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, PasswordResetService, RateLimiter, SessionService, UserStateService, StepUpService,
       InvitationsService, // 0091
@@ -295,6 +302,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       MediaService, // 0.15.292
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)
+      ForecastWindowService, // 0.15.431 (own line)
       PasskeyService, // S4
       DuplicateRowsSettingsService,
       TemplateNoticeSettingsService,

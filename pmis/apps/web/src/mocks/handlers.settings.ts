@@ -32,7 +32,7 @@ const CR = () => (C().contractorRules ??= initCfg().contractorRules);
 /** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 interface AlertRuleRow {
-  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon'; params: Record<string, unknown>; audience: Record<string, unknown>;
+  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon' | 'link_orphans'; params: Record<string, unknown>; audience: Record<string, unknown>;
   title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; locked: boolean; version: number;
   created_at: string; updated_at: string;
 }
@@ -300,6 +300,7 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
   { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
   { key: 'media.thumbnails_per_minute', group: 'media', unit: 'per_minute', default: 120, min: 0, max: 6000 },
+  { key: 'registers.custom_max', group: 'registers', unit: 'registers', default: 20, min: 1, max: 100 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
@@ -502,6 +503,9 @@ const ragView = () => ({
   items: RAG_CAT.map((c) => ({ ...c, enabled: ragState.saved[c.code]?.enabled ?? false, green: ragState.saved[c.code]?.green ?? c.default_green, amber: ragState.saved[c.code]?.amber ?? c.default_amber })),
   version: ragState.version, updated_at: ragState.updated_at, updated_by: null,
 });
+/** The number of weeks the dashboard forecast averages (contract 0.15.431): the setting dashboard.forecast_window_weeks, default 4, version 0 until the first save. */
+let fcState = { version: 0, weeks: 4, updated_at: null as string | null, updated_by: null as null };
+const fcView = () => ({ ...fcState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
@@ -659,6 +663,20 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     ragState = { version: ragState.version + 1, saved, updated_at: new Date().toISOString() };
     return HttpResponse.json(ragView(), tag(ragState.version));
+  }),
+  // ------------------------------------------------------------------ forecast window (contract 0.15.431, settings review gap 4)
+  http.get(`${B}/settings/dashboard/forecast-window`, () => { const g = guard(); if (g) return g; return HttpResponse.json(fcView(), tag(fcState.version)); }),
+  http.put(`${B}/settings/dashboard/forecast-window`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, fcState.version); if (p) return p;
+    const b = (await request.json()) as { weeks?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weeks) || b.weeks! < 2 || b.weeks! > 12) errs.push({ path: '/weeks', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    fcState = { ...fcState, version: fcState.version + 1, weeks: b.weeks!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(fcView(), tag(fcState.version));
   }),
   // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
   http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
@@ -1705,12 +1723,19 @@ export const settingsHandlers = [
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
   // ------------------------------------------------------------------ alert rules (0.15.242, migration 0342): notifications only
+  http.get(`${B}/settings/alert-rules/link-orphans`, () => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({ links: [
+      { register_key: 'invoices', field_code: 'procurement_record_id', target_register: 'procurement', rows_with_value: 12, orphan_rows: 2, examples: ['00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2'] },
+      { register_key: 'financial_advances', field_code: 'advance_id', target_register: 'financial_advances', rows_with_value: 5, orphan_rows: 0, examples: [] },
+    ] });
+  }),
   http.get(`${B}/settings/alert-rules`, () => {
     const g = needAdmin(); if (g) return g;
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }, { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] }],
         kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
@@ -1722,11 +1747,11 @@ export const settingsHandlers = [
     const g = needAdmin(); if (g) return g;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
-    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
+    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon', 'link_orphans'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
     if (ALERT_RULES.some((x) => x.code === b.code)) return fields({ path: '/code', code: 'conflict' });
     const row = {
       id: `00000000-0000-4000-8000-${String(ALERT_RULES.length + 1).padStart(12, '0')}`,
-      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon',
+      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon' | 'link_orphans',
       params: (b.params ?? {}) as Record<string, unknown>, audience: (b.audience ?? { type: 'system_admin' }) as Record<string, unknown>,
       title_en: String(b.title_en ?? ''), title_ar: String(b.title_ar ?? ''), body_en: String(b.body_en ?? ''), body_ar: String(b.body_ar ?? ''),
       link: (b.link ?? null) as string | null, enabled: b.enabled !== false, locked: b.locked === true, version: 1,
