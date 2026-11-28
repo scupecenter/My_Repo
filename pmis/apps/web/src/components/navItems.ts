@@ -34,6 +34,7 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'wor
   { key: 'car_dispatcher', to: '/registers/car_dispatcher', icon: 'dismantle', group: 'registers' },
   { key: 'finance_hub', to: '/finance-hub', icon: 'financeHub', group: 'registers' },
   { key: 'financial_advances', to: '/registers/financial_advances', icon: 'procurement', group: 'registers' },
+  { key: 'registers.custom', to: '/custom-registers', icon: 'dismantle', group: 'registers' },
   { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
   { key: 'data_hub', to: '/data-hub', icon: 'dataHub', group: 'data' },
   { key: 'templates', to: '/templates', icon: 'document', group: 'data' },

@@ -18,6 +18,7 @@ import { formatAllowed, sniff } from './sniff';
 import { StorageService, newObjectKey } from './storage.service';
 import { thumbKeysOf } from '../media/thumbs';
 import { suggestSlots } from './suggest';
+import { photoMinCount, photosMissing } from './photo-missing.rules';
 
 export const SITE_DOCS = 'sites.documents';
 /** The largest file any document may allow (the library caps max_size_mb at 200); the multipart parser stops there. */
@@ -77,6 +78,9 @@ export interface DocumentSlotDto {
   needs_signature: boolean;
   needs_stamp: boolean;
   awaiting_signed_copy: boolean;
+  /** D6 (0.15.564): the minimum photos the type asks for (photo_rules.min_count) and how many are still missing; null when it asks for none. Informs only. */
+  photo_min_count: number | null;
+  photos_missing: number | null;
 }
 
 interface TaskCtx {
@@ -358,6 +362,8 @@ export class DocumentsService {
         min_files: num(spec.min_files) ?? s.dt_min_files,
         max_files: spec.max_files === undefined ? s.dt_max_files : (spec.max_files as number | null),
         camera_only: typeof photo === 'object' && photo !== null && photo.camera_only === true,
+        photo_min_count: photoMinCount(photo),
+        photos_missing: photosMissing(photo, slotFiles),
         expiry_tracked: typeof spec.expiry_tracked === 'boolean' ? spec.expiry_tracked : s.dt_has_expiry,
         can_upload: can && (['missing', 'uploaded', 'rejected'].includes(s.status) || (s.status === 'approved' && s.inherited)),
         blank_form_file_id: s.blank_form_file_id,
