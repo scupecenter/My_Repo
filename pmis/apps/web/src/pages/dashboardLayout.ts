@@ -64,3 +64,35 @@ export function orderedVisible(
     .filter((r) => r.shown)
     .map((r) => r.code);
 }
+
+/**
+ * Per-user widgets (contract 0.15.585): the layout a tab shows. The caller's own layout wins; without one the global layout of Settings > Dashboard
+ * (F20) applies, and without that the owner default of the counters card (PMO tab only, until a layout is saved).
+ */
+export function effectiveLayout(
+  tab: string,
+  personal: Record<string, TabLayout> | undefined,
+  global: Record<string, TabLayout> | undefined,
+): TabLayout | undefined {
+  return (
+    personal?.[tab] ??
+    global?.[tab] ??
+    (tab === "pmo" ? undefined : { order: [], hidden: ["counters"] })
+  );
+}
+
+/** The three tab layouts a template stores: the caller's own layout of each tab (or the one in force), with `tab` replaced by the rows being edited. */
+export function templateLayouts(
+  tabs: readonly string[],
+  personal: Record<string, TabLayout> | undefined,
+  global: Record<string, TabLayout> | undefined,
+  edited: { tab: string; rows: CardRow[] },
+): Record<string, TabLayout> {
+  const out: Record<string, TabLayout> = {};
+  for (const t of tabs) {
+    const l =
+      t === edited.tab ? toLayout(edited.rows) : effectiveLayout(t, personal, global);
+    out[t] = { order: [...(l?.order ?? [])], hidden: [...(l?.hidden ?? [])] };
+  }
+  return out;
+}

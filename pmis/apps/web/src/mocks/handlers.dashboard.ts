@@ -50,12 +50,14 @@ const fields = (path: string, code: string) => problem(422, 'validation_failed',
 // ---------------------------------------------------------------- mock state (per mock database, so resetDb() starts it again)
 type Value = { id: string; item_code: string; version: number; value_pct: number; effective_date: string; reason: string; created_at: string; by: string; source: string; historical_correction: boolean };
 type Plan = { id: string; item_code: string; version: number; points: ManualPlanPoint[]; reason: string; source: string; created_at: string; by: string };
-type State = { values: Value[]; plans: Plan[]; periods: Record<string, DelayPeriod[]>; variant: PipelineVariant };
+type MineTab = { order: string[]; hidden: string[]; version: number };
+type Tpl = { id: string; name: string; layouts: Record<string, { order: string[]; hidden: string[] }>; created_at: string };
+type State = { values: Value[]; plans: Plan[]; periods: Record<string, DelayPeriod[]>; variant: PipelineVariant; mine: Record<string, Record<string, MineTab>>; tpls: Record<string, Tpl[]> };
 const states = new WeakMap<Db, State>();
 const S = (): State => {
   const d = db();
   let s = states.get(d);
-  if (!s) { s = { values: [], plans: [], periods: {}, variant: 'A' }; states.set(d, s); }
+  if (!s) { s = { values: [], plans: [], periods: {}, variant: 'A', mine: {}, tpls: {} }; states.set(d, s); }
   return s;
 };
 
@@ -104,6 +106,64 @@ const PARTIES: DelayParty[] = ['gecol', 'hlc', 'client', 'contractor', 'external
 const me = () => { const v = viewer(); return { id: v?.key ?? 'user', display_name: v?.name ?? 'User', employee_id: v?.employee_id ?? null }; };
 
 // Mock of GET /dashboard (contract 0.7.2, 0.11.0). An account without `dashboard` in its navigation gets the module_forbidden answer.
+
+// ---------------------------------------------------------------- 0.15.585: per-user dashboard widgets (personal: keyed by the signed-in account)
+const who = (): string => viewer()?.key ?? 'anon';
+const mineOf = (): Record<string, MineTab> => (S().mine[who()] ??= {});
+const tplsOf = (): Tpl[] => (S().tpls[who()] ??= []);
+const dupCards = (o: string[], h: string[]) => new Set([...o, ...h]).size !== o.length + h.length;
+const widgetHandlers = [
+  http.get(`${B}/me/dashboard-layout`, () => { const g = guard(); if (g) return g; if (!canUse()) return problem(403, 'forbidden', 'No access'); return HttpResponse.json({ tabs: mineOf() }); }),
+  http.put(`${B}/me/dashboard-layout/:tab`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'forbidden', 'No access');
+    const tab = String(params.tab);
+    if (!['pmo', 'cw', 'te'].includes(tab)) return fields('/tab', 'unknown_tab');
+    const b = (await request.json()) as { order: string[]; hidden: string[]; version: number };
+    if (dupCards(b.order, b.hidden)) return fields('/cards', 'duplicate');
+    const cur = mineOf()[tab];
+    if ((cur?.version ?? 0) !== b.version) return problem(412, 'precondition_failed', 'The layout changed since you read it.');
+    const next = { order: b.order, hidden: b.hidden, version: (cur?.version ?? 0) + 1 };
+    mineOf()[tab] = next;
+    return HttpResponse.json({ tab, ...next });
+  }),
+  http.delete(`${B}/me/dashboard-layout/:tab`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'forbidden', 'No access');
+    delete mineOf()[String(params.tab)];
+    return HttpResponse.json({ tab: String(params.tab), reset: true });
+  }),
+  http.get(`${B}/me/dashboard-templates`, () => { const g = guard(); if (g) return g; if (!canUse()) return problem(403, 'forbidden', 'No access'); return HttpResponse.json({ items: tplsOf() }); }),
+  http.post(`${B}/me/dashboard-templates`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'forbidden', 'No access');
+    const b = (await request.json()) as { name: string; layouts: Tpl['layouts'] };
+    const name = (b.name ?? '').trim();
+    if (!name || name.length > 80) return fields('/name', 'invalid');
+    const list = tplsOf();
+    const same = list.find((x) => x.name === name);
+    if (!same && list.length >= 20) return fields('/name', 'too_many');
+    const row = same ?? { id: crypto.randomUUID(), name, layouts: b.layouts, created_at: new Date().toISOString() };
+    row.layouts = b.layouts;
+    if (!same) list.push(row);
+    return HttpResponse.json({ id: row.id, name, layouts: row.layouts }, { status: 201 });
+  }),
+  http.post(`${B}/me/dashboard-templates/:id/apply`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'forbidden', 'No access');
+    const t = tplsOf().find((x) => x.id === params.id);
+    if (!t) return problem(404, 'not_found', 'Not found');
+    for (const [tab, l] of Object.entries(t.layouts)) mineOf()[tab] = { order: l.order, hidden: l.hidden, version: (mineOf()[tab]?.version ?? 0) + 1 };
+    return HttpResponse.json({ tabs: mineOf() });
+  }),
+  http.delete(`${B}/me/dashboard-templates/:id`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'forbidden', 'No access');
+    S().tpls[who()] = tplsOf().filter((x) => x.id !== params.id);
+    return HttpResponse.json({ id: String(params.id), deleted: true });
+  }),
+];
+
 export const dashboardHandlers = [
   http.get(`${B}/dashboard`, ({ request }) => {
     const g = guard(); if (g) return g;
@@ -459,4 +519,5 @@ export const dashboardHandlers = [
     Object.assign(p, { voided: true, voided_at: new Date().toISOString(), void_reason: b.reason.trim(), voided_by: me() });
     return HttpResponse.json(p);
   }),
+  ...widgetHandlers,
 ];

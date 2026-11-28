@@ -46,6 +46,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | From | To | Kind | Field | Typed or derived |
 |---|---|---|---|---|
 | HLC record | Procurement records of the site | register link, many (`hlc_pr_links`, Q150) | `pr_no`, `hlc_approval_date`, `procurement_record_id` | derived |
+| Dashboard layout of a user | Dashboard card catalogue | personal state, no register | `dash_user_layouts` (`order`, `hidden`), `dash_user_templates` | chosen by the user; a card the catalogue no longer has is dropped when a template is applied (0717) |
 | Dismantle part (outsourced) | Procurement order | register link | `procurement_order_id`, contractor | contractor derived from the order |
 | Register records, task instances, task delay periods, contractor teams and contracts | Contractor company (`external_parties`) | foreign key | `external_party_id`, `party_id` | chosen |
 | Procurement, snags, quality inspections, issues | Contractor company | foreign key (0182, `_idfk`) | `party_id`, `responsible_party_id` | chosen |

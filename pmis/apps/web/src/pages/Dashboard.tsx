@@ -31,7 +31,9 @@ import { EmptyState } from "@/components/States";
 import { useToast } from "@/components/Toast";
 import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
-import { orderedVisible, type TabLayout } from "./dashboardLayout";
+import { effectiveLayout, orderedVisible, type TabLayout } from "./dashboardLayout";
+import { DashboardWidgets } from "./dashboardWidgets";
+import { useMyDashboardLayouts } from "@/api/dashboardWidgets";
 import {
   Bar,
   Card,
@@ -569,6 +571,7 @@ export function Dashboard() {
     tabsAllowed,
   );
   const dashSettings = useDashboardSettings();
+  const myLayouts = useMyDashboardLayouts();
   const rag = useProgressRag().data?.items;
   const q: DashboardQuery = {
     ref_date: sp.get("ref_date") ?? "",
@@ -1443,6 +1446,20 @@ export function Dashboard() {
           {t("dash.central_hidden", { n: d.meta.central_items_hidden })}
         </p>
       )}
+      {dashSettings.data && (
+        <DashboardWidgets
+          tab={tab}
+          cards={dashSettings.data.catalogue.cards.map((c) => ({
+            code: c.code,
+            label: (i18n.language === "ar" && c.label_ar) || c.label_en,
+          }))}
+          personal={myLayouts.data}
+          versions={Object.fromEntries(
+            Object.entries(myLayouts.data ?? {}).map(([k, v]) => [k, v.version]),
+          )}
+          global={dashSettings.data.tabs}
+        />
+      )}
       {d && d.headline.sites_total === 0 && (
         <EmptyState title={t("dash.empty")} />
       )}
@@ -1455,8 +1472,7 @@ export function Dashboard() {
         <>
           {/* F20 (owner default 2026-11-15): the counters card is on the PMO tab only, until the tab's layout is saved in the settings. */}
           {orderBlocks(
-            dashSettings.data?.tabs[tab] ??
-              (tab === "pmo" ? undefined : { order: [], hidden: ["counters"] }),
+            effectiveLayout(tab, myLayouts.data, dashSettings.data?.tabs),
             {
               site_map: (
                 <>
