@@ -209,6 +209,13 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'The request is not valid.',
         errors: Array.isArray(extra.errors) ? (extra.errors as FieldError[]) : [],
       });
+    case 'gone':
+      // 0561: a dashboard share link that expired or was revoked
+      return new ProblemException(410, 'gone', { detail: detail ?? 'This link expired or was revoked.' });
+    case 'conflict':
+      return new ProblemException(409, 'conflict', { detail: detail ?? 'This was already done.' });
+    case 'unauthenticated':
+      return new ProblemException(401, 'unauthenticated', { detail: detail ?? 'Sign in to continue.' });
     default:
       return null;
   }

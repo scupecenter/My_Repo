@@ -71,6 +71,7 @@ import {
   type DashTab,
 } from "./dashboardTabs";
 import { DateInput } from '@/components/DateInput';
+import { ShareDashboardButton } from "@/components/DashboardShare";
 
 type DashMilestone = Dash["pipeline"]["nodes"][number];
 const STATUSES = [
@@ -1318,6 +1319,7 @@ export function Dashboard() {
               data-testid="dash-share-panel"
               className={`${shareOpen ? "flex" : "hidden"} absolute end-0 top-full z-30 mt-1 min-w-56 flex-col gap-1 rounded-lg border border-line bg-surface p-2 shadow-lg`}
             >
+              <ShareDashboardButton sp={sp} inMenu />
               <Link className="btn justify-start" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
                 <MonitorPlay size={16} />
                 {t("dash.tv")}

@@ -447,6 +447,7 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | saved_view_targets | KEEP | Saved view sharing. |
 | saved_view_region_targets | KEEP | Saved view sharing. |
 | document_grid_views | KEEP | Personal column layout of the documents grid. |
+| dashboard_share_links | KEEP | Dashboard share links (0561): kept like saved views - a link grants nothing by itself and the opener always sees their own data. |
 
 ### Logs (KEEP, append-only)
 

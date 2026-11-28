@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected'
   | 'file_too_large' | 'file_rejected' | 'malware_scan_unavailable' | 'export_expired' | 'team_scope_mismatch' | 'two_factor_enforced'
   | 'scope_scenario_conflict' | 'override_not_revertible'
+  | 'gone' | 'conflict'
   | 'too_many_rows' | 'integrity_too_large' | 'mail_not_configured'
   | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan'
   | 'list_not_configured' | 'confirmation_mismatch'

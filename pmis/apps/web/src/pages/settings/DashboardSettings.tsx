@@ -22,6 +22,7 @@ import { ForecastMethod } from "./ForecastMethod";
 import { ForecastWindow } from "./ForecastWindow";
 import { SnapshotSchedule } from "./SnapshotSchedule";
 import { HealthBands } from "./HealthBands";
+import { ShareLinksCard } from '@/components/DashboardShare';
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -347,6 +348,7 @@ export function DashboardSettings() {
       )}
     </section>
     <PartialCreditCard />
+      <ShareLinksCard />
     </>
   );
 }

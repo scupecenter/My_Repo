@@ -16,6 +16,7 @@ import { StatusUpdates } from '@/pages/StatusUpdates';
 import { ContractorsReports } from '@/pages/ContractorsReports';
 import { Workload } from '@/pages/Workload';
 import { Dashboard } from '@/pages/Dashboard';
+import { SharedDashboard } from '@/components/DashboardShare';
 import { ManualItems } from '@/pages/ManualItems';
 import { ChangePassword } from '@/pages/ChangePassword';
 import { InviteAccept } from '@/pages/InviteAccept';
@@ -123,6 +124,7 @@ function gated(session: Session) {
         <Route path="reports/contractors" element={<ContractorsReports />} />
         <Route path="status-updates" element={<StatusUpdates />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="dashboard/shared/:token" element={<SharedDashboard />} />
         <Route path="dashboard/manual-items" element={<ManualItems />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/new" element={<NewSite />} />
