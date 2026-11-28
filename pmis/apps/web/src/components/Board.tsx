@@ -1,5 +1,13 @@
 import { AlertTriangle } from 'lucide-react';
 import type { DragEvent, ReactNode } from 'react';
+import type { CardSize } from '@/lib/tablePrefs';
+
+/** V6 (0.15.574): the card size of the board (Display option of the screen): the cell air and the card list's spacing and base text. */
+export const CARD_SIZE_CLASS: Record<CardSize, { cell: string; list: string }> = {
+  sm: { cell: 'p-0.5', list: 'space-y-0.5 text-xs' },
+  md: { cell: 'p-1', list: 'space-y-1 text-sm' },
+  lg: { cell: 'p-2', list: 'space-y-2 text-base' },
+};
 
 /** A column of a board: its key, its name, the number of cards in it (all of them, not only the cards drawn) and an optional WIP limit. */
 export interface BoardColumn { key: string; name: string; count: number; wip?: { limit: number; over: boolean; text: string } | null }
@@ -14,9 +22,11 @@ export interface BoardCell<C> { cards: C[]; more?: ReactNode }
  * record (a site, a register record), so a card moves only through the record's own actions. The screen gives the columns, the lanes, the
  * cells and how a card is drawn.
  */
-export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, testid, empty, emptyTestid, label, total: totalIn, onDropTo }: {
+export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, testid, empty, emptyTestid, label, total: totalIn, onDropTo, size = 'md' }: {
   /** Optional: a card dropped on a cell (the column key, the lane key). Without it nothing can be dropped, as before. */
   onDropTo?: (column: string, lane: string, e: DragEvent) => void;
+  /** V6: the card size (Display option of the screen, default comfortable) */
+  size?: CardSize;
   columns: BoardColumn[];
   /** every card of the board (default: the sum of the column counts) */
   total?: number;
@@ -36,7 +46,7 @@ export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, t
 }) {
   const total = totalIn ?? columns.reduce((n, c) => n + c.count, 0);
   return (
-    <div className="overflow-auto" data-testid={testid}>
+    <div className="overflow-auto" data-testid={testid} data-card-size={size}>
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(220px, 1fr))` }}>
         {columns.map((c) => (
           <div key={c.key} data-testid={`board-col-${c.key}`} data-over-wip={c.wip?.over || undefined}
@@ -55,9 +65,9 @@ export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, t
             {columns.map((c) => {
               const x = cell(c.key, l.key);
               return (
-                <div key={c.key} className="min-h-12 rounded-md bg-card2/40 p-1" data-testid={`board-cell-${c.key}-${l.key}`}
+                <div key={c.key} className={`min-h-12 rounded-md bg-card2/40 ${CARD_SIZE_CLASS[size].cell}`} data-testid={`board-cell-${c.key}-${l.key}`}
                   {...(onDropTo ? { onDragOver: (e: DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, onDrop: (e: DragEvent) => { e.preventDefault(); onDropTo(c.key, l.key, e); } } : {})}>
-                  <ul className="space-y-1" aria-label={label(c, l)}>
+                  <ul className={CARD_SIZE_CLASS[size].list} aria-label={label(c, l)}>
                     {x?.cards.map((k) => <li key={cardKey(k)}>{card(k)}</li>)}
                   </ul>
                   {x?.more}

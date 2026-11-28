@@ -99,6 +99,7 @@ describe("column prefs: width and hidden defaults", () => {
     expect(p.density).toBeUndefined();
     expect(reconcile({ ...EMPTY_PREFS, density: "normal" }, DEFS).density).toBe("normal");
     expect(reconcile({ ...EMPTY_PREFS, display: { size: "lg", font: 1 } as never }, DEFS).display).toEqual({ size: "lg" });
+    expect(reconcile({ ...EMPTY_PREFS, display: { card: "lg" } }, DEFS).display).toEqual({ card: "lg" });
   });
 });
 

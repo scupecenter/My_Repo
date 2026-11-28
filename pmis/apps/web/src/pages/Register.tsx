@@ -762,6 +762,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 </label>
               </>
             ) : undefined}
+            cards={view === "vertical" && layout === "board" ? { value: tbl.display.card, onChange: (v) => tbl.setDisplay({ card: v }) } : undefined}
             table={view === "vertical" && (layout === "list" || layout === "wide") ? tbl : undefined}
           />
         }
@@ -1071,6 +1072,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
               partial={partial}
+              size={tbl.display.card}
             />
           )}
           {layout === "map" && (

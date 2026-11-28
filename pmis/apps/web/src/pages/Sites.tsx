@@ -386,6 +386,7 @@ export function Sites() {
               </select>
             </label>
           ) : undefined}
+          cards={asBoard ? { value: tbl.display.card, onChange: (v) => tbl.setDisplay({ card: v }) } : undefined}
           table={asBoard || asMap || asTimeline || asCalendar ? undefined : tbl} />}
         columns={<ColumnMenu density={false} api={tbl} label={label} />}
         exporter={menuTpl ? <TemplateExportMenu testid="sites-tools" exportTestid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} hasTemplate
@@ -399,7 +400,7 @@ export function Sites() {
         <Navigate to="/registers/dismantle" replace />
       ) : asBoard ? (
         // F5: the same filters as the list (the F3 tree included); stage, bucket and stream are list views and do not apply to the board
-        <SitesBoard swimlane={lane}
+        <SitesBoard swimlane={lane} size={tbl.display.card}
           query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, overall_status: f.overall_status || undefined, ...extra }} />
       ) : asTimeline ? (
         // Item 7: read only, the same filters as the list

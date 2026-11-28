@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNod
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
-import { DENSITIES } from '@/lib/tablePrefs';
+import { DENSITIES, CARD_SIZES, type CardSize } from '@/lib/tablePrefs';
 import type { TableApi } from './TableKit';
 import { canEditDisplayDefaults } from './TableStandard';
 import { Tip } from './Tip';
@@ -24,7 +24,7 @@ export type ViewOption = { id: string; label: string; hint?: string; icon: React
  * The keyboard model is the one the view menu had: Enter or Space opens, the arrows, Home and End move over the view items, Enter picks, Escape
  * closes and the focus returns to the button. Every view item keeps the test id its layout button had.
  */
-export function LayoutPanel({ testid, views, options, table, grouped }: {
+export function LayoutPanel({ testid, views, options, table, grouped, cards }: {
   testid: string;
   /** the layouts of the screen (list, wide table, grid, board, timeline, map) */
   views?: { value: string; options: ViewOption[]; onChange: (id: string) => void };
@@ -34,6 +34,8 @@ export function LayoutPanel({ testid, views, options, table, grouped }: {
   table?: TableApi;
   /** the table has group header rows: the Display section then offers the group summary (count and status bar) */
   grouped?: boolean;
+  /** Decision V6 (0.15.574): the card size of the board view, in the options section while the board is on */
+  cards?: { value: CardSize; onChange: (v: CardSize) => void };
 }) {
   const { t } = useTranslation();
   const me = useMe(true).data;
@@ -92,10 +94,21 @@ export function LayoutPanel({ testid, views, options, table, grouped }: {
               ))}
             </div>
           )}
-          {options && (
+          {(options || cards) && (
             <div className="space-y-2 border-t border-line pt-2" data-testid={`${testid}-options`}>
               <div className="text-xs font-semibold text-mute">{t('layout.options')}</div>
               {options}
+              {cards && (
+                <div className="space-y-1" role="radiogroup" aria-label={t('tstd.display_card')}>
+                  <div className="text-xs font-semibold text-mute">{t('tstd.display_card')}</div>
+                  <div className="flex flex-wrap gap-1">
+                    {CARD_SIZES.map((v) => (
+                      <button key={v} type="button" role="radio" aria-checked={cards.value === v} data-testid={`display-card-${v}`} onClick={() => cards.onChange(v)}
+                        className={`btn px-2 py-1 text-xs ${cards.value === v ? 'bg-accentSoft text-accentText' : ''}`}>{t(`tstd.size_${v}`)}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {table && (
