@@ -41,7 +41,6 @@ BEGIN
 END $$;
 
 GRANT INSERT, UPDATE ON register_definitions TO pmis_definer;
-GRANT INSERT ON nav_item_catalogue TO pmis_definer;
 GRANT SELECT, INSERT, UPDATE ON template_definitions TO pmis_definer;
 GRANT SELECT ON register_fields TO pmis_definer;
 
@@ -176,9 +175,6 @@ BEGIN
   IF mk IS NULL THEN PERFORM public.rcol_err('/fields', 'required', 'Add at least one required column that is in the template: it identifies a record when a file is uploaded.'); END IF;
   keys := CASE WHEN d.site_scoped THEN jsonb_build_array(jsonb_build_array('site_code', mk)) ELSE jsonb_build_array(jsonb_build_array(mk)) END;
   UPDATE public.register_definitions SET enabled = true, version = version + 1 WHERE register_key = p_key RETURNING * INTO d;
-  INSERT INTO public.nav_item_catalogue (key, default_group, ord, added_in)
-  VALUES (p_key, 'registers', 1000 + (SELECT count(*)::int FROM public.register_definitions x WHERE x.is_custom), '0531')
-  ON CONFLICT (key) DO NOTHING;
   INSERT INTO public.template_definitions (template_id, name, name_ar, target_entity, kind, register_key, module_key, custom_entity, match_keys, sort_order)
   VALUES ('TPL-' || upper(replace(p_key, '_', '-')), d.name_en, d.name_ar, p_key, 'register', p_key, d.module_key, NULL, keys, d.sort_order)
   ON CONFLICT (template_id) DO NOTHING;
@@ -245,3 +241,8 @@ BEGIN
                               admin_register_enable(text, text, integer) TO pmis_app;
   END IF;
 END $$;
+
+-- The menu key of the one "Custom registers" entry (it opens the hub of the enabled custom registers). Additive; an existing key is kept.
+INSERT INTO nav_item_catalogue (key, default_group, ord, added_in) VALUES
+  ('registers.custom', 'registers', 270, '0531')
+ON CONFLICT (key) DO NOTHING;

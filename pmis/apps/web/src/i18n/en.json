@@ -217,6 +217,7 @@
     "group_home": "Dashboard",
     "group_work": "Work",
     "group_data": "Data hub",
+    "registers.custom": "Custom registers",
     "finance_hub": "Finance hub",
     "data_hub": "Data hub",
     "master_import": "Master import and comparison",
@@ -4848,6 +4849,9 @@
     "enabled": "Custom register enabled.",
     "enable_note": "The register gets its menu entry, its upload and download template and its permission module. Grant the module to the roles that need it in the permission grid.",
     "hide_note": "The register leaves the menu and the grid editor. Its records and grants stay, and you can show it again.",
+    "hub_title": "Custom registers",
+    "hub_note": "The registers an administrator created without code. You see the ones you have the right to view.",
+    "hub_empty": "No custom register is available to you.",
     "show_note": "The register comes back to the menu and the grid editor."
   },
   "regcols": {
