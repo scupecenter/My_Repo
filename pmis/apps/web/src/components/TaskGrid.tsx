@@ -21,6 +21,7 @@ import { LayoutPanel } from './LayoutPanel';
 import { UnifiedFilter } from './UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { fmtDate } from '@/lib/time';
+import { RelDue } from './RelDue';
 import { useToast } from './Toast';
 import { useVirtual } from './useVirtual';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge, TIMING_SORTS, ballHolders, sortByTiming, type TimingSort } from './TaskTiming';
@@ -232,7 +233,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, views, l
       case 'ball': return <span className="flex flex-wrap items-center gap-1">{task.state === 'approved' || task.state === 'na' ? (task.state === 'na' ? <NotApplicable /> : <Empty />) : <><Holders holders={task.ball_in_court?.holders ?? []} /><ExternalParty task={task} /><BallSince task={task} /></>}{task.holder_absent && <span className="chip bg-waitBg text-waitInk" data-testid={`absent-${task.id}`}><UserX size={12} className="me-1" />{t('grid.absent')}</span>}</span>;
       case 'plan': case 'actual': return dateCell(task, id, ix);
       case 'sla': return task.sla?.measured === false ? <span className="chip bg-lockBg text-lockInk" data-testid={`sla-not-measured-${task.id}`}>{t('sla.not_measured')}</span>
-        : task.sla?.max_wd != null ? <span className="inline-flex flex-wrap items-center gap-1">{task.sla.due_date && <span className="mono text-xs" data-testid={`sla-due-${task.id}`} title={t('tstd.sla_due')}>{fmtDate(task.sla.due_date, i18n.language)}</span>}<span data-testid={`sla-${task.id}`} data-colour={task.sla.colour} className={`chip ${SLA_TONE[task.sla.colour ?? 'none']}`}>{task.sla.min_wd}–{task.sla.max_wd} {t('approvals.wd')}{task.sla.colour === 'red' ? ` · ${t('grid.late')}` : ''}</span>
+        : task.sla?.max_wd != null ? <span className="inline-flex flex-wrap items-center gap-1">{task.sla.due_date && <span className="mono text-xs" data-testid={`sla-due-${task.id}`} title={t('tstd.sla_due')}>{fmtDate(task.sla.due_date, i18n.language)}</span>}{task.sla.due_date && <RelDue date={task.sla.due_date} done={task.state === 'approved'} testid={`reldue-${task.id}`} />}<span data-testid={`sla-${task.id}`} data-colour={task.sla.colour} className={`chip ${SLA_TONE[task.sla.colour ?? 'none']}`}>{task.sla.min_wd}–{task.sla.max_wd} {t('approvals.wd')}{task.sla.colour === 'red' ? ` · ${t('grid.late')}` : ''}</span>
           <SlaOverrun task={task} />
           {/* 0.12.0 (D4b): a tentative holiday inside the period; Q135: Pending SLA Confirmation */}
           {task.sla.due_date_tentative && <span className="chip bg-waitBg text-waitInk" data-testid={`sla-tentative-${task.id}`} title={t('sla.tentative_title', { dates: (task.sla.tentative_holidays ?? []).join(', ') })}>{t('sla.tentative_date')}</span>}

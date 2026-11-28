@@ -10,6 +10,7 @@ import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, type T
 import type { TaskDetail, TaskRegisterField } from '@/api/types';
 import { DocSlots } from './DocSlots';
 import { DraftBar, useDraft } from './DraftBar';
+import { RelDue } from './RelDue';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
 import { EditingNotice } from './EditingNotice';
 import { useCommentReaction, useCommentResolved } from '@/api/x';
@@ -145,7 +146,7 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
             : <div className="font-semibold">{task.sla?.min_wd ?? '–'}–{task.sla?.max_wd ?? '–'} {t('approvals.wd')} <span className={`chip ${task.sla?.colour === 'red' ? 'bg-lateBg text-lateInk' : 'bg-doneBg text-doneInk'}`}>{task.sla?.elapsed_wd ?? 0}</span>
               {task.sla?.pending_confirmation && <span className="chip ms-1 bg-waitBg text-waitInk" data-testid="drawer-sla-pending">{t('sla.pending_confirmation')}</span>}
               <span className="ms-1"><SlaOverrun task={task} testid="drawer-overrun" /></span></div>}</div>
-          {task.sla?.due_date && <div><span className="text-mute">{t('sla.due_date')}</span><div className="mono font-semibold" data-testid="drawer-due-date">{task.sla.due_date}
+          {task.sla?.due_date && <div><span className="text-mute">{t('sla.due_date')}</span><div className="mono font-semibold" data-testid="drawer-due-date">{task.sla.due_date}</div><div className="mt-1"><RelDue date={task.sla.due_date} done={task.state === 'approved'} testid="drawer-reldue" />
             {task.sla.due_date_tentative && <span className="chip ms-1 bg-waitBg text-waitInk" data-testid="drawer-due-tentative" title={t('sla.tentative_title', { dates: (task.sla.tentative_holidays ?? []).join(', ') })}>{t('sla.tentative_date')}</span>}</div></div>}
           {task.task_code === 'B6' && (
             /* 0.12.0 (Q13): the Layout Submitted Date, its own field (never taken from another date) */

@@ -5,7 +5,7 @@ import { loadPref, savePref } from './localPref';
  * Small display features a person can switch off for themselves (Settings > Screens > Interface > "On this device"). Stored on the device like the other view prefs,
  * so no data and no permission is involved. Each feature adds its key here and one line of text in `ui.extra_*`.
  */
-export const UI_EXTRAS = ['copy_link', 'chart_png', 'last_updated'] as const;
+export const UI_EXTRAS = ['copy_link', 'chart_png', 'last_updated', 'relative_due'] as const;
 export type UiExtra = (typeof UI_EXTRAS)[number];
 
 const subs = new Set<() => void>();
