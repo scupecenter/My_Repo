@@ -20223,6 +20223,17 @@ export interface components {
             /** @description The language of the signed-out pages until the visitor chooses one; null: the browser default (English). */
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+            /** @description Render only (0658): the remember-my-id box of the card. */
+            show_remember: boolean;
+            show_language_switch: boolean;
+            show_theme_switch: boolean;
+            /** @description The help line under the card. */
+            show_help: boolean;
+            /** @description Empty: the built-in title. */
+            welcome_title_en: string;
+            welcome_title_ar: string;
+            welcome_subtitle_en: string;
+            welcome_subtitle_ar: string;
             /** @description The system version, shown to signed-in users only (the post-login splash and this screen). */
             server_version: string;
             /** Format: date-time */
@@ -20241,6 +20252,17 @@ export interface components {
             animation: boolean;
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+            /** @description Render only (0658): the remember-my-id box of the card. */
+            show_remember?: boolean;
+            show_language_switch?: boolean;
+            show_theme_switch?: boolean;
+            /** @description The help line under the card. */
+            show_help?: boolean;
+            /** @description Empty: the built-in title. */
+            welcome_title_en?: string;
+            welcome_title_ar?: string;
+            welcome_subtitle_en?: string;
+            welcome_subtitle_ar?: string;
         };
         /** @description 0.15.97. The public sign-in page config: ONLY what the signed-out pages render. No version, no audit data, nothing about users. */
         LoginPagePublic: {
@@ -20253,6 +20275,17 @@ export interface components {
             animation: boolean;
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+            /** @description Render only (0658): the remember-my-id box of the card. */
+            show_remember: boolean;
+            show_language_switch: boolean;
+            show_theme_switch: boolean;
+            /** @description The help line under the card. */
+            show_help: boolean;
+            /** @description Empty: the built-in title. */
+            welcome_title_en: string;
+            welcome_title_ar: string;
+            welcome_subtitle_en: string;
+            welcome_subtitle_ar: string;
         };
         /** @description 0.15.193. The download lock categories (setting `security.download_locks`, migration 0293). */
         DownloadLocks: {

@@ -324,6 +324,7 @@ const finReaders: { enabled: boolean; role_codes: string[]; version: number; upd
 const financeReadersView = () => ({ ...finReaders, roles: FIN_ROLES, can_edit: isAdmin() });
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
+const CARD_FIELDS = ['show_remember', 'show_language_switch', 'show_theme_switch', 'show_help', 'welcome_title_en', 'welcome_title_ar', 'welcome_subtitle_en', 'welcome_subtitle_ar'] as const;
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
 const NL = () => (C().navLayout ??= initCfg().navLayout);
 const navView = () => {
@@ -915,7 +916,7 @@ export const settingsHandlers = [
   http.put(`${B}/settings/login-page`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     const b = await body<{ announcement_en?: unknown; announcement_ar?: unknown; announcement_kind?: unknown; animation?: unknown; default_locale?: unknown; support_links?: unknown; reason?: string } & Record<string, unknown>>(request);
-    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['announcement_en', 'announcement_ar', 'announcement_kind', 'animation', 'default_locale', 'support_links', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['announcement_en', 'announcement_ar', 'announcement_kind', 'animation', 'default_locale', 'support_links', 'reason', ...CARD_FIELDS].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
     if (typeof b.announcement_en !== 'string' || b.announcement_en.trim().length > 280) errs.push({ path: '/announcement_en', code: 'invalid' });
     if (typeof b.announcement_ar !== 'string' || b.announcement_ar.trim().length > 280) errs.push({ path: '/announcement_ar', code: 'invalid' });
     if (b.announcement_kind !== 'info' && b.announcement_kind !== 'maintenance') errs.push({ path: '/announcement_kind', code: 'invalid' });
@@ -929,6 +930,8 @@ export const settingsHandlers = [
       typeof (l as { url?: unknown }).url === 'string' && /^(https?:\/\/|mailto:)/i.test((l as { url: string }).url.trim()) && (l as { url: string }).url.trim().length <= 300;
     if (!links || links.length > 5 || !links.every(linkOk)) errs.push({ path: '/support_links', code: 'invalid' });
     if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    for (const k of ['show_remember', 'show_language_switch', 'show_theme_switch', 'show_help']) if (k in b && typeof b[k] !== 'boolean') errs.push({ path: `/${k}`, code: 'invalid' });
+    for (const [k, max] of [['welcome_title_en', 80], ['welcome_title_ar', 80], ['welcome_subtitle_en', 160], ['welcome_subtitle_ar', 160]] as const) if (k in b && (typeof b[k] !== 'string' || (b[k] as string).trim().length > max)) errs.push({ path: `/${k}`, code: 'invalid' });
     if (errs.length) return fields(...errs);
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
     const p = ver(request, loginPage().version); if (p) return p;
@@ -938,9 +941,10 @@ export const settingsHandlers = [
       announcement_kind: b.announcement_kind as 'info' | 'maintenance', animation: b.animation as boolean,
       default_locale: b.default_locale as 'en' | 'ar' | null,
       support_links: (links ?? []).map((l) => ({ label_en: l.label_en.trim(), label_ar: l.label_ar.trim(), url: l.url.trim() })),
+      ...Object.fromEntries(CARD_FIELDS.map((k) => [k, k in b ? (typeof b[k] === 'string' ? (b[k] as string).trim() : b[k]) : loginPage()[k]])),
     };
     const cur = loginPage();
-    if (JSON.stringify(nxt) === JSON.stringify({ announcement_en: cur.announcement_en, announcement_ar: cur.announcement_ar, announcement_kind: cur.announcement_kind, animation: cur.animation, default_locale: cur.default_locale, support_links: cur.support_links }))
+    if (JSON.stringify(nxt) === JSON.stringify({ announcement_en: cur.announcement_en, announcement_ar: cur.announcement_ar, announcement_kind: cur.announcement_kind, animation: cur.animation, default_locale: cur.default_locale, support_links: cur.support_links, ...Object.fromEntries(CARD_FIELDS.map((k) => [k, cur[k]])) }))
       return problem(409, 'invalid_transition', 'These are already the login page settings.');
     const v = viewer()!;
     Object.assign(cur, { ...nxt, version: cur.version + 1, updated_at: new Date().toISOString(),

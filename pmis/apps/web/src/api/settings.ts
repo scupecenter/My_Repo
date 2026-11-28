@@ -107,7 +107,7 @@ export const useLoginPage = () => useQuery({ queryKey: ['login-page'], queryFn: 
 export const useLoginPagePublic = () => useQuery({ queryKey: ['login-page-public'], queryFn: () => api.get<LoginPagePublic>('/settings/login-page/public'), staleTime: 30_000, retry: 1 });
 export const useSetLoginPage = () => {
   const qc = useQueryClient();
-  return useMutation<LoginPage, ApiError, { version: number; announcement_en: string; announcement_ar: string; announcement_kind: 'info' | 'maintenance'; animation: boolean; default_locale: 'en' | 'ar' | null; support_links: SupportLink[]; reason: string }>({
+  return useMutation<LoginPage, ApiError, { version: number; announcement_en: string; announcement_ar: string; announcement_kind: 'info' | 'maintenance'; animation: boolean; default_locale: 'en' | 'ar' | null; support_links: SupportLink[]; show_remember?: boolean; show_language_switch?: boolean; show_theme_switch?: boolean; show_help?: boolean; welcome_title_en?: string; welcome_title_ar?: string; welcome_subtitle_en?: string; welcome_subtitle_ar?: string; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/login-page', { version, body }), onSettled: () => refresh(qc, 'login-page', 'login-page-public'),
   });
 };

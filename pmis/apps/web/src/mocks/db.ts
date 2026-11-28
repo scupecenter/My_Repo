@@ -182,17 +182,24 @@ function initLoginPage() {
   return {
     announcement_en: '', announcement_ar: '', announcement_kind: 'info' as 'info' | 'maintenance', animation: true,
     default_locale: null as 'en' | 'ar' | null, support_links: [] as { label_en: string; label_ar: string; url: string }[],
+    ...initLoginCard(),
     version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
   };
 }
+/** 0658: the render-only card fields and their defaults. */
+const CARD_KEYS = ['show_remember', 'show_language_switch', 'show_theme_switch', 'show_help', 'welcome_title_en', 'welcome_title_ar', 'welcome_subtitle_en', 'welcome_subtitle_ar'] as const;
+export function initLoginCard() {
+  return { show_remember: true, show_language_switch: true, show_theme_switch: true, show_help: true, welcome_title_en: '', welcome_title_ar: '', welcome_subtitle_en: '', welcome_subtitle_ar: '' };
+}
 /** 0.15.97: the login page settings (older saved mock states have none). */
-export const loginPage = () => (db().loginPage ??= initLoginPage());
+export const loginPage = () => { const c = (db().loginPage ??= initLoginPage()); for (const [k, v] of Object.entries(initLoginCard())) if (!(k in c)) (c as Record<string, unknown>)[k] = v; return c; };
 /** 0.15.97: the public door answers only what the signed-out pages render (login_page_public). */
 export const loginPagePublic = () => {
   const c = loginPage();
   return {
     announcement: c.announcement_en === '' && c.announcement_ar === '' ? null : { en: c.announcement_en, ar: c.announcement_ar, kind: c.announcement_kind },
     animation: c.animation, default_locale: c.default_locale, support_links: c.support_links,
+    ...Object.fromEntries(CARD_KEYS.map((k) => [k, c[k]])),
   };
 };
 /** 0243: the bytes of the identity images (ui_assets); the mock keeps them in memory only. */

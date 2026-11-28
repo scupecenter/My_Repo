@@ -27,6 +27,15 @@ const putBody = z.object({
   animation: z.boolean(),
   default_locale: z.enum(['en', 'ar']).nullable(),
   support_links: z.array(supportLink).max(5),
+  // 0658: render-only card fields; absent keys keep their stored value
+  show_remember: z.boolean().optional(),
+  show_language_switch: z.boolean().optional(),
+  show_theme_switch: z.boolean().optional(),
+  show_help: z.boolean().optional(),
+  welcome_title_en: z.string().trim().max(80).optional(),
+  welcome_title_ar: z.string().trim().max(80).optional(),
+  welcome_subtitle_en: z.string().trim().max(160).optional(),
+  welcome_subtitle_ar: z.string().trim().max(160).optional(),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
 
@@ -39,6 +48,14 @@ export interface LoginPageDto {
   animation: boolean;
   default_locale: 'en' | 'ar' | null;
   support_links: SupportLink[];
+  show_remember: boolean;
+  show_language_switch: boolean;
+  show_theme_switch: boolean;
+  show_help: boolean;
+  welcome_title_en: string;
+  welcome_title_ar: string;
+  welcome_subtitle_en: string;
+  welcome_subtitle_ar: string;
   server_version: string;
   updated_at: string | null;
   updated_by: { id: string; display_name: string; employee_id: string | null } | null;
@@ -52,6 +69,14 @@ export interface LoginPagePublicDto {
   animation: boolean;
   default_locale: 'en' | 'ar' | null;
   support_links: SupportLink[];
+  show_remember: boolean;
+  show_language_switch: boolean;
+  show_theme_switch: boolean;
+  show_help: boolean;
+  welcome_title_en: string;
+  welcome_title_ar: string;
+  welcome_subtitle_en: string;
+  welcome_subtitle_ar: string;
 }
 
 const PUBLIC_LIMIT_PER_IP = 120;
