@@ -20,8 +20,11 @@ export const ARCHIVE_SCREEN = 'library-archive';
 const STATUSES = ['due', 'generated', 'signed_uploaded', 'in_review', 'approved', 'rejected', 'superseded'] as const;
 const MAX_LIMIT = 200;
 
-const siteBody = z.object({ site_id: uuidSchema }).strict();
-const generateBody = z.object({ site_id: uuidSchema, remarks: z.string().max(1000).nullable().optional() }).strict();
+// exactly one of site_id (a task document) or record_id (a document from an approved register record, 0711)
+const siteBody = z.object({ site_id: uuidSchema.optional(), record_id: uuidSchema.optional() }).strict()
+  .refine((b) => (b.site_id === undefined) !== (b.record_id === undefined), { message: 'site_id or record_id, exactly one' });
+const generateBody = z.object({ site_id: uuidSchema.optional(), record_id: uuidSchema.optional(), remarks: z.string().max(1000).nullable().optional() }).strict()
+  .refine((b) => (b.site_id === undefined) !== (b.record_id === undefined), { message: 'site_id or record_id, exactly one' });
 const reasonBody = z.object({ reason: z.string().max(2000) }).strict();
 const zipBody = z.object({
   doc_code: z.string().trim().min(1).max(40).optional(),
@@ -57,7 +60,7 @@ const SLOT_ROWS = Prisma.sql`
   LEFT JOIN LATERAL (SELECT f.id, f.version, f.file_group_id, f.original_name, f.mime_type, f.uploaded_by, f.uploaded_at, f.approved_date FROM document_files f
                      WHERE f.slot_id = s.id AND f.is_current ORDER BY f.uploaded_at DESC, f.id DESC LIMIT 1) cf ON true
   LEFT JOIN LATERAL (SELECT g.id, g.number, g.generated_at FROM library_generated_docs g
-                     WHERE s.task_id IS NOT NULL AND g.task_id = s.task_id AND g.doc_type_id = s.doc_type_id AND g.status = 'generated' ORDER BY g.generated_at DESC LIMIT 1) gd ON true
+                     WHERE ((s.task_id IS NOT NULL AND g.task_id = s.task_id) OR (s.register_entity_id IS NOT NULL AND g.register_entity_id = s.register_entity_id)) AND g.doc_type_id = s.doc_type_id AND g.status = 'generated' ORDER BY g.generated_at DESC LIMIT 1) gd ON true
   LEFT JOIN LATERAL (SELECT w.acted_by, w.created_at FROM workflow_steps w
                      WHERE s.status::text = 'approved' AND w.task_id = s.task_id AND w.action::text = 'approve' ORDER BY w.created_at DESC LIMIT 1) ap ON true
   WHERE s.site_id IS NOT NULL AND s.status::text <> 'not_required'`;
@@ -198,7 +201,7 @@ export class LibraryMenuService {
     const id = this.templateId(templateId);
     const b = parse(siteBody, raw);
     const r = await this.one<{ data: Record<string, unknown>; html: string; bindings: Record<string, string>; task_id: string | null }>(
-      Prisma.sql`SELECT lib_preview(${id}::uuid, ${b.site_id}::uuid) AS j`);
+      b.record_id ? Prisma.sql`SELECT lib_preview_record(${id}::uuid, ${b.record_id}::uuid) AS j` : Prisma.sql`SELECT lib_preview(${id}::uuid, ${b.site_id}::uuid) AS j`);
     const out = renderForm(r.html, formData(r.data, r.bindings));
     // the filled copy goes through the allow-list again (the template was checked on save; the data is escaped by the renderer)
     return { html: sanitizeHtml(out.html).html, task_id: r.task_id ?? null, warnings: out.missing };
@@ -209,7 +212,7 @@ export class LibraryMenuService {
     const id = this.templateId(templateId);
     const b = parse(generateBody, raw);
     const g = await this.one<{ id: string; data: Record<string, unknown>; html: string; bindings: Record<string, string> }>(
-      Prisma.sql`SELECT lib_generate(${id}::uuid, ${b.site_id}::uuid, ${b.remarks ?? null}::text) AS j`);
+      b.record_id ? Prisma.sql`SELECT lib_generate_record(${id}::uuid, ${b.record_id}::uuid, ${b.remarks ?? null}::text) AS j` : Prisma.sql`SELECT lib_generate(${id}::uuid, ${b.site_id}::uuid, ${b.remarks ?? null}::text) AS j`);
     const out = renderForm(g.html, formData(g.data, g.bindings));
     const doc = await this.one<Record<string, unknown>>(Prisma.sql`SELECT lib_generated_attach(${g.id}::uuid, ${sanitizeHtml(out.html).html}::text) AS j`);
     return { ...doc, warnings: out.missing };

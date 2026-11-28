@@ -286,3 +286,22 @@ describe('W5: the Archive (cards, list, lifecycle, zip)', () => {
     expect(v.status).toBe(201);
   });
 });
+
+describe('0711: generate from a register record (body and refusals)', () => {
+  it('exactly one of site_id and record_id; an unknown record is 404; nothing is written', async () => {
+    const before = (await db.query('SELECT count(*)::int AS n FROM library_generated_docs')).rows[0].n;
+    const both = await flow.e.api.call('post', `/library/forms/${TPL}/preview`, { site_id: flow.site.id, record_id: '00000000-0000-4000-8000-000000000001' });
+    expect(both.status).toBe(422);
+    const none = await flow.e.api.call('post', `/library/forms/${TPL}/generate`, {});
+    expect(none.status).toBe(422);
+    const unknown = await flow.e.api.call('post', `/library/forms/${TPL}/generate`, { record_id: '00000000-0000-4000-8000-000000000001' });
+    expect(unknown.status).toBe(404);
+    expect((await db.query('SELECT count(*)::int AS n FROM library_generated_docs')).rows[0].n).toBe(before);
+  });
+  it('a task document still has a task and no record; a row with neither owner is refused by the table', async () => {
+    const col = (await db.query(`SELECT is_nullable FROM information_schema.columns WHERE table_name = 'library_generated_docs' AND column_name = 'register_entity_id'`)).rows[0];
+    expect(col.is_nullable).toBe('YES');
+    const bad = await db.query(`SELECT conname FROM pg_constraint WHERE conname = 'library_generated_docs_owner_check'`);
+    expect(bad.rows).toHaveLength(1);
+  });
+});

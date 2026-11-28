@@ -15713,9 +15713,12 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [site_id]
+              oneOf:
+              - {required: [site_id]}
+              - {required: [record_id]}
               properties:
                 site_id: {type: string, format: uuid}
+                record_id: {type: string, format: uuid, description: 'Generate from an approved current register record (its site is used). Needs "Documents: generate" for the region; else 404/403; a record not approved is 422 `record_not_approved`.'}
       responses:
         '200':
           description: Preview.
@@ -15745,9 +15748,12 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [site_id]
+              oneOf:
+              - {required: [site_id]}
+              - {required: [record_id]}
               properties:
                 site_id: {type: string, format: uuid}
+                record_id: {type: string, format: uuid}
                 remarks: {type: [string, 'null'], maxLength: 1000}
       responses:
         '201':
@@ -20217,19 +20223,20 @@ components:
         warnings: {type: array, items: {type: string}, description: 'Placeholders with no value for this site.'}
     LibraryGeneratedDocument:
       type: object
-      required: [id, number, status, site_id, site_code, task_id, doc_code, generated_at]
+      required: [id, number, status, site_id, site_code, doc_code, generated_at]
       properties:
         id: {type: string, format: uuid}
         number: {type: string}
         status: {type: string, enum: [generated, voided]}
+        register_entity_id: {type: [string, 'null'], format: uuid}
         template_id: {type: string, format: uuid}
         template_code: {type: string}
         template_version: {type: integer}
         site_id: {type: string, format: uuid}
         site_code: {type: string}
         region_id: {$ref: '#/components/schemas/RegionId'}
-        task_id: {type: string, format: uuid}
-        task_code: {type: string}
+        task_id: {type: [string, 'null'], format: uuid}
+        task_code: {type: [string, 'null']}
         doc_code: {type: string}
         remarks: {type: [string, 'null']}
         sha256: {type: [string, 'null']}
