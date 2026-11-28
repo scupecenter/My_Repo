@@ -216,7 +216,10 @@ describe('a big New sites batch: L1 sends (drafts), L2 approves all in the backg
       // diagnostics for a flaky short approval: which rows were left and what the database recorded for them
       const left = await q<Record<string, unknown>>(db, `SELECT row_no, site_code, action::text AS action, decision::text AS decision, errors, decision_note, diff
         FROM import_batch_rows WHERE batch_id = $1 AND decision::text <> 'approved' ORDER BY row_no LIMIT 8`, [b.id]);
-      throw new Error(`approve all left rows: status ${done.body.status}; counts ${JSON.stringify(done.body.counts)}; progress ${JSON.stringify(done.body.progress)}; rows ${JSON.stringify(left)}`);
+      // the reasons: the failed list of the run (kept by the job) and the technical rows the database wrote to the system log for this batch
+      const jobRows = await q<Record<string, unknown>>(db, `SELECT state, n_failed, n_approved, error, left(failed::text, 1500) AS failed FROM import_batch_jobs WHERE batch_id = $1 ORDER BY created_at`, [b.id]);
+      const logs = await q<Record<string, unknown>>(db, `SELECT message, left(context::text, 400) AS context FROM system_log WHERE context ->> 'batch_id' = $1 ORDER BY id LIMIT 6`, [b.id]);
+      throw new Error(`approve all left rows: status ${done.body.status}; counts ${JSON.stringify(done.body.counts)}; progress ${JSON.stringify(done.body.progress)}; rows ${JSON.stringify(left)}; jobs ${JSON.stringify(jobRows)}; system_log ${JSON.stringify(logs)}`);
     }
     expect(done.body).toMatchObject({ status: 'approved', counts: { approved: ROWS, pending: 0 }, progress: { state: 'done', approved: ROWS } });
     const sites = await sitesOf(b.codes);
