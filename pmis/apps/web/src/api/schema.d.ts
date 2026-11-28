@@ -2554,6 +2554,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sites/{site_id}/planned-dates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Proposed planned dates of the tasks of a site, from predecessors and work calendars (0.15.463, A4)
+         * @description 0.15.463 (migration 0603). Needs `sites` view in the site's region (404 otherwise). Computed on read. `reason` explains a task without a proposal: `no_predecessor`, `predecessor_undated`, `no_rule`, `has_actual`, `closed`. Empty `items` when the rules are switched off.
+         */
+        get: operations["getSitePlannedDates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/planned-dates/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm the proposed planned dates of chosen tasks (0.15.463, A4)
+         * @description 0.15.463 (migration 0603). Needs `sites` edit in the site's region (403 `action_forbidden`). Each task takes the proposal current at the time of the call; a task without a proposal or already on it is counted in `skipped`. One audit record per task (`task_planned_date_proposal_applied`).
+         */
+        post: operations["applySitePlannedDates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites/{site_id}/applicability": {
         parameters: {
             query?: never;
@@ -5299,6 +5343,30 @@ export interface paths {
          */
         get: operations["listReassignmentAlerts"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/plan-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rules of the proposed planned dates (0.15.463, A4)
+         * @description 0.15.463 (migration 0603). Every signed-in user. Without a saved value: enabled, basis `max`, cascade true.
+         */
+        get: operations["getPlanRules"];
+        /**
+         * Set the rules of the proposed planned dates (Administration > Settings > Planned dates)
+         * @description 0.15.463 (migration 0603): System Admin or a delegate of `admin.settings` edit for all regions (403), a reason of at least 3 characters and If-Match. Closed body: enabled, basis (`max` or `min`), cascade. Audited (`plan_rules_update`).
+         */
+        put: operations["setPlanRules"];
         post?: never;
         delete?: never;
         options?: never;
@@ -17669,6 +17737,40 @@ export interface components {
             wrap: boolean;
             zebra: boolean;
         };
+        PlanRules: {
+            enabled: boolean;
+            /** @enum {string} */
+            basis: "max" | "min";
+            cascade: boolean;
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            /** Format: uuid */
+            updated_by?: string | null;
+        };
+        PlannedDates: {
+            rules: components["schemas"]["PlanRules"];
+            items: {
+                /** Format: uuid */
+                task_id: string;
+                task_code: string;
+                name_en: string;
+                name_ar: string | null;
+                state: string;
+                /** Format: date */
+                planned_date: string | null;
+                /** Format: date */
+                proposed_date: string | null;
+                /** @description Proposed minus planned, in calendar days; null without a planned date. */
+                slip_days: number | null;
+                /** @enum {string|null} */
+                reason: "no_predecessor" | "predecessor_undated" | "no_rule" | "has_actual" | "closed" | null;
+                basis_task_code: string | null;
+                /** @enum {string|null} */
+                basis_kind: "actual" | "planned" | "proposed" | null;
+                working_days: number | null;
+            }[];
+        };
         TableDisplaySetting: {
             defaults: components["schemas"]["TableDisplay"];
             version: number;
@@ -28312,6 +28414,64 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getSitePlannedDates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannedDates"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applySitePlannedDates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    task_ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        applied: number;
+                        skipped: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getSiteApplicability: {
         parameters: {
             query?: never;
@@ -33265,6 +33425,63 @@ export interface operations {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ReassignmentAlert"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlanRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setPlanRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    enabled: boolean;
+                    /** @enum {string} */
+                    basis: "max" | "min";
+                    cascade: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanRules"];
                 };
             };
             401: components["responses"]["Unauthorized"];

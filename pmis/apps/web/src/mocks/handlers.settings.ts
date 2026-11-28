@@ -469,6 +469,7 @@ const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
 let snapState = { version: 0, weekday: 4, updated_at: null as string | null, updated_by: null as null };
 const snapView = () => ({ ...snapState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
+let planRules = { enabled: true, basis: 'max' as 'max' | 'min', cascade: true, version: 0, updated_at: null as string | null, updated_by: null as string | null };
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
 
@@ -620,6 +621,22 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     bandsState = { ...bandsState, version: bandsState.version + 1, green: b.green!, amber: b.amber!, updated_at: new Date().toISOString() };
     return HttpResponse.json(bandsView(), tag(bandsState.version));
+  }),
+  // ------------------------------------------------------------------ planned-date rules (A4, contract 0.15.463)
+  http.get(`${B}/settings/plan-rules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(planRules, tag(planRules.version)); }),
+  http.put(`${B}/settings/plan-rules`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, planRules.version); if (p) return p;
+    const b = (await request.json()) as { enabled?: boolean; basis?: string; cascade?: boolean; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (typeof b.cascade !== 'boolean') errs.push({ path: '/cascade', code: 'required' });
+    if (b.basis !== 'max' && b.basis !== 'min') errs.push({ path: '/basis', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    planRules = { ...planRules, version: planRules.version + 1, enabled: b.enabled!, basis: b.basis as 'max' | 'min', cascade: b.cascade!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(planRules, tag(planRules.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),

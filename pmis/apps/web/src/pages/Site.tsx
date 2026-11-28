@@ -1,3 +1,4 @@
+import { SitePlannedDates } from '@/components/SitePlannedDates';
 import { SiteActivity } from '@/components/SiteActivity';
 import { LayoutPanel } from '@/components/LayoutPanel';
 import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
@@ -129,6 +130,7 @@ export function Site() {
           </div>
           <SiteSummaryStrip site={s} />
           <SiteGantt site={s} />
+          <SitePlannedDates siteId={s.id} />
           <SiteIdentity site={s} />
           <SitePendingChanges siteId={s.id} />
           <SiteAdminEdit site={s} />

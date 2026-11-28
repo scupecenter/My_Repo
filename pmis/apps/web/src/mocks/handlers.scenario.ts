@@ -1,3 +1,4 @@
+import { uid } from './ids';
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { GateEvent, ScenarioRule, SiteApplicability, SlaMasterColumn } from '@/api/scenario';
@@ -69,7 +70,28 @@ const site = (id: string) => { const i = siteIndex(id); return i >= 0 && i < SIT
 const reasonOk = (b: { reason?: unknown }) => typeof b.reason === 'string' && b.reason.trim().length >= 3;
 const noReason = () => problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required' }] });
 
+const plannedDone = new Set<number>();
 export const scenarioHandlers = [
+  // A4 (contract 0.15.463): proposals computed from the predecessors; two synthetic tasks per site
+  http.get(`${B}/sites/:id/planned-dates`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const i = site(params.id as string);
+    if (i < 0) return problem(404, 'not_found', 'Site not found');
+    const items = plannedDone.has(i) ? [] : [
+      { task_id: uid(`plan-${i}-a`), task_code: 'B2', name_en: 'Site survey report', name_ar: 'تقرير مسح الموقع', state: 'open', planned_date: '2026-11-10', proposed_date: '2026-11-14', slip_days: 4, reason: null, basis_task_code: 'B1', basis_kind: 'actual', working_days: 2 },
+      { task_id: uid(`plan-${i}-b`), task_code: 'B3', name_en: 'Design approval', name_ar: 'اعتماد التصميم', state: 'open', planned_date: null, proposed_date: '2026-11-18', slip_days: null, reason: null, basis_task_code: 'B2', basis_kind: 'proposed', working_days: 2 },
+    ];
+    return HttpResponse.json({ rules: { enabled: true, basis: 'max', cascade: true, version: 0, updated_at: null, updated_by: null }, items });
+  }),
+  http.post(`${B}/sites/:id/planned-dates/apply`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const i = site(params.id as string);
+    if (i < 0) return problem(404, 'not_found', 'Site not found');
+    const b = (await request.json()) as { task_ids?: string[] };
+    if (!Array.isArray(b.task_ids) || !b.task_ids.length) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/task_ids', code: 'invalid' }] });
+    plannedDone.add(i);
+    return HttpResponse.json({ applied: b.task_ids.length, skipped: 0 });
+  }),
   http.get(`${B}/sites/:id/applicability`, ({ params }) => {
     const g = guard(); if (g) return g;
     const i = site(params.id as string);

@@ -33,6 +33,17 @@ export class SitesController {
     return this.sites.list(auth, query);
   }
 
+  @Get(':id/planned-dates')
+  plannedDates(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.sites.plannedDates(auth, id);
+  }
+
+  @Post(':id/planned-dates/apply')
+  @HttpCode(200)
+  applyPlannedDates(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown) {
+    return this.sites.applyPlannedDates(auth, id, body);
+  }
+
   @Get(':id')
   async get(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<Record<string, unknown>> {
     const site = await this.sites.get(auth, id);
