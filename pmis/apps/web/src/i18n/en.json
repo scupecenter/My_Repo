@@ -310,6 +310,7 @@
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
     "deliverables": "Deliverables",
+    "tools_equipment": "Tools & Equipment",
     "incidents": "Incidents & Security"
   },
   "toast": {
@@ -2214,6 +2215,9 @@
     "execution": "Execution",
     "lesson": "Lesson",
     "follow_up": "Follow-up",
+    "equipment": "Equipment",
+    "custody": "Custody",
+    "calibration_inspection": "Calibration and inspection",
     "invoice": "Invoice",
     "payment": "Payment",
     "deliverable": "Deliverable",
