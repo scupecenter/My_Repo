@@ -1,8 +1,8 @@
-import { ChevronLeft, ChevronRight, ClipboardCopy, Download, Lock, LockOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, ClipboardCopy, Download, FileSpreadsheet, Lock, LockOpen, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { exportDailyPlan, useDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
+import { downloadDailyPlanTemplate, exportDailyPlan, useDailyPlan, useImportDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { MoreMenu, PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
@@ -87,6 +87,10 @@ export function DailyPlan() {
       toast(t('dailyPlan.copy_failed'), 'err');
     }
   };
+  const importer = useImportDailyPlan();
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const doTemplate = () => { downloadDailyPlanTemplate(date, scope(progress.data)).then((n) => toast(t('grid.downloaded', { name: n })), fail); };
   const doExport = () => {
     const filtered = Object.entries(filters).some(([k, v]) => k !== 'region' && !!v);
     const sites = filtered ? [...new Set([...rowsOf(progress.data), ...rowsOf(tomorrow.data)].map((r) => r.site_id))] : undefined;
@@ -143,6 +147,8 @@ export function DailyPlan() {
             settings="daily_plan"
             items={[
               { id: 'export', label: t('dailyPlan.export'), icon: <Download size={16} aria-hidden />, testid: 'daily-plan-export', disabled: !progress.data, onSelect: doExport },
+              { id: 'template', label: t('dailyPlan.template'), icon: <FileSpreadsheet size={16} aria-hidden />, testid: 'daily-plan-template', disabled: !progress.data, onSelect: doTemplate },
+              ...(plans.some((p) => p.can_edit) ? [{ id: 'import', label: t('dailyPlan.import'), icon: <Upload size={16} aria-hidden />, testid: 'daily-plan-import', onSelect: () => importInput.current?.click() }] : []),
               { id: 'copy', label: t('dailyPlan.copy'), icon: <ClipboardCopy size={16} aria-hidden />, testid: 'daily-plan-copy', disabled: !progress.data || !tomorrow.data, onSelect: () => void copy() },
             ]} />
         </span>
@@ -206,6 +212,16 @@ export function DailyPlan() {
         </div>
       )}
 
+      <input ref={importInput} type="file" accept=".xlsx" className="sr-only" tabIndex={-1} data-testid="daily-plan-import-file" aria-label={t('dailyPlan.import')}
+        onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); importer.reset(); e.target.value = ''; }} />
+      {importFile && (
+        <FormDialog open withReason={false} onClose={() => setImportFile(null)} testid="daily-plan-import-dialog" title={t('dailyPlan.import')} submitLabel={t('dailyPlan.import_apply')} busy={importer.isPending}
+          error={importer.isError ? errText(importer.error, t) : null}
+          onSubmit={() => importer.mutate({ file: importFile }, { onSuccess: (r) => { setImportFile(null); toast(t('dailyPlan.imported', { updated: r.updated, added: r.added, removed: r.removed, unchanged: r.unchanged })); } })}>
+          <p className="mono text-sm" dir="ltr" data-testid="daily-plan-import-name">{importFile.name}</p>
+          <p className="mt-2 text-sm text-mute">{t('dailyPlan.import_note')}</p>
+        </FormDialog>
+      )}
       {edit && <RowDialog row={edit} tab={tab} onClose={() => setEdit(null)} busy={ops.save.isPending} error={ops.save.isError ? errText(ops.save.error, t) : null}
         onSave={(body) => { const p = planOf(edit.region_id); if (p) ops.save.mutate({ date: shownDate, region: edit.region_id, site: edit.site_id, version: p.version, body }, { onSuccess: () => { setEdit(null); toast(t('dailyPlan.saved')); } }); }} />}
       {adding && <AddDialog plans={plans.filter((p) => p.can_edit)} name={regionName} onClose={() => setAdding(false)} busy={ops.add.isPending} error={ops.add.isError ? errText(ops.add.error, t) : null}
