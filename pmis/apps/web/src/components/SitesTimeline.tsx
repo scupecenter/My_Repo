@@ -29,7 +29,7 @@ export function SitesTimeline({ query }: { query: Record<string, string | undefi
   }, [sp, dateCols]);
   const q = useSiteMasterRows(master ? 'master' : undefined, { ...Object.fromEntries(Object.entries(query).filter(([, v]) => v)), limit: 100 });
   const today = new Date().toISOString().slice(0, 10);
-  const model = useMemo(() => buildTimeline(q.data?.rows ?? [], chosen, today), [q.data, chosen, today]);
+  const model = useMemo(() => buildTimeline((q.data?.rows ?? []).map((r) => ({ id: r.site_id, code: r.site_code, values: r.values })), chosen.map(String), today), [q.data, chosen, today]);
   const name = (ord: number) => { const c = dateCols.find((x) => x.ord === ord); return (ar && c?.name_ar) || c?.header || String(ord); };
   const toggle = (ord: number) => setSp((p) => {
     const n = new URLSearchParams(p);
@@ -73,13 +73,13 @@ export function SitesTimeline({ query }: { query: Record<string, string | undefi
               style={{ left: `calc(12.5rem + (100% - 13rem) * ${posPct(model, Math.floor(Date.parse(`${today}T00:00:00Z`) / 86_400_000)) / 100})` }} />
             <ul data-testid="timeline-rows">
               {model.rows.map((r) => (
-                <li key={r.site_id} className="flex items-center border-b border-line/60 py-1" data-testid={`timeline-row-${r.code}`}>
-                  <Link to={`/sites/${r.site_id}`} className="w-48 shrink-0 truncate pe-2 text-sm text-ink hover:underline" ><b className="mono">{r.code}</b></Link>
+                <li key={r.id} className="flex items-center border-b border-line/60 py-1" data-testid={`timeline-row-${r.code}`}>
+                  <Link to={`/sites/${r.id}`} className="w-48 shrink-0 truncate pe-2 text-sm text-ink hover:underline" ><b className="mono">{r.code}</b></Link>
                   <div className="relative mx-2 h-5 flex-1">
                     <span className="absolute top-1/2 h-1 -translate-y-1/2 rounded bg-line" style={{ left: `${posPct(model, r.from)}%`, width: `${Math.max(posPct(model, r.to) - posPct(model, r.from), 0.4)}%` }} />
                     {r.points.map((p) => (
-                      <span key={p.ord} role="img" aria-label={`${name(p.ord)}: ${fmtDate(p.iso, i18n.language)}`} title={`${name(p.ord)}: ${fmtDate(p.iso, i18n.language)}`}
-                        className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card" style={{ left: `${posPct(model, p.day)}%`, background: TONES[chosen.indexOf(p.ord) % TONES.length] }} />
+                      <span key={p.key} role="img" aria-label={`${name(Number(p.key))}: ${fmtDate(p.iso, i18n.language)}`} title={`${name(Number(p.key))}: ${fmtDate(p.iso, i18n.language)}`}
+                        className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card" style={{ left: `${posPct(model, p.day)}%`, background: TONES[chosen.indexOf(Number(p.key)) % TONES.length] }} />
                     ))}
                   </div>
                 </li>

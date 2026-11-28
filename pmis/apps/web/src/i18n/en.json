@@ -7650,7 +7650,8 @@
     "map": "Map",
     "map_hint": "Items on the map",
     "chart_hint": "The rows as bars or a ring, by a field you choose",
-    "calendar_hint": "On a month grid, by a date you choose"
+    "calendar_hint": "On a month grid, by a date you choose",
+    "timeline_hint": "On a date axis, by date fields you choose"
   },
   "batchedit": {
     "title": "Batch edit",
@@ -8073,7 +8074,9 @@
     "empty": "No dates to draw",
     "empty_hint": "Pick another date column or widen the filters.",
     "today": "Today",
-    "note": "{{shown}} of {{total}} loaded sites have a date in the chosen columns ({{all}} match the filters; the first 100 are drawn)."
+    "note": "{{shown}} of {{total}} loaded sites have a date in the chosen columns ({{all}} match the filters; the first 100 are drawn).",
+    "hint_records": "Pick up to {{max}} date fields. Read only: dates change through their records.",
+    "note_records": "{{shown}} of {{total}} loaded records have a date in the chosen fields."
   },
   "rowActions": {
     "label": "Row actions",
