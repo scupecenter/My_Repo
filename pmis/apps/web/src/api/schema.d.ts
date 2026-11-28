@@ -8242,6 +8242,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard/progress-rag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Green and amber thresholds of the progress figures (0.15.432)
+         * @description 0.15.432. The setting `dashboard.progress_rag`: for the SPI (`spi`), the progress against plan in points (`progress_gap`, progress minus planned, can be negative) and the weekly velocity of the
+         *     progress curve (`velocity`, points per week): `enabled`, `green`, `amber` (higher is better, green is not below amber). A figure is coloured only while `enabled` is true; nothing is enabled until an admin saves it.
+         *     `default_green` and `default_amber` are suggestions shown in the editor (`green` and `amber` carry them until the first save). `version` is 0 until the first save and moves on every save (the ETag).
+         *     Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getProgressRag"];
+        /**
+         * Save the thresholds of the progress figures (reason, If-Match, audited)
+         * @description 0.15.432. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). All three figures are sent. Field errors (422 `validation_failed`): `required`
+         *     (`enabled` boolean, `green` and `amber` numbers), `invalid` (outside the range of the figure: `spi` 0 to 5, `progress_gap` and `velocity` -100 to 100), `invalid_order` (green below amber), `unknown_key`.
+         *     One audit row with before and after values and the reason. Nothing stored is rewritten: the colour is worked out when the figure is drawn.
+         */
+        put: operations["setProgressRag"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/goals": {
         parameters: {
             query?: never;
@@ -20405,6 +20434,41 @@ export interface components {
         };
         /** @description 0.15.430. The setting dashboard.snapshot_weekday (default 4, Thursday). */
         SnapshotSchedule: components["schemas"]["SnapshotScheduleInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ProgressRagItemInput: {
+            /** @description True: the figure is coloured by green and amber. False: no colour (the stored numbers are kept). */
+            enabled: boolean;
+            green: number;
+            amber: number;
+        };
+        ProgressRagInput: {
+            items: {
+                spi: components["schemas"]["ProgressRagItemInput"];
+                progress_gap: components["schemas"]["ProgressRagItemInput"];
+                velocity: components["schemas"]["ProgressRagItemInput"];
+            };
+        };
+        ProgressRagItem: components["schemas"]["ProgressRagItemInput"] & {
+            /** @enum {string} */
+            code: "spi" | "progress_gap" | "velocity";
+            label_en: string;
+            label_ar: string;
+            /** @enum {string} */
+            unit: "index" | "points" | "points_per_week";
+            min: number;
+            max: number;
+            /** @description The suggested green (not stored). */
+            default_green: number;
+            /** @description The suggested amber (not stored). */
+            default_amber: number;
+        };
+        /** @description 0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity. */
+        ProgressRag: {
+            items: components["schemas"]["ProgressRagItem"][];
             version: number;
             /** Format: date-time */
             updated_at?: string | null;
@@ -38370,6 +38434,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnapshotSchedule"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getProgressRag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The thresholds. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressRag"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setProgressRag: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["ProgressRagInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressRag"];
                 };
             };
             401: components["responses"]["Unauthorized"];
