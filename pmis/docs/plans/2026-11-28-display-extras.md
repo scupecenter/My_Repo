@@ -15,6 +15,7 @@ Customer text: `docs/customer/display-extras.md`. Contract: no path change excep
 | 3 | 3 last updated | `last_updated` | `LastUpdated` in `PageHeader` | Reads the query cache, skips background query keys; the button refetches the page's data. |
 | 4 | 4 due dates in words | `relative_due` | `RelDue` in `TaskGrid` and `TaskDrawer` | Colour bands: overdue red, 0 to 2 days amber, within a week blue, later quiet; finished tasks show none. |
 | 5 | 1 totals row | `totals_row` | `lib/columnTotals.ts`, `RegisterGrid` `totals` prop | Loaded rows only; sum, average, count, min, max per column, remembered per register and column. |
+| 6 | 7 private notes | `private_notes` | `PrivateNotePanel` under the task and register drawers | Server side (migration 0668, contract 0.15.597); only the author reads it, an administrator included; KEEP in the data reset. |
 
 ## Rules kept
 Every icon button has a tip and an aria-label. Arabic RTL and English. No migration. Each PR has a vitest file and a Playwright spec (EN, AR, 390px).
