@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -131,14 +131,9 @@ describe('Task drawer', () => {
     const slot = (await screen.findAllByTestId(/^slot-input-/))[0];
     await userEvent.upload(slot, file());
     await waitFor(() => expect(screen.getByTestId('drawer-submit')).toBeEnabled());
-    // submitting without the actual date is refused in plain words (422 mandatory_fields_missing), nothing changes
-    await userEvent.click(screen.getByTestId('drawer-submit'));
-    expect(await screen.findByText('Fill the mandatory fields first: actual_date.')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-state')).toHaveTextContent('Entry');
-    // save the date (If-Match), then submit
-    fireEvent.change(screen.getByTestId('drawer-actual-date'), { target: { value: '2026-10-20' } });
-    await userEvent.click(screen.getByTestId('drawer-save'));
-    expect(await screen.findByText('Saved.')).toBeInTheDocument();
+    // A5: no actual date yet, so today is the default (editable, prominent); Submit saves it first and then submits
+    expect(screen.getByTestId('drawer-actual-default')).toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-missing')).toBeNull();
     await userEvent.click(screen.getByTestId('drawer-submit'));
     await waitFor(() => expect(screen.getByTestId('drawer-state')).toHaveTextContent('Awaiting approval'));
     await waitFor(() => expect(screen.getByTestId('history-list')).toHaveTextContent(/Auto-skipped/));

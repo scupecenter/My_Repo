@@ -851,6 +851,7 @@
     "reopen": "Reopen"
   },
   "drawer": {
+    "actual_default": "Default: today. Change it if the work was finished on another day. It is saved when you submit.",
     "mandatory": "Mandatory",
     "drop": "Drop a file or click to upload",
     "comments": "Comments",
