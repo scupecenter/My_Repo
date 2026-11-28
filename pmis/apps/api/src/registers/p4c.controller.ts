@@ -97,6 +97,12 @@ export class P4cController {
     return this.p4c.issueRiskOptions(auth);
   }
 
+  /** 0765: the lessons learned that may apply to an Issue being written. */
+  @Get('issues/lesson-suggestions')
+  issueLessonSuggestions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.issueLessonSuggestions(auth, q);
+  }
+
   @Get('risks/:entity_id/issues')
   riskIssues(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
     return this.p4c.riskIssues(auth, entityId);

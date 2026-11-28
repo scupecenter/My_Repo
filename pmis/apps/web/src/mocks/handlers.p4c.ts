@@ -9,7 +9,7 @@ import { db, save, stepUpValid, viewer } from './db';
 import { guard, problem, stepUp } from './handlers';
 import { toRecord } from './handlers.registers';
 import { dismantleOrders, gecolCfg } from './p4cData';
-import { siteIndex, siteMeta } from './sites';
+import { siteIdOf, siteIndex, siteMeta } from './sites';
 
 const B = API_BASE;
 const R = () => db().reg;
@@ -95,6 +95,20 @@ export const p4cHandlers = [
     const g = guard(); if (g) return g;
     const items = R().records.filter((o: MockRecord) => o.register_key === 'risks' && o.state !== 'voided')
       .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, risk_id: o.data.risk_id, statement: o.data.risk_statement, status: o.data.status, state: o.state }));
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${B}/registers/issues/lesson-suggestions`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url);
+    const toks = [...new Set((u.searchParams.get('q') ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3))];
+    const need = Math.min(2, toks.length);
+    const items = toks.length === 0 ? [] : R().records.filter((o: MockRecord) => o.register_key === 'lessons_learned' && o.state === 'approved')
+      .map((o: MockRecord) => {
+        const words = new Set(String(['title', 'lesson', 'description', 'recommendation', 'category'].map((k) => o.data[k] ?? '').join(' ')).toLowerCase().split(/[^\p{L}\p{N}]+/u));
+        return { o, m: toks.filter((w) => words.has(w)).length };
+      })
+      .filter((x) => x.m >= need && x.m > 0).sort((a, b) => b.m - a.m).slice(0, 5)
+      .map(({ o, m }) => ({ id: o.id, entity_id: o.entity_id, title: o.data.title ?? null, category: o.data.category ?? null, lesson: o.data.lesson ?? null, recommendation: o.data.recommendation ?? null, same_site: o.site_index !== null && siteIdOf(o.site_index) === u.searchParams.get('site_id'), matches: m }));
     return HttpResponse.json({ items });
   }),
   http.get(`${B}/registers/risks/:entity_id/issues`, ({ params }) => {

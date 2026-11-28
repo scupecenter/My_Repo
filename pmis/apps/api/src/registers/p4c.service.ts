@@ -119,6 +119,17 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/issues/lesson-suggestions : approved Lessons Learned sharing words with the text of a new Issue (the database applies the Lessons view right and regions). */
+  async issueLessonSuggestions(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('issues', 'view');
+    const site = typeof q.site_id === 'string' && q.site_id !== '' ? q.site_id : null;
+    if (site !== null && !uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
+    const text = typeof q.q === 'string' ? q.q : '';
+    if (text.length > 2000) throw problems.validation([{ path: '/q', code: 'too_long', message: 'q is at most 2000 characters.' }]);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT lessons_suggest(${site}::uuid, ${text}::text, 5) AS r`);
+    return { items };
+  }
+
   /** GET /registers/risks/{entity_id}/issues : the issues that realise one risk. */
   async riskIssues(auth: AuthContext, entityId: string): Promise<{ items: unknown[] }> {
     await this.access.requireRegions('risks', 'view');

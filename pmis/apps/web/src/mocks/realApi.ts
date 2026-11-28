@@ -532,6 +532,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/register-state'],
   ['put', '/settings/register-state/:key'],
   ['get', '/registers/issues/risk-options'],
+  ['get', '/registers/issues/lesson-suggestions'],
   ['get', '/registers/risks/:entity_id/issues'],
   ['get', '/registers/procurement/:entity_id/receipts'],
   ['get', '/registers/:key/:entity_id/related'],
