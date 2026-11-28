@@ -5473,7 +5473,7 @@ export interface paths {
         };
         /**
          * The last runs of the alert rules, run by the system (0.15.473)
-         * @description 0.15.473 (migration 0612): System Admin. The last 50 runs, newest first: the rule (`rule_id`, `rule_code`, `kind`), `run_at` and `fired` (the targets the rule fired for in that run, 0 when nothing was found). A run that fired is also an audit row `alert_rule_run` with no actor (the system), via job, job_name `alert_rules`.
+         * @description 0.15.473 (migration 0614): System Admin. The last 50 runs, newest first: the rule (`rule_id`, `rule_code`, `kind`), `run_at` and `fired` (the targets the rule fired for in that run, 0 when nothing was found). A run that fired is also an audit row `alert_rule_run` with no actor (the system), via job, job_name `alert_rules`.
          */
         get: operations["getAlertRuleRuns"];
         put?: never;
