@@ -164,6 +164,12 @@ export class WarehouseController {
     return r;
   }
 
+  /** Migration 0567: the audit trail of one item with the field changes (System Admin or a warehouse_items delegate). Restore uses PATCH items/:id. */
+  @Get("items/:id/history")
+  itemHistory(@Auth() auth: AuthContext, @Param("id") id: string) {
+    return this.wh.itemHistory(auth, id);
+  }
+
   @Delete("items/:id")
   @HttpCode(200)
   deleteItem(
