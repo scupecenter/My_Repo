@@ -111,3 +111,27 @@ export const useSettingsChangeLog = (scope: "dashboard" | "goals") =>
     queryFn: () =>
       api.get<SettingsChangeLog>("/settings/change-log", { query: { scope, limit: 50 } }),
   });
+
+/** 0.15.431 (settings review gap 3): the number of weeks the dashboard forecast averages. Kept in the setting dashboard.forecast_window_weeks. */
+export type ForecastWindow = S["ForecastWindow"];
+
+export const useForecastWindow = () =>
+  useQuery({
+    queryKey: ["forecastWindow"],
+    queryFn: () =>
+      api.get<ForecastWindow>("/settings/dashboard/forecast-window"),
+  });
+
+export function useSetForecastWindow() {
+  const qc = useQueryClient();
+  return useMutation<
+    ForecastWindow,
+    ApiError,
+    { version: number; body: { weeks: number; reason: string } }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/forecast-window", { version, body }),
+    onSettled: () =>
+      void qc.invalidateQueries({ queryKey: ["forecastWindow"] }),
+  });
+}
