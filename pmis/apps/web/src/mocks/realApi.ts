@@ -240,6 +240,9 @@ export const REAL_API_AUTH_USERS = [
   ['patch', '/me/profile'],
   ['get', '/admin/document-search-index'],
   ['get', '/me/push'],
+  ['get', '/me/calendar-feed'],
+  ['post', '/me/calendar-feed'],
+  ['delete', '/me/calendar-feed'],
   ['post', '/me/push/subscribe'],
   ['post', '/me/push/unsubscribe'],
   // Contract 0.15.531: personal notification settings (apps/api: notifications; migration 0583).

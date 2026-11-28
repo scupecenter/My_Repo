@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { createHash, randomBytes } from 'node:crypto';
+import { buildFeedIcs, type FeedEvent } from '../workflow/ics';
 import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
@@ -160,5 +162,35 @@ export class MeService {
     const access = await this.db.tx.$queryRaw<{ tabs: string[]; hidden: boolean }[]>(Prisma.sql`SELECT app_dashboard_tabs(${auth.user.id}::uuid) AS tabs, app_nav_hidden(${auth.user.id}::uuid) AS hidden`);
     if (access[0]?.hidden) { nav.delete('messages'); nav.delete('inbox'); }
     return { grants: effGrants, nav: [...nav].sort(), dashboard_tabs: access[0]?.tabs ?? ['cw', 'pmo', 'te'], matrix_levels: [...levels.values()] };
+  }
+
+  /** D4 (0.15.460, migration 0600): the caller's own calendar feed. The secret is shown once, when it is made; only its SHA-256 hash is stored. */
+  async feedStatus(auth: AuthContext): Promise<Record<string, unknown>> {
+    void auth;
+    const r = await this.db.tx.$queryRaw<{ r: Record<string, unknown> }[]>(Prisma.sql`SELECT calendar_feed_status() AS r`);
+    return r[0]?.r ?? { enabled: false };
+  }
+
+  async feedSet(auth: AuthContext): Promise<Record<string, unknown>> {
+    void auth;
+    const token = randomBytes(32).toString('base64url');
+    const hash = createHash('sha256').update(token).digest('hex');
+    const r = await this.db.tx.$queryRaw<{ r: Record<string, unknown> }[]>(Prisma.sql`SELECT calendar_feed_set(${hash}::text) AS r`);
+    return { ...(r[0]?.r ?? {}), path: `/me/calendar-feed/${token}.ics` };
+  }
+
+  async feedRevoke(auth: AuthContext): Promise<Record<string, unknown>> {
+    void auth;
+    const r = await this.db.tx.$queryRaw<{ r: Record<string, unknown> }[]>(Prisma.sql`SELECT calendar_feed_revoke() AS r`);
+    return r[0]?.r ?? { enabled: false };
+  }
+
+  /** The public read of a feed link (no session): the body, or null when the link is wrong, turned off or rotated. */
+  async feedIcs(token: string): Promise<string | null> {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+    const hash = createHash('sha256').update(token).digest('hex');
+    const r = await this.db.tx.$queryRaw<{ r: FeedEvent[] | null }[]>(Prisma.sql`SELECT calendar_feed_events(${hash}::text) AS r`);
+    const events = r[0]?.r;
+    return events ? buildFeedIcs(events, new Date()) : null;
   }
 }

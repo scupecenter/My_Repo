@@ -7551,6 +7551,21 @@
     "org_keep": "Keep held-notice history (days)",
     "org_dedupe_note": "The dedupe window drops the same unread notice (same person, type, title and link) sent again inside it."
   },
+  "calFeed": {
+    "title": "My calendar feed",
+    "note": "A private link for your calendar app (Outlook, Google, Apple). It shows only your own dates: your planned dates and the expiry dates of your own permits. It is off until you turn it on. Anyone who has the link can see those dates, so keep it private. You can replace it or turn it off at any time and the old link stops at once.",
+    "on": "The feed is on",
+    "off": "The feed is off",
+    "enable": "Turn on",
+    "rotate": "Make a new link",
+    "disable": "Turn off",
+    "once": "Your link. It is shown only now; copy it into your calendar app.",
+    "link": "Calendar feed link",
+    "copy": "Copy the link",
+    "copied": "Link copied.",
+    "last_read": "Last read by a calendar app:",
+    "failed": "Could not change the calendar feed. Try again."
+  },
   "push": {
     "title": "Notifications on this device",
     "note": "Get a short alert on this phone or computer when you have a new notification. The alert only says you have something new; open the inbox to read it. The bell and the e-mail stay as they are, and you can turn this off at any time.",

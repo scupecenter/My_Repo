@@ -177,11 +177,16 @@ const npHandlers = [
     return HttpResponse.json(npState.org);
   }),
 ];
+/** D4: the mock feed of the signed-in person (one link at a time, like the real one). */
+const FEED: { token: string | null; at: string; n: number } = { token: null, at: '', n: 0 };
 export const profileHandlers = [
   ...npHandlers,
   http.get(`${B}/me/sessions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: MY_SESSIONS }); }),
   http.post(`${B}/me/sessions/revoke-others`, () => { const g = guard(); if (g) return g; const n = MY_SESSIONS.filter((s) => !s.is_current).length; MY_SESSIONS = MY_SESSIONS.filter((s) => s.is_current); return HttpResponse.json({ revoked_count: n }); }),
   http.post(`${B}/me/sessions/:id/revoke`, ({ params }) => { const g = guard(); if (g) return g; MY_SESSIONS = MY_SESSIONS.filter((s) => s.session_id !== params.id || s.is_current); return HttpResponse.json({ revoked_count: 1 }); }),
+  http.get(`${B}/me/calendar-feed`, () => { const g = guard(); if (g) return g; return HttpResponse.json(FEED.token ? { enabled: true, created_at: FEED.at, rotated_at: null, last_read_at: null, read_count: 0 } : { enabled: false }); }),
+  http.post(`${B}/me/calendar-feed`, () => { const g = guard(); if (g) return g; const rotated = FEED.token !== null; FEED.token = `mockfeedtoken${(FEED.n += 1)}`.padEnd(43, 'x'); FEED.at = new Date().toISOString(); return HttpResponse.json({ enabled: true, rotated, path: `/me/calendar-feed/${FEED.token}.ics` }); }),
+  http.delete(`${B}/me/calendar-feed`, () => { const g = guard(); if (g) return g; const removed = FEED.token ? 1 : 0; FEED.token = null; return HttpResponse.json({ enabled: false, removed }); }),
   http.get(`${B}/me/push`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ enabled: false, public_key: null, count: 0, this_browser: false }); }),
   http.get(`${B}/me/profile`, () => { const g = guard(); if (g) return g; return withEtag(profileBody()); }),
 
