@@ -90,6 +90,19 @@
       }
     }
   },
+  "fhs": {
+    "title": "Finance hub settings",
+    "widgets_title": "Cards of the page",
+    "widgets_note": "Which cards the Finance hub shows. A card is also hidden when its register is not open to the person.",
+    "widget_advances": "Advances summary",
+    "widget_invoices": "Invoices summary",
+    "widget_quick_links": "Quick links",
+    "widget_templates": "Templates",
+    "thresholds_title": "Thresholds",
+    "thresholds_note": "When a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets.",
+    "settle_warn_days": "Advance warning after (days)",
+    "aging_days": "Invoice aging bounds (days)"
+  },
   "dhs": {
     "title": "Data hub settings", "widgets_title": "Landing page widgets", "widgets_note": "Choose what the Data hub landing page shows. A hidden widget is only hidden; its page stays in the menu.",
     "widget_quick_bar": "Quick template download bar", "widget_batches": "Batches needing action", "widget_template_changes": "Template changes", "widget_recent": "Recent uploads and exports", "widget_health": "Data health", "widget_admin": "Admin section (System Admin only)",
@@ -98,12 +111,48 @@
     "screen_templates": "Templates", "screen_uploads": "Uploads & batches", "screen_exports": "Exports", "screen_master_import": "Master import & comparison",
     "view_cards": "Cards", "view_rows": "Rows", "view_table": "Table", "view_compact": "Compact list"
   },
+  "fhub": {
+    "title": "Finance hub",
+    "subtitle": "Advances and invoices in one place",
+    "all_hidden": "All cards are hidden. Turn them on in Settings > Screens > Finance hub.",
+    "no_access": "No finance register is open to you.",
+    "adv_title": "Financial advances",
+    "adv_open": "Open advances",
+    "adv_overdue": "Disbursed and unsettled for over {{days}} days",
+    "adv_amount": "Open balance",
+    "amounts_hidden": "Amounts follow the register's own rule and are not shown to you.",
+    "inv_title": "Invoices",
+    "inv_open": "Open invoices",
+    "inv_overdue": "Past due date",
+    "inv_by_state": "By state",
+    "inv_aging": "Aging of the open invoices",
+    "inv_state_Received": "Received",
+    "inv_state_UnderReview": "Under review",
+    "inv_state_Approved": "Approved",
+    "inv_state_Disputed": "Disputed",
+    "inv_age_first": "Up to {{days}} days",
+    "inv_age_second": "{{from}} to {{to}} days",
+    "inv_age_third": "Over {{days}} days",
+    "links_title": "Quick links",
+    "link_adv_all": "All advance records",
+    "link_adv_open": "Advances",
+    "link_adv_expenses": "Expenses",
+    "link_adv_settlements": "Settlements", "link_adv_triage": "Advances waiting for triage",
+    "link_inv_all": "All invoices",
+    "link_inv_triage": "Invoices waiting for triage",
+    "templates_title": "Templates",
+    "templates_note": "The register templates, filled or blank, from the Templates page.",
+    "tpl_adv": "Financial advances (TPL-ADV)",
+    "tpl_inv": "Invoices (TPL-INVOICES)",
+    "open_register": "Open",
+    "open_templates": "Templates"
+  },
   "dhub": {
     "title": "Data hub", "subtitle": "Templates, uploads, exports and data health in one place",
     "settings_hint": "Data hub settings (widgets and default views)", "all_hidden": "All widgets are hidden. Turn them on in Settings > Screens > Data hub.",
     "quick_title": "Quick template download", "pick_template": "Template", "pick_template_ph": "Type to find a template", "pick_action": "Action", "pick_action_ph": "Choose an action", "pick_template_first": "Choose a template first", "none_found": "No template matches", "quick_go": "Go",
     "act_blank": "Download blank copy", "act_blank_hint": "The approved empty template", "act_prefill": "Download pre-filled copy", "act_prefill_hint": "With the records in force in your regions", "act_upload": "Upload a filled file", "act_upload_hint": "Starts an import batch", "act_open": "Open Templates page", "act_open_hint": "All templates and batches",
-    "kind_master": "Master", "kind_stream": "Section", "kind_register": "Register", "kind_sites": "New sites", "kind_list_values": "List values", "kind_holidays": "Holidays",
+    "kind_master": "Master", "kind_stream": "Section", "kind_register": "Register", "kind_sites": "New sites", "kind_list_values": "List values", "kind_daily_plan": "Daily Plan", "kind_holidays": "Holidays",
     "my_downloads": "Your last downloads", "prefilled": "pre-filled",
     "w_batches": "Batches needing action", "batches_none": "Nothing waits for you.", "open_all": "Open", "open_templates": "Templates",
     "act_send": "Send", "act_review_l2": "Review", "act_returned": "Returned", "act_checking": "Checking",
@@ -116,6 +165,7 @@
     "group_home": "Dashboard",
     "group_work": "Work",
     "group_data": "Data hub",
+    "finance_hub": "Finance hub",
     "data_hub": "Data hub",
     "master_import": "Master import and comparison",
     "column_mapping": "Column mapping",
@@ -465,11 +515,21 @@
     "carried": "{{n}} sites carried over"
   },
   "panel": {
+    "move": "Move the panel",
+    "move_hint": "Drag, or use the arrow keys",
+    "pin": "Pin (dock) the panel",
+    "unpin": "Unpin the panel",
+    "float": "Float the panel",
+    "anchor_end-top": "Panel at the top, end side",
+    "anchor_end-bottom": "Panel at the bottom, end side",
+    "anchor_start-top": "Panel at the top, start side",
+    "anchor_start-bottom": "Panel at the bottom, start side",
     "tab_all": "All",
     "tab_unread": "Unread",
     "tab_priority": "Priority"
   },
   "common": {
+    "name_ar_missing": "Arabic name is empty: Arabic users will see the English name.",
     "pick_date": "Pick a date from the calendar",
     "date_hint": "Date as YYYY-MM-DD",
     "search": "Search",
@@ -1155,6 +1215,7 @@
   },
   "export": {
     "open": "Export",
+    "centre": "Exports centre",
     "title": "Export",
     "body": "Excel file in the Site Master layout, limited to your regions and modules.",
     "whole": "Whole project (full Master)",
@@ -1272,6 +1333,7 @@
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
     "section_screens_data-hub": "Data hub",
+    "section_screens_finance-hub": "Finance hub",
     "section_screens_goals": "Goals",
     "section_security_newdevice": "New-device code",
     "section_security_passkeys": "Passkeys",
@@ -2093,6 +2155,10 @@
     "top_up_amount": "Extra amount (LYD)",
     "period_to": "Extend period to",
     "topped_up": "Top-up draft created",
+    "new_expense": "New expense",
+    "new_settlement": "Settle this advance",
+    "child_created": "Draft created from this advance",
+    "child_hint": "The draft is filled from this advance: the advance, the site, today as the date and, for a settlement, the remaining balance as the amount to return.",
     "balance": "Balance",
     "hidden": "hidden"
   },
@@ -2199,6 +2265,7 @@
     "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply."
   },
   "regErrors": {
+    "overridden_by_later_row": "A later row of the same record in this file replaced this one. It is kept here and in the error report.",
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
     "required": "{{field}} is required.",
     "site_required": "Choose the site first.",
@@ -2432,6 +2499,9 @@
     "off": "off"
   },
   "batchReview": {
+    "show_overridden": "Replaced",
+    "hint_overridden": "Rows set aside because the same record appears again later in the file and the setting \"last row wins\" is on. Nothing is lost: they stay listed here and in the error report.",
+    "kpi_overridden": "Replaced by a later row",
     "kpis": "Upload counts",
     "kpi_rows": "Rows checked",
     "kpi_rows_sub": "{{pct}}% valid",
@@ -2542,6 +2612,38 @@
     "kind_mixed": "mixed holders"
   },
   "wh": {
+    "tab_reorder": "Reorder limits",
+    "tab_rma": "Supplier returns",
+    "rl_note": "The level under which an item is flagged \"below reorder\", and the quantity to reorder. Only the available stock counts (not the quarantine).",
+    "rl_only_below": "Only items at or under the level",
+    "rl_add": "Add a limit for an item",
+    "rl_level": "Reorder level",
+    "rl_qty": "Reorder quantity",
+    "rl_available": "Available",
+    "rl_below": "Below reorder",
+    "rl_empty": "No reorder limits yet.",
+    "rl_title": "Reorder limit: {{item}}",
+    "rl_saved": "Reorder limit saved.",
+    "rl_clear": "Remove the limit",
+    "rl_clear_reason": "Limit removed",
+    "rma_note": "What the supplier did with items sent back from quarantine. This only tracks the return; the stock leaves quarantine through the \"returned to supplier\" exit.",
+    "rma_all": "All statuses",
+    "rma_new": "New supplier return",
+    "rma_no": "RMA no.",
+    "rma_qty": "Quantity",
+    "rma_supplier": "Supplier",
+    "rma_sent_on": "Sent on",
+    "rma_sent": "Sent",
+    "rma_replaced": "Replaced",
+    "rma_credited": "Credited",
+    "rma_rejected": "Rejected",
+    "rma_closed": "Closed",
+    "rma_to_replaced": "Replaced",
+    "rma_to_credited": "Credited",
+    "rma_to_rejected": "Rejected",
+    "rma_to_closed": "Close",
+    "rma_empty": "No supplier returns.",
+    "rma_saved": "Supplier return saved.",
     "title": "Warehouse",
     "tab_items": "Item master",
     "tab_movements": "DN / RN movements",
@@ -2843,7 +2945,22 @@
     "done_enforce": "Two-factor is now enforced.",
     "done_unenforce": "Two-factor is no longer enforced."
   },
+  "exlog": {
+    "title": "Exports log",
+    "hint": "Every export you made, with its scope, state and how long the file can be downloaded. Scheduled exports appear here too.",
+    "schedule": "Scheduled export",
+    "whole": "Whole project",
+    "as_of": "as of",
+    "col_what": "Export",
+    "col_scope": "Scope",
+    "col_when": "When",
+    "col_status": "State",
+    "col_rows": "Rows",
+    "col_expires": "Download until"
+  },
   "tpl": {
+    "tab_templates": "Templates and uploads",
+    "tab_exports": "Exports",
     "title": "Templates and uploads",
     "subtitle": "Each register has one approved template, and the Site Master has one per stream and the whole Master. Download it, fill it, and upload the same file. Every row then goes through Entry and Review / Approve like a manual entry.",
     "catalogue": "Approved templates",
@@ -2909,6 +3026,7 @@
     "mode_draft": "Save Draft / Planning",
     "mode_draft_hint": "The planned dates and values are saved without submitting. Nothing goes to L2 and no milestone moves.",
     "kind_sites": "New sites",
+    "kind_daily_plan": "Daily Plan (download here, upload on the Daily Plan page)",
     "kind_holidays": "Holidays (upload in Settings > Calendar)",
     "kind_list_values": "List values (upload in the list)",
     "rule_sites": "One row per new site. Each valid row becomes a site draft when you send the batch; no site exists until L2 approves it.",
@@ -3061,6 +3179,10 @@
     "p_returned_note": "{{x}} was returned with a note",
     "p_nobody_level": "{{x}}: nobody can act on the {{y}} level.",
     "t_a_new_site_was_approved": "A new site was approved",
+    "t_approval_reminder": "Approval reminder",
+    "t_approval_escalated": "Approval escalated",
+    "t_task_idle": "Task idle",
+    "t_level_has_no_holder": "Level has no holder",
     "p_sla_escalation": "SLA escalation: {{x}}",
     "p_reminder": "Reminder: {{x}}"
   },
@@ -3483,6 +3605,9 @@
       "unavailable_materials": "You cannot see the Warehouse, so the materials position is not shown.",
       "receive_rate": "receive rate",
       "sites_short": "Sites short on materials",
+      "draft_pr": "Draft purchase request",
+      "col_draft": "Draft",
+      "draft_remark": "Shortage of {{item}}: missing {{missing}} (required {{required}}, dispatched {{dispatched}}).",
       "no_shortage": "No material shortage on the visible sites.",
       "top_shortages": "The biggest missing lines",
       "col_site": "Site",
@@ -3616,6 +3741,11 @@
     }
   },
   "docs": {
+    "signed": "Signed",
+    "stamped": "Stamped",
+    "awaiting_signed": "Awaiting the signed and stamped copy: upload it as the next version.",
+    "mark_signed": "This file is the signed copy",
+    "mark_stamped": "This file is the stamped copy",
     "err": {
       "too_large": "The file is larger than the {{mb}} MB this document allows."
     },
@@ -3902,7 +4032,9 @@
       "icon_style": "Icon weight",
       "menu_style": "Side menu",
       "accent": "Accent colour",
-      "contrast": "Contrast"
+      "contrast": "Contrast",
+      "inbox_panel": "Notification panel",
+      "inbox_anchor": "Floating panel corner"
     },
     "opt": {
       "density": {
@@ -3947,10 +4079,23 @@
       "contrast": {
         "standard": "Standard",
         "high": "High"
+      },
+      "inbox_panel": {
+        "overlay": "Overlay (default)",
+        "floating": "Floating window",
+        "docked": "Docked at the edge"
+      },
+      "inbox_anchor": {
+        "end-top": "End, top",
+        "end-bottom": "End, bottom",
+        "start-top": "Start, top",
+        "start-bottom": "Start, bottom"
       }
     }
   },
   "nav_side": {
+    "palette_hidden": "Also find the screens I hid from the menu when I search (Ctrl+K)",
+    "fixed_first": "Dashboard is always the first entry of the menu and cannot be hidden.",
     "title": "Sidebar",
     "subtitle": "Choose what your menu shows, the order of its screens and the badge style. The pinned shortcuts are managed on the menu itself (the star).",
     "badges": "Badges",
@@ -5560,6 +5705,18 @@
       "ghadames": "Ghadames"
     }
   },
+  "dupRows": {
+    "title": "Duplicate rows in one file",
+    "note": "When the same record is in an upload file twice, the first row wins by default and the later rows are refused. Choose \"last row wins\" to let the later row replace the earlier one. The replaced rows are never lost: the review before approval lists them, and so does the error report.",
+    "default": "For every register",
+    "first": "First row wins (default)",
+    "last": "Last row wins",
+    "use_default": "Use the default",
+    "per_register": "Per register ({{count}} set)",
+    "hint": "Applies to register templates only.",
+    "excluded": "Not covered, the first row still wins: Master, sites, stream, list-values and holiday templates.",
+    "confirm": "Duplicate rows in a file: {{mode}}."
+  },
   "importsSettings": {
     "title": "Imports / Background processing",
     "note": "A send or an approval of a batch with more rows than this number runs in the background, in parts, so that a big file is never cut off. Smaller batches are done at once.",
@@ -6826,6 +6983,11 @@
     "result_no_backup": "This reset ran without a backup: no backup restores the database to the moment before it. Only the files in the quarantine can be put back."
   },
   "dailyPlan": {
+    "template": "Download template (this day)",
+    "import": "Import from template",
+    "import_apply": "Apply file",
+    "import_note": "Only the editable columns are read: the manual values, Reason, Remark, sites added by hand and Remove from plan = yes. Site name and Region are ignored. A locked day or a refused row refuses the whole file.",
+    "imported": "Imported: {{updated}} updated, {{added}} added, {{removed}} removed, {{unchanged}} unchanged.",
     "title": "Daily Plan",
     "subtitle": "Daily progress of the day and the plan of the next working day, filled from system data.",
     "tab_progress": "Progress",
@@ -7092,6 +7254,15 @@
     "people": "People",
     "last": "Last alert sent: {{at}}",
     "never": "No alert sent yet."
+  },
+  "marks": {
+    "title": "Signed and stamped copies",
+    "note": "Mark the document types that need a signed copy and a stamped copy. The upload then asks if the file is that copy and the slot shows it is awaited. Nothing is blocked.",
+    "signature": "Needs signed copy",
+    "stamp": "Needs stamped copy",
+    "reason": "Reason for the change",
+    "save": "Save",
+    "saved": "Saved."
   },
   "as": {
     "title": "Archive",
@@ -7762,6 +7933,11 @@
     "kind_weekly_status_missing": "Weekly status missing",
     "kind_record_idle": "Record idle in a state",
     "kind_weekly_status_missing_help": "Fires for every region without a Weekly status update of the current working week. Placeholders: {{region}}.",
+    "kind_advance_unsettled": "Advance not settled",
+    "kind_invoice_due_soon": "Invoice due soon",
+    "kind_advance_unsettled_help": "Fires weekly for every approved advance still disbursed or in settlement for at least the days. Leave the days empty to use the Finance hub warning days. Placeholders: {{record}}, {{state}}, {{days}}.",
+    "kind_invoice_due_soon_help": "Fires once per invoice and due date for every approved invoice that is not paid or cancelled and is due within the days (7 when empty) or already late. Placeholders: {{record}}, {{due}}, {{days}}.",
+    "days_hub": "Hub value",
     "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}.",
     "col_locked": "Locked", "kpi": "KPI", "op": "Comparison", "op_above": "above", "op_below": "below", "value": "Threshold",
     "locked": "Locked (no edits until unlocked)",
@@ -7836,6 +8012,17 @@
     "export_max_rows_hint": "Audit log and security log exports are refused above this many rows; narrow the dates or export in parts.",
     "idempotency_max_entries": "Remembered repeat-protection keys",
     "idempotency_max_entries_hint": "How many recent requests the system remembers so a repeated click is not done twice. Older ones are dropped first.",
+    "login_ip_attempts": "Failed sign-ins per address before a wait",
+    "login_ip_attempts_hint": "One address may fail this many sign-ins inside the window below before every new attempt has to wait. Also the code and re-check attempts allowed per minute for one address or one account.",
+    "login_ip_window_seconds": "Window for counting failed sign-ins",
+    "login_ip_window_seconds_hint": "Failures older than this are forgotten for the address.",
+    "login_ip_base_seconds": "First wait",
+    "login_ip_base_seconds_hint": "After the free failures, the first wait. It doubles on each further failure.",
+    "login_ip_max_seconds": "Longest wait",
+    "login_ip_max_seconds_hint": "The wait never grows past this. It cannot be shorter than the first wait. An address is never blocked for long, because many people share one.",
+    "login_identifier_attempts": "Sign-in attempts per account",
+    "login_identifier_attempts_hint": "Attempts allowed per minute for one account name, and for password re-checks and code regeneration.",
+    "unit_attempts": "attempts",
     "unit_hours": "hours",
     "unit_seconds": "seconds",
     "unit_rows": "rows",

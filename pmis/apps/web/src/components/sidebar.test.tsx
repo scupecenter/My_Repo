@@ -101,12 +101,12 @@ describe('Sidebar tree (N1-N12)', () => {
   it('puts Dashboard first, on its own, and shows the waiting counts the lists already give', async () => {
     app();
     const first = await screen.findByTestId('nav-dashboard');
-    expect(screen.getByTestId('nav-group-home')).toBeInTheDocument();
-    expect(screen.queryByTestId('nav-group-toggle-home')).not.toBeInTheDocument(); // one entry: no heading row
+    // Dashboard is its own first row (above Favourites, Recent and every group); the Home heading no longer draws it a second time
+    expect(screen.queryByTestId('nav-group-home')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-first')).toContainElement(first);
     expect(screen.getByTestId('nav-group-work')).not.toContainElement(first);
-    const all = [...document.querySelectorAll('[data-testid^="nav-group-"][data-depth="1"], [data-testid="nav-dashboard"]')].map((e) => e.getAttribute('data-testid'));
-    expect(all.indexOf('nav-dashboard')).toBeGreaterThan(-1);
-    expect(screen.getByTestId('sidebar').querySelector('[data-testid^="nav-group-"]')).toHaveAttribute('data-testid', 'nav-group-home');
+    const nav = screen.getByTestId('sidebar').querySelector('nav')!;
+    expect(nav.querySelector('[data-testid]')).toHaveAttribute('data-testid', 'nav-first');
     // the numbers come from the two lists' own totals (Approvals, My Work do-now)
     await waitFor(() => expect(screen.getByTestId('nav-approvals')).toHaveTextContent(/\d/));
   });
@@ -219,7 +219,7 @@ describe('Sidebar tree (N1-N12)', () => {
     expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
     expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
     const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].filter((a) => !a.getAttribute('data-testid')?.startsWith('nav-group-open-')).map((a) => a.getAttribute('data-testid'));
-    expect(regs).toEqual(['dismantle', 'procurement', 'gecol', 'hlc', 'permits_hse', 'incidents', 'lessons_learned', 'invoices', 'deliverables', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
+    expect(regs).toEqual(['dismantle', 'procurement', 'gecol', 'hlc', 'permits_hse', 'incidents', 'lessons_learned', 'invoices', 'deliverables', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'finance_hub', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('Change Control Log');
   });
 
