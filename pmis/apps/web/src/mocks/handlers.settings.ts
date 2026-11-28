@@ -31,7 +31,7 @@ const CR = () => (C().contractorRules ??= initCfg().contractorRules);
 /** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 interface AlertRuleRow {
-  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon' | 'date_approaching'; params: Record<string, unknown>; audience: Record<string, unknown>;
+  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon' | 'link_orphans' | 'date_approaching'; params: Record<string, unknown>; audience: Record<string, unknown>;
   title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; locked: boolean; version: number;
   created_at: string; updated_at: string;
 }
@@ -287,6 +287,7 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
   { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
   { key: 'media.thumbnails_per_minute', group: 'media', unit: 'per_minute', default: 120, min: 0, max: 6000 },
+  { key: 'registers.custom_max', group: 'registers', unit: 'registers', default: 20, min: 1, max: 100 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
@@ -313,6 +314,14 @@ const supportDto = (g: SupportGrant) => ({
   id: g.id, from_user: g.from, to_user: g.to, target_kind: 'user', target: { kind: 'user', id: g.to.id, label: g.to.display_name }, scope: 'partial', rights: g.rights, region_codes: [], module_codes: [],
   allow_redelegate: false, valid_from: g.valid_from, valid_to: g.valid_to, state: g.revoked ? 'revoked' : new Date(g.valid_to) <= new Date() ? 'expired' : 'active', reason: g.reason, revoked_at: g.revoked_at,
 });
+const FIN_ROLES = [
+  { code: 'PM', name_en: 'Project Manager', name_ar: 'مدير المشروع' },
+  { code: 'FIN_OFFICER', name_en: 'Finance Officer', name_ar: 'مسؤول المالية' },
+  { code: 'MANAGEMENT', name_en: 'Management', name_ar: 'الإدارة' },
+];
+const finReaders: { enabled: boolean; role_codes: string[]; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { enabled: false, role_codes: ['FIN_OFFICER', 'PM'], version: 1, updated_at: null, updated_by: null };
+const financeReadersView = () => ({ ...finReaders, roles: FIN_ROLES, can_edit: isAdmin() });
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
@@ -454,6 +463,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
     { code: 'ops_phase', label_en: 'Phase scope: sites per project phase, progress and derived targets', label_ar: 'نطاق المراحل: المواقع لكل مرحلة والتقدم والمستهدفات المشتقة' },
     { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
+    { code: 'ops_finance', label_en: 'Restricted financial summary: advances and disbursed against completion', label_ar: 'ملخص مالي مقيّد: السلف والمنصرف مقابل الإنجاز' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -480,6 +490,9 @@ const ragView = () => ({
   items: RAG_CAT.map((c) => ({ ...c, enabled: ragState.saved[c.code]?.enabled ?? false, green: ragState.saved[c.code]?.green ?? c.default_green, amber: ragState.saved[c.code]?.amber ?? c.default_amber })),
   version: ragState.version, updated_at: ragState.updated_at, updated_by: null,
 });
+/** The number of weeks the dashboard forecast averages (contract 0.15.431): the setting dashboard.forecast_window_weeks, default 4, version 0 until the first save. */
+let fcState = { version: 0, weeks: 4, updated_at: null as string | null, updated_by: null as null };
+const fcView = () => ({ ...fcState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
@@ -638,6 +651,20 @@ export const settingsHandlers = [
     ragState = { version: ragState.version + 1, saved, updated_at: new Date().toISOString() };
     return HttpResponse.json(ragView(), tag(ragState.version));
   }),
+  // ------------------------------------------------------------------ forecast window (contract 0.15.431, settings review gap 4)
+  http.get(`${B}/settings/dashboard/forecast-window`, () => { const g = guard(); if (g) return g; return HttpResponse.json(fcView(), tag(fcState.version)); }),
+  http.put(`${B}/settings/dashboard/forecast-window`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, fcState.version); if (p) return p;
+    const b = (await request.json()) as { weeks?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weeks) || b.weeks! < 2 || b.weeks! > 12) errs.push({ path: '/weeks', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    fcState = { ...fcState, version: fcState.version + 1, weeks: b.weeks!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(fcView(), tag(fcState.version));
+  }),
   // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
   http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
   http.put(`${B}/settings/dashboard/health-bands`, async ({ request }) => {
@@ -774,6 +801,30 @@ export const settingsHandlers = [
     if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.206: who sees the restricted financial summary of the dashboard
+  http.get(`${B}/settings/dashboard-finance-readers`, () => { const g = guard(); if (g) return g; const j = financeReadersView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/dashboard-finance-readers`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; role_codes?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'role_codes', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    const codes = Array.isArray(b.role_codes) ? (b.role_codes as unknown[]).map(String) : null;
+    if (!codes) errs.push({ path: '/role_codes', code: 'required' });
+    else if (codes.some((c) => !FIN_ROLES.some((r) => r.code === c))) errs.push({ path: '/role_codes', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, finReaders.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const next = [...new Set(codes!)].sort();
+    if (finReaders.enabled === b.enabled && JSON.stringify(finReaders.role_codes) === JSON.stringify(next)) return problem(409, 'invalid_transition', 'These are already the readers of the financial summary.');
+    const v = viewer()!;
+    Object.assign(finReaders, { enabled: b.enabled as boolean, role_codes: next, version: finReaders.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = financeReadersView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
@@ -1658,12 +1709,19 @@ export const settingsHandlers = [
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
   // ------------------------------------------------------------------ alert rules (0.15.242, migration 0342): notifications only
+  http.get(`${B}/settings/alert-rules/link-orphans`, () => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({ links: [
+      { register_key: 'invoices', field_code: 'procurement_record_id', target_register: 'procurement', rows_with_value: 12, orphan_rows: 2, examples: ['00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2'] },
+      { register_key: 'financial_advances', field_code: 'advance_id', target_register: 'financial_advances', rows_with_value: 5, orphan_rows: 0, examples: [] },
+    ] });
+  }),
   http.get(`${B}/settings/alert-rules`, () => {
     const g = needAdmin(); if (g) return g;
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }, { kind: 'date_approaching', params: ['register_key', 'date_field', 'days_before'] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }, { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] }, { kind: 'date_approaching', params: ['register_key', 'date_field', 'days_before'] }],
         kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
@@ -1676,11 +1734,11 @@ export const settingsHandlers = [
     const g = needAdmin(); if (g) return g;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
-    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon', 'date_approaching'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
+    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon', 'link_orphans', 'date_approaching'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
     if (ALERT_RULES.some((x) => x.code === b.code)) return fields({ path: '/code', code: 'conflict' });
     const row = {
       id: `00000000-0000-4000-8000-${String(ALERT_RULES.length + 1).padStart(12, '0')}`,
-      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon' | 'date_approaching',
+      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon' | 'link_orphans' | 'date_approaching',
       params: (b.params ?? {}) as Record<string, unknown>, audience: (b.audience ?? { type: 'system_admin' }) as Record<string, unknown>,
       title_en: String(b.title_en ?? ''), title_ar: String(b.title_ar ?? ''), body_en: String(b.body_en ?? ''), body_ar: String(b.body_ar ?? ''),
       link: (b.link ?? null) as string | null, enabled: b.enabled !== false, locked: b.locked === true, version: 1,

@@ -110,7 +110,7 @@ import {
   NoResults,
 } from "@/components/States";
 import { registerErrorMessage } from "@/lib/registerErrors";
-import { isLive, OWNER_NOTE } from "@/lib/registerForms";
+import { isCustomKey, isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
@@ -1288,7 +1288,7 @@ export function RegisterPage() {
   const { t } = useTranslation();
   const { key = "" } = useParams();
   const defs = useRegisterDefs();
-  if (!isLive(key)) return <RegisterSoon name={key} />;
+  if (!isLive(key) && !isCustomKey(key)) return <RegisterSoon name={key} />;
   if (defs.isLoading) return <p className="text-mute">{t("common.loading")}</p>;
   const def = defs.data?.find((d) => d.register_key === key);
   if (!def)
@@ -1313,7 +1313,7 @@ export function RegisterRecordPage() {
   const { t } = useTranslation();
   const { key = "", id = "" } = useParams();
   const defs = useRegisterDefs();
-  if (!isLive(key)) return <RegisterSoon name={key} />;
+  if (!isLive(key) && !isCustomKey(key)) return <RegisterSoon name={key} />;
   if (defs.isLoading) return <p className="text-mute">{t("common.loading")}</p>;
   const def = defs.data?.find((d) => d.register_key === key);
   if (!def)

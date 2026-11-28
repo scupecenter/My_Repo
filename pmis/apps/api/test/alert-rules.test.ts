@@ -191,6 +191,33 @@ describe('alert rules (0342)', () => {
     expect((await db.query('SELECT count(*)::int AS c FROM alert_rule_fires WHERE rule_id = $1', [adv.rows[0].j.id])).rows[0].c).toBe(advFires.rows[0].c);
     await db.query('ROLLBACK');
   });
+
+  it('link_orphans (0650) checks its params, fires once per link and week for dangling links and reports example ids', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const fails = async (run: () => Promise<unknown>, re: RegExp) => { await db.query('SAVEPOINT s'); await expect(run()).rejects.toThrow(re); await db.query('ROLLBACK TO s'); };
+    await db.query(`INSERT INTO register_links (register_key, field_code, target_register, same_site, label_fields, enforce, sort_order)
+                    VALUES ('issues', 'orph_test_id', 'risks', false, ARRAY['title'], false, 901)`);
+    await fails(() => save(rule(`${PREFIX}-bo1`, { kind: 'link_orphans', params: { register_key: 'nope' } }), 'bad'), /register_key/);
+    await fails(() => save(rule(`${PREFIX}-bo2`, { kind: 'link_orphans', params: { field_code: 'orph_test_id' } }), 'bad'), /field_code/);
+    await fails(() => save(rule(`${PREFIX}-bo3`, { kind: 'link_orphans', params: { min_rows: 0 } }), 'bad'), /min_rows/);
+    await fails(() => save(rule(`${PREFIX}-bo4`, { kind: 'link_orphans', params: { days: 3 } }), 'bad'), /params/);
+    const r = await save(rule(`${PREFIX}-orph`, { kind: 'link_orphans', params: { register_key: 'issues', field_code: 'orph_test_id', min_rows: 1 }, title_en: 'Dangling {{register}}.{{field}}', body_en: '{{count}} rows' }), 'add the orphans rule');
+    const site = await makeSite(db, REGION, { prefix: PREFIX.toUpperCase() });
+    await db.query(
+      `INSERT INTO register_records (entity_id, register_key, record_type, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, created_by, data)
+       VALUES (gen_random_uuid(), 'issues', NULL, $1, $2, false, true, 'entry', 1, 3, 0, $3, $4::jsonb)`,
+      [site.id, REGION, adminId, JSON.stringify({ orph_test_id: '11111111-1111-4111-8111-111111111111' })]);
+    await db.query(`SELECT alert_rules_run('2031-03-21'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', 'issues.orph_test_id')).toBe(1);
+    await db.query(`SELECT alert_rules_run('2031-03-22'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', 'issues.orph_test_id')).toBe(1);
+    const rep = await db.query(`SELECT register_link_orphans_json(5) AS j`);
+    const row = (rep.rows[0].j as { field_code: string; orphan_rows: number; examples: string[] }[]).find((x) => x.field_code === 'orph_test_id');
+    expect(row?.orphan_rows).toBe(1);
+    expect(row?.examples).toHaveLength(1);
+    await db.query('ROLLBACK');
+  });
 });
 
 describe('kpi_threshold alert rules (0348)', () => {

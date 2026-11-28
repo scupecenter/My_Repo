@@ -119,4 +119,16 @@ describe('Settings, alert rules', () => {
     await u.selectOptions(screen.getByTestId('ar-date-field'), 'target_date');
     expect(screen.getByTestId('ar-days')).toBeInTheDocument();
   });
+
+  it('offers the orphans alert kind with a register, a field and the minimum rows', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    await u.click(await screen.findByTestId('ar-new'));
+    await u.selectOptions(screen.getByTestId('ar-kind'), 'link_orphans');
+    expect(screen.getByTestId('ar-min-rows')).toHaveValue(1);
+    expect(screen.queryByTestId('ar-field-code')).toBeNull();
+    await u.selectOptions(screen.getByTestId('ar-register'), 'issues');
+    expect(screen.getByTestId('ar-field-code')).toBeInTheDocument();
+  });
 });
