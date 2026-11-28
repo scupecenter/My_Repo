@@ -69,6 +69,7 @@ export class AlertRulesService {
           { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] },
           { kind: 'advance_unsettled', params: ['days'] },
           { kind: 'invoice_due_soon', params: ['days'] },
+          { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] },
         ],
         kpis,
         audiences: ['system_admin', 'module'],
@@ -76,6 +77,12 @@ export class AlertRulesService {
         modules: [...MODULES, ...(await customModuleDefs(this.db, true))].map((m) => ({ key: m.key, name_en: m.name_en })),
       },
     };
+  }
+
+  /** GET /settings/alert-rules/link-orphans (0.15.510, migration 0650): the dangling-link report with example ids, System Admin. */
+  async linkOrphans() {
+    await this.requireAdmin();
+    return { links: (await this.db.tx.$queryRaw<{ j: unknown[] }[]>(Prisma.sql`SELECT register_link_orphans_json(20) AS j`))[0]!.j };
   }
 
   /** POST /settings/alert-rules: create a rule. */
