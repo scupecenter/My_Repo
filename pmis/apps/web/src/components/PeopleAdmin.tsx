@@ -5,6 +5,8 @@ import { NavLink, Navigate, Outlet, useLocation, useSearchParams } from 'react-r
 import { useMe } from '@/api/hooks';
 import type { Me } from '@/api/types';
 import { hasGrant, isAdmin } from '@/lib/perm';
+import type { ScreenKey } from '@/lib/screenSettings';
+import { ScreenSettingsLink } from './ScreenSettingsLink';
 
 /**
  * The pages of the "Users & Roles" screen, in tab order. Each one opens only for holders of its module (effective.nav), or
@@ -22,6 +24,9 @@ export const PEOPLE_TABS: readonly { key: string; to: string; label: string; gra
   { key: 'admin.delegation', to: '/admin/delegation', label: 'nav.admin.delegation' },
   { key: 'admin.matrix', to: '/admin/matrix', label: 'nav.admin.matrix' },
 ];
+
+/** The Settings section that owns each People page's configuration (Roles, Groups and Delegation have none: they are the Settings > Access entries themselves). */
+const PEOPLE_GEAR: Record<string, ScreenKey> = { 'admin.users': 'users', 'admin.online': 'users', 'admin.assignments': 'assignments', 'admin.matrix': 'matrix' };
 
 export const PEOPLE_KEYS: ReadonlySet<string> = new Set(PEOPLE_TABS.map((p) => p.key));
 
@@ -75,7 +80,7 @@ export function PeopleAdminLayout() {
   const online = PEOPLE_TABS.find((p) => p.key === 'admin.online');
   return (
     <div data-testid="page-people-admin">
-      <h1 className="text-2xl font-bold">{t('nav.admin.users')}</h1>
+      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t('nav.admin.users')}</h1>{page && PEOPLE_GEAR[page.key] && <span className="ms-auto"><ScreenSettingsLink screen={PEOPLE_GEAR[page.key]} /></span>}</div>
       <nav role="tablist" aria-label={t('nav.admin.users')} className="mb-4 mt-3 flex flex-wrap gap-1 border-b border-line" data-testid="people-tabs">
         {tabs.map((p) => (
           <NavLink key={p.key} to={p.to} role="tab" aria-selected={p.key === 'admin.users' ? usersOn : here?.key === p.key} data-testid={`people-tab-${p.key.slice(6)}`}

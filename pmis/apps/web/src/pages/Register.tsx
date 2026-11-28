@@ -774,7 +774,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             {t("registers.new")}
           </button>
         }
-        columns={view === "vertical" ? <ColumnMenu api={tbl} label={label} /> : undefined}
+        columns={view === "vertical" ? <ColumnMenu density={false} api={tbl} label={label} /> : undefined}
         exporter={
             <TemplateExportMenu
               testid="register-tools"
@@ -1107,7 +1107,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                       key={r.id}
                       role="listitem"
                       tabIndex={0}
-                      aria-selected={on || cur}
+                      aria-current={on || cur ? 'true' : undefined}
                       onKeyDown={(e) => {
                         if (
                           (e.key === "Enter" || e.key === " ") &&
