@@ -1,8 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, Copy, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { api } from '@/api/client';
 import { useSession } from '@/api/hooks';
 import { useHandoverOpenCounts, useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
@@ -11,6 +12,7 @@ import { useAddRegisterComment, useCommentReaction, useCommentResolved, useRegis
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
+import { copyData, clearDuplicateSource, duplicateSource, setDuplicateSource } from '@/lib/registerDuplicate';
 import { columnDefaults, defaultsFor, forEntry, forType, OWNER_NOTE, patchData, sectionsFor, typeData, typeRequired, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldHistory } from './logs/FieldHistory';
@@ -133,7 +135,7 @@ function TriageDialog({ open, op, registerKey, selfId, onClose, onSend }: { open
 }
 
 /** The record form, tabs and actions of a register record: the body of the drawer, and (decision V5) the body of the full record page. */
-export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
+export function RegisterRecordBody({ def: rawDef, record, onCreated, copyOf = null }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void; /** a new record opened as a copy of this one */ copyOf?: RegisterRecord | null }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const key = rawDef.register_key;
@@ -157,19 +159,20 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const [shortageSp] = useSearchParams();
   const fromShortage = !record && rawDef.register_key === 'procurement' && shortageSp.get('from') === 'shortage';
   const [data, setData] = useState<Data>(() => {
-    const base = record?.data ?? defaultsFor(rawDef.register_key, rawDef);
+    const base = record?.data ?? (copyOf ? copyData(rawDef, copyOf) : defaultsFor(rawDef.register_key, rawDef));
     const remark = shortageSp.get('remark');
     return fromShortage && remark ? { ...base, remark: remark.slice(0, 500) } : base;
   });
   // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement picks it, GECOL and HLC show it read-only)
   const hasContractor = ['procurement', 'gecol', 'hlc', 'issues', 'quality'].includes(rawDef.register_key);
-  const [party, setParty] = useState<string>(record?.external_party?.id ?? '');
+  const [party, setParty] = useState<string>((record ?? copyOf)?.external_party?.id ?? '');
   const companies = useContractorCompanies(rawDef.register_key === 'procurement');
-  const [site, setSite] = useState<SiteSel>(fromShortage && shortageSp.get('site') ? { id: shortageSp.get('site') as string, code: shortageSp.get('site_code') ?? '' } : record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
-  const [rtype, setRtype] = useState<string>(record?.record_type ?? (fromShortage ? 'pr' : ''));
+  const [site, setSite] = useState<SiteSel>(fromShortage && shortageSp.get('site') ? { id: shortageSp.get('site') as string, code: shortageSp.get('site_code') ?? '' } : (record ?? copyOf)?.site_id ? { id: (record ?? copyOf)!.site_id as string, code: (record ?? copyOf)!.site_code ?? '', region_id: (record ?? copyOf)!.region_id as number | undefined } : null);
+  const [rtype, setRtype] = useState<string>((record ?? copyOf)?.record_type ?? (fromShortage ? 'pr' : ''));
   // 0.15.103: the columns prefilled from the admin's defaults on a new record; a column leaves the set when the person edits it
-  const [prefilled, setPrefilled] = useState<Set<string>>(() => (record ? new Set() : new Set(Object.keys(columnDefaults(rawDef)))));
-  const [dirty, setDirty] = useState(false);
+  const [prefilled, setPrefilled] = useState<Set<string>>(() => (record || copyOf ? new Set() : new Set(Object.keys(columnDefaults(rawDef)))));
+  // a copy starts dirty: it is unsaved input, so leaving it asks first and the draft keeps it
+  const [dirty, setDirty] = useState(!!copyOf && !record);
   const [tried, setTried] = useState(false);
   const [server, setServer] = useState<Record<string, FieldIssue>>({});
   const [rejecting, setRejecting] = useState(false);
@@ -183,7 +186,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
   // Q115: unsaved input is a server-side draft of this user only (never a save, a submission or an input of a calculation)
-  const dr = useDraft(`record.${rawDef.register_key}.${record?.id ?? 'new'}`, { data, record_type: rtype }, dirty, editable);
+  const dr = useDraft(`record.${rawDef.register_key}.${record?.id ?? (copyOf ? `copy.${copyOf.id}` : 'new')}`, { data, record_type: rtype }, dirty, editable);
   // 0042: the form offers only the scopes the caller may enter (the HLC Fiber Team: scope HLC); a read-only view shows the record as it is
   // 0.12.2 (Q222, D220b): the permit form offers only the permit types the caller may enter, and the streams they may choose for a purpose-based type
   // audit 2026-11-17 (C X2 / X3): a register with record types asks for the type on every new record (site-scoped or not, so a company, team,
@@ -202,6 +205,14 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const typed = (d: Data) => (untypedRecord ? d : typeData(rawDef, rtype, d));
   const sections = sectionsFor(def, data);
   const set = (code: string, v: unknown) => { setPrefilled((p) => { if (!p.has(code)) return p; const n = new Set(p); n.delete(code); return n; }); setData((d) => ({ ...d, [code]: v })); setDirty(true); setServer((s) => { const n = { ...s }; delete n[code]; return n; }); };
+  const nav = useNavigate();
+  /** A copy is traced on the new record: one comment names the source (shown in the Comments tab and the Activity list). The create itself already wrote the step and the field history. */
+  const afterCopy = (r: RegisterRecord) => {
+    if (!copyOf) return;
+    clearDuplicateSource();
+    if (r.region_id) void api.post(`/registers/${key}/records/${r.id}/comments`, { body: t('registers.dup_note', { code: copyOf.site_code ?? copyOf.id.slice(0, 8) }) }).catch(() => undefined);
+  };
+  const duplicate = () => { if (!record) return; setDuplicateSource(key, record); nav(`/registers/${key}?record=new`); };
   const fail = (e: unknown) => { setServer(serverFieldIssues(e)); const m = reservedMessage(t, e) ?? registerErrorMessage(t, e); if (m) toast(m, 'err'); };
   const name = (i18n.language === 'ar' && def.name_ar) || def.name_en;
 
@@ -223,7 +234,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
     if (typeMissing) { setServer({ record_type: { code: 'required' } }); return; }
     const body = visibleData(def, typed(data));
     if (!record) create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: body }, {
-      onSuccess: (r) => { dr.clear(); toast(t('registers.saved')); setDirty(false); onCreated(r.id); }, onError: fail,
+      onSuccess: (r) => { dr.clear(); afterCopy(r); toast(t('registers.saved')); setDirty(false); onCreated(r.id); }, onError: fail,
     });
     else update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: () => { dr.clear(); toast(t('registers.saved')); setDirty(false); }, onError: fail });
   };
@@ -242,7 +253,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
     if (!record) {
       create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
-        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); settle(); onCreated(r.id); }, onError: (e) => { fail(e); settle(); onCreated(r.id); } }),
+        onSuccess: (r) => { afterCopy(r); op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); settle(); onCreated(r.id); }, onError: (e) => { fail(e); settle(); onCreated(r.id); } }); },
         onError: fail,
       });
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
@@ -278,6 +289,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
       {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
+        {!record && copyOf && <p role="note" className="rounded-md border border-line bg-card2 p-2 text-sm" data-testid="reg-copy-banner"><Copy size={14} className="me-1 inline" aria-hidden />{t('registers.dup_banner', { code: copyOf.site_code ?? copyOf.id.slice(0, 8) })}</p>}
         {record && <EditingNotice kind="record" id={record.id} editing={editable} testid="reg-editing-notice" />}
         {editable && <DraftBar draft={dr} onRestore={(v) => { if (v.data && typeof v.data === 'object') setData(v.data as Data); if (typeof v.record_type === 'string') setRtype(v.record_type); setDirty(true); }} />}
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
@@ -473,6 +485,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
           </div>
         )}
         <div className="flex flex-wrap gap-2">
+          {record && <button className="btn" data-testid="reg-duplicate" title={t('registers.duplicate_hint')} disabled={busy} onClick={duplicate}><Copy size={16} />{t('registers.duplicate')}</button>}
           {record && act('new_version') && <button className="btn" data-testid="reg-new-version" disabled={busy} onClick={() => newVersion.mutate(record, { onSuccess: (r) => { toast(t('registers.version_created')); onCreated(r.id); }, onError: fail })}><FilePlus2 size={16} />{t('registers.new_version')}</button>}
           {record && act('transfer') && <button className="btn" data-testid="reg-transfer" disabled={busy} onClick={() => transfer.mutate({ record }, { onSuccess: () => toast(t('registers.transferred')), onError: fail })}><ArrowRightLeft size={16} />{t('registers.transfer')}</button>}
           {record && act('void') && <button className="btn" data-testid="reg-void" disabled={busy} onClick={() => setVoiding(true)}><Ban size={16} />{t('registers.void')}</button>}
@@ -500,9 +513,12 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
   const { t } = useTranslation();
   const isNew = recordId === 'new';
   const q = useRegisterRecord(def.register_key, isNew ? null : recordId);
+  const copyOf = duplicateSource(def.register_key, recordId);
+  // a copy is only for the form it was started for: opening anything else drops it
+  useEffect(() => { if (!isNew) clearDuplicateSource(); }, [isNew]);
   return (
     <DrawerFrame name="register" testid="register-drawer" wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
-      {isNew ? <RegisterRecordBody key="new" def={def} record={null} onCreated={onOpen} />
+      {isNew ? <RegisterRecordBody key={copyOf ? `copy-${copyOf.id}` : 'new'} def={def} record={null} copyOf={copyOf} onCreated={onOpen} />
         : q.data ? <RegisterRecordBody key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
           : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>

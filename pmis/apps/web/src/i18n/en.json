@@ -2274,6 +2274,10 @@
     "grid": "Grid"
   },
   "registers": {
+    "duplicate": "Duplicate",
+    "duplicate_hint": "Start a new record filled from this one. Nothing is saved until you save or submit.",
+    "dup_banner": "Copy of {{code}}: the values are copied, nothing is saved yet. Check them, then save or submit.",
+    "dup_note": "Created as a copy of {{code}}.",
     "new_more": "More ways to add",
     "new_blank": "New blank record",
     "new_import": "Import rows from the template",
@@ -8255,6 +8259,7 @@
     "note": "{{shown}} of {{total}} loaded sites have a date in the chosen columns ({{all}} match the filters; the first 100 are drawn)."
   },
   "rowActions": {
+    "duplicate": "Duplicate record",
     "label": "Row actions",
     "open": "Open",
     "open_tab": "Open in a new tab",
