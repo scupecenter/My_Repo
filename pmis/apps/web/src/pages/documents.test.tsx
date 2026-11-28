@@ -117,6 +117,9 @@ describe('Site Documents tab', () => {
     expect(await screen.findByText(/GSDN_Documents_\d{8}\.zip/)).toBeInTheDocument();
     // the whole site
     expect(screen.getByTestId('docs-zip-all')).toBeEnabled();
+    // the acceptance pack of the site (phase 4): one click, the same job
+    await u.click(screen.getByTestId('docs-zip-acceptance'));
+    await waitFor(() => expect(screen.getAllByText(/GSDN_Documents_\d{8}\.zip/).length).toBeGreaterThan(0));
   });
 });
 

@@ -3,7 +3,7 @@ import { api, type ApiError } from './client';
 
 /** Contract 0.15.331 (migration 0430): the editable rules of the registers (Settings > Register rules). */
 export type RuleSpec = { register_key: string; key: string; type: 'boolean' | 'text'; default?: unknown; label_en: string; label_ar?: string };
-export type RegisterRules = { register_key: string; name_en: string; name_ar?: string | null; rules: Record<string, unknown>; version: number };
+export type RegisterRules = { register_key: string; name_en: string; name_ar?: string | null; rules: Record<string, unknown>; other?: Record<string, unknown>; version: number };
 const K = ['register-rules'] as const;
 
 export const useRegisterRules = () =>
