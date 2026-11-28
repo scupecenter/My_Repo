@@ -167,6 +167,14 @@ export class TemplatesService {
       }
       return false;
     }
+    // 0746 (Companies K4): the company templates, for those who see the Contractors or Procurement screens (the database decides what a row may change)
+    if (t.kind === 'company_contacts' || t.kind === 'company_documents' || t.kind === 'company_onboarding') {
+      for (const m of ['contractors', 'procurement']) {
+        const regs = await this.access.regions(m, 'view');
+        if (regs === null || regs.length > 0) return true;
+      }
+      return false;
+    }
     // 0145 (B12): the holidays, only for those who may change the calendar
     if (t.kind === 'holidays') return this.access.isAdmin('calendars', 'edit');
     return false;
@@ -235,6 +243,7 @@ export class TemplatesService {
     if (t.kind === 'list_values') return this.downloadListValues(auth, t, q);
     if (t.kind === 'holidays') return this.downloadHolidays(auth, t);
     if (t.kind === 'daily_plan') return this.downloadDailyPlan(auth, t, q);
+    if (t.kind === 'company_contacts' || t.kind === 'company_documents' || t.kind === 'company_onboarding') return this.downloadCompany(auth, t, q);
     if (t.kind !== 'register' || !t.register_key || !t.module_key) throw problems.notFound('This template cannot be downloaded yet.');
     const regs = await this.access.requireRegions(t.module_key, 'view');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
@@ -355,6 +364,31 @@ export class TemplatesService {
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
         ${JSON.stringify({ version: t.current_version, prefill: date !== undefined, rows: rows.length, kind: t.kind, date: date ?? null })}::jsonb, NULL)`);
     return { buffer, fileName: `${t.template_id}${date ? `_${date}` : ''}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
+  }
+
+  /**
+   * 0746 (Companies K4): TPL-COMPANY-CONTACTS, -DOCUMENTS and -ONBOARDING. Blank, or filled (`prefill=true`, or `party_ids` = the companies picked in the list) with what the
+   * company records hold now: hidden contacts and documents are left out, the checklist shows every item that applies to the company type. The import is POST /companies/import.
+   */
+  private async downloadCompany(auth: AuthContext, t: TemplateRow, q: Record<string, unknown>): Promise<{ buffer: Buffer; fileName: string }> {
+    if (!(await this.usable(t, auth))) throw problems.notFound('This template does not exist.');
+    if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
+    const raw = q.party_ids ?? q['party_ids[]'];
+    const parties = raw === undefined ? [] : (Array.isArray(raw) ? raw : [raw]).flatMap((x) => (typeof x === 'string' ? x.split(',') : [])).map((s) => s.trim()).filter(Boolean);
+    if (parties.length > 200) throw problems.validation([{ path: '/party_ids', code: 'too_many', message: 'At most 200 companies.' }]);
+    for (const s of parties) if (!uuidSchema.safeParse(s).success) throw problems.validation([{ path: '/party_ids', code: 'invalid', message: 'party_ids are uuids.' }]);
+    const prefill = boolParam(q, 'prefill') === true || parties.length > 0;
+    let rows: Record<string, unknown>[] = [];
+    if (prefill) {
+      const r = await this.db.tx.$queryRaw<{ r: Record<string, unknown>[] | null }[]>(Prisma.sql`
+        SELECT company_export_rows(${t.kind}::text, ${parties.length ? parties : null}::uuid[]) AS r`);
+      rows = (r[0]?.r ?? []).slice(0, importMaxRows());
+    }
+    const issuedAt = new Date();
+    const buffer = await this.build(t, t.columns, rows, { prefill, employeeId: null, issuedAt });
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
+        ${JSON.stringify({ version: t.current_version, prefill, rows: rows.length, kind: t.kind, companies: parties.length })}::jsonb, NULL)`);
+    return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
   /** 0145 (B12, ADR 0011): the empty TPL-HOLIDAYS workbook, for a System Admin or a delegate of the calendar. */
