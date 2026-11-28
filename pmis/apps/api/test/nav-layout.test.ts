@@ -57,7 +57,7 @@ describe('the editable side menu: GET and PUT /settings/nav-layout', () => {
       expect(r.status).toBe(200);
       expect(etag(r)).toMatch(/^"\d{1,9}"$/);
       expect(r.body).toMatchObject({ layout: null, is_default: true, updated_by: null, can_edit: can });
-      expect(r.body.catalogue).toHaveLength(58); // +1 of 0411 (field), +1 of 0592 (registers.custom), +1 of 0406 (finance_hub), +1 of 0326 (deliverables), +5 of 0400 (data_hub, master_import, column_mapping, data_reset, recycle_bin); 42 of 0081, logs.system of 0082 (the System Log screen), daily_plan of 0149 (My Work > Daily Plan), library.forms and library.archive of 0151 (W5), incidents of 0183, lessons_learned of 0184, invoices of 0185
+      expect(r.body.catalogue).toHaveLength(59); // +1 of 0411 (field), +1 of 0597 (tools_equipment), +1 of 0592 (registers.custom), +1 of 0406 (finance_hub), +1 of 0326 (deliverables), +5 of 0400 (data_hub, master_import, column_mapping, data_reset, recycle_bin); 42 of 0081, logs.system of 0082 (the System Log screen), daily_plan of 0149 (My Work > Daily Plan), library.forms and library.archive of 0151 (W5), incidents of 0183, lessons_learned of 0184, invoices of 0185
       expect(r.body.catalogue).toContain('logs.system');
       expect(r.body.catalogue).toEqual(expect.arrayContaining(['library.forms', 'library.archive', 'finance_hub', 'registers.custom']));
       expect(r.body.catalogue.slice(0, 3)).toEqual(['my_work', 'daily_plan', 'inbox']);

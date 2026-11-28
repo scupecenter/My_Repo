@@ -27,6 +27,8 @@ const body = z
     include_superseded: z.boolean().optional(),
     /** Library Archive zip: `DocType_SiteID_Number_vN.ext` in a folder per document type (set by the server route, never by the client). */
     naming: z.enum(['archive']).optional(),
+    /** Field mode phase 4: the consolidated site acceptance pack. Needs `site_id`; carries only the approved current PAC, FAC and HOTO files, one folder per document type, with an index. */
+    pack: z.enum(['acceptance']).optional(),
   })
   .strict();
 type Scope = z.infer<typeof body>;
@@ -118,6 +120,10 @@ export class ZipService implements OnApplicationBootstrap {
     const conds = this.docs.filterSql(q, regions);
     conds.push(Prisma.sql`s.status::text <> 'not_required'`);
     if (scope.file_ids) conds.push(Prisma.sql`f.id = ANY(${scope.file_ids}::uuid[])`);
+    if (scope.pack === 'acceptance') {
+      conds.push(Prisma.sql`dt.code ~ '(^|[_-])(PAC|FAC|HOTO)([_-]|$)'`);
+      conds.push(Prisma.sql`s.status::text = 'approved'`);
+    }
     conds.push(registerScope);
     return conds;
   }
@@ -125,6 +131,9 @@ export class ZipService implements OnApplicationBootstrap {
   async start(auth: AuthContext, raw: unknown, idemKey: string | undefined, onStarted: (fn: () => void) => void): Promise<JobDto> {
     const regions = await this.docs.downloadRegions();
     const scope = parse(body, raw);
+    if (scope.pack && (!scope.site_id || scope.file_ids || scope.include_superseded || scope.slot_status || scope.doc_code || scope.stage_code || scope.naming)) {
+      throw problems.validation([{ path: '/pack', code: 'pack_scope', message: 'The acceptance pack is made for one site, with no other filter.' }]);
+    }
     if (!scope.site_id && !scope.stage_code && !scope.doc_code && !scope.file_ids) {
       throw problems.validation([{ path: '/', code: 'scope_required', message: 'Choose a site, a stage, a document type or a list of files.' }]);
     }
@@ -212,7 +221,7 @@ export class ZipService implements OnApplicationBootstrap {
         for (const r of included) {
           const archive = job.scope.naming === 'archive';
           const name = archive ? archiveName({ doc_code: r.doc_code, site_code: r.site_code, doc_number: r.doc_number, version: r.version, ext: r.ext ?? 'bin' }) : displayName({ site_code: r.site_code, task_code: r.task_code, doc_code: r.doc_code, candidate_label: r.candidate_label, approved_date: r.approved_date, uploaded_at: r.uploaded_at, ext: r.ext ?? 'bin', version: r.version, is_current: r.is_current });
-          const folder = archive ? safePart(r.doc_code) : `${safePart(r.site_code)}/${safePart(r.stage_code ?? 'NA')}`;
+          const folder = archive || job.scope.pack ? safePart(r.doc_code) : `${safePart(r.site_code)}/${safePart(r.stage_code ?? 'NA')}`;
           let path = `${folder}/${name}`;
           for (let n = 2; used.has(path.toLowerCase()); n++) path = `${folder}/${name.replace(/(\.[a-z0-9]+)$/, `_${n}$1`)}`;
           used.add(path.toLowerCase());
@@ -227,6 +236,21 @@ export class ZipService implements OnApplicationBootstrap {
         }
         for (const r of skipped) {
           manifest.push(['', r.original_name, r.sha256, r.version, r.is_current, r.slot_status, r.approved_date, r.uploaded_at.toISOString()].map(csvCell).join(',') + ',' + mk(r.id) + ',' + csvCell('left out: waits for the virus scan'));
+        }
+        if (job.scope.pack === 'acceptance') {
+          // the index of the pack, in English and Arabic: the site, the date, and the number of files per document type
+          const per = new Map<string, number>();
+          for (const r of included) per.set(r.doc_code, (per.get(r.doc_code) ?? 0) + 1);
+          const day = new Date().toISOString().slice(0, 10);
+          const lines = [
+            `Site acceptance pack / حزمة قبول الموقع`, `Site / الموقع: ${included[0]!.site_code}`, `Date / التاريخ: ${day}`, `Files / الملفات: ${included.length}`, '',
+            ...[...per.entries()].map(([code, n]) => `${code}: ${n}`), '',
+            'Only approved, current files are included. The file list with checksums is in manifest.csv.',
+            'تشمل الحزمة الملفات المعتمدة والحالية فقط. قائمة الملفات مع بصمة كل ملف في manifest.csv.',
+          ];
+          const ix = new ZipPassThrough('INDEX.txt');
+          zip.add(ix);
+          ix.push(new Uint8Array(Buffer.from('\ufeff' + lines.join('\r\n') + '\r\n', 'utf8')), true);
         }
         const m = new ZipPassThrough('manifest.csv');
         zip.add(m);

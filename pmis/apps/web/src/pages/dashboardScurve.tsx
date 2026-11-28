@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { ProjectStatusSnapshot } from "@/api/dashboard";
 import { EChart, type Palette } from "@/components/EChart";
-import { useProgressRag } from "@/api/dashboardSettings";
+import { useForecastMethod, useForecastWindow, useProgressRag } from "@/api/dashboardSettings";
 import { RAG_CLASS, ragTone } from "@/lib/progressRag";
-import { forecastFull, scurveSeries, weeklyVelocity } from "@/lib/scurve";
+import { forecastFull, scurveSeries, VELOCITY_WINDOW, weeklyVelocity, type ForecastMethod } from "@/lib/scurve";
 import { Card, pct, signed } from "./dashboardBits";
 
 const FONT = "Cairo, system-ui, sans-serif";
@@ -28,11 +28,19 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
     [snaps],
   );
   const series = useMemo(() => scurveSeries(points), [points]);
-  const velocity = useMemo(() => weeklyVelocity(points), [points]);
+  // contract 0.15.431: the number of weeks is the setting dashboard.forecast_window_weeks (default 4); until it is read the old fixed value is used
+  const windowWeeks = useForecastWindow().data?.weeks ?? VELOCITY_WINDOW;
+  // contract 0.15.474: the weekly pace is taken by the setting dashboard.forecast_method (mean, the default and the former behaviour, or a fitted straight line)
+  const m = useForecastMethod().data?.method;
+  const method: ForecastMethod = m === "linear" ? "linear" : "mean";
+  const velocity = useMemo(() => weeklyVelocity(points, windowWeeks, method), [points, windowWeeks, method]);
   // contract 0.15.432: the velocity is coloured only when an admin turned it on in Settings > Dashboard
   const velTone = ragTone(useProgressRag().data?.items, "velocity", velocity);
   const forecast = useMemo(() => forecastFull(points, velocity), [points, velocity]);
   const last = series[series.length - 1];
+  // the forecast is drawn as a dashed line from the last actual point to 100 % on the forecast date (only when it lies after the last point)
+  const showForecast = forecast !== null && last !== undefined && last.actual < 100 && forecast > last.date;
+  const dates = useMemo(() => (showForecast ? [...series.map((x) => x.date), forecast] : series.map((x) => x.date)), [series, showForecast, forecast]);
   const lastSnap = (snaps?.items ?? []).filter((s) => s.scope !== "region").sort((a, b) => (a.taken_on < b.taken_on ? 1 : -1))[0];
   const fmtDate = (iso: string | null) =>
     iso === null ? "–" : new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(new Date(`${iso}T00:00:00Z`));
@@ -46,7 +54,7 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
       grid: { left: 16, right: 16, top: 32, bottom: 8, containLabel: true },
       xAxis: {
         type: "category",
-        data: series.map((s) => s.date),
+        data: dates,
         axisLabel: { color: p.mute, hideOverlap: true },
         axisLine: { lineStyle: { color: p.line } },
       },
@@ -80,9 +88,23 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
           areaStyle: { color: p.accent, opacity: 0.08 },
           data: series.map((s) => s.actual),
         },
+        ...(showForecast
+          ? [
+              {
+                name: t("dash.scurve.forecast"),
+                type: "line",
+                smooth: false,
+                symbol: "none",
+                lineStyle: { type: "dotted", color: p.accent, width: 2 },
+                itemStyle: { color: p.accent },
+                data: [...series.map((_, i) => (i === series.length - 1 ? series[i].actual : null)), 100],
+                connectNulls: true,
+              },
+            ]
+          : []),
       ],
     }),
-    [series, t],
+    [series, dates, showForecast, t],
   );
 
   return (

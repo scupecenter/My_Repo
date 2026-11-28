@@ -102,3 +102,51 @@ export function useSetProgressRag() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["progressRag"] }),
   });
 }
+
+/** 0.15.474 (phase 5): how the dashboard forecast takes the weekly pace, mean or linear. Kept in the setting dashboard.forecast_method. */
+export type ForecastMethod = S["ForecastMethod"];
+
+export const useForecastMethod = () =>
+  useQuery({
+    queryKey: ["forecastMethod"],
+    queryFn: () =>
+      api.get<ForecastMethod>("/settings/dashboard/forecast-method"),
+  });
+
+export function useSetForecastMethod() {
+  const qc = useQueryClient();
+  return useMutation<
+    ForecastMethod,
+    ApiError,
+    { version: number; body: { method: "mean" | "linear"; reason: string } }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/forecast-method", { version, body }),
+    onSettled: () =>
+      void qc.invalidateQueries({ queryKey: ["forecastMethod"] }),
+  });
+}
+
+/** 0.15.431 (settings review gap 3): the number of weeks the dashboard forecast averages. Kept in the setting dashboard.forecast_window_weeks. */
+export type ForecastWindow = S["ForecastWindow"];
+
+export const useForecastWindow = () =>
+  useQuery({
+    queryKey: ["forecastWindow"],
+    queryFn: () =>
+      api.get<ForecastWindow>("/settings/dashboard/forecast-window"),
+  });
+
+export function useSetForecastWindow() {
+  const qc = useQueryClient();
+  return useMutation<
+    ForecastWindow,
+    ApiError,
+    { version: number; body: { weeks: number; reason: string } }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/forecast-window", { version, body }),
+    onSettled: () =>
+      void qc.invalidateQueries({ queryKey: ["forecastWindow"] }),
+  });
+}
