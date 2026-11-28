@@ -27,6 +27,8 @@ describe('Data hub landing', () => {
     expect(screen.getByTestId('hub-widget-health')).toBeInTheDocument();
     expect(screen.getByTestId('hub-link-data-reset')).toHaveAttribute('href', '/admin/settings/data/reset');
     expect(screen.getByTestId('hub-link-recycle-bin')).toHaveAttribute('href', '/admin/settings/registers/recycle');
+    await waitFor(() => expect(screen.getByTestId('hub-link-structure')).toHaveTextContent('(2)'));
+    expect(screen.getByTestId('hub-link-structure')).toHaveAttribute('href', '/admin/settings/data/structure');
     expect(screen.getByTestId('screen-settings-link')).toHaveAttribute('href', '/admin/settings/screens/data-hub');
     expect(screen.getByTestId('screen-settings-link')).toHaveAttribute('aria-label');
   });
