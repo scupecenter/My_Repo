@@ -33,8 +33,6 @@ beforeAll(async () => {
   db = await superDbDocs();
   admin = await plainAdmin(app, db);
   flow = await docFlow(app, db, 'A2', { region: R });
-  // the draft document types the CW forms belong to are published by the product owner later; the suite activates them as publishing would
-  await db.query(`UPDATE document_types SET is_active = true, updated_at = now() WHERE code IN ('B7_DN', 'E3_CWRN_GEN', 'B13_PAC', 'B15_FAC')`);
   // the contractor of the site: the party of its latest CW procurement row (design/forms/bindings.md)
   const party = (await db.query(`INSERT INTO external_parties (name, type) VALUES ($1, 'cw_contractor') RETURNING id`, [`Contractor ${TAG}`])).rows[0];
   await db.query(`INSERT INTO procurement_records (site_id, region_id, scope, party_id, po_wo_no, po_wo_date) VALUES ($1, $2, 'CW', $3, $4, '2026-02-01')`,
@@ -72,13 +70,16 @@ const makeMovement = async (type: 'cw_dn' | 'cw_rn', qty: number) => {
      VALUES ($1, $2, $3, $4, 'posted', $5, $6, $7, now()) RETURNING id`,
     [ent.entity_id, ent.id, type, type === 'cw_dn' ? 'issue' : 'return', flow.site.id, R, admin.user.id])).rows[0];
   const item = (await db.query(`INSERT INTO warehouse_items (item_code, item_group, name, unit) VALUES ($1, 'CW', $2, 'pcs') RETURNING id`,
-    [`IT-${TAG}-${type}`, `Outdoor cabinet ${TAG} ${type}`])).rows[0];
+    [`IT-${TAG}-${type === 'cw_dn' ? 'DN' : 'RN'}`, `Outdoor cabinet ${TAG} ${type}`])).rows[0];
   await db.query(`INSERT INTO wh_movement_lines (movement_id, item_id, qty, qty_approved, condition, sort_order) VALUES ($1, $2, $3, $3, 'Good', 0)`,
     [mv.id, item.id, qty]);
   return mv.id as string;
 };
 const auditAfter = async (id: string) =>
   (await db.query(`SELECT after FROM audit_log WHERE action = 'library_document_generate' AND entity_id = $1`, [id])).rows[0]?.after;
+/** The draft document types the CW forms belong to are published by the product owner later; the suites activate them as publishing would. */
+const activateDocTypes = () =>
+  db.query(`UPDATE document_types SET is_active = true, updated_at = now() WHERE code IN ('B7_DN', 'E3_CWRN_GEN', 'B13_PAC', 'B15_FAC')`);
 
 describe('CW forms: the seeds of migration 0712', () => {
   it('the generated RN of E3 is a draft document type; the blank rows and the central store are settings', async () => {
@@ -103,13 +104,14 @@ describe('CW forms: the seeds of migration 0712', () => {
 describe('CW forms: DN and RN print their warehouse movement', () => {
   let DN: string; let RN: string;
   beforeAll(async () => {
+    await activateDocTypes();
     DN = await makeTpl(`${TAG}-DN`, 'B7_DN', 'DN-CW-{REGION}-{YYYY}-{SEQ:4}', DN_HTML);
     RN = await makeTpl(`${TAG}-RN`, 'E3_CWRN_GEN', 'RN-CW-{REGION}-{YYYY}-{SEQ:4}', RN_HTML);
   });
 
   it('without a movement the DN is refused; with one it takes the region number, prints the data and links the movement', async () => {
     const no = await flow.e.api.call('post', `/library/forms/${DN}/generate`, { site_id: flow.site.id });
-    expect(no.status).toBe(422);
+    expect(no.status).toBe(409);
     expect(no.body.code).toBe('invalid_transition');
     const mv = await makeMovement('cw_dn', 5);
     const p = await flow.e.api.call('post', `/library/forms/${DN}/preview`, { site_id: flow.site.id });
@@ -144,6 +146,7 @@ describe('CW forms: DN and RN print their warehouse movement', () => {
 describe('CW forms: the PAC and the FAC guards', () => {
   let PAC: string; let FAC: string;
   beforeAll(async () => {
+    await activateDocTypes();
     PAC = await makeTpl(`${TAG}-PAC`, 'B13_PAC', 'PAC-CW-{REGION}-{YYYY}-{SEQ:4}', PAC_HTML);
     FAC = await makeTpl(`${TAG}-FAC`, 'B15_FAC', 'FAC-CW-{REGION}-{YYYY}-{SEQ:4}', FAC_HTML);
   });
@@ -169,7 +172,7 @@ describe('CW forms: the PAC and the FAC guards', () => {
 
   it('the FAC needs the issued PAC and waits for its DLP expiry; a System Admin may override, audited', async () => {
     const early = await flow.e.api.call('post', `/library/forms/${FAC}/generate`, { site_id: flow.site.id });
-    expect(early.status).toBe(422);
+    expect(early.status).toBe(409);
     expect(early.body.code).toBe('invalid_transition');
     const over = await admin.api.call('post', `/library/forms/${FAC}/generate`, { site_id: flow.site.id });
     expect(over.status, JSON.stringify(over.body)).toBe(201);
