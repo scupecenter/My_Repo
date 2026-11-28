@@ -13644,6 +13644,13 @@ export interface components {
             view?: components["schemas"]["ExportView"];
             /** @description Subset of the caller's regions (B3). A region outside the caller's scope is 422 `validation_failed`. Default is all of the caller's regions. */
             regions?: components["schemas"]["RegionId"][];
+            /** @description 0.15.461 (D5). The site pack of one site: a zip with one workbook per part and a README. Send it alone (with `parts`, `view` or `regions` it is 422). Only the parts the caller may export in the region of the site, only the columns the caller may read; voided records, project-wide figures and the dismantle part are left out. Same export lock and audit as every export. */
+            site_pack?: {
+                /** Format: uuid */
+                site_id: string;
+                /** @description Default: every part the caller may export that is site scoped. */
+                parts?: components["schemas"]["ExportPartKey"][];
+            };
             /**
              * Format: date
              * @description Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`. 0.15.34: only today is accepted, a past date is 422 with item code `as_of_unsupported`.
@@ -13708,7 +13715,12 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "full" | "partial" | "view";
+            kind: "full" | "partial" | "view" | "site_pack";
+            /**
+             * Format: uuid
+             * @description Only for `site_pack` (0.15.461).
+             */
+            site_id?: string;
             /** @description Echo of the request; empty for `full` and `view`. */
             parts?: components["schemas"]["ExportPartKey"][];
             view?: components["schemas"]["ExportView"];
