@@ -14,6 +14,7 @@ import {
   Unlock,
   Warehouse as WarehouseIcon,
   Ruler,
+  FileSpreadsheet,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -880,6 +881,16 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                         onSelect: () =>
                           nav(
                             `/admin/settings/registers/columns?register=${key}`,
+                          ),
+                      },
+                      {
+                        id: "col-structure",
+                        label: t("struct.edit_link"),
+                        icon: <FileSpreadsheet size={16} />,
+                        testid: "register-structure-edit",
+                        onSelect: () =>
+                          nav(
+                            `/admin/settings/registers/columns?register=${key}&tab=structure`,
                           ),
                       },
                     ]

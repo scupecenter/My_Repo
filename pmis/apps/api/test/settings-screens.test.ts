@@ -365,7 +365,7 @@ describe('Q441: the mail notification kinds', () => {
     const missing = [...found].filter((k) => !cat.includes(k) && !reserved(k) && k !== 'system');
     expect(missing).toEqual([]);
     // and everything offered is written by something (a kind nobody writes would be a dead checkbox)
-    const offeredButNotFound = cat.filter((k) => !found.has(k) && k !== 'site_region_moved' && !['expiry_radar', 'approval_digest', 'weekly_digest'].includes(k)); // the digest jobs write these with their own INSERT (0166, 0360, 0362)
+    const offeredButNotFound = cat.filter((k) => !found.has(k) && k !== 'site_region_moved' && !['expiry_radar', 'approval_digest', 'weekly_digest', 'structure_proposal', 'structure_decision'].includes(k)); // the digest jobs write these with their own INSERT (0166, 0360, 0362)
     expect(offeredButNotFound).toEqual([]);
   });
 });

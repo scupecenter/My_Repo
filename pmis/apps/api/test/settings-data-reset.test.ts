@@ -93,6 +93,9 @@ beforeAll(async () => {
   await db.query(`UPDATE users SET email = 'reset.admin@example.test' WHERE id = $1`, [admin3.user.id]);
   await db.query(readFileSync(SEED, 'utf8').split('\n').filter((l) => !l.startsWith('\\')).map((l) => l.replace(/ \\g \/dev\/null$/, ';')).join('\n'));
   phrase = `RESET ${(await q<{ d: string }>(db, 'SELECT current_database() AS d'))[0]!.d}`;
+  // the existing run tests approve and run at once: the waiting period (default 24 h) is off for this suite, the tests of 0372 turn it on
+  const cur = await admin1.api.call('get', '/settings/data-reset');
+  await admin1.api.call('put', '/settings/data-reset/settings', { reason: 'Suite setup: no waiting period', request_expiry_minutes: 30, backup_max_age_hours: 24, cooloff_minutes: 0 }, { 'If-Match': String(cur.body.settings.version) });
 }, 120_000);
 
 afterAll(async () => {
@@ -387,7 +390,7 @@ describe('the guarded settings', () => {
     const ok = await admin1.api.call('put', '/settings/data-reset/settings', { reason: 'Owner: one hour', request_expiry_minutes: 60, backup_max_age_hours: 24 }, { 'If-Match': v });
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ request_expiry_minutes: 60, backup_max_age_hours: 24 });
-    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_settings_update' AND actor_id = $1`, [admin1.user.id])).toHaveLength(1);
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_settings_update' AND actor_id = $1 AND reason = 'Owner: one hour'`, [admin1.user.id])).toHaveLength(1);
     const c = new PgClient({ connectionString: process.env.TEST_DATABASE_URL_DRST });
     await c.connect();
     try {
@@ -399,6 +402,65 @@ describe('the guarded settings', () => {
     } finally {
       await c.end();
     }
+  });
+});
+
+const putSettings = async (body: Record<string, unknown>) => {
+  const st = await admin1.api.call('get', '/settings/data-reset');
+  return admin1.api.call('put', '/settings/data-reset/settings', { reason: 'Waiting period test', request_expiry_minutes: 60, backup_max_age_hours: 24, ...body }, { 'If-Match': String(st.body.settings.version) });
+};
+
+describe('the waiting period after the approval (migration 0372, contract 0.15.268)', () => {
+  it('the setting is validated, optional in the body (omitted keeps the value) and defaults to 24 hours', async () => {
+    const bad = await putSettings({ cooloff_minutes: 43201 });
+    expect(bad.status).toBe(422);
+    expect(bad.body.errors.map((e: { path: string; code: string }) => `${e.path}:${e.code}`)).toEqual(['/cooloff_minutes:out_of_range']);
+    expect((await putSettings({ cooloff_minutes: 1.5 })).status).toBe(422);
+    const ok = await putSettings({ cooloff_minutes: 60 });
+    expect(ok.status).toBe(200);
+    expect(ok.body.cooloff_minutes).toBe(60);
+    expect((await putSettings({})).body.cooloff_minutes).toBe(60);
+    expect((await putSettings({ cooloff_minutes: 0 })).body.cooloff_minutes).toBe(0);
+  });
+
+  it('a request inherits the wait; the approval sets run_after and both admins are told; the run is 409 cooloff_active until then; the notice before the run is sent once', async () => {
+    // no backup row is written here: a later test of this file relies on there being none (the request says it needs none)
+    expect((await putSettings({ cooloff_minutes: 60 })).status).toBe(200);
+    const r = await post(admin1, '/requests', { reason: 'Waiting period synthetic test', confirm_text: phrase, parts: ['procurement'], archive: 'none', require_backup: false, no_backup_confirm: 'NO BACKUP' });
+    expect(r.status).toBe(201);
+    const id = r.body.id as string;
+    expect(r.body.cooloff).toMatchObject({ minutes: 60, run_after: null, active: false });
+    // the setting changes later, the request keeps its value (and the settings door refuses while a request is open)
+    expect((await putSettings({ cooloff_minutes: 5 })).status).toBe(409);
+    const ap = await post(admin2, `/requests/${id}/approve`, { reason: 'Waiting period synthetic approval', scope_hash: r.body.scope_hash }, etag(r));
+    expect(ap.status).toBe(200);
+    expect(ap.body.cooloff).toMatchObject({ minutes: 60, active: true });
+    expect(new Date(ap.body.cooloff.run_after).getTime() - Date.now()).toBeGreaterThan(55 * 60_000);
+    // the request stays open for the usual expiry counted from run_after
+    expect(new Date(ap.body.expires_at).getTime()).toBeGreaterThan(new Date(ap.body.cooloff.run_after).getTime());
+    const told = await q<{ user_id: string }>(db, `SELECT user_id FROM notifications WHERE kind = 'data_reset_request' AND title LIKE '%waiting before it can run%' AND created_at > now() - interval '1 minute'`);
+    expect(told.map((t) => t.user_id).sort()).toEqual([admin1.user.id, admin2.user.id].sort());
+    const run = await post(admin1, `/requests/${id}/run`, { confirm_text: phrase }, etag(ap));
+    expect(run.status).toBe(409);
+    expect(run.body.code).toBe('cooloff_active');
+    // the wait and the moment never change with the request
+    await expect(db.query(`UPDATE data_reset_requests SET cooloff_minutes = 0 WHERE id = $1`, [id])).rejects.toThrow();
+    await expect(db.query(`UPDATE data_reset_requests SET run_after = now() WHERE id = $1`, [id])).rejects.toThrow();
+    // not yet near the end: no notice; near the end (the guard is bypassed for the test only): both admins once
+    expect(await svc().notifyCooloff()).toBe(0);
+    await db.query(`SET session_replication_role = replica`);
+    await db.query(`UPDATE data_reset_requests SET run_after = now() + interval '10 minutes' WHERE id = $1`, [id]);
+    await db.query(`RESET session_replication_role`);
+    expect(await svc().notifyCooloff()).toBe(1);
+    expect(await svc().notifyCooloff()).toBe(0);
+    const soon = await q<{ user_id: string }>(db, `SELECT user_id FROM notifications WHERE kind = 'data_reset_request' AND title LIKE '%can run soon%' AND created_at > now() - interval '1 minute'`);
+    expect(soon.map((t) => t.user_id).sort()).toEqual([admin1.user.id, admin2.user.id].sort());
+    // either admin cancels while it waits
+    const last = await admin2.api.call('get', `/settings/data-reset/requests/${id}`);
+    expect(last.body.cooloff.active).toBe(true);
+    const c = await post(admin2, `/requests/${id}/cancel`, { reason: 'Waiting period test only' }, etag(last));
+    expect(c.status).toBe(200);
+    expect((await putSettings({ cooloff_minutes: 0 })).status).toBe(200);
   });
 });
 

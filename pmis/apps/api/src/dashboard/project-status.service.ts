@@ -92,7 +92,7 @@ export class ProjectStatusService {
               SELECT dash_project_status(NULL::date, ${regionRaw ? Number(regionRaw) : null}::int, ${siteRaw ?? null}::uuid, 'none'::text, ${ws}::uuid, ${exclude}::boolean) AS r`));
             const c = (((((one[0]!.r ?? {}) as Json).ps ?? {}) as Json).card ?? {}) as Json;
             // a phase with no measured progress yet does not get a row
-            if (((c.activities ?? []) as Json[]).length > 0) phaseRows.push({ key: set.phase, label: set.phase, progress_pct: c.progress_pct ?? 0, planned_pct: c.planned_pct ?? null, activities: c.activities ?? [] });
+            if (((c.activities ?? []) as Json[]).length > 0) phaseRows.push({ key: set.phase, label: set.phase, progress_pct: c.progress_pct ?? 0, planned_pct: c.planned_pct ?? null, forecast_date: c.forecast_date ?? null, activities: c.activities ?? [] });
           }
           return whole;
         })()
@@ -131,7 +131,7 @@ export class ProjectStatusService {
       ...(group === 'phase'
         ? { rows: phaseRows }
         : group !== 'none'
-          ? { rows: ((ps.rows ?? []) as Json[]).map((x) => ({ key: x.key, label: x.label, progress_pct: x.progress_pct, planned_pct: x.planned_pct ?? null, activities: x.activities ?? {} })) }
+          ? { rows: ((ps.rows ?? []) as Json[]).map((x) => ({ key: x.key, label: x.label, progress_pct: x.progress_pct, planned_pct: x.planned_pct ?? null, forecast_date: x.forecast_date ?? null, activities: x.activities ?? {} })) }
           : {}),
     };
   }
