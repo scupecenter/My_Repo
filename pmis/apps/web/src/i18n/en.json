@@ -2279,6 +2279,10 @@
     "grid": "Grid"
   },
   "registers": {
+    "risk_level_low": "Low",
+    "risk_level_medium": "Medium",
+    "risk_level_high": "High",
+    "risk_level_critical": "Critical",
     "new_more": "More ways to add",
     "new_blank": "New blank record",
     "new_import": "Import rows from the template",

@@ -2279,6 +2279,10 @@
     "grid": "شبكة"
   },
   "registers": {
+    "risk_level_low": "منخفض",
+    "risk_level_medium": "متوسط",
+    "risk_level_high": "مرتفع",
+    "risk_level_critical": "حرج",
     "new_more": "طرق إضافة أخرى",
     "new_blank": "سجل جديد فارغ",
     "new_import": "استيراد صفوف من القالب",

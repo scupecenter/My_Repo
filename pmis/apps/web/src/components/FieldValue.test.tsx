@@ -25,6 +25,11 @@ describe('FieldValue', () => {
     expect(screen.getByTestId('fv')).toHaveTextContent('Open');
     expect(screen.getByTestId('fv')).not.toHaveAttribute('data-colour');
   });
+  it('A2: the derived risk level shows as a translated word', () => {
+    const f = { code: 'risk_level', label_en: 'Risk level', type: 'text' } as unknown as RegisterField;
+    render(<FieldValue f={f} v="critical" testid="fv" />);
+    expect(screen.getByTestId('fv')).toHaveTextContent('Critical');
+  });
   it('draws a percentage as a number with one progress bar', () => {
     const f = { code: 'pct', label_en: 'Done', type: 'percentage' } as unknown as RegisterField;
     render(<FieldValue f={f} v={45} testid="fv" />);

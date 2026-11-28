@@ -63,6 +63,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |
 | Issues, snags, quality, orders, contract end | Contractor performance view (0180) | computed on read, no stored value | thresholds in setting `contractors.performance` | derived |
 | Warehouse DN / RN documents | Stock, per-site quantity, serials | posted by approved documents | `wh_movement_lines`, `warehouse_site_qty`, `warehouse_serials` | derived |
+| Risks | Risk score and level (0780, A2) | computed on read, no stored value | `risk_score` = probability x impact; `risk_level` = the band of the dashboard risk matrix (`riskBand`) | derived |
 | Register records (procurement, warehouse, dismantle, issues, quality, car dispatcher, financial advances, risks) | Related records panel (0324) | computed on read, no stored value | `record_related(register, entity)`; the link list is the setting `registers.links` (0431, Settings > Register links) | derived |
 | Change Control | Procurement order, task | register link, typed by pick-list | `procurement_order_id`, `affected_task_code` (0325); the order shows the change-pending mark through `record_related` | chosen |
 | Issues | Task | text field filled by a task picker | `blocked_gate_or_task` (the task code) | chosen |

@@ -16,6 +16,7 @@ import { FilterCatalogService } from '../views/filter-catalog.service';
 import { setVia, viaSchema } from '../common/via';
 import { resolveMentions } from '../common/mentions';
 import { evidenceDot } from '../site-master/site-master.service';
+import { riskBand, riskScore } from '../dashboard/dashboard-extras.rules';
 import { DocumentsService } from '../documents/documents.service';
 import { WorkflowService } from '../workflow/workflow.service';
 import { MatrixAssigneeDto, TaskViewService, UserRefDto, accountStatus, levelCode } from '../workflow/task-view.service';
@@ -638,7 +639,7 @@ export class RegistersService {
         state: r.state,
         current_level: r.current_level,
         levels_required: r.n_levels,
-        data: r.data,
+        data: r.register_key === 'risks' ? withRiskScore(r.data) : r.data,
         custom: r.custom,
         return_count: r.return_count,
         last_return_note: r.last_return_note,
@@ -1040,4 +1041,13 @@ export class RegistersService {
     const [dto] = await this.workflow.commentDtos(rows, auth.user.id);
     return dto;
   }
+}
+
+/** A2 (0780): the derived risk score (probability x impact) and its band, added on read to the data of a risk; never stored, never typed. */
+export function withRiskScore(data: Record<string, unknown>): Record<string, unknown> {
+  const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+  const score = riskScore(num(data.probability), num(data.impact));
+  if (score === null) return data;
+  const band = riskBand(score);
+  return { ...data, risk_score: score, ...(band ? { risk_level: band } : {}) };
 }
