@@ -52,6 +52,7 @@ import { OpsQualityCard } from "./dashboardQuality";
 import { OpsApprovalsCard } from "./dashboardApprovals";
 import { OpsChangesCard } from "./dashboardChanges";
 import { OpsInvoicesCard, OpsStaleCard, OpsWarehouseCard } from "./dashboardL4";
+import { OpsFinanceCard } from "./dashboardFinance";
 import { useDashboardSettings, useProgressRag } from "@/api/dashboardSettings";
 import { RAG_CLASS, ragTone } from "@/lib/progressRag";
 import { GoalsPanel } from "@/components/GoalsPanel";
@@ -1511,6 +1512,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.204 (owner approval 2026-11-26, item 7): tasks waiting review or approval, ages per ball-in-court role */}
                   <OpsApprovalsCard ops={ops.data} />
+                </>
+              ),
+
+              ops_finance: (
+                <>
+                  {/* 0.15.206 (owner approval 2026-11-26, item 9): restricted financial summary; renders nothing unless the caller is a configured reader */}
+                  <OpsFinanceCard ops={ops.data} />
                 </>
               ),
 
