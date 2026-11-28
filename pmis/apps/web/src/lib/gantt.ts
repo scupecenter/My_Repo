@@ -4,7 +4,20 @@ type Node = components['schemas']['PipelineNode'];
 
 export interface GanttRow { code: string; node: Node; baseline: number | null; planned: number | null; actual: number | null }
 export interface GanttDep { from: string; to: string; fromDay: number; toDay: number; conflict: boolean }
-export interface GanttModel { rows: GanttRow[]; min: number; max: number; today: number | null; deps: GanttDep[] }
+export interface GanttCritical {
+  /** Codes of the stages that can still move the finish date: every dated stage without an actual date, from the first one to the last. */
+  codes: string[];
+  /** The finish date (day number): the date of the last dated stage. */
+  finish: number | null;
+  /** The finish date the baselines give (the last baseline), and the days the finish sits after it (negative: ahead). */
+  baselineFinish: number | null;
+  varianceDays: number | null;
+  /** Days each critical stage added to the delay on its own: its slip against baseline minus the slip of the stage before it. */
+  added: Record<string, number>;
+  /** The critical stage that added the most delay (more than 0), or null. */
+  driver: string | null;
+}
+export interface GanttModel { rows: GanttRow[]; min: number; max: number; today: number | null; deps: GanttDep[]; critical: GanttCritical }
 
 /** The date a row is drawn at for dependency lines: actual, else planned, else baseline. */
 export const rowDay = (r: GanttRow): number | null => r.actual ?? r.planned ?? r.baseline;
@@ -33,11 +46,80 @@ export function buildGantt(pipeline: Node[] | undefined, todayIso?: string): Gan
     const fa = rowDay(a); const fb = rowDay(b);
     if (fa !== null && fb !== null) deps.push({ from: a.code, to: b.code, fromDay: fa, toDay: fb, conflict: fb < fa });
   }
-  return { rows, min: Math.min(...all), max: Math.max(...all), today, deps };
+  return { rows, min: Math.min(...all), max: Math.max(...all), today, deps, critical: criticalPath(rows) };
+}
+
+/**
+ * The chain that sets the finish date. Stages wait for the one before (finish to start), so a stage already done (actual date) can no longer
+ * move the finish, and every dated stage still open can. The slip of a stage is its date minus its baseline; what it added is its slip minus the
+ * slip of the dated stage before it. Display only: nothing is saved and no date changes.
+ */
+export function criticalPath(rows: GanttRow[]): GanttCritical {
+  const dated = rows.filter((r) => rowDay(r) !== null);
+  const last = dated[dated.length - 1];
+  const codes = dated.filter((r) => r.actual === null).map((r) => r.code);
+  const finish = last ? rowDay(last) : null;
+  const lastBase = [...rows].reverse().find((r) => r.baseline !== null)?.baseline ?? null;
+  const added: Record<string, number> = {};
+  let prevSlip = 0;
+  for (const r of dated) {
+    const d = rowDay(r)!;
+    const slip = r.baseline !== null ? d - r.baseline : prevSlip;
+    if (codes.includes(r.code)) added[r.code] = slip - prevSlip;
+    prevSlip = slip;
+  }
+  let driver: string | null = null;
+  let best = 0;
+  for (const c of codes) if ((added[c] ?? 0) > best) { best = added[c]!; driver = c; }
+  return { codes, finish, baselineFinish: lastBase, varianceDays: finish !== null && lastBase !== null ? finish - lastBase : null, added, driver };
 }
 
 /** Position 0..100 of a day on the model's span. */
 export function pos(model: GanttModel, d: number): number {
   const span = Math.max(model.max - model.min, 1);
   return ((d - model.min) / span) * 100;
+}
+
+export interface WhatIf {
+  code: string;
+  delta: number;
+  /** New day of every row that moves (the chosen stage and the open stages after it). */
+  moved: Record<string, number>;
+  /** The finish day after the move, the days it shifted, and the variance against the last baseline after the move. */
+  finish: number | null;
+  finishShift: number;
+  varianceDays: number | null;
+  /** Codes dated before the stage they wait for after the move (a new order conflict). */
+  conflicts: string[];
+}
+
+/**
+ * What if this stage moved by `delta` days? The stage and every open stage after it move by the same days (each keeps its own duration); a stage that
+ * already has an actual date stays where it is and ends the push. Only a picture on the screen: nothing is saved and no date is changed.
+ */
+export function whatIf(model: GanttModel, code: string, delta: number): WhatIf | null {
+  const i = model.rows.findIndex((r) => r.code === code);
+  const start = model.rows[i];
+  if (!start || rowDay(start) === null || start.actual !== null) return null;
+  const moved: Record<string, number> = {};
+  for (let k = i; k < model.rows.length; k += 1) {
+    const r = model.rows[k]!;
+    const d = rowDay(r);
+    if (d === null) continue;
+    if (r.actual !== null) break;
+    moved[r.code] = d + delta;
+  }
+  const dayOf = (r: GanttRow): number | null => moved[r.code] ?? rowDay(r);
+  const dated = model.rows.filter((r) => dayOf(r) !== null);
+  const last = dated[dated.length - 1];
+  const finish = last ? dayOf(last) : null;
+  const conflicts: string[] = [];
+  for (let k = 1; k < dated.length; k += 1) if (dayOf(dated[k]!)! < dayOf(dated[k - 1]!)!) conflicts.push(dated[k]!.code);
+  const base = model.critical.baselineFinish;
+  return {
+    code, delta, moved, finish,
+    finishShift: finish !== null && model.critical.finish !== null ? finish - model.critical.finish : 0,
+    varianceDays: finish !== null && base !== null ? finish - base : null,
+    conflicts,
+  };
 }
