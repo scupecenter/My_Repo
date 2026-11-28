@@ -121,6 +121,12 @@ export class WorkflowEditorController {
     return this.tag(res, await this.editor.setWeight(auth, version, task, ifMatch, body));
   }
 
+  /** Migration 0491: the lock mode (strict or open) of a draft version. The per-site switch (0085) stays the override. */
+  @Put('versions/:version/lock-mode')
+  async setLockMode(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setLockMode(auth, version, ifMatch, body));
+  }
+
   @Put('versions/:version/tasks/:task/closing')
   async setClosing(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
     return this.tag(res, await this.editor.setClosing(auth, version, task, ifMatch, body));

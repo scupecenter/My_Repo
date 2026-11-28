@@ -351,3 +351,167 @@ describe('default value of a column (0254)', () => {
     expect((r.data as Record<string, unknown>).c_dflt_num).toBeUndefined();
   });
 });
+
+describe('structure by template (0560): the Structure sheet, the proposal, the review and the approval', () => {
+  const SP = '/structure-proposals';
+  let second: Actor;
+  const sheetOf = async (): Promise<{ wb: Awaited<ReturnType<typeof import('./tpl-helpers').load>>; ws: import('exceljs').Worksheet }> => {
+    const { load } = await import('./tpl-helpers');
+    const dl = await downloadTemplate(admin.api, 'TPL-GECOL');
+    expect(dl.status).toBe(200);
+    const wb = await load(dl.buffer);
+    return { wb, ws: wb.getWorksheet('Structure') as import('exceljs').Worksheet };
+  };
+  const rowOf = (ws: import('exceljs').Worksheet, code: string): number => {
+    let at = 0;
+    ws.eachRow((r, n) => { if (n > 1 && String(r.getCell(1).value) === code) at = n; });
+    return at;
+  };
+  const upload = async (wb: import('exceljs').Workbook, who: Actor = admin, reasonText = 'Rename and add from Excel') => {
+    const buffer = Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);
+    const t2 = who.api.raw('post', `${SP}/upload`);
+    if (who.api.csrf) t2.set('X-CSRF-Token', who.api.csrf);
+    return t2.field('reason', reasonText).attach('file', buffer, { filename: 'edited.xlsx', contentType: 'application/octet-stream' });
+  };
+  const version = async (): Promise<number> => Number((await q(db, `SELECT current_version FROM template_definitions WHERE template_id = 'TPL-GECOL'`))[0]!.current_version);
+
+  beforeAll(async () => { second = await plainAdmin(app, db, true); });
+
+  it('the Structure sheet is in the download of who may edit the columns, with one row per column, and not in the download of others', async () => {
+    const { ws } = await sheetOf();
+    expect(ws).toBeTruthy();
+    expect(String(ws.getRow(1).getCell(1).value)).toBe('Code');
+    const fields = (await screen()).fields;
+    expect(ws.actualRowCount - 1).toBeGreaterThanOrEqual(fields.length);
+    expect(rowOf(ws, 'c_text')).toBeGreaterThan(1);
+    const { load } = await import('./tpl-helpers');
+    const other = await downloadTemplate(t.entry.api, 'TPL-GECOL');
+    if (other.status === 200) expect((await load(other.buffer)).getWorksheet('Structure')).toBeUndefined();
+  });
+
+  it('an upload makes a proposal and writes nothing to the register; nobody else can upload', async () => {
+    const { wb, ws } = await sheetOf();
+    const r = rowOf(ws, 'c_text');
+    ws.getCell(r, 2).value = 'Renamed from Excel';
+    const add = ws.actualRowCount + 1;
+    ws.getCell(add, 1).value = 'x_from_sheet';
+    ws.getCell(add, 2).value = 'Added from Excel';
+    ws.getCell(add, 4).value = 'text';
+    const before = await field('c_text');
+    expect((await upload(wb, plain)).status).toBe(403);
+    const res = await upload(wb);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(res.body.status).toBe('pending');
+    expect(res.body.blocked_count).toBe(0);
+    expect(res.body.summary).toMatchObject({ rename: 1, add: 1 });
+    expect((await field('c_text'))?.label_en).toBe(before?.label_en);
+    expect(await field('x_from_sheet')).toBeUndefined();
+    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_proposal_submit'`))[0]!.n).toBeGreaterThan(0);
+  });
+
+  it('a sheet with no change is refused, and a file without the sheet is refused', async () => {
+    const { wb } = await sheetOf();
+    const same = await upload(wb);
+    expect(same.status).toBe(422);
+    wb.removeWorksheet('Structure');
+    const none = await upload(wb);
+    expect(none.status).toBe(422);
+    expect(none.body.reason ?? none.body.extra?.reason).toBe('structure_missing');
+  });
+
+  it('the approval applies the items through the column doors, issues a new template version and lists the proposal as applied', async () => {
+    const list = await admin.api.call('get', `${SP}?status=pending`);
+    expect(list.status).toBe(200);
+    const p = (list.body.items as Record<string, any>[]).find((x) => x.summary?.add === 1);
+    expect(p).toBeTruthy();
+    const v0 = await version();
+    expect((await plain.api.call('post', `${SP}/${p!.id}/decision`, { action: 'approve', note: 'ok go' })).status).toBe(403);
+    const ok = await admin.api.call('post', `${SP}/${p!.id}/decision`, { action: 'approve', note: 'Reviewed the differences' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.status).toBe('applied');
+    expect((await field('c_text'))?.label_en).toBe('Renamed from Excel');
+    expect(await field('x_from_sheet')).toMatchObject({ type: 'text', label_en: 'Added from Excel' });
+    expect(await version()).toBeGreaterThan(v0);
+    expect((await admin.api.call('post', `${SP}/${p!.id}/decision`, { action: 'approve', note: 'again please' })).status).toBe(409);
+  });
+
+  it('hiding a column needs a second System Admin, and the approval needs the step-up', async () => {
+    const { wb, ws } = await sheetOf();
+    ws.getCell(rowOf(ws, 'x_from_sheet'), 13).value = 'No';
+    const res = await upload(wb);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(res.body.needs_two_people).toBe(true);
+    const id = res.body.id as string;
+    expect((await admin.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'my own proposal' })).status).toBe(403);
+    expect((await noStep.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'no step up' })).status).toBe(401);
+    const ok = await second.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'Second admin approves' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect((await field('x_from_sheet'))?.is_active).toBe(false);
+  });
+
+  it('a rejection needs a note; a blocked item (a system column is hidden) disables the approval; the differences download as .xlsx', async () => {
+    const sys = (await screen()).fields.find((f) => f.is_system && f.is_active);
+    expect(sys).toBeTruthy();
+    const { wb, ws } = await sheetOf();
+    ws.getCell(rowOf(ws, sys!.code), 13).value = 'No';
+    const res = await upload(wb);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(res.body.blocked_count).toBe(1);
+    const id = res.body.id as string;
+    expect((await second.api.call('post', `${SP}/${id}/decision`, { action: 'approve', note: 'try it anyway' })).status).toBe(409);
+    expect((await second.api.call('post', `${SP}/${id}/decision`, { action: 'reject' })).status).toBe(422);
+    const dl = await (await import('./tpl-helpers')).getBinary(second.api, `${SP}/${id}/differences`);
+    expect(dl.status).toBe(200);
+    expect(dl.buffer.subarray(0, 2).toString()).toBe('PK');
+    const rj = await second.api.call('post', `${SP}/${id}/decision`, { action: 'reject', note: 'A system column stays visible' });
+    expect(rj.status).toBe(200);
+    expect(rj.body.status).toBe('rejected');
+    expect((await field(sys!.code))?.is_active).toBe(true);
+  });
+
+  it('an applied proposal is undone by a proposal of its own that goes through the same approval', async () => {
+    const applied = (await admin.api.call('get', `${SP}?status=applied`)).body.items as Record<string, any>[];
+    const rename = applied.find((x) => x.summary?.rename === 1 && x.summary?.add === 1);
+    expect(rename).toBeTruthy();
+    const rv = await admin.api.call('post', `${SP}/${rename!.id}/revert`, { reason: 'Back to the earlier names' });
+    expect(rv.status, JSON.stringify(rv.body)).toBe(201);
+    expect(rv.body.reverts_id).toBe(rename!.id);
+    expect((await second.api.call('post', `${SP}/${rv.body.id}/decision`, { action: 'approve', note: 'Undo reviewed' })).status).toBe(200);
+    expect((await field('c_text'))?.label_en).not.toBe('Renamed from Excel');
+    expect((await admin.api.call('get', `${SP}/${rename!.id}`)).body.status).toBe('reverted');
+  });
+
+  it('the rules (0562): everyone reads them; a change needs a reason, If-Match and the step-up; the size limit, the second person and the notices follow them', async () => {
+    const PO = '/settings/structure-policy';
+    const pol = await admin.api.call('get', PO);
+    expect(pol.status).toBe(200);
+    expect(pol.body).toMatchObject({ who_proposes: 'fields_editors', who_approves: 'admins', two_person: 'risky_only', max_items: 200, notify_approvers: true, notify_proposer: true });
+    expect((await plain.api.call('get', PO)).status).toBe(200);
+    const ifm = (v: number) => ({ 'If-Match': `"${v}"` });
+    expect((await plain.api.call('put', PO, { reason: 'try it', max_items: 5 }, ifm(pol.body.version))).status).toBe(403);
+    expect((await noStep.api.call('put', PO, { reason: 'no step up', max_items: 5 }, ifm(pol.body.version))).status).toBe(401);
+    expect((await admin.api.call('put', PO, { reason: 'bad value', two_person: 'never' }, ifm(pol.body.version))).status).toBe(422);
+    expect((await admin.api.call('put', PO, { reason: 'bad size', max_items: 501 }, ifm(pol.body.version))).status).toBe(422);
+    const one = await admin.api.call('put', PO, { reason: 'one item only', max_items: 1, two_person: 'always' }, ifm(pol.body.version));
+    expect(one.status, JSON.stringify(one.body)).toBe(200);
+    expect(one.body).toMatchObject({ max_items: 1, two_person: 'always' });
+    expect((await admin.api.call('put', PO, { reason: 'stale version', max_items: 2 }, ifm(pol.body.version))).status).toBe(412);
+    expect((await admin.api.call('put', PO, { reason: 'same again', max_items: 1 }, ifm(one.body.version))).status).toBe(409);
+    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_policy_update'`))[0]!.n).toBeGreaterThan(0);
+    try {
+      const two = await admin.api.call('post', SP, { register_key: 'gecol', reason: 'two items', rows: [{ code: 'x_pol_a', label_en: 'Pol A', type: 'text' }, { code: 'x_pol_b', label_en: 'Pol B', type: 'text' }] });
+      expect(two.status).toBe(422);
+      const mk = await admin.api.call('post', SP, { register_key: 'gecol', reason: 'one item', rows: [{ code: 'x_pol_a', label_en: 'Pol A', type: 'text' }] });
+      expect(mk.status, JSON.stringify(mk.body)).toBe(201);
+      expect(mk.body.needs_two_people).toBe(true);
+      expect((await admin.api.call('post', `${SP}/${mk.body.id}/decision`, { action: 'approve', note: 'my own proposal' })).status).toBe(403);
+      const rj = await second.api.call('post', `${SP}/${mk.body.id}/decision`, { action: 'reject', note: 'Not needed for now' });
+      expect(rj.status).toBe(200);
+      const kinds = (await q(db, `SELECT kind FROM notifications WHERE kind IN ('structure_proposal', 'structure_decision')`)).map((x) => x.kind as string);
+      expect(kinds).toEqual(expect.arrayContaining(['structure_proposal', 'structure_decision']));
+    } finally {
+      const cur = await admin.api.call('get', PO);
+      await admin.api.call('put', PO, { reason: 'restore the defaults', max_items: 200, two_person: 'risky_only' }, ifm(cur.body.version));
+    }
+  });
+});

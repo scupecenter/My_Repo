@@ -23,6 +23,7 @@ const slaRuleBody = z.object({
 const weightBody = z.object({
   counts_in_weight: z.boolean(), weight_value: z.number().min(0).max(100).optional(), weight_group: z.string().trim().max(20).nullable().optional(), reason,
 }).strict();
+const lockModeBody = z.object({ lock_mode: z.enum(['strict', 'open']), reason }).strict();
 const confirmImpact = z.string().max(200).optional();
 const code = z.string().trim().min(1).max(40);
 const nameEn = z.string().trim().min(1).max(200);
@@ -267,6 +268,13 @@ export class WorkflowEditorService {
     const b = parse(discardBody, raw);
     const etag = await this.gate(auth, 'sla_rules', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_sla_rule_remove(${version}::int, ${etag}::int, ${task}::text, ${rule}::uuid, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0491: the lock mode of a draft version (strict by default). The right of the publish door; no site is changed. */
+  async setLockMode(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(lockModeBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'administer', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_lock_mode(${version}::int, ${etag}::int, ${b.lock_mode}::text, ${b.reason}::text) AS r`);
   }
 
   /** Migration 0109: counts in project weight, the percent and the weight group of a task (draft only; the draft shows the totals, publishing blocks them). */
