@@ -24119,6 +24119,8 @@ export interface components {
             manual_items_planned?: number;
             /** @description 0.12.7 (Q175): null for the project-wide figure. */
             central_line?: components["schemas"]["CentralLine"] | null;
+            /** @description 0.15.590 (B9): whether the per-site complexity coefficients (setting `dashboard.site_complexity_weighting`) are applied to the cross-site figures. */
+            site_complexity_weighting?: boolean;
             activities: components["schemas"]["DashboardProjectStatusActivity"][];
         };
         /** @description The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`. */

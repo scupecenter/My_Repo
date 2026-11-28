@@ -35,6 +35,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 | CW forms | `design/forms/` | DN, RN, PAC, FAC as HTML templates rendered to A4 PDF |
 | Agents | `../.claude/agents/*.md`, `ORCHESTRATION.md` | 9 agents with their models and folders |
 | References | `docs/reference/` | Blueprint v1.1, decisions D1–D88, the Master user manual, and the previous standalone dashboard (`legacy-dashboard/`, read-only, the KPI reference for P3) |
+| Progress engine | `docs/spec/rules.md` §6, `db/sql/592_site_complexity_weighting.sql` | Project Status figures with the derived site-complexity weighting (owner decision 2026-11-28; contract 0.15.590, migration 0593; kill switch `dashboard.site_complexity_weighting`) |
 
 **Not verified in this refresh:** the number of operations in the contract, the current model count, and the state of every web screen. Check them in the code before quoting them. No server URL is recorded here: ask the owner or IT for the deployment address.
 

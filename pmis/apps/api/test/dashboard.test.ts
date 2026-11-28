@@ -28,6 +28,9 @@ type J = Record<string, any>;
 beforeAll(async () => {
   app = await startApp({ databaseUrl: process.env.TEST_DATABASE_URL_DASH as string });
   db = await superDbDash();
+  // this suite's hand-computed project figures predate 0593 site-complexity weighting; pin it off
+  await db.query(`INSERT INTO settings (key, value, updated_at) VALUES ('dashboard.site_complexity_weighting', 'false'::jsonb, now())
+    ON CONFLICT (key) DO UPDATE SET value = 'false'::jsonb, updated_at = now()`);
   const x = await makeUser(db, { assigned: true });
   const y = await makeUser(db, { assigned: true });
   await db.query(`UPDATE users SET display_name = 'Owner X' WHERE id = $1`, [x.id]);
