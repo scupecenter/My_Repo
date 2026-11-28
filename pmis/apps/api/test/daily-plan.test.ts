@@ -373,3 +373,55 @@ describe('settings and the job', () => {
     }
   });
 });
+
+/** Migration 0566 (hardening layer 1b): locks of a plan, a row and a column of the rows, on the model of the register locks. */
+describe('Daily Plan entity locks (0566)', () => {
+  const DL = '2025-06-22'; // a Sunday, its own plan so no other test depends on it
+  it('a locked plan refuses the entry holder and not a System Admin; unlock restores it; every change is audited', async () => {
+    const dayBase = `/daily-plans/${DL}/regions/${REGION}`;
+    const first = await l1.api.call('post', `${dayBase}/sites`, { site_code: s2.code }, { 'If-Match': '"0"' });
+    expect(first.status).toBe(200);
+    const head = planOf((await get(l1, DL)).body);
+    expect(head.plan_id).toBeTruthy();
+    const lock = await admin.api.call('post', `/entity-locks/daily_plan/${head.plan_id}`, { reason: 'Frozen for review' });
+    expect(lock.status).toBe(200);
+    const locked = planOf((await get(l1, DL)).body);
+    expect(locked.entity_locked).toBe(true);
+    expect(locked.can_edit).toBe(false);
+    const refused = await l1.api.call('patch', `${dayBase}/sites/${s2.id}`, { remark: 'second' }, { 'If-Match': `"${locked.version}"` });
+    expect(refused.status).toBe(403);
+    expect(JSON.stringify(refused.body)).toMatch(/register_locked/);
+    const exempt = await admin.api.call('patch', `${dayBase}/sites/${s2.id}`, { remark: 'admin edit' }, { 'If-Match': `"${locked.version}"` });
+    expect(exempt.status).toBe(200);
+    expect((await admin.api.call('delete', `/entity-locks/daily_plan/${head.plan_id}`, { reason: 'Review done' })).status).toBe(200);
+    const after = planOf((await get(l1, DL)).body);
+    expect((await l1.api.call('patch', `${dayBase}/sites/${s2.id}`, { remark: 'third' }, { 'If-Match': `"${after.version}"` })).status).toBe(200);
+    const audit = await db.query(`SELECT action FROM audit_log WHERE entity_id = $1 AND action IN ('entity_lock','entity_unlock') ORDER BY id`, [head.plan_id]);
+    expect(audit.rows.map((r) => r.action)).toEqual(['entity_lock', 'entity_unlock']);
+  });
+
+  it('a locked column refuses a body that names it; a row lock refuses edits of that row', async () => {
+    const dayBase = `/daily-plans/${DL}/regions/${REGION}`;
+    const head0 = planOf((await get(l1, DL)).body);
+    const rowId = rowOf((await get(l1, DL)).body, s2.id)?.row_id as string;
+    expect(rowId).toBeTruthy();
+    try {
+      expect((await admin.api.call('post', '/entity-locks/columns/daily_plan_row/remark', { reason: 'Remarks closed' })).status).toBe(200);
+      const v = planOf((await get(l1, DL)).body).version;
+      const r = await l1.api.call('patch', `${dayBase}/sites/${s2.id}`, { remark: 'blocked' }, { 'If-Match': `"${v}"` });
+      expect(r.status).toBe(403);
+      expect(JSON.stringify(r.body)).toMatch(/register_locked/);
+    } finally {
+      await admin.api.call('delete', '/entity-locks/columns/daily_plan_row/remark', { reason: 'Remarks open again' });
+    }
+    expect((await admin.api.call('post', `/entity-locks/daily_plan_row/${rowId}`, { reason: 'Row frozen' })).status).toBe(200);
+    try {
+      const v = planOf((await get(l1, DL)).body).version;
+      expect((await l1.api.call('patch', `${dayBase}/sites/${s2.id}`, { remark: 'row blocked' }, { 'If-Match': `"${v}"` })).status).toBe(403);
+      expect((await l1.api.call('delete', `${dayBase}/sites/${s2.id}`, undefined, { 'If-Match': `"${v}"` })).status).toBe(403);
+    } finally {
+      await admin.api.call('delete', `/entity-locks/daily_plan_row/${rowId}`, { reason: 'Row open again' });
+    }
+    expect(head0.plan_id).toBeTruthy();
+  });
+});
