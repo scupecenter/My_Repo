@@ -3141,6 +3141,10 @@
     "p_returned_note": "{{x}} was returned with a note",
     "p_nobody_level": "{{x}}: nobody can act on the {{y}} level.",
     "t_a_new_site_was_approved": "A new site was approved",
+    "t_approval_reminder": "Approval reminder",
+    "t_approval_escalated": "Approval escalated",
+    "t_task_idle": "Task idle",
+    "t_level_has_no_holder": "Level has no holder",
     "p_sla_escalation": "SLA escalation: {{x}}",
     "p_reminder": "Reminder: {{x}}"
   },

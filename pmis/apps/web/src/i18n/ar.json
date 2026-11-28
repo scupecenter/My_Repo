@@ -3149,6 +3149,10 @@
     "p_returned_note": "أُعيد {{x}} مع ملاحظة",
     "p_nobody_level": "{{x}}: لا أحد يستطيع التصرف في مستوى {{y}}.",
     "t_a_new_site_was_approved": "تم اعتماد موقع جديد",
+    "t_approval_reminder": "تذكير بالاعتماد",
+    "t_approval_escalated": "تم تصعيد الاعتماد",
+    "t_task_idle": "مهمة بلا نشاط",
+    "t_level_has_no_holder": "مستوى بلا مسؤول",
     "p_sla_escalation": "تصعيد اتفاقية مستوى الخدمة: {{x}}",
     "p_reminder": "تذكير: {{x}}"
   },
