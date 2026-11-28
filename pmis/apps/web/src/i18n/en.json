@@ -2274,6 +2274,14 @@
     "grid": "Grid"
   },
   "registers": {
+    "bulk_set": "Set a field",
+    "bulk_export": "Export selected",
+    "bulk_set_title": "Set a field on {{count}} records",
+    "bulk_set_hint": "The same rules as editing one record: locked records and fields you cannot edit are skipped and listed.",
+    "bulk_set_field": "Field",
+    "bulk_set_pick": "Choose a field",
+    "bulk_set_apply": "Apply to {{count}}",
+    "bulk_exported": "Exported {{count}} rows",
     "new_more": "More ways to add",
     "new_blank": "New blank record",
     "new_import": "Import rows from the template",
@@ -8775,5 +8783,6 @@
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
   },
+  "activity": {"title": "Activity", "filter": "Filter the activity", "kind_all": "All", "kind_comment": "Comments", "kind_step": "Workflow", "kind_change": "Field changes", "empty": "No activity yet."},
   "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
 }

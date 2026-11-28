@@ -62,6 +62,7 @@ import {
 } from "@/components/GridColumnAdmin";
 import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
+import { BulkSetFieldDialog } from "@/components/BulkSetFieldDialog";
 import { RegisterQuickPreview } from "@/components/RegisterQuickPreview";
 import { SplitNewButton } from "@/components/SplitNewButton";
 import { WhatsNewHint } from "@/components/WhatsNewHint";
@@ -401,6 +402,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const voidRec = useRecordOp(key);
   const [bulk, setBulk] = useState<null | "lock" | "unlock" | "void">(null);
   const [pickOpen, setPickOpen] = useState(false);
+  const [bulkSet, setBulkSet] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [colDlg, setColDlg] = useState<null | {
     code: string;
@@ -442,6 +444,43 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     if (notDone.length)
       toast(t("registers.bulk_refused", { list: notDone.join(", ") }), "err");
     setBulk(null);
+  };
+  // bulk edit: one field, one value, each record through the normal edit path (If-Match, locks, field rules); the refused ones are listed
+  const runBulkSet = async (code: string, value: unknown) => {
+    const fc = def.fields.find((x) => x.code === code);
+    let done = 0;
+    const notDone: string[] = [];
+    for (const r of real.filter((x) => picked.has(x.id))) {
+      const ok = !!fc && !!r.allowed_actions?.includes("edit") && (admin || (!fc.locked && !r.locked));
+      if (!ok) {
+        notDone.push(r.site_code ?? r.id.slice(0, 8));
+        continue;
+      }
+      try {
+        await save.mutateAsync({ record: r, patch: { data: { [code]: value } } });
+        done += 1;
+      } catch {
+        notDone.push(r.site_code ?? r.id.slice(0, 8));
+      }
+    }
+    toast(t("registers.bulk_result", { done, refused: notDone.length }));
+    if (notDone.length) toast(t("registers.bulk_refused", { list: notDone.join(", ") }), "err");
+    setBulkSet(false);
+  };
+  // export the selected rows as CSV (what the table shows, readable values; the UTF-8 mark keeps Arabic right in Excel)
+  const exportPicked = () => {
+    const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const head = [label("site"), label("state"), ...fieldCols.map((c) => fieldLabel(c, i18n.language))];
+    const lines = real
+      .filter((r) => picked.has(r.id))
+      .map((r) => [r.site_code ?? "", r.state ?? "", ...fieldCols.map((c) => showValue(c, r.data[c.code], i18n.language, t))].map(q).join(","));
+    const url = URL.createObjectURL(new Blob(["\ufeff" + [head.map(q).join(","), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${key}-selected.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(t("registers.bulk_exported", { count: picked.size }));
   };
   // a card dragged to another board column: the status field is saved through the normal edit path (If-Match); the server may still refuse; undo for 8 seconds
   const moveCard = (r: RegisterRecord, code: string, value: string | null) => {
@@ -1267,6 +1306,22 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             >
               {t("registers.void_selected")}
             </button>
+            <button
+              type="button"
+              className="btn"
+              data-testid="register-bulk-set"
+              onClick={() => setBulkSet(true)}
+            >
+              {t("registers.bulk_set")}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              data-testid="register-bulk-export"
+              onClick={exportPicked}
+            >
+              {t("registers.bulk_export")}
+            </button>
             {picked.size === 1 && (
               <button
                 type="button"
@@ -1294,6 +1349,14 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               {t("table.copy_codes")}
             </button>
           </BulkBar>
+          <BulkSetFieldDialog
+            key={bulkSet ? "open" : "closed"}
+            open={bulkSet}
+            count={picked.size}
+            fields={fieldCols.filter((c) => INLINE_TYPES.includes(c.type) && !c.read_only)}
+            onClose={() => setBulkSet(false)}
+            onApply={(c, v) => void runBulkSet(c, v)}
+          />
           <RegisterQuickPreview
             def={def}
             record={real.find((x) => x.id === previewId) ?? null}
