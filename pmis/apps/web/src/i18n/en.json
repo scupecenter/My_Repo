@@ -4427,6 +4427,7 @@
     "note_admin": "The site keeps its values until L2 approves. Region and cluster are for a System Admin: they change who can see the site, so a System Admin approves them too.",
     "name": "English name",
     "name_ar": "Arabic name",
+    "address": "Address",
     "latitude": "Latitude",
     "longitude": "Longitude",
     "region": "Region",
@@ -6771,6 +6772,19 @@
     "impact_retry": "Try again",
     "closing": "This task closes the milestone",
     "closing_chip": "Closing task"
+  },
+  "acqLocation": {
+    "title": "Site location from the selected candidate",
+    "candidate": "Candidate",
+    "site": "Site now",
+    "reason": "Site location from the selected acquisition candidate",
+    "fill": "Propose this location for the site",
+    "cancel": "Cancel",
+    "replace": "Yes, propose the candidate's location",
+    "differs": "The site has other values: review",
+    "confirm": "The site already has other values. Propose the candidate's instead? The site keeps its values until the change is approved.",
+    "failed": "The proposal was not accepted. Check your rights or the values.",
+    "note": "This opens a Change Control proposal, the same as Site identity: one draft for the coordinates and one for the address, only for what differs. Nothing changes on the site until it is approved."
   },
   "studioLists": {
     "back_to_lists": "Back to the lists",

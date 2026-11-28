@@ -22,6 +22,7 @@ import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { RelatedRecords } from './RelatedRecords';
+import { AcquisitionSiteLocation } from './AcquisitionSiteLocation';
 import { SiteTaskField } from './SiteTaskField';
 import { SiteGateField } from './SiteGateField';
 import { useRegisterLinks } from '@/api/p4c';
@@ -422,6 +423,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
         )}
         {record && rk === 'procurement' && record.state === 'approved' && <OrderReceipts entityId={record.entity_id as string} />}
         {record && key === 'risks' && <RiskIssues entityId={record.entity_id as string} />}
+        {record && (def.register_key as string) === 'acquisition' && record.site_id && <AcquisitionSiteLocation siteId={record.site_id} data={record.data} />}
         {record && <RelatedRecords registerKey={rk} entityId={record.entity_id as string} />}
         {record && rk === 'financial_advances' && <Balance record={record} />}
         {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}

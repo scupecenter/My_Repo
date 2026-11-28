@@ -26,7 +26,7 @@ export function SiteAdminEdit({ site }: { site: SiteDetail }) {
   const fields = (site.custom_fields ?? []) as SiteCustomField[];
   const values = (site.custom ?? {}) as Record<string, unknown>;
   const initial = () => ({
-    name: site.name ?? '', name_ar: site.name_ar ?? '', latitude: site.latitude == null ? '' : String(site.latitude), longitude: site.longitude == null ? '' : String(site.longitude),
+    name: site.name ?? '', name_ar: site.name_ar ?? '', address: site.address ?? '', latitude: site.latitude == null ? '' : String(site.latitude), longitude: site.longitude == null ? '' : String(site.longitude),
     region_id: String(site.region_id), cluster_code: site.cluster_code ?? '', scenario: site.delivery_scenario ?? '', reason: '',
     custom: Object.fromEntries(fields.map((f) => [f.code, values[f.code] == null ? '' : String(values[f.code])])) as Record<string, string>,
   });
@@ -41,6 +41,7 @@ export function SiteAdminEdit({ site }: { site: SiteDetail }) {
     const identity: NonNullable<SiteAdminEditBody['identity']> = {};
     if (form.name.trim() !== cur.name) identity.name = form.name.trim();
     if (form.name_ar.trim() !== cur.name_ar) identity.name_ar = form.name_ar.trim() === '' ? null : form.name_ar.trim();
+    if (form.address.trim() !== cur.address) identity.address = form.address.trim() === '' ? null : form.address.trim();
     if (form.latitude.trim() !== cur.latitude || form.longitude.trim() !== cur.longitude) {
       identity.latitude = num(form.latitude) as number | null; identity.longitude = num(form.longitude) as number | null;
     }
@@ -74,7 +75,7 @@ export function SiteAdminEdit({ site }: { site: SiteDetail }) {
   });
   const errAt = (p: string) => errors.find((e) => e.path === p);
   const regionName = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
-  const txt = (k: 'name' | 'name_ar' | 'latitude' | 'longitude' | 'cluster_code', label: string, dir?: 'rtl') => (
+  const txt = (k: 'name' | 'name_ar' | 'address' | 'latitude' | 'longitude' | 'cluster_code', label: string, dir?: 'rtl') => (
     <label className="flex flex-col gap-1" key={k}><span className="text-mute">{label}</span>
       <input className="input" data-testid={`site-admin-${k}`} dir={dir} value={form![k]} onChange={(e) => set(k, e.target.value)} aria-invalid={!!errAt(`/identity/${k}`)} />
       {errAt(`/identity/${k}`) && <span className="text-xs text-lateInk" role="alert">{t(`siteIdentity.err.${errAt(`/identity/${k}`)!.code}`, { defaultValue: t('siteIdentity.err.invalid') })}</span>}
@@ -95,6 +96,7 @@ export function SiteAdminEdit({ site }: { site: SiteDetail }) {
           <div className="grid gap-3 sm:grid-cols-2">
             {txt('name', t('siteIdentity.name'))}
             {txt('name_ar', t('siteIdentity.name_ar'), 'rtl')}
+            {txt('address', t('siteIdentity.address'))}
             {txt('latitude', t('siteIdentity.latitude'))}
             {txt('longitude', t('siteIdentity.longitude'))}
             <label className="flex flex-col gap-1"><span className="text-mute">{t('siteIdentity.region')}</span>
