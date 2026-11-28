@@ -849,6 +849,15 @@
     "resolved": "Resolved",
     "reopen": "Reopen"
   },
+  "pnote": {
+    "title": "Private note",
+    "tip": "A note only you can read. Nobody else sees it, whatever their role.",
+    "hint": "Only you can read this note. It stays with this record.",
+    "has": "Has a note",
+    "save": "Save note",
+    "saved": "Saved",
+    "failed": "Could not save the note"
+  },
   "drawer": {
     "mandatory": "Mandatory",
     "drop": "Drop a file or click to upload",
@@ -8267,6 +8276,8 @@
     "extra_relative_due_hint": "Shows the due date as tomorrow or 2 days ago, coloured, next to the exact date.",
     "extra_totals_row": "Totals row in grids",
     "extra_totals_row_hint": "Shows a totals row (sum, average, count, min or max, your choice per column) at the foot of a register grid with number columns.",
+    "extra_private_notes": "Private notes on records",
+    "extra_private_notes_hint": "Shows a private note under a task or record drawer. Only you can read your notes, nobody else, whatever their role.",
     "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
     "guard_enabled": "Ask before leaving unsaved changes",
     "guard_comment": "A comment you typed",

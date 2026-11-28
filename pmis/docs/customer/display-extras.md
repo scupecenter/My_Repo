@@ -8,6 +8,7 @@ Settings > Screens > Interface > "On this device" holds personal switches for sm
 - Last updated: a note "Updated 3 min ago" and a refresh button in the page header of the dashboard, the lists and the registers. It dates the data the page shows (not background items such as notifications) and the button reloads that data.
 - Due dates in words: next to the exact due date of a task (in the task grid and the task drawer) a coloured chip says "tomorrow", "2 days ago", "in 3 weeks". Overdue is red, today to 2 days amber, within a week blue, later quiet. A finished task shows no chip.
 - Totals row: at the foot of a register grid that has number columns, one figure per number column. Pick sum, average, count, min or max for each column (your choice is remembered per register and column). It totals the rows loaded in the grid, skipping empty cells.
+- Private notes: under a task or register record drawer, a closed "Private note" strip opens a text box (up to 4000 characters). Only you can read it: not the owner of the record, not a System Admin. It is saved on the server, so it follows you to another device, and the switch only hides the strip. Clearing the text keeps the (empty) note.
 
 ## بالعربية
 في الإعدادات > الشاشات > الواجهة > «على هذا الجهاز» مفاتيح شخصية للميزات الصغيرة. تخص متصفحك فقط ولا يُحفظ شيء على الخادم.
@@ -17,3 +18,4 @@ Settings > Screens > Interface > "On this device" holds personal switches for sm
 - آخر تحديث: ملاحظة «آخر تحديث: قبل 3 د» وزر تحديث في رأس لوحة المعلومات والقوائم والسجلات. تؤرّخ بيانات الصفحة (لا العناصر الخلفية كالإشعارات) والزر يعيد تحميلها.
 - تواريخ الاستحقاق بالكلمات: بجانب تاريخ استحقاق المهمة (في شبكة المهام ولوحة المهمة) شارة ملونة تقول «غدًا» أو «قبل يومين» أو «خلال 3 أسابيع». المتأخر أحمر، من اليوم إلى يومين كهرماني، خلال أسبوع أزرق، وما بعده هادئ. المهمة المنجزة بلا شارة.
 - صف الإجماليات: أسفل شبكة السجل التي فيها أعمدة رقمية رقم واحد لكل عمود رقمي. اختر المجموع أو المتوسط أو العدد أو الأدنى أو الأعلى لكل عمود (يُحفظ اختيارك لكل سجل وعمود). يحسب الصفوف المحمّلة في الشبكة ويتجاهل الخلايا الفارغة.
+- الملاحظات الخاصة: أسفل لوحة المهمة أو السجل شريط «ملاحظة خاصة» مغلق يفتح مربع نص (حتى 4000 حرف). أنت وحدك تقرؤها: لا مالك السجل ولا مسؤول النظام. تُحفظ على الخادم فتتبعك إلى جهاز آخر، والمفتاح يخفي الشريط فقط. مسح النص يُبقي الملاحظة فارغة.
