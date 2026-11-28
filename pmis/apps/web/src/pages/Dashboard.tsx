@@ -43,6 +43,7 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { PsDetailTable } from "./dashboardPsTable";
 import { OpsPhaseCard } from "./dashboardPhase";
 import { PinnedViewsCard } from "./dashboardPins";
 import { OpsScurveCard } from "./dashboardScurve";
@@ -2077,6 +2078,13 @@ export function Dashboard() {
                       )}
                     </Card>
                   </div>
+                </>
+              ),
+
+              ps_detail: (
+                <>
+                  {/* 0.15.366: the compact A1..A8 table, the items of each heading hidden until opened */}
+                  <PsDetailTable activities={ps?.activities} />
                 </>
               ),
 
