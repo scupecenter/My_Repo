@@ -153,9 +153,9 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
 /** P4: the check of the file inside the dialog: a stacked bar (valid, duplicate, rejected) with the numbers, and the error report. */
 function CheckSummary({ batch: b, busy, onReport }: { batch: UploadedBatch; busy: boolean; onReport: () => void }) {
   const { t } = useTranslation();
-  const err = b.counts.error ?? 0, dup = Math.min(b.counts.duplicate ?? 0, err), bad = err - dup;
+  const err = b.counts.error ?? 0, dup = Math.min(b.counts.duplicate ?? 0, err), over = Math.min(b.counts.overridden ?? 0, err - dup), bad = err - dup - over;
   const valid = (b.counts.create ?? 0) + (b.counts.update ?? 0) + (b.counts.unchanged ?? 0), total = valid + err;
-  const segs = [{ key: 'valid', n: valid, tone: 'bg-done', label: t('batchReview.kpi_valid') }, { key: 'duplicate', n: dup, tone: 'bg-wait', label: t('batchReview.kpi_duplicate') }, { key: 'invalid', n: bad, tone: 'bg-late', label: t('batchReview.kpi_invalid') }];
+  const segs = [{ key: 'valid', n: valid, tone: 'bg-done', label: t('batchReview.kpi_valid') }, { key: 'duplicate', n: dup, tone: 'bg-wait', label: t('batchReview.kpi_duplicate') }, { key: 'overridden', n: over, tone: 'bg-lock', label: t('batchReview.kpi_overridden') }, { key: 'invalid', n: bad, tone: 'bg-late', label: t('batchReview.kpi_invalid') }];
   return (
     <div className="space-y-2" data-testid="template-upload-check">
       <p className="font-semibold">{t('tpl.up_checked', { total, valid })}</p>
