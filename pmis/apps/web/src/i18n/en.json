@@ -5405,6 +5405,7 @@
     "internal_types": "Team types of an internal team (In-House), separated by commas",
     "closed": "Order statuses that end an order, separated by commas"
   },
+  "company": {"back": "All companies", "not_found": "This company was not found.", "tabs": "Company sections", "type_hint": "Company type", "scopes": "Scope of work", "no_perf": "No performance data yet for this company.", "perf_forbidden": "You do not have the right to read performance.", "tab_overview": "Overview", "tab_performance": "Performance", "tab_record": "Record", "tab_overview_hint": "The key numbers of this company", "tab_performance_hint": "Delays, snags, quality, orders and contract, worked out from the records", "tab_record_hint": "The register record: edit, drafts, approval and history", "record_note": "The company data (name, type, contacts in the record, scope) is kept in the Companies register. Open the record to edit it, see its drafts and its history.", "open_record": "Open the register record"},
   "companies": {"title": "Companies", "tabs": "Company views", "tab_list": "List", "tab_ranking": "Ranking", "tab_complete": "Data to complete", "tab_match": "Team and scope match", "tab_list_hint": "The register of companies: add, edit, import and export", "tab_ranking_hint": "How each company performs on delays, snags, quality, orders and contract", "tab_complete_hint": "Companies, teams and contracts that miss data", "tab_match_hint": "Running orders whose team no longer matches the scope"},
   "contractorReports": {
     "title": "Contractor reports",

@@ -7,12 +7,12 @@ import type { ContractorPerformanceRow } from '@/api/types';
 type Level = ContractorPerformanceRow['level'];
 const TONE: Record<Level, string> = { ok: 'bg-card2', amber: 'bg-lateBg text-lateInk', red: 'bg-lateBg text-lateInk font-bold', insufficient: 'bg-card2 text-mute' };
 
-function Chip({ level, label, testid }: { level: Level; label: string; testid?: string }) {
+export function Chip({ level, label, testid }: { level: Level; label: string; testid?: string }) {
   const { t } = useTranslation();
   return <span className={`chip ${TONE[level]}`} data-testid={testid} data-level={level}>{label} <span className="text-xs">({t(`contractorPerf.level_${level}`)})</span></span>;
 }
 
-const pctText = (p: number | null | undefined) => (p === null || p === undefined ? '—' : `${p}%`);
+export const pctText = (p: number | null | undefined) => (p === null || p === undefined ? '—' : `${p}%`);
 
 /** Contractor performance, read only (contract 0.15.89): a section of the Contractors reports; a caller who may not read it sees nothing. */
 export function ContractorPerformance() {
@@ -38,7 +38,7 @@ export function ContractorPerformance() {
             <tbody>
               {q.data.items.map((r) => (
                 <tr key={r.party_id} className="border-t border-line align-top" data-testid={`perf-${r.name}`}>
-                  <td className="p-2 font-semibold"><Link className="underline" to="/companies">{r.name}</Link></td>
+                  <td className="p-2 font-semibold"><Link className="underline" to={`/companies/${r.party_id}`}>{r.name}</Link></td>
                   <td className="p-2"><Chip level={r.level} label={t(`contractorPerf.level_${r.level}`)} testid={`perf-level-${r.name}`} /></td>
                   <td className="p-2">{r.delay_days}<span className="block text-xs text-mute">{t('contractorPerf.open_note', { open: r.issues_open, total: r.issues_total })}</span></td>
                   <td className="p-2"><Chip level={r.snags.overdue_level} label={pctText(r.snags.overdue_pct)} /><span className="block text-xs text-mute">{t('contractorPerf.open_note', { open: r.snags.open, total: r.snags.total })}</span></td>
