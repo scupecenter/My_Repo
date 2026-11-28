@@ -89,7 +89,7 @@ describe('register links (migration 0409)', () => {
     await db.query('ROLLBACK');
   });
 
-  it('lists the linked records of a site per register (0413)', async () => {
+  it('lists the linked records of a site per register (0651)', async () => {
     await db.query('BEGIN');
     await beginAs(db, adminId);
     const site = await makeSite(db, REGION, { prefix: `${PREFIX}L`.toUpperCase() });

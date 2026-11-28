@@ -1,5 +1,6 @@
 import { SiteActivity } from '@/components/SiteActivity';
 import { LayoutPanel } from '@/components/LayoutPanel';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 import { SiteGantt } from '@/components/SiteGantt';
 import { SiteSummaryStrip } from '@/components/SiteSummaryStrip';
 import type { TasksExportColumnCode } from '@/api/types';
@@ -116,7 +117,7 @@ export function Site() {
         <>
           <div className="flex flex-wrap items-start gap-3">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold" data-testid="site-title"><span className="mono">{s.site_code}</span> {s.name}</h1>
+              <div className="flex items-center gap-2"><h1 className="text-2xl font-bold" data-testid="site-title"><span className="mono">{s.site_code}</span> {s.name}</h1><ScreenSettingsLink screen="site" /></div>
               {s.name_ar && <p dir="rtl" lang="ar" className="text-lg text-mute" data-testid="site-name-ar">{s.name_ar}</p>}
               <p className="text-mute" data-testid="site-meta">{(i18n.language === 'ar' && region?.name_ar) || region?.name_en} · {s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : ''}{s.cluster_code ? ` · ${s.cluster_code}` : ''}</p>
             </div>
@@ -165,7 +166,7 @@ export function Site() {
       {!docsTab && <>
       <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2></div>
       {layout === 'row' && !dismantle && <TableToolbar testid="task-row-toolbar" kind="list"
-        views={<SavedViews screen="site-tasks" value={{ tq, ...(tadvTree ? { advanced: tadvTree } : {}) }} empty={TIMELINE_VIEW_EMPTY} table={timeline}
+        views={<SavedViews screen="site-tasks" sharedScreen value={{ tq, ...(tadvTree ? { advanced: tadvTree } : {}) }} empty={TIMELINE_VIEW_EMPTY} table={timeline}
           onApply={(x) => { const r = x as Record<string, unknown>; setSp((p) => { const n = new URLSearchParams(p); const v = String(r.tq ?? ''); if (v) n.set('tq', v); else n.delete('tq'); const enc = encodeFilter(r.advanced as FilterTree | undefined); if (enc) n.set('tadv', enc); else n.delete('tadv'); return n; }, { replace: true }); }} />}
         search={<SearchBox testid="task-row-search" value={tq} onChange={(x) => setParam('tq', x || null)} placeholder={t('tstd.search_tasks')} />}
         filter={<UnifiedFilter screen="site-tasks" value={tadvTree} onChange={(tree) => setParam('tadv', encodeFilter(tree) || null)} onClearAll={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}

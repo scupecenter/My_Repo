@@ -1,5 +1,5 @@
--- 0413_site_linked_records: the "Linked records" view of a site (D60, phase 3). Read only, additive; no table, no grant of a role changes.
--- Mirror: db/sql/412_site_linked_records.sql (kept identical to prisma/migrations/0413_site_linked_records/migration.sql).
+-- 0651_site_linked_records: the "Linked records" view of a site (D60, phase 3). Read only, additive; no table, no grant of a role changes.
+-- Mirror: db/sql/650_site_linked_records.sql (kept identical to prisma/migrations/0651_site_linked_records/migration.sql).
 --
 -- site_linked_records(site): for every enabled register, the current records of the site that the caller can see (the register view and the region rule, as
 -- the register lists): the count, the latest ten, and for each of them the records it points to through the declared links (register_links, 0409) with

@@ -10,7 +10,7 @@ import { useToast } from '@/components/Toast';
 import { fmtDateTime } from '@/lib/time';
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 
-const GROUPS = ['sessions', 'rows', 'exports'] as const;
+const GROUPS = ['sessions', 'rows', 'exports', 'media'] as const;
 const id = (key: string): string => key.replace(/\./g, '_');
 
 /**

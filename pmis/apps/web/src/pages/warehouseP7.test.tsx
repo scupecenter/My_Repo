@@ -117,7 +117,7 @@ describe('P7 in the Warehouse screen', () => {
     expect(screen.queryByTestId('wh-mv-edit-open-DN-2026-0099')).not.toBeInTheDocument();
     await u.click(await screen.findByTestId('wh-mv-edit-open-DN-2026-0101'));
     const panel = await screen.findByTestId('wh-mv-edit');
-    expect(panel.closest('tr')).not.toBeNull();   // in the table, not a modal
+    expect(panel.closest('[role=rowgroup]')).not.toBeNull();   // in the table, not a modal
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByTestId('wh-mv-edit-reason')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('wh-mv-edit-submit')).toBeDisabled());
