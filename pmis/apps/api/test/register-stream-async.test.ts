@@ -42,6 +42,16 @@ afterAll(async () => {
 
 const etag = (res: { headers: Record<string, unknown> }): string => String(res.headers.etag);
 const count = async (sql: string, params: unknown[] = []): Promise<number> => Number((await q<{ n: string }>(db, `SELECT count(*) AS n FROM (${sql}) x`, params))[0]!.n);
+/** The run may be taken by the resume job of another test app on the shared database (it is "busy" for this process), so process() can return while rows are still
+ *  being done: wait until the batch is no longer processing (at most 60 s) before reading it. */
+const settle = async (batchId: string): Promise<void> => {
+  const end = Date.now() + 60_000;
+  for (;;) {
+    const s = (await q<{ s: string }>(db, 'SELECT status AS s FROM import_batches WHERE id = $1', [batchId]))[0]?.s;
+    if (s !== 'processing' || Date.now() > end) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+};
 const runOf = async (batchId: string): Promise<PendingJob> => {
   const j = (await jobs.pending(0)).find((x) => x.batch_id === batchId);
   if (!j) throw new Error('no running job for the batch');
@@ -144,6 +154,7 @@ describe('a big register batch: L1 sends, L2 decides in the background', () => {
     const s = await send(l1, b.id, b.tag);
     expect(s.status).toBe(202);
     await jobs.process(await runOf(b.id));
+    await settle(b.id);
     const w = await get(l2, b.id);
     expect(w.body).toMatchObject({ status: 'in_approval', counts: { pending: ROWS } });
     return { id: b.id, tag: etag(w) };
@@ -175,6 +186,7 @@ describe('a big register batch: L1 sends, L2 decides in the background', () => {
     const victim = (await recordsOf(b.id))[2]!;
     await db.query(`UPDATE register_records SET state = 'in_review' WHERE id = $1`, [victim.id]);
     await jobs.process(await runOf(b.id));
+    await settle(b.id);
     const done = await get(l2, b.id);
     expect(done.body.progress).toMatchObject({ state: 'done', kind: 'decide', approved: ROWS - 1, failed: 1, rows_done: ROWS });
     const recs = await recordsOf(b.id);
@@ -212,6 +224,7 @@ describe('a big register batch: L1 sends, L2 decides in the background', () => {
     expect(go.status).toBe(202);
     expect(go.body.progress).toMatchObject({ kind: 'decide', action: 'reject', rows_total: ROWS });
     await jobs.process(await runOf(b.id));
+    await settle(b.id);
     const done = await get(l2, b.id);
     expect(done.body).toMatchObject({ status: 'rejected', note: 'Wrong owner on every row', counts: { rejected: ROWS }, progress: { state: 'done', rejected: ROWS, failed: 0 } });
     expect((await recordsOf(b.id)).every((r) => r.state === 'entry')).toBe(true);
@@ -399,6 +412,7 @@ describe('Settings, Imports: the background threshold imports.async_rows', () =>
     const sent = await send(l1, b.id, b.tag);
     expect(sent.status).toBe(202);
     await jobs.process(await runOf(b.id));
+    await settle(b.id);
     expect((await get(l1, b.id)).body.status).toBe('in_approval');
 
     const back = await put(allDelegate, { async_rows: 50, reason: 'Back to the default on behalf of the administrator' }, etag(await read(allDelegate)));
@@ -477,6 +491,7 @@ describe('the Master import apply sends a big staged batch in the background', (
       expect((await taskStates(tasks)).every((t) => t.state === 'open')).toBe(true);           // nothing sent yet: the batch is sent in chunks
       expect(await count(`SELECT 1 FROM audit_log WHERE action = 'master_import.apply_queued' AND entity_id = $1`, [run.id])).toBe(1);
       await jobs.process(await runOf(b.id));
+      await settle(b.id);
       expect(spy).not.toHaveBeenCalled();                                                     // as before: the apply never synchronised the documents
     } finally {
       spy.mockRestore();
