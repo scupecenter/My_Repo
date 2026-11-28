@@ -225,7 +225,7 @@ export function ArchiveList() {
     <div data-testid="page-library-archive-list" data-doc={docCode}>
       <PageHeader title={title} subtitle={t('lib.lifecycle_note')} context={<Link to="/library/archive" className="btn ms-auto px-2 py-1 text-xs" data-testid="lib-back"><ArrowLeft size={14} className="rtl:rotate-180" />{t('lib.back')}</Link>} />
       <TableToolbar testid="lib-archive-toolbar"
-        views={<SavedViews screen="library-archive" value={{ q, superseded: superseded ? 'true' : '', ...(advTree ? { advanced: advTree } : {}) }} empty={EMPTY} table={tbl}
+        views={<SavedViews screen="library-archive" sharedScreen value={{ q, superseded: superseded ? 'true' : '', ...(advTree ? { advanced: advTree } : {}) }} empty={EMPTY} table={tbl}
           onApply={(v) => { const x = v as Record<string, unknown>; setParams({ q: String(x.q ?? ''), superseded: String(x.superseded ?? ''), adv: encodeFilter((v as { advanced?: FilterTree }).advanced) }); }} />}
         search={<SearchBox testid="lib-archive-search" value={q} onChange={(v) => setParams({ q: v })} placeholder={t('lib.search_docs')} />}
         filter={<UnifiedFilter screen="library-archive" value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree) })} onClearAll={() => setParams({ adv: '', superseded: '' })}
