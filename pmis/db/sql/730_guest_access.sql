@@ -362,6 +362,9 @@ BEGIN
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_definer', f);
   END LOOP;
+  -- admin_create_guest (owned by pmis_definer) hands the new account its role through the existing identity doors.
+  GRANT EXECUTE ON FUNCTION idm_assign(uuid, uuid, "PermissionLevel", "TeamKind", timestamptz, timestamptz, boolean, boolean, integer[], boolean, text[], uuid[], text) TO pmis_definer;
+  GRANT EXECUTE ON FUNCTION idm_set_user_status(uuid, "UserStatus", text) TO pmis_definer;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     GRANT EXECUTE ON FUNCTION guest_access_state(), admin_set_guest_access(boolean, integer, integer, text, integer), guest_access_list(),
       admin_create_guest(uuid, timestamptz, integer[], text[], text, text), admin_extend_guest(uuid, timestamptz, text), admin_end_guest(uuid, text),
