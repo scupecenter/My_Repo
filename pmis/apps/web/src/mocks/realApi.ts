@@ -225,6 +225,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractor-performance'],
   ['get', '/settings/contractor-performance'],
   ['put', '/settings/contractor-performance'],
+  // Contract 0.15.269: the manual partial-credit entries of the progress editor (apps/api: settings; migration 0543).
+  ['get', '/settings/partial-credit'],
+  ['put', '/settings/partial-credit'],
   // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
   ['get', '/settings/alert-rules'],
   ['post', '/settings/alert-rules'],
@@ -581,6 +584,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/workflow/versions/:version/weight-totals'],
   ['put', '/workflow/versions/:version/tasks/:task/sla-rule'],
   ['post', '/workflow/versions/:version/tasks/:task/sla-rules/:rule/remove'],
+  // Contract 0.15.269: estimated man-days and planned duration of a task in a draft (migration 0542).
+  ['put', '/workflow/versions/:version/tasks/:task/estimate'],
   ['put', '/workflow/versions/:version/tasks/:task/weight'],
   ['put', '/workflow/versions/:version/tasks/:task/closing'],
   ['put', '/workflow/versions/:version/tasks/:task/successors'],

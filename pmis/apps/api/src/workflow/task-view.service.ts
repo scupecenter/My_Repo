@@ -51,6 +51,10 @@ export interface TaskSummaryDto {
   name_ar: string | null;
   stage_code: string;
   stream_code: string | null;
+  /** 0.15.269: the workflow version the site runs on; the milestone/gate date rule applies from version 2. */
+  workflow_version: number;
+  /** 0.15.269: the task is the milestone task of its stage; on workflow version 2+ its date is computed, never typed. */
+  is_milestone_task: boolean;
   state: string;
   current_level: number;
   levels_required: number;
@@ -375,6 +379,8 @@ export class TaskViewService {
         name_ar: r.name_ar,
         stage_code: r.stage_code,
         stream_code: r.stream_code,
+        workflow_version: r.workflow_version,
+        is_milestone_task: r.is_milestone_task,
         state: r.state === 'rejected' ? 'entry' : r.state,
         current_level: r.current_level,
         levels_required: r.n_levels,
