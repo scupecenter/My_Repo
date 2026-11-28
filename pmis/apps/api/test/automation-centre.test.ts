@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { beginAs, makeAdmin, makeUser, superDb } from './helpers';
 
 /**
- * Migration 0612: the run history of the alert rules (Automation centre). The daily job calls alert_rules_runs_record() right after the rules ran: one run
+ * Migration 0614: the run history of the alert rules (Automation centre). The daily job calls alert_rules_runs_record() right after the rules ran: one run
  * row per enabled rule, and one audit row written by the system (no actor, via job) for a rule that fired. Notifications only; nothing else changes.
  */
 const PREFIX = `auc${randomBytes(3).toString('hex')}`;
@@ -25,7 +25,7 @@ const rule = (code: string): Record<string, unknown> => ({
   title_en: 'No weekly status: {{region}}', title_ar: 'لا يوجد تحديث أسبوعي: {{region}}', body_en: 'Week {{week}}', body_ar: 'أسبوع {{week}}',
 });
 
-describe('alert rule runs (0612)', () => {
+describe('alert rule runs (0614)', () => {
   it('records a run row and one system audit row for a rule that fired, and lists it for the admin', async () => {
     await db.query('BEGIN');
     await beginAs(db, adminId);

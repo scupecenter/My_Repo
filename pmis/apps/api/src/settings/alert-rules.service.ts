@@ -45,7 +45,7 @@ interface RuleRow {
 }
 
 /**
- * 0.15.473 (migration 0612): the ready-made rules of the Automation centre. A template only fills the existing alert rule form: the admin reviews it,
+ * 0.15.473 (migration 0614): the ready-made rules of the Automation centre. A template only fills the existing alert rule form: the admin reviews it,
  * gives a code and a reason and saves it through the same create call, so every check, the audit row and the notifications-only limit are those of the rules.
  * The closed list lives here (no table); `params` and `audience` are exactly what admin_alert_rule_save accepts.
  */
@@ -111,7 +111,7 @@ export class AlertRulesService {
     };
   }
 
-  /** GET /settings/alert-rules/runs (0.15.473, migration 0612): the last runs of the rules, written by the system (audit action alert_rule_run, no actor). System Admin. */
+  /** GET /settings/alert-rules/runs (0.15.473, migration 0614): the last runs of the rules, written by the system (audit action alert_rule_run, no actor). System Admin. */
   async runs() {
     await this.requireAdmin();
     return { runs: (await this.db.tx.$queryRaw<{ j: unknown[] }[]>(Prisma.sql`SELECT alert_rule_runs_json(50) AS j`))[0]!.j };
