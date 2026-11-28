@@ -1409,6 +1409,7 @@
     "section_security_passkeys": "Passkeys",
     "section_workflow_simulate": "Who approves?",
     "section_alerts_rules": "Alert rules",
+    "section_alerts_triggers": "Link triggers",
     "section_documents_media": "Media",
     "section_security_limits": "Limits",
     "index_sla": "Rules, calendar and weights that set due dates and scoring.",
@@ -8536,6 +8537,30 @@
     "rule": "rule",
     "nobody": "Nobody holds this level.",
     "fallback": "Who could act through the admin path:"
+  },
+  "linkTriggers": {
+    "title": "Link triggers",
+    "intro": "Per declared link, switch on a proposal: when the approved record that holds the link differs from the approved record it links to in a date or list field, the daily job proposes a new version of the linked record. It never writes a record; an entry holder of the linked register applies the proposal and it goes through the approval chain.",
+    "empty": "No link trigger yet. Add one below; it starts switched off.",
+    "open": "{{n}} open proposals",
+    "enabled": "On",
+    "enabled_help": "A change asks for a reason and is written to the audit log.",
+    "dry_run": "Dry run",
+    "dry_total": "A run would propose {{n}} updates now.",
+    "dry_note": "A dry run writes nothing.",
+    "link": "Link",
+    "source_field": "Copy from (this register)",
+    "target_field": "To (linked register)",
+    "reason": "Reason",
+    "add": "Add trigger",
+    "add_help": "Only date and list fields of the same type, never a calculated field. A new trigger is off until you switch it on."
+  },
+  "linkProposals": {
+    "title": "Proposed updates",
+    "intro": "A linked record changed. Make the new version of the record below, or dismiss the proposal. The approved version stays in force until the new version is approved.",
+    "empty": "No proposed updates.",
+    "apply": "Make the new version",
+    "dismiss": "Dismiss"
   },
   "alertRules": {
     "title": "Alert rules",

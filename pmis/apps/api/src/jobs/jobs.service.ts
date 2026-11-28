@@ -30,6 +30,7 @@ export interface DailyJobResult {
   digests?: number;
   /** 0342: alert rule notifications (in-app only) written by this run */
   alertRules?: number;
+  linkProposals?: number;
   /** 0360 (A3): expiry radar notices (in-app only) written by this run */
   expiryNotices?: number;
   /** 0362 (A9): approval digest notices written by this run */
@@ -144,6 +145,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (escalated > 0) result.slaEscalations = escalated;
         const ruleNotes = await this.alertRules();
         if (ruleNotes > 0) result.alertRules = ruleNotes;
+        const proposed = await this.linkTriggers();
+        if (proposed > 0) result.linkProposals = proposed;
         const expiring = await this.expiryRadar();
         if (expiring > 0) result.expiryNotices = expiring;
         const changed = await this.templateChanges();
@@ -298,6 +301,17 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('alert rules failed');
       await this.syslog.write('error', 'alert rules failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0629 (L5): the link triggers propose, never write: one proposal per trigger and source version, a notice to the entry holders of the target row. */
+  private async linkTriggers(): Promise<number> {
+    const n = await this.runs.run('link_triggers', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT link_triggers_run() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('link triggers failed');
+      await this.syslog.write('error', 'link triggers failed', {});
       return 0;
     }
     return n;

@@ -1726,6 +1726,59 @@ export const settingsHandlers = [
   }),
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
+  // ------------------------------------------------------------------ link triggers (0.15.488, migration 0629): proposals only
+  http.get(`${B}/settings/link-triggers`, () => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({
+      links: [{ register_key: 'invoices', field_code: 'procurement_record_id', target_register: 'procurement', source_fields: [{ code: 'due_date', field_type: 'date' }, { code: 'stage', field_type: 'list' }], target_fields: [{ code: 'delivery_date', field_type: 'date' }, { code: 'stage', field_type: 'list' }] }],
+      triggers: LINK_TRIGGERS.map((x) => ({ ...x, target_register: 'procurement', open_proposals: LINK_PROPOSALS.filter((p) => p.status === 'open').length })),
+    });
+  }),
+  http.post(`${B}/settings/link-triggers`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<Record<string, unknown>>(request);
+    if (typeof b.reason !== 'string' || b.reason.trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (LINK_TRIGGERS.some((x) => x.register_key === b.register_key && x.field_code === b.field_code && x.target_field === b.target_field)) return fields({ path: '/target_field', code: 'duplicate' });
+    const id = `00000000-0000-4000-8000-00000000c${String(LINK_TRIGGERS.length + 1).padStart(3, '0')}`;
+    LINK_TRIGGERS.push({ id, register_key: String(b.register_key), field_code: String(b.field_code), source_field: String(b.source_field), target_field: String(b.target_field), enabled: b.enabled === true, rev: 1 });
+    return HttpResponse.json({ id });
+  }),
+  http.put(`${B}/settings/link-triggers/:id`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<Record<string, unknown>>(request);
+    const x = LINK_TRIGGERS.find((t) => t.id === String(params.id));
+    if (!x) return problem(404, 'not_found', 'Not found');
+    if (typeof b.reason !== 'string' || b.reason.trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (b.target_field !== x.target_field) return fields({ path: '/target_field', code: 'immutable' });
+    x.source_field = String(b.source_field); x.enabled = b.enabled === undefined ? x.enabled : b.enabled === true; x.rev += 1;
+    return HttpResponse.json({ id: x.id });
+  }),
+  http.post(`${B}/settings/link-triggers/:id/preview`, ({ params }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!LINK_TRIGGERS.some((t) => t.id === String(params.id))) return problem(404, 'not_found', 'Not found');
+    return HttpResponse.json({ dry_run: true, total: 1, items: [{ source_code: 'INV-001', target_register: 'procurement', target_code: 'PO-001', before: '2031-01-01', after: '2031-02-01' }] });
+  }),
+  http.get(`${B}/me/link-proposals`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const st = new URL(request.url).searchParams.get('status') ?? 'open';
+    return HttpResponse.json({ items: LINK_PROPOSALS.filter((p) => st === 'all' || p.status === st) });
+  }),
+  http.post(`${B}/link-proposals/:id/apply`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const p = LINK_PROPOSALS.find((x) => x.id === String(params.id));
+    if (!p) return problem(404, 'not_found', 'Not found');
+    if (p.status !== 'open') return problem(409, 'invalid_transition', 'The proposal is closed already.');
+    p.status = 'applied';
+    return HttpResponse.json({ id: p.id, status: 'applied', new_record: '00000000-0000-4000-8000-00000000d001' });
+  }),
+  http.post(`${B}/link-proposals/:id/dismiss`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const p = LINK_PROPOSALS.find((x) => x.id === String(params.id));
+    if (!p) return problem(404, 'not_found', 'Not found');
+    if (p.status !== 'open') return problem(409, 'invalid_transition', 'The proposal is closed already.');
+    p.status = 'dismissed';
+    return HttpResponse.json({ id: p.id, status: 'dismissed' });
+  }),
   // ------------------------------------------------------------------ alert rules (0.15.242, migration 0342): notifications only
   http.get(`${B}/settings/alert-rules/link-orphans`, () => {
     const g = needAdmin(); if (g) return g;
@@ -1915,6 +1968,11 @@ export const settingsHandlers = [
 
 import { SEC_LOG } from './settingsData';
 const SEC_LOG_LEN = () => SEC_LOG.length;
+const LINK_TRIGGERS: { id: string; register_key: string; field_code: string; source_field: string; target_field: string; enabled: boolean; rev: number }[] = [];
+const LINK_PROPOSALS: { id: string; status: 'open' | 'applied' | 'dismissed'; target_register: string; target_record: string; target_version: number; target_code: string | null; target_field: string; before: string | null; after: string; created_at: string; closed_at: string | null; new_record: string | null }[] = [
+  { id: '00000000-0000-4000-8000-00000000b001', status: 'open', target_register: 'procurement', target_record: '00000000-0000-4000-8000-00000000a001', target_version: 1, target_code: 'PO-001', target_field: 'delivery_date', before: '2031-01-01', after: '2031-02-01', created_at: '2031-01-15T08:00:00Z', closed_at: null, new_record: null },
+  { id: '00000000-0000-4000-8000-00000000b002', status: 'open', target_register: 'procurement', target_record: '00000000-0000-4000-8000-00000000a002', target_version: 1, target_code: 'PO-002', target_field: 'delivery_date', before: null, after: '2031-03-01', created_at: '2031-01-15T08:00:00Z', closed_at: null, new_record: null },
+];
 const byIdSafe = (e: string) => { try { return byId(e); } catch { return null; } };
 function SEC_FILTER({ ev, q, from, to, out }: { ev: string[]; q: string; from: string | null; to: string | null; out: string | null }): SecurityLogEntry[] {
   return SEC_LOG.filter((e) => (!ev.length || ev.includes(e.event)) && (!out || e.outcome === out) && (!from || e.at >= from) && (!to || e.at <= to)

@@ -12985,6 +12985,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/link-triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The link triggers and the declared links with their copyable fields (0.15.488)
+         * @description 0.15.488 (migration 0629). System Admin. Date and list fields only, same type on both sides, never derived.
+         */
+        get: operations["getLinkTriggers"];
+        put?: never;
+        /**
+         * Declare a link trigger (0.15.488)
+         * @description 0.15.488 (migration 0629). System Admin, with a reason. Off unless `enabled` is true. One trigger per link and target field (422 `duplicate`).
+         */
+        post: operations["createLinkTrigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/link-triggers/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change or switch a link trigger (0.15.488)
+         * @description 0.15.488 (migration 0629). System Admin, with a reason. The link and the target field of a trigger never change.
+         */
+        put: operations["updateLinkTrigger"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/link-triggers/{trigger_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry run of a link trigger (0.15.488)
+         * @description 0.15.488 (migration 0629). System Admin. What a run would propose now (at most 200 rows shown, the total counted). Writes nothing.
+         */
+        post: operations["previewLinkTrigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/link-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's proposed updates from link triggers (0.15.488)
+         * @description 0.15.488 (migration 0629). Entry holders of the target row of the Matrix, or an admin of settings. `status` is open (default), applied, dismissed or all.
+         */
+        get: operations["getLinkProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/link-proposals/{proposal_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the proposed new version (0.15.488)
+         * @description 0.15.488 (migration 0629). Makes a new version of the approved target record with the proposed value through the existing new-version and edit calls, as the caller; it stays in entry and goes through the approval chain. 404 for a proposal the caller may not see, 409 when it is closed.
+         */
+        post: operations["applyLinkProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/link-proposals/{proposal_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss a proposed update (0.15.488)
+         * @description 0.15.488 (migration 0629). Closes the proposal without changing any record.
+         */
+        post: operations["dismissLinkProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/saved-views/{view_id}/pin": {
         parameters: {
             query?: never;
@@ -23372,6 +23496,72 @@ export interface components {
                 [key: string]: unknown;
             };
             position: number;
+        };
+        LinkTriggerInput: {
+            register_key: string;
+            /** @description The declared link (a field of register_key). */
+            field_code: string;
+            source_field: string;
+            target_field: string;
+            enabled?: boolean;
+            reason: string;
+        };
+        LinkTriggerField: {
+            code: string;
+            field_type: string;
+        };
+        LinkTriggersResponse: {
+            links: {
+                register_key: string;
+                field_code: string;
+                target_register: string;
+                source_fields: components["schemas"]["LinkTriggerField"][];
+                target_fields: components["schemas"]["LinkTriggerField"][];
+            }[];
+            triggers: {
+                /** Format: uuid */
+                id: string;
+                register_key: string;
+                field_code: string;
+                target_register: string;
+                source_field: string;
+                target_field: string;
+                enabled: boolean;
+                rev: number;
+                open_proposals: number;
+            }[];
+        };
+        LinkTriggerPreview: {
+            /** @enum {boolean} */
+            dry_run: true;
+            total: number;
+            items: {
+                source_code?: string | null;
+                target_register: string;
+                target_code?: string | null;
+                before?: string | null;
+                after?: string | null;
+            }[];
+        };
+        LinkProposal: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "open" | "applied" | "dismissed";
+            target_register: string;
+            /** Format: uuid */
+            target_record: string;
+            target_version?: number;
+            target_code?: string | null;
+            target_field: string;
+            before?: string | null;
+            after: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            closed_at?: string | null;
+            /** Format: uuid */
+            new_record?: string | null;
         };
         SavedView: {
             /** Format: uuid */
@@ -48002,6 +48192,202 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getLinkTriggers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The triggers and the links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTriggersResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createLinkTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkTriggerInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateLinkTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkTriggerInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    previewLinkTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals a run would write. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTriggerPreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getLinkProposals: {
+        parameters: {
+            query?: {
+                status?: "open" | "applied" | "dismissed" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LinkProposal"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    applyLinkProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Applied. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        status: "applied";
+                        /** Format: uuid */
+                        new_record: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    dismissLinkProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dismissed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        status: "dismissed";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     pinSavedViewHome: {

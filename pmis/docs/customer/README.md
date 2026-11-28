@@ -26,5 +26,6 @@
 | دليل التشغيل (Runbook) | P3 | Operations runbook | P3 |
 
 المصادر: `CLAUDE.md`، `CHANGELOG.md`، `docs/adr/`، `docs/spec/`، `db/erd.md`، `contracts/openapi.yaml`، `HANDOVER.md`. الإضافات المقترحة غير المؤكدة مكتوبة فيها «يُؤكَّد لاحقاً».
+| [link-triggers.md](link-triggers.md) | A register change proposes a new version of a linked record, applied by its holder |
 | [shortage-draft-purchase-request.md](shortage-draft-purchase-request.md) | Draft purchase request from a material shortage line |
 | [site-acceptance-pack.md](site-acceptance-pack.md) | One archive of the approved PAC, FAC and HOTO files of a site |
