@@ -174,6 +174,8 @@ async function seed(d: PgClient): Promise<void> {
   await d.query(
     `UPDATE settings SET value = jsonb_set(value, '{targets,monthly_on_air}', '4'::jsonb) WHERE key = 'dashboard.settings'`,
   );
+  // 0.15.367: a typed target counts only while the manual override of the target policy is on (off by default: the target is derived from the scope)
+  await d.query(`UPDATE settings SET value = '{"manual_override": true}'::jsonb WHERE key = 'dashboard.target_policy'`);
 
   // Task transitions of the open task of A: entry, then in review, then approved (the approved state is not a working state)
   const dA = (
