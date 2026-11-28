@@ -3,6 +3,8 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import { REGISTER_DEFS, recId, type MockRecord } from './registersData';
+
+const ORDER_LINKS: Record<string, string> = { warehouse: 'procurement_order_id', issues: 'procurement_order_id', quality: 'procurement_order_id', change_control: 'procurement_order_id', car_dispatcher: 'procurement_record_id', financial_advances: 'procurement_record_id', invoices: 'procurement_record_id' };
 import { db, save, stepUpValid, viewer } from './db';
 import { guard, problem, stepUp } from './handlers';
 import { toRecord } from './handlers.registers';
@@ -52,6 +54,30 @@ export const p4cHandlers = [
     if (bad.length) return fields(...bad.map(([, i]) => ({ path: `/procurement_entity_ids/${i}`, code: 'not_hlc_pr' })));
     r.pr_links = ids; r.version += 1; r.updated_at = new Date().toISOString(); save();
     return HttpResponse.json(toRecord(r), { headers: { ETag: `"${r.version}"` } });
+  }),
+
+  // D60: the declared links of a register and the generic picker (the demo declares none; a test overrides them)
+  http.get(`${B}/registers/:key/links`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const key = String(params.key);
+    const items: { field: string; target_register: string; target_record_type: string | null; same_site: boolean; enforce: boolean }[] = [];
+    if (ORDER_LINKS[key]) items.push({ field: ORDER_LINKS[key]!, target_register: 'procurement', target_record_type: null, same_site: key !== 'car_dispatcher', enforce: false });
+    if (key === 'financial_advances') items.push({ field: 'advance_id', target_register: 'financial_advances', target_record_type: 'advance', same_site: true, enforce: false });
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${B}/registers/:key/link-options/:field`, ({ request, params }) => {
+    const g = guard(); if (g) return g;
+    const site = new URL(request.url).searchParams.get('site_id');
+    const si = site ? siteIndex(site) : null;
+    if (params.field === 'advance_id') {
+      const items = R().records.filter((o: MockRecord) => o.register_key === 'financial_advances' && o.record_type === 'advance' && o.state === 'approved' && ['disbursed', 'settlement_in_progress'].includes(String(o.data.advance_state)) && (si === null || o.site_index === si))
+        .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, label: [o.data.advance_kind, o.data.disbursed_date].filter(Boolean).join(' · ') || o.entity_id.slice(0, 8) }));
+      return HttpResponse.json({ items });
+    }
+    const items = R().records
+      .filter((o: MockRecord) => o.register_key === 'procurement' && o.state === 'approved' && !/^\s*cancel/i.test(String(o.data.order_status ?? '')) && (si === null || o.site_index === si))
+      .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, label: `${o.data.po_wo_no ?? o.data.pr_no ?? String(o.entity_id).slice(0, 8)} · ${(o.external_party as { name?: string } | null)?.name ?? 'No contractor'}` }));
+    return HttpResponse.json({ items });
   }),
 
   // 0181: the picker of a warehouse receipt and the receipts against an order
