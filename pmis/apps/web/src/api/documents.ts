@@ -40,10 +40,11 @@ function useRefresh(target: SlotTarget) {
 export function useSlotUpload(owner: Pick<TaskDetail, 'id' | 'site_id'> | SlotTarget) {
   const target = asTarget(owner);
   const refresh = useRefresh(target);
-  return useMutation<unknown, ApiError, { slot: DocumentSlot; file: File }>({
-    mutationFn: ({ slot, file }) => {
+  return useMutation<unknown, ApiError, { slot: DocumentSlot; file: File; marks?: { signed: boolean; stamped: boolean } }>({
+    mutationFn: ({ slot, file, marks }) => {
       const f = new FormData();
       f.append('file', file);
+      if (marks) { f.append('signed', String(marks.signed)); f.append('stamped', String(marks.stamped)); }
       const cur = slot.files.filter((x) => x.is_current);
       if (slot.max_files === 1 && cur.length === 1) f.append('replaces_file_group_id', cur[0]!.file_group_id);
       return api.post(`${target.base}/slots/${slot.id}/files`, { body: f });
@@ -138,5 +139,16 @@ export function useBlankForm() {
   return useMutation<DocumentType, ApiError, { id: string; version: number; file: File; reason: string }>({
     mutationFn: ({ id, version, file, reason }) => { const f = new FormData(); f.append('file', file); f.append('reason', reason); return api.post(`/document-library/${id}/blank-form`, { version, body: f }); },
     onSettled: refresh,
+  });
+}
+
+/** 0555: which document types need a signed and a stamped copy (Settings > Documents > Archive). */
+export type DocMarks = { types: Record<string, { signature: boolean; stamp: boolean }>; version: number };
+export const useDocMarks = () => useQuery({ queryKey: ['doc-marks'], queryFn: () => api.get<DocMarks>('/settings/document-marks') });
+export function useSaveDocMark() {
+  const qc = useQueryClient();
+  return useMutation<DocMarks, ApiError, { code: string; signature: boolean; stamp: boolean; reason: string }>({
+    mutationFn: ({ code, ...body }) => api.put<DocMarks>(`/settings/document-marks/${encodeURIComponent(code)}`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['doc-marks'] }); },
   });
 }

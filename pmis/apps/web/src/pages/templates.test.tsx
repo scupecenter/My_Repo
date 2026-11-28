@@ -21,6 +21,24 @@ const Routed = () => (
 );
 
 describe('Templates page', () => {
+  it('Exports tab (0.15.269): the log of the exports with scope, state, rows, expiry and a download with a hint; the schedule link is for the admin; the templates stay on the other tab', async () => {
+    await signIn('pm');
+    await api.post('/exports/master', { body: { parts: ['car_dispatcher', 'incidents'] } });
+    renderApp(<Routed />, { route: '/templates' });
+    const u = userEvent.setup();
+    await screen.findByTestId('tpl-row-TPL-GECOL');
+    expect(screen.queryByTestId('export-log')).not.toBeInTheDocument();
+    await u.click(screen.getByTestId('tpl-tab-exports'));
+    expect(await screen.findByTestId('export-log')).toBeInTheDocument();
+    expect(screen.queryByTestId('tpl-row-TPL-GECOL')).not.toBeInTheDocument();
+    const row = await waitFor(() => { const r = screen.getByTestId('exlog-table').querySelector('tbody tr'); expect(r).not.toBeNull(); return r as HTMLElement; });
+    expect(row).toHaveTextContent('Parts');
+    expect(screen.getByTestId('exlog-schedule-link')).toHaveAttribute('href', '/admin/settings/data/export');
+    await waitFor(() => expect(row.querySelector('button[aria-label="Download"]')).not.toBeNull());
+    await u.click(screen.getByTestId('tpl-tab-templates'));
+    expect(await screen.findByTestId('tpl-row-TPL-GECOL')).toBeInTheDocument();
+  });
+
   it('lists the approved template of each register with its version and downloads it blank or pre-filled', async () => {
     await signIn('pm');
     const asked: string[] = [];

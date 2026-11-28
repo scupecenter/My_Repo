@@ -20,7 +20,7 @@ import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
 import { API_BASE } from '@/api/client';
-import { sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { PALETTE_HIDDEN_KEY, sanitizeUiNav, withoutHidden, type UiNav } from '@/lib/sidebarPrefs';
 import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
@@ -137,7 +137,9 @@ function ShellFrame() {
   // Field mode (0411): its menu entry shows only while a System Admin has turned it on
   const fieldOn = useFieldPwaSettings().enabled;
   const sideItems = visibleNavItems(me.data).filter((n) => n.key !== 'field' || fieldOn);
-  const paletteItems = permittedNavItems(me.data).filter((n) => n.key !== 'field' || fieldOn);
+  // the search box follows the personal menu: screens the person hid are left out unless they turned on "also search hidden screens" (Profile, My sidebar)
+  const paletteAll = loadPref<boolean>(PALETTE_HIDDEN_KEY, false) === true;
+  const paletteItems = (paletteAll ? permittedNavItems(me.data) : withoutHidden(permittedNavItems(me.data), side)).filter((n) => n.key !== 'field' || fieldOn);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back

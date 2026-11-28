@@ -1,3 +1,4 @@
+import { MissingArabicHint } from '@/components/MissingArabicHint';
 import { Plus, Trash2 } from "lucide-react";
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from "react";
@@ -102,6 +103,7 @@ export function GoalsSettings() {
                 </td>
                 <td className="px-2">
                   <input className="input w-full" dir="rtl" aria-label={t("goals.name_ar")} data-testid={`goal-name-ar-${g.id}`} value={g.name_ar ?? ""} maxLength={120} onChange={(e) => change(i, { name_ar: e.target.value || null })} />
+                  <MissingArabicHint en={g.name_en} ar={g.name_ar} testid={`goal-name-ar-warn-${g.id}`} />
                 </td>
                 <td className="px-2">
                   <select className="input" aria-label={t("goals.metric")} data-testid={`goal-metric-${g.id}`} value={g.metric} onChange={(e) => change(i, { metric: e.target.value })}>

@@ -41,7 +41,7 @@ const lits = (e: string) => [...e.matchAll(/'((?:[^']|'')*)'/g)].map((m) => m[1]
 
 /** Titles that come from a caller or a template, by migration: not checkable by text. */
 const CALLER_SUPPLIED = new Set([
-  'p_title', 'left(p_title, 300)', 'ttl', 'v_title',
+  'p_title', 'left(p_title, 300)', 'ttl', 'v_title', 'NEW.title',
   "coalesce(nullif(p_title ->> u.loc, ''), p_title ->> 'en')",
 ]);
 
