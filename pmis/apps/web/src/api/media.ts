@@ -23,6 +23,13 @@ export const useSetMediaSettings = () => {
     onSettled: () => { void qc.invalidateQueries({ queryKey: ['media-settings'] }); void qc.invalidateQueries({ queryKey: ['media-items'] }); void qc.invalidateQueries({ queryKey: ['media-facets'] }); },
   });
 };
+export type MediaExportJob = S['MediaExportJob'];
+export type MediaRef = { kind: 'document_file' | 'snag_photo'; id: string };
+export const useStartMediaExport = () => useMutation<MediaExportJob, ApiError, MediaRef[]>({ mutationFn: (items) => api.post<MediaExportJob>('/media/exports', { idempotencyKey: crypto.randomUUID(), body: { items } }) });
+/** The state of one export, read every 2 s until it is done or failed. */
+export const useMediaExportJob = (id: string | null) =>
+  useQuery({ queryKey: ['media-export', id], enabled: !!id, queryFn: () => api.get<MediaExportJob>(`/media/exports/${id}`), refetchInterval: (q) => (q.state.data && ['done', 'failed'].includes(q.state.data.status) ? false : 2000) });
+
 export const useMediaFacets = () => useQuery({ queryKey: ['media-facets'], queryFn: () => api.get<MediaFacets>('/media/facets') });
 
 const clean = (f: MediaFilter) => Object.fromEntries(Object.entries(f).filter(([, v]) => v !== ''));

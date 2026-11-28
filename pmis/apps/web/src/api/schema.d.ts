@@ -6802,6 +6802,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export a selection of gallery items as a zip with an index (0.15.532)
+         * @description Each chosen item must be in the caller's gallery (422 `not_visible`), the total size must be within `export_max_mb` (422 `export_too_large`), and a step-up is required (401 `step_up_required`). The job runs in the background with the requester's own rights; files that wait for the virus scan are left out and listed in `index.csv`.
+         */
+        post: operations["startMediaExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/exports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * State of one media export (0.15.532)
+         * @description Only the person who started the export sees it (404 otherwise).
+         */
+        get: operations["getMediaExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/exports/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a finished media export (0.15.532)
+         * @description A zip of `SITE/NAME` files plus `index.csv`. Audited; available for 7 days (410 `export_expired` after that, 409 `invalid_transition` while it runs).
+         */
+        get: operations["downloadMediaExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/identity/logo": {
         parameters: {
             query?: never;
@@ -19599,6 +19659,8 @@ export interface components {
             /** @description Whether withdrawn and rejected items can be listed (they are never deleted). */
             show_withdrawn: boolean;
             page_size: number;
+            /** @description Size cap of an export of a selection (0.15.531). */
+            export_max_mb: number;
             thumbnails: components["schemas"]["MediaThumbnails"];
             /** Format: date-time */
             updated_at?: string | null;
@@ -19618,7 +19680,39 @@ export interface components {
             image_only: boolean;
             show_withdrawn: boolean;
             page_size: number;
+            export_max_mb?: number;
             thumbnails: components["schemas"]["MediaThumbnails"];
+        };
+        MediaExportInput: {
+            items: {
+                /** @enum {string} */
+                kind: "document_file" | "snag_photo";
+                /** Format: uuid */
+                id: string;
+            }[];
+        };
+        MediaExportJob: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "media_export";
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed";
+            progress: number;
+            result?: {
+                /** Format: uuid */
+                export_id: string;
+                file_count: number | null;
+                size_bytes: number | null;
+                /** Format: date-time */
+                expires_at: string | null;
+                download_path: string;
+            };
+            error?: components["schemas"]["Problem"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
         };
         MediaItem: {
             /** @enum {string} */
@@ -19840,7 +19934,7 @@ export interface components {
             /** @enum {string} */
             key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries" | "login.ip_attempts" | "login.ip_window_seconds" | "login.ip_base_seconds" | "login.ip_max_seconds" | "login.identifier_attempts" | "media.thumbnails_per_minute";
             /** @enum {string} */
-            group: "sessions" | "rows" | "exports" | "media" | "media";
+            group: "sessions" | "rows" | "exports" | "media";
             /** @enum {string} */
             unit: "hours" | "seconds" | "rows" | "sites" | "entries" | "attempts" | "per_minute";
             default: number;
@@ -36004,6 +36098,83 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    startMediaExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaExportInput"];
+            };
+        };
+        responses: {
+            /** @description The job. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaExportJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMediaExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaExportJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadMediaExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
         };
     };
     putUiLogo: {

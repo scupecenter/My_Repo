@@ -448,6 +448,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/media/items'],
   ['get', '/media/facets'],
   ['get', '/media/items/:kind/:id/thumbnail'],
+  // Contract 0.15.531: export of a selection from the gallery (apps/api: media; migration 0471).
+  ['post', '/media/exports'],
+  ['get', '/media/exports/:id'],
+  ['get', '/media/exports/:id/download'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/dashboard-target-policy'],
   ['put', '/settings/dashboard-target-policy'],

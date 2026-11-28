@@ -17,7 +17,7 @@ const item = (id: string, over: Partial<MediaItem> = {}): MediaItem => ({
   has_thumbnail: false, download_url: `/files/${id}/download`, ...over,
 });
 const settings = (): MediaSettings => ({
-  enabled: true, snag_photos: true, document_kinds: ['photo'], register_keys: [], include_site_documents: true, exclude_doc_codes: [], image_only: true, show_withdrawn: false, page_size: 60,
+  enabled: true, snag_photos: true, document_kinds: ['photo'], register_keys: [], include_site_documents: true, exclude_doc_codes: [], image_only: true, show_withdrawn: false, page_size: 60, export_max_mb: 500,
   thumbnails: { enabled: true, small_px: 320, medium_px: 960, quality: 78, format: 'webp', max_source_mb: 25 }, version: 3, can_edit: true, thumbnails_available: true,
 });
 
@@ -59,6 +59,26 @@ describe('Library > Media', () => {
     await u.click(await screen.findByTestId('media-layout-date'));
     expect(await screen.findByTestId('media-group-2026-11-21')).toBeInTheDocument();
     expect(screen.getByTestId('media-group-2026-11-20')).toBeInTheDocument();
+  });
+
+  it('exports the chosen photos: a job is started with the picked items and the zip is downloaded when it is done', async () => {
+    await signIn('pm');
+    let sent: { items?: { kind: string; id: string }[] } = {};
+    server.use(
+      http.get(`${API_BASE}/media/items`, () => HttpResponse.json({ enabled: true, items: [item('a1'), item('a2')], page: { limit: 60, next_cursor: null } })),
+      http.get(`${API_BASE}/media/facets`, () => HttpResponse.json({ document_types: [], snag_types: [], registers: [] })),
+      http.post(`${API_BASE}/media/exports`, async ({ request }) => { sent = (await request.json()) as typeof sent; return HttpResponse.json({ id: 'j1', kind: 'media_export', status: 'queued', progress: 0, created_at: '2026-11-28T00:00:00Z', finished_at: null }, { status: 202 }); }),
+      http.get(`${API_BASE}/media/exports/j1`, () => HttpResponse.json({ id: 'j1', kind: 'media_export', status: 'running', progress: 0.5, created_at: '2026-11-28T00:00:00Z', finished_at: null })),
+    );
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/library/media" element={<LibraryMedia />} /></Routes>, { route: '/library/media' });
+    expect(await screen.findByTestId('media-card-a1')).toBeInTheDocument();
+    expect(screen.getByTestId('media-export')).toBeDisabled();
+    await u.click(screen.getByTestId('media-pick-a2'));
+    expect(screen.getByTestId('media-export')).toBeEnabled();
+    await u.click(screen.getByTestId('media-export'));
+    await waitFor(() => expect(sent.items).toEqual([{ kind: 'snag_photo', id: 'a2' }]));
+    await waitFor(() => expect(screen.getByTestId('media-export')).toBeDisabled());   // preparing: one export at a time
   });
 
   it('says so when the gallery is switched off', async () => {
