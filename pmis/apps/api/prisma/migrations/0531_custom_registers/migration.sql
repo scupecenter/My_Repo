@@ -1,4 +1,4 @@
--- 0531_custom_registers: admin-defined custom registers without code (item 11, owner approval 2026-11-26; design accepted by main 2026-11-28).
+-- 0531_custom_registers: admin-defined custom registers without code (item 11).
 -- Mirror: db/sql/530_custom_registers.sql (kept byte-identical).
 --
 -- A custom register is a row of register_definitions with is_custom = true, its fields in register_fields, and its records in register_records, run by the
