@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useMe } from '@/api/hooks';
 import { UI_FEATURES_SEED, useSaveUiFeatures, useUiFeaturesSetting, type UiFeatures } from '@/api/uiFeatures';
 import { Avatar } from '@/components/Avatar';
+import { DisplayExtrasCard } from '@/components/DisplayExtrasCard';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { canEditDisplayDefaults } from '@/components/TableStandard';
@@ -131,6 +132,7 @@ export function InterfaceSettings() {
         </div>
         <FieldErr errs={errs} path="/sections/unsaved_guard" />
       </section>
+      <DisplayExtrasCard />
       <UnsavedGuard scope="settings" dirty={!!f && can} needsReason label={t('ui.settings_title')} onSave={(reason) => new Promise<boolean>((res) => save.mutate({ sections: v, reason, version: q.data.version }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {q.data.updated_by && <p className="text-xs text-mute" data-testid="ui-updated">{t('tstd.settings_updated', { name: q.data.updated_by.display_name, at: q.data.updated_at ?? '' })}</p>}
       {can ? (

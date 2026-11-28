@@ -31,6 +31,7 @@ The system models the standard telecom site-delivery pipeline:
 - **Dashboards and reporting**: operational KPIs, workload, status updates, and scheduled exports.
 - **Collaboration**: inbox, approvals queue, messages, announcements, and notifications.
 - **Auditability**: a full audit log of data and configuration changes.
+- **Small display features** (per device, Settings > Screens > Interface): copy-link button in record drawers, with chart PNG download, last-updated note, due dates in words, totals row and private notes added by their own changes. Details in `pmis/docs/customer/display-extras.md`.
 - **Operations**: installer and update scripts, automated database and file backups, and a tested disaster-recovery procedure.
 
 ## Modules and Records

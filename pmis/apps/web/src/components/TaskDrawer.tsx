@@ -196,7 +196,7 @@ export function TaskDrawer({ taskId, onClose, registerFields = [], nav, intent }
   const { t } = useTranslation();
   const q = useTask(taskId);
   return (
-    <DrawerFrame name="task" testid="task-drawer" open={!!taskId} onClose={onClose} nav={nav && { ...nav, current: taskId }}>
+    <DrawerFrame name="task" testid="task-drawer" link={q.data ? `/sites/${q.data.site_id}?task=${q.data.id}` : undefined} open={!!taskId} onClose={onClose} nav={nav && { ...nav, current: taskId }}>
       {q.data ? <Body key={`${q.data.id}:${intent ?? ''}`} task={q.data} regFields={registerFields} intent={intent} /> : <div className="p-4"><Dialog.Title className="font-bold">{t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>
   );

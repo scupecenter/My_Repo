@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Link2, Maximize2, Minimize2 } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -13,6 +13,7 @@ import {
 import { useAskLeave, useUnsavedGuard, type GuardSource } from "@/lib/unsavedGuard";
 import { useTranslation } from "react-i18next";
 import { loadPref, savePref } from "@/lib/localPref";
+import { copyText, useExtra } from "@/lib/uiExtras";
 import { Tip } from "./Tip";
 
 export const DRAWER_MIN = 360;
@@ -55,6 +56,7 @@ export function DrawerFrame({
   onClose,
   testid,
   nav,
+  link,
   wide = 560,
   children,
 }: {
@@ -63,6 +65,8 @@ export function DrawerFrame({
   onClose: () => void;
   testid: string;
   nav?: DrawerNav;
+  /** Path (and query) that opens this record again; shows the copy-link button. */
+  link?: string;
   wide?: number;
   children: ReactNode;
 }) {
@@ -72,6 +76,13 @@ export function DrawerFrame({
     const s = loadPref<Partial<Size>>(key, {});
     return { w: clampW(s.w ?? wide), full: !!s.full };
   });
+  const [copied, setCopied] = useState<"" | "ok" | "fail">("");
+  const showLink = useExtra("copy_link") && !!link;
+  useEffect(() => {
+    if (!copied) return;
+    const id = window.setTimeout(() => setCopied(""), 1800);
+    return () => window.clearTimeout(id);
+  }, [copied]);
   const dirty = useRef(false);
   const opener = useRef<HTMLElement | null>(null);
   const put = (s: Size) => {
@@ -213,12 +224,28 @@ export function DrawerFrame({
                     )}
                   </>
                 )}
+                {showLink && (
+                  <Tip text={t("drawer.copy_link")}>
+                    <button
+                      type="button"
+                      className="btn ms-auto px-2 py-1"
+                      aria-label={t("drawer.copy_link")}
+                      data-testid="drawer-copy-link"
+                      onClick={() => void copyText(new URL(link!, window.location.origin).href).then((ok) => setCopied(ok ? "ok" : "fail"))}
+                    >
+                      {copied === "ok" ? <Check size={14} /> : <Link2 size={14} />}
+                    </button>
+                  </Tip>
+                )}
+                <span role="status" className="text-xs text-mute" data-testid="drawer-copy-note">
+                  {copied === "ok" ? t("drawer.link_copied") : copied === "fail" ? t("drawer.link_failed") : ""}
+                </span>
                 <Tip
                   text={size.full ? t("drawer.restore") : t("drawer.expand")}
                 >
                   <button
                     type="button"
-                    className="btn ms-auto px-2 py-1"
+                    className={`btn px-2 py-1 ${showLink ? "" : "ms-auto"}`}
                     aria-pressed={size.full}
                     aria-label={
                       size.full ? t("drawer.restore") : t("drawer.expand")
