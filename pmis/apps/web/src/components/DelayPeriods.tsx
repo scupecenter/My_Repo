@@ -115,6 +115,13 @@ export function DelayPeriodsPanel({ taskId }: { taskId: string }) {
         </ul>
       )}
       {voidP.isError && <p role="alert" className="mt-1 text-sm text-lateInk">{errText(voidP.error, t)}</p>}
+      {canPropose && d.suggestion && (
+        <div className="mt-3 rounded-md border border-line bg-waitBg p-2 text-sm text-waitInk" data-testid="delayp-suggestion">
+          <p>{t(`delayp.suggest_${d.suggestion.basis}`, { from: d.suggestion.from_date, to: d.suggestion.to_date })}{d.suggestion.party ? ` ${t('delayp.suggest_party', { party: t(`delayp.parties.${d.suggestion.party}`) })}` : ''}</p>
+          <p className="text-xs">{t('delayp.suggest_only')}</p>
+          <button type="button" className="btn mt-1 px-2 py-1 text-xs" data-testid="delayp-suggest-use" onClick={() => setForm((f) => ({ ...f, from_date: d.suggestion!.from_date, to_date: d.suggestion!.to_date, party: d.suggestion!.party ?? f.party }))}>{t('delayp.suggest_use')}</button>
+        </div>
+      )}
       {canPropose ? (
         <form className="mt-3 grid grid-cols-2 gap-2 text-sm" data-testid="delayp-form" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <label>{t('delayp.from')}<DateInput className="input mono" data-testid="delayp-from" value={form.from_date} onChange={(e) => setForm((f) => ({ ...f, from_date: e.target.value }))} required /></label>
