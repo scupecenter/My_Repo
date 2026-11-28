@@ -44,7 +44,7 @@ info:
     - 0.15.262 (2026-11-27): the unsaved-changes guard joins `ui.features` as the section `unsaved_guard` (migration 0401, mirror `db/sql/400_ui_unsaved_guard.sql`; CHANGELOG UnsavedGuard, Decision 11). Additive: `UiFeatures` and `UiFeaturesPatch` gain `unsaved_guard` (`UiUnsavedGuard`: `enabled` and one boolean per area); a stored value without the section takes the seed (guard on everywhere). No new path.
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
     - 0.15.369 (2026-11-27): the floating Inbox panel joins the appearance profile as two dimensions, `inbox_panel` (overlay, floating, docked) and `inbox_anchor` (end-top, end-bottom, start-top, start-bottom), in `UiPrefs` (migration 0526, mirror `db/sql/525_inbox_panel_mode.sql`). Additive: the same personal door, organization defaults and lock apply; no new route.
-    - 0.15.585 (2026-11-28): per-user dashboard widgets (migration 0713, mirror `db/sql/712_dash_user_widgets.sql`). Additive. `GET /me/dashboard-layout` (`UserDashboardLayouts`) lists the tabs the caller customised; `PUT /me/dashboard-layout/{tab}` (`UserDashboardLayoutSave`, tab `pmo`, `cw` or `te`) stores the caller's own card order and hidden cards with the version read (0 for a tab not customised yet; a stale version answers 412 `precondition_failed`); `DELETE /me/dashboard-layout/{tab}` returns the tab to the global layout of Settings > Dashboard. `GET /me/dashboard-templates`, `POST /me/dashboard-templates` (a name the caller already uses is replaced; at most 20), `POST /me/dashboard-templates/{template_id}/apply` and `DELETE /me/dashboard-templates/{template_id}` keep named sets of the three tab layouts. Card codes come from the existing F20 catalogue (unknown code or a card listed twice answers 422 `validation_failed`). Personal display preference: needs dashboard.view only, touches the caller's own rows, no grant, role, permission, visibility or audit change; the data of every card is still filtered by the caller's own rights.
+    - 0.15.585 (2026-11-28): per-user dashboard widgets (migration 0717, mirror `db/sql/716_dash_user_widgets.sql`). Additive. `GET /me/dashboard-layout` (`UserDashboardLayouts`) lists the tabs the caller customised; `PUT /me/dashboard-layout/{tab}` (`UserDashboardLayoutSave`, tab `pmo`, `cw` or `te`) stores the caller's own card order and hidden cards with the version read (0 for a tab not customised yet; a stale version answers 412 `precondition_failed`); `DELETE /me/dashboard-layout/{tab}` returns the tab to the global layout of Settings > Dashboard. `GET /me/dashboard-templates`, `POST /me/dashboard-templates` (a name the caller already uses is replaced; at most 20), `POST /me/dashboard-templates/{template_id}/apply` and `DELETE /me/dashboard-templates/{template_id}` keep named sets of the three tab layouts. Card codes come from the existing F20 catalogue (unknown code or a card listed twice answers 422 `validation_failed`). Personal display preference: needs dashboard.view only, touches the caller's own rows, no grant, role, permission, visibility or audit change; the data of every card is still filtered by the caller's own rights.
     - 0.15.530 (2026-11-28): the More menu joins the appearance profile as one dimension, `more_menu` (`list` default, `grid` = icon tiles with a search box), in `UiPrefs` (migration 0581, mirror `db/sql/580_more_menu_mode.sql`). Additive: the same personal door, organization default, personal-choice lock and audit as every other dimension; no table, column or permission change.
     - 0.15.531 (2026-11-28): personal notification settings on top of the applied policy (migration 0583, mirror `db/sql/582`): `GET/PUT /me/notification-prefs` (per type bell and e-mail choices, scheduled do-not-disturb, ETag), `POST /me/notification-prefs/snooze`, `POST /me/notification-prefs/test`, `GET /me/notification-prefs/decisions`, and the org switches `GET/PUT /admin/notification-personal` (System Admin). Quiet time holds e-mail and push, never the bell; a mandatory type is never held. Additive.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
@@ -19848,7 +19848,7 @@ paths:
       operationId: getMyDashboardLayouts
       summary: The caller's own dashboard card layouts (0.15.585)
       description: >-
-        0.15.585 (migration 0713). The tabs the caller customised, each with the card order, the hidden cards and the version to send back on save.
+        0.15.585 (migration 0717). The tabs the caller customised, each with the card order, the hidden cards and the version to send back on save.
         A tab that is absent follows the global layout of `GET /settings/dashboard`.
       responses:
         '200':
@@ -19866,7 +19866,7 @@ paths:
       operationId: saveMyDashboardLayout
       summary: Arrange and hide the cards of one dashboard tab for the caller (0.15.585)
       description: >-
-        0.15.585 (migration 0713). Stores the caller's own order and hidden cards of the tab. `version` is the version read with the layout
+        0.15.585 (migration 0717). Stores the caller's own order and hidden cards of the tab. `version` is the version read with the layout
         (0 when the tab was not customised yet); a stale version answers 412 `precondition_failed`. Unknown card code or a card listed twice answers 422
         `validation_failed`. Personal: no audit row, no change for any other user.
       requestBody:
@@ -19888,7 +19888,7 @@ paths:
       tags: [dashboard]
       operationId: resetMyDashboardLayout
       summary: Back to the global layout of one tab (0.15.585)
-      description: 0.15.585 (migration 0713). Removes the caller's own layout of the tab; the tab follows the global layout of Settings > Dashboard again. No error when there was none.
+      description: 0.15.585 (migration 0717). Removes the caller's own layout of the tab; the tab follows the global layout of Settings > Dashboard again. No error when there was none.
       responses:
         '200':
           description: Reset.
@@ -19908,7 +19908,7 @@ paths:
       tags: [dashboard]
       operationId: getMyDashboardTemplates
       summary: The caller's dashboard layout templates (0.15.585)
-      description: 0.15.585 (migration 0713). Named sets of the three tab layouts, oldest first.
+      description: 0.15.585 (migration 0717). Named sets of the three tab layouts, oldest first.
       responses:
         '200':
           description: The caller's templates.
@@ -19926,7 +19926,7 @@ paths:
       operationId: saveMyDashboardTemplate
       summary: Save the caller's layouts as a named template (0.15.585)
       description: >-
-        0.15.585 (migration 0713). A name the caller already uses is replaced. At most 20 templates (422 `validation_failed`, `/name` `too_many`).
+        0.15.585 (migration 0717). A name the caller already uses is replaced. At most 20 templates (422 `validation_failed`, `/name` `too_many`).
         A tab the template omits keeps the global layout when the template is applied.
       requestBody:
         required: true
@@ -19953,7 +19953,7 @@ paths:
       tags: [dashboard]
       operationId: applyMyDashboardTemplate
       summary: Apply a template to the caller's dashboard (0.15.585)
-      description: 0.15.585 (migration 0713). Each tab the template holds replaces the caller's layout of that tab; a card the catalogue no longer has is dropped. A template of another user answers 404.
+      description: 0.15.585 (migration 0717). Each tab the template holds replaces the caller's layout of that tab; a card the catalogue no longer has is dropped. A template of another user answers 404.
       parameters:
         - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
@@ -19970,7 +19970,7 @@ paths:
       tags: [dashboard]
       operationId: deleteMyDashboardTemplate
       summary: Delete a dashboard template of the caller (0.15.585)
-      description: 0.15.585 (migration 0713). Idempotent; a template of another user is never touched.
+      description: 0.15.585 (migration 0717). Idempotent; a template of another user is never touched.
       parameters:
         - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
       responses:

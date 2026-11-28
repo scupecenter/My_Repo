@@ -1,5 +1,5 @@
--- 0713_dash_user_widgets (contract 0.15.585): per-user dashboard widgets. Each user arranges and hides the cards of their own dashboard tabs and keeps
--- named layout templates. Mirror: db/sql/712_dash_user_widgets.sql (kept identical).
+-- 0717_dash_user_widgets (contract 0.15.585): per-user dashboard widgets. Each user arranges and hides the cards of their own dashboard tabs and keeps
+-- named layout templates. Mirror: db/sql/716_dash_user_widgets.sql (kept identical).
 --
 -- Additive. Reuses the F20 layout shape (order + hidden per tab pmo/cw/te) and the F20 card catalogue; no second catalogue. Personal display
 -- preference, like the pinned views (0344): no grant, role, permission, visibility or audit change; a hidden card only changes what the caller sees,

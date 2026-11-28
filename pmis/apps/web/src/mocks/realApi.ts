@@ -393,7 +393,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/presence/editing'],
   ['post', '/presence/editing/stop'],
   ['get', '/presence/editing'],
-  // Contract 0.15.585 (0713): per-user dashboard widgets (own card order, hidden cards, layout templates).
+  // Contract 0.15.585 (0717): per-user dashboard widgets (own card order, hidden cards, layout templates).
   ['get', '/me/dashboard-layout'],
   ['put', '/me/dashboard-layout/:tab'],
   ['delete', '/me/dashboard-layout/:tab'],

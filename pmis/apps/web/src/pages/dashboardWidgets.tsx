@@ -17,7 +17,7 @@ import {
 } from "./dashboardLayout";
 
 /**
- * Per-user dashboard widgets (contract 0.15.585, migration 0713). The caller arranges and hides the
+ * Per-user dashboard widgets (contract 0.15.585, migration 0717). The caller arranges and hides the
  * cards of the tab in view and keeps named templates of the three tab layouts. Rows, moves and the stored shape are the F20 functions of
  * dashboardLayout.ts (no second layout model). Personal: it changes only what the caller sees; the data of every card is still the caller's own.
  */

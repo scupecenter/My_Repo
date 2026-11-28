@@ -6,7 +6,7 @@ import { G } from "./reg-helpers";
 import { actor } from "./wf-helpers";
 
 /**
- * Per-user dashboard widgets (contract 0.15.585, migration 0713): the caller's own card order, hidden cards and layout templates. Personal and
+ * Per-user dashboard widgets (contract 0.15.585, migration 0717): the caller's own card order, hidden cards and layout templates. Personal and
  * permission-neutral: dashboard.view is the only grant needed, each caller sees and changes only their own rows, the card codes are the F20 catalogue,
  * a stale version answers 412, and nothing is audited.
  */

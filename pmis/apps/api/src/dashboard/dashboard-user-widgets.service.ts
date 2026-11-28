@@ -24,7 +24,7 @@ export interface UserTemplate {
 }
 
 /**
- * Per-user dashboard widgets (contract 0.15.585, migration 0713). The caller arranges and hides the cards of their own dashboard tabs and keeps named
+ * Per-user dashboard widgets (contract 0.15.585, migration 0717). The caller arranges and hides the cards of their own dashboard tabs and keeps named
  * templates. Personal display preference: reads and writes need dashboard.view only and touch the caller's own rows (row level security), so no grant,
  * role or permission changes; the data of every card is still filtered by the caller's own rights. A tab without a personal layout follows the global
  * layout of Settings > Dashboard (F20, 0.15.24).

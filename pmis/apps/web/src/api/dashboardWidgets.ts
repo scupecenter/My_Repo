@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
 import type { components } from "./schema";
 
-/** Per-user dashboard widgets (contract 0.15.585, migration 0713): the caller's own card order, hidden cards and layout templates. */
+/** Per-user dashboard widgets (contract 0.15.585, migration 0717): the caller's own card order, hidden cards and layout templates. */
 type S = components["schemas"];
 export type UserDashboardLayouts = S["UserDashboardLayouts"];
 export type UserDashboardTab = S["UserDashboardTab"];

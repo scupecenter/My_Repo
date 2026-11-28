@@ -12901,7 +12901,7 @@ export interface paths {
         };
         /**
          * The caller's own dashboard card layouts (0.15.585)
-         * @description 0.15.585 (migration 0713). The tabs the caller customised, each with the card order, the hidden cards and the version to send back on save. A tab that is absent follows the global layout of `GET /settings/dashboard`.
+         * @description 0.15.585 (migration 0717). The tabs the caller customised, each with the card order, the hidden cards and the version to send back on save. A tab that is absent follows the global layout of `GET /settings/dashboard`.
          */
         get: operations["getMyDashboardLayouts"];
         put?: never;
@@ -12924,13 +12924,13 @@ export interface paths {
         get?: never;
         /**
          * Arrange and hide the cards of one dashboard tab for the caller (0.15.585)
-         * @description 0.15.585 (migration 0713). Stores the caller's own order and hidden cards of the tab. `version` is the version read with the layout (0 when the tab was not customised yet); a stale version answers 412 `precondition_failed`. Unknown card code or a card listed twice answers 422 `validation_failed`. Personal: no audit row, no change for any other user.
+         * @description 0.15.585 (migration 0717). Stores the caller's own order and hidden cards of the tab. `version` is the version read with the layout (0 when the tab was not customised yet); a stale version answers 412 `precondition_failed`. Unknown card code or a card listed twice answers 422 `validation_failed`. Personal: no audit row, no change for any other user.
          */
         put: operations["saveMyDashboardLayout"];
         post?: never;
         /**
          * Back to the global layout of one tab (0.15.585)
-         * @description 0.15.585 (migration 0713). Removes the caller's own layout of the tab; the tab follows the global layout of Settings > Dashboard again. No error when there was none.
+         * @description 0.15.585 (migration 0717). Removes the caller's own layout of the tab; the tab follows the global layout of Settings > Dashboard again. No error when there was none.
          */
         delete: operations["resetMyDashboardLayout"];
         options?: never;
@@ -12947,13 +12947,13 @@ export interface paths {
         };
         /**
          * The caller's dashboard layout templates (0.15.585)
-         * @description 0.15.585 (migration 0713). Named sets of the three tab layouts, oldest first.
+         * @description 0.15.585 (migration 0717). Named sets of the three tab layouts, oldest first.
          */
         get: operations["getMyDashboardTemplates"];
         put?: never;
         /**
          * Save the caller's layouts as a named template (0.15.585)
-         * @description 0.15.585 (migration 0713). A name the caller already uses is replaced. At most 20 templates (422 `validation_failed`, `/name` `too_many`). A tab the template omits keeps the global layout when the template is applied.
+         * @description 0.15.585 (migration 0717). A name the caller already uses is replaced. At most 20 templates (422 `validation_failed`, `/name` `too_many`). A tab the template omits keeps the global layout when the template is applied.
          */
         post: operations["saveMyDashboardTemplate"];
         delete?: never;
@@ -12973,7 +12973,7 @@ export interface paths {
         put?: never;
         /**
          * Apply a template to the caller's dashboard (0.15.585)
-         * @description 0.15.585 (migration 0713). Each tab the template holds replaces the caller's layout of that tab; a card the catalogue no longer has is dropped. A template of another user answers 404.
+         * @description 0.15.585 (migration 0717). Each tab the template holds replaces the caller's layout of that tab; a card the catalogue no longer has is dropped. A template of another user answers 404.
          */
         post: operations["applyMyDashboardTemplate"];
         delete?: never;
@@ -12994,7 +12994,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a dashboard template of the caller (0.15.585)
-         * @description 0.15.585 (migration 0713). Idempotent; a template of another user is never touched.
+         * @description 0.15.585 (migration 0717). Idempotent; a template of another user is never touched.
          */
         delete: operations["deleteMyDashboardTemplate"];
         options?: never;
@@ -23309,7 +23309,7 @@ export interface components {
         };
         /** @description 0.15.585: the caller's own card order and hidden cards of one dashboard tab, with the version to send back on save. */
         UserDashboardTab: {
-            /** @description The shown cards */
+            /** @description The shown cards, in display order. */
             order: string[];
             /** @description The hidden cards. */
             hidden: string[];
