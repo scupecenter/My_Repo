@@ -96,6 +96,8 @@ import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controll
 import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
 import { ProgressRagController } from './dashboard/progress-rag.controller';
 import { ProgressRagService } from './dashboard/progress-rag.service';
+import { ForecastMethodController } from './dashboard/forecast-method.controller';
+import { ForecastMethodService } from './dashboard/forecast-method.service';
 import { ForecastWindowController } from './dashboard/forecast-window.controller';
 import { ForecastWindowService } from './dashboard/forecast-window.service';
 import { GoalsController } from './dashboard/goals.controller';
@@ -266,6 +268,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
+      ForecastMethodController, // 0.15.474 (own line)
       ForecastWindowController, // 0.15.431 (own line)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
@@ -304,6 +307,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       MediaService, // 0.15.292
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)
+      ForecastMethodService, // 0.15.474 (own line)
       ForecastWindowService, // 0.15.431 (own line)
       PasskeyService, // S4
       DuplicateRowsSettingsService,
