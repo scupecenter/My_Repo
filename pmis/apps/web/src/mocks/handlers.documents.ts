@@ -155,6 +155,7 @@ export const documentHandlers = [
   http.post(`${B}/exports/zip`, async ({ request }) => {
     const g = guard(); if (g) return g;
     const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    if (b.pack !== undefined && (b.pack !== 'acceptance' || !b.site_id || Object.keys(b).some((k) => !['pack', 'site_id', 'include_superseded'].includes(k)))) return fields({ path: '/pack', code: 'pack_scope' });
     if (!b.site_id && !b.stage_code && !b.doc_code && !b.file_ids) return fields({ path: '/', code: 'scope_required' });
     const id = crypto.randomUUID();
     jobs.set(id, { polls: 0, scope: b, name: `GSDN_Documents_${tripoliToday().replace(/-/g, '')}.zip` });
