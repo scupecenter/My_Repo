@@ -21,6 +21,8 @@ let allDelegate: Actor;
 let regDelegate: Actor;
 const REASON = 'Owner request 2026-11-26';
 const DEFAULT = { announcement_en: '', announcement_ar: '', announcement_kind: 'info', animation: true, default_locale: null, support_links: [] };
+/** 0658: the render-only card fields and their defaults (a body without them keeps the current values). */
+const CARD = { show_remember: true, show_language_switch: true, show_theme_switch: true, show_help: true, welcome_title_en: '', welcome_title_ar: '', welcome_subtitle_en: '', welcome_subtitle_ar: '' };
 const SAMPLE = {
   announcement_en: 'Planned maintenance on Sunday 02:00-04:00.', announcement_ar: 'صيانة مجدولة يوم الأحد من 02:00 إلى 04:00.',
   announcement_kind: 'maintenance', animation: false, default_locale: 'ar',
@@ -57,9 +59,9 @@ describe('the public door: GET /settings/login-page/public', () => {
     const r = await pub();
     expect(r.status).toBe(200);
     expect(r.headers['cache-control']).toContain('max-age=30');
-    expect(r.body).toEqual({ announcement: null, animation: true, default_locale: null, support_links: [] });
+    expect(r.body).toEqual({ announcement: null, animation: true, default_locale: null, support_links: [], ...CARD });
     // nothing else leaks: no version, no audit data, nothing about users
-    expect(Object.keys(r.body).sort()).toEqual(['animation', 'announcement', 'default_locale', 'support_links']);
+    expect(Object.keys(r.body).sort()).toEqual(['animation', 'announcement', 'default_locale', 'support_links', ...Object.keys(CARD)].sort());
     expect(JSON.stringify(r.body)).not.toMatch(/version|updated_|can_edit|0\.15/);
   });
 });
@@ -120,7 +122,7 @@ describe('Settings, Screens, Login page: GET and PUT /settings/login-page', () =
     expect(p.status).toBe(200);
     expect(p.body).toEqual({
       announcement: { en: SAMPLE.announcement_en, ar: SAMPLE.announcement_ar, kind: 'maintenance' },
-      animation: false, default_locale: 'ar', support_links: SAMPLE.support_links,
+      animation: false, default_locale: 'ar', support_links: SAMPLE.support_links, ...CARD,
     });
     const same = await put(admin, { ...SAMPLE, reason: REASON }, etag(ok));
     expect(same.status).toBe(409);
@@ -129,6 +131,22 @@ describe('Settings, Screens, Login page: GET and PUT /settings/login-page', () =
     // back to the default; the banner hides again
     const back = await put(admin, { ...DEFAULT, reason: REASON }, etag(ok));
     expect(back.status).toBe(200);
-    expect((await pub()).body).toEqual({ announcement: null, animation: true, default_locale: null, support_links: [] });
+    expect((await pub()).body).toEqual({ announcement: null, animation: true, default_locale: null, support_links: [], ...CARD });
+  });
+
+describe('card display fields (0658)', () => {
+  it('are written with the page, validated, kept when a body omits them, and shown by the public door', async () => {
+    const cur = await read(admin);
+    const card = { show_remember: false, show_help: false, welcome_title_en: 'Welcome back', welcome_title_ar: 'أهلاً بعودتك', welcome_subtitle_en: 'Sign in to GSDN', welcome_subtitle_ar: 'سجّل الدخول' };
+    const ok = await put(admin, { ...DEFAULT, ...card, reason: REASON }, etag(cur));
+    expect(ok.status).toBe(200);
+    expect((await pub()).body).toMatchObject({ ...CARD, ...card });
+    for (const bad of [{ show_remember: 'no' }, { welcome_title_en: 'x'.repeat(81) }, { welcome_subtitle_ar: 'x'.repeat(161) }, { welcome_title_ar: 5 }]) {
+      expect((await put(admin, { ...DEFAULT, ...bad, reason: REASON }, etag(ok))).status).toBe(422);
+    }
+    // a body without the card keys keeps them
+    const kept = await put(admin, { ...DEFAULT, animation: false, reason: REASON }, etag(ok));
+    expect(kept.status).toBe(200);
+    expect((await pub()).body).toMatchObject({ ...CARD, ...card, animation: false });
   });
 });

@@ -16,12 +16,21 @@ type Draft = {
   animation: boolean;
   default_locale: 'en' | 'ar' | null;
   support_links: SupportLink[];
+  show_remember: boolean;
+  show_language_switch: boolean;
+  show_theme_switch: boolean;
+  show_help: boolean;
+  welcome_title_en: string;
+  welcome_title_ar: string;
+  welcome_subtitle_en: string;
+  welcome_subtitle_ar: string;
 };
 
 const clean = (d: Draft): Draft => ({
   ...d,
   announcement_en: d.announcement_en.trim(),
   announcement_ar: d.announcement_ar.trim(),
+  welcome_title_en: d.welcome_title_en.trim(), welcome_title_ar: d.welcome_title_ar.trim(), welcome_subtitle_en: d.welcome_subtitle_en.trim(), welcome_subtitle_ar: d.welcome_subtitle_ar.trim(),
   support_links: d.support_links.map((l) => ({ label_en: l.label_en.trim(), label_ar: l.label_ar.trim(), url: l.url.trim() })),
 });
 
@@ -41,6 +50,8 @@ export function LoginPageSettings() {
   const v: Draft = draft ?? {
     announcement_en: cur.announcement_en, announcement_ar: cur.announcement_ar, announcement_kind: cur.announcement_kind,
     animation: cur.animation, default_locale: cur.default_locale, support_links: cur.support_links.map((l) => ({ ...l })),
+    show_remember: cur.show_remember, show_language_switch: cur.show_language_switch, show_theme_switch: cur.show_theme_switch, show_help: cur.show_help,
+    welcome_title_en: cur.welcome_title_en, welcome_title_ar: cur.welcome_title_ar, welcome_subtitle_en: cur.welcome_subtitle_en, welcome_subtitle_ar: cur.welcome_subtitle_ar,
   };
   const dirty = JSON.stringify(clean(v)) !== JSON.stringify(clean({ ...cur, support_links: cur.support_links }));
   const ro = !cur.can_edit;
@@ -78,6 +89,21 @@ export function LoginPageSettings() {
           ))}
           <span className="text-xs text-mute">{t('loginPage.ann_hide')}</span>
         </div>
+      </fieldset>
+
+      <fieldset className="space-y-2" data-testid="lp-card">
+        <legend className="mb-1 text-sm font-semibold">{t('loginPage.card')}</legend>
+        <p className="text-xs text-mute">{t('loginPage.card_note')}</p>
+        {([['show_remember', 'card_remember'], ['show_language_switch', 'card_lang'], ['show_theme_switch', 'card_theme'], ['show_help', 'card_help']] as const).map(([k, label]) => (
+          <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid={`lp-${k}`} checked={v[k]} disabled={ro} onChange={(e) => patch({ [k]: e.target.checked })} />{t(`loginPage.${label}`)}</label>
+        ))}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div><label className="block text-sm font-semibold" htmlFor="lp-title-en">{t('loginPage.title_en')}</label><input id="lp-title-en" dir="ltr" maxLength={80} className="input mt-1 w-full" data-testid="lp-welcome-title-en" value={v.welcome_title_en} disabled={ro} placeholder={t('login.title')} onChange={(e) => patch({ welcome_title_en: e.target.value })} /></div>
+          <div><label className="block text-sm font-semibold" htmlFor="lp-title-ar">{t('loginPage.title_ar')}</label><input id="lp-title-ar" dir="rtl" maxLength={80} className="input mt-1 w-full" data-testid="lp-welcome-title-ar" value={v.welcome_title_ar} disabled={ro} onChange={(e) => patch({ welcome_title_ar: e.target.value })} /></div>
+          <div><label className="block text-sm font-semibold" htmlFor="lp-sub-en">{t('loginPage.sub_en')}</label><input id="lp-sub-en" dir="ltr" maxLength={160} className="input mt-1 w-full" data-testid="lp-welcome-sub-en" value={v.welcome_subtitle_en} disabled={ro} onChange={(e) => patch({ welcome_subtitle_en: e.target.value })} /></div>
+          <div><label className="block text-sm font-semibold" htmlFor="lp-sub-ar">{t('loginPage.sub_ar')}</label><input id="lp-sub-ar" dir="rtl" maxLength={160} className="input mt-1 w-full" data-testid="lp-welcome-sub-ar" value={v.welcome_subtitle_ar} disabled={ro} onChange={(e) => patch({ welcome_subtitle_ar: e.target.value })} /></div>
+        </div>
+        <p className="text-xs text-mute">{t('loginPage.card_empty')}</p>
       </fieldset>
 
       <label className="flex items-start gap-2 text-sm">

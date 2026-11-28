@@ -1,6 +1,7 @@
 import { AlertTriangle, Info, LifeBuoy, LogIn } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLoginPagePublic } from '@/api/settings';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { isPending, useLocalLogin } from '@/api/auth';
 import { API_BASE, ApiError } from '@/api/client';
@@ -23,7 +24,13 @@ export function loginUrl(identifier: string, returnTo = '/my-work') {
 }
 
 export function Login() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // 0658: render-only card settings (Settings > Screens > Login page); until they load, and when they cannot be read, everything shows.
+  const card = useLoginPagePublic().data;
+  const showRemember = card?.show_remember ?? true, showHelp = card?.show_help ?? true;
+  const arLang = i18n.language === 'ar';
+  const welcomeTitle = (arLang ? card?.welcome_title_ar : card?.welcome_title_en)?.trim() || (arLang ? card?.welcome_title_en : card?.welcome_title_ar)?.trim() || t('login.title');
+  const welcomeSub = (arLang ? card?.welcome_subtitle_ar : card?.welcome_subtitle_en)?.trim() || (arLang ? card?.welcome_subtitle_en : card?.welcome_subtitle_ar)?.trim() || t('login.subtitle');
   const saved = readRememberedId();
   const [id, setId] = useState(saved);
   const [remember, setRemember] = useState(saved !== '');
@@ -36,7 +43,7 @@ export function Login() {
   const [params] = useSearchParams();
   const nav = useNavigate();
   const login = useLocalLogin();
-  const keepId = () => { if (remember) writeRememberedId(id); else clearRememberedId(); };
+  const keepId = () => { if (remember && showRemember) writeRememberedId(id); else clearRememberedId(); };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (login.isPending) return;
@@ -66,8 +73,8 @@ export function Login() {
     <AuthShell>
       <form onSubmit={submit} className="card auth-card auth-enter space-y-4 p-6 sm:p-8" data-testid="login-form" aria-busy={login.isPending}>
         <div>
-          <h1 className="text-2xl font-bold">{t('login.title')}</h1>
-          <p className="mt-1 text-mute">{t('login.subtitle')}</p>
+          <h1 className="text-2xl font-bold" data-testid="login-title">{welcomeTitle}</h1>
+          <p className="mt-1 text-mute" data-testid="login-subtitle">{welcomeSub}</p>
         </div>
         {notice && <p role="status" className="flex items-start gap-2 rounded-md bg-accentSoft p-3 text-sm text-accentText" data-testid="login-notice"><Info size={16} className="mt-0.5 shrink-0" aria-hidden />{notice}</p>}
         <div>
@@ -76,10 +83,10 @@ export function Login() {
         </div>
         <PasswordField id="password" label={t('login.password')} testid="login-password" autoComplete="current-password" value={pw} onChange={setPw} />
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <label className="flex cursor-pointer items-center gap-2" title={t('login.remember_hint')}>
+          {showRemember ? <label className="flex cursor-pointer items-center gap-2" title={t('login.remember_hint')}>
             <input type="checkbox" data-testid="login-remember" checked={remember} onChange={(e) => { setRemember(e.target.checked); if (!e.target.checked) clearRememberedId(); }} />
             {t('login.remember')}
-          </label>
+          </label> : <span />}
           <Link to="/forgot-password" className="font-semibold text-link hover:underline" data-testid="login-forgot">{t('login.forgot')}</Link>
         </div>
         {msg && <p role="alert" data-testid="login-error" className="flex items-start gap-2 text-lateInk"><AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />{msg}</p>}
@@ -92,7 +99,7 @@ export function Login() {
             <button className="btn w-full" data-testid="login-m365" type="button" onClick={() => window.location.assign(loginUrl(id))}>{t('login.m365')}</button>
           </>
         )}
-        <p className="flex items-start gap-2 border-t border-line pt-3 text-xs text-faint" data-testid="login-help"><LifeBuoy size={14} className="mt-0.5 shrink-0" aria-hidden />{t('login.note')}</p>
+        {showHelp && <p className="flex items-start gap-2 border-t border-line pt-3 text-xs text-faint" data-testid="login-help"><LifeBuoy size={14} className="mt-0.5 shrink-0" aria-hidden />{t('login.note')}</p>}
         <p className="text-xs text-faint">{t('login.need_access')}</p>
       </form>
     </AuthShell>

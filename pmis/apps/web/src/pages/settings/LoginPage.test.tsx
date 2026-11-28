@@ -22,6 +22,24 @@ describe('Settings > Screens > Login page', () => {
     expect(screen.getByTestId('settings-section-screens-login')).toBeInTheDocument();
   });
 
+  it('card display (0658): hides parts of the card and sets a welcome text, saved with a reason and a step-up, shown by the public door', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    const u = userEvent.setup();
+    page();
+    await screen.findByTestId('page-login-settings');
+    await u.click(screen.getByTestId('lp-show_remember'));
+    await u.click(screen.getByTestId('lp-show_theme_switch'));
+    await u.type(screen.getByTestId('lp-welcome-title-en'), 'Welcome back');
+    await u.type(screen.getByTestId('lp-welcome-title-ar'), 'أهلاً بعودتك');
+    await u.click(screen.getByTestId('lp-save'));
+    await u.type(await screen.findByTestId('lp-dialog-reason'), 'Owner request 2026-11-28');
+    await u.click(screen.getByTestId('lp-dialog-submit'));
+    await waitFor(async () => expect((await api.get<LoginPage>('/settings/login-page')).show_remember).toBe(false));
+    const pub = await api.get<Record<string, unknown>>('/settings/login-page/public');
+    expect(pub).toMatchObject({ show_remember: false, show_theme_switch: false, show_language_switch: true, show_help: true, welcome_title_en: 'Welcome back', welcome_title_ar: 'أهلاً بعودتك' });
+  });
+
   it('saves the announcement, the default language, the animation and a support link with a reason and a step-up (audited)', async () => {
     await signIn('pm');
     await api.post('/__mock/step-up');
