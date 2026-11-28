@@ -367,6 +367,8 @@ describe('hybrid mode list', () => {
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
       'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/ops-limits', 'PUT /settings/ops-limits', 'GET /settings/login-page/public',
+      // contract 0.15.595: resource capacity planning
+      'GET /settings/capacity-plan', 'PUT /settings/capacity-plan', 'GET /capacity/plan',
       // contract 0.15.292: the media gallery
       'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
       'GET /settings/dashboard-target-policy', 'PUT /settings/dashboard-target-policy', 'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',

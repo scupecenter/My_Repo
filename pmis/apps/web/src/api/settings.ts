@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { OpsLimits, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList, ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, DashboardFinanceReaders, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting, DashboardTargetPolicy,
+import type { CapacityPlan, CapacityPlanSettings, OpsLimits, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList, ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, DashboardFinanceReaders, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting, DashboardTargetPolicy,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -100,6 +100,15 @@ export const useSetUiIdentity = () => {
   const qc = useQueryClient();
   return useMutation<UiIdentity, ApiError, { version: number; default_brand: UiBrand; allow_user_choice: boolean; defaults?: UiIdentity['defaults']; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/identity', { version, body }), onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
+  });
+};
+/** 0.15.595 (migration 0666): resource capacity planning. The settings (skills, crews, efforts) and the weekly plan computed from the open tasks. */
+export const useCapacitySettings = () => useQuery({ queryKey: ['capacity-settings'], queryFn: () => api.get<CapacityPlanSettings>('/settings/capacity-plan') });
+export const useCapacityPlan = (regionId: string) => useQuery({ queryKey: ['capacity-plan', regionId], queryFn: () => api.get<CapacityPlan>('/capacity/plan', { query: { region_id: regionId || undefined } }) });
+export const useSetCapacitySettings = () => {
+  const qc = useQueryClient();
+  return useMutation<CapacityPlanSettings, ApiError, { version: number; skills: CapacityPlanSettings['skills']; crews: CapacityPlanSettings['crews']; efforts: CapacityPlanSettings['efforts']; days_per_week: number; utilization_pct: number; horizon_weeks: number; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/capacity-plan', { version, body }), onSettled: () => refresh(qc, 'capacity-settings', 'capacity-plan'),
   });
 };
 /** 0.15.97 (migration 0197): Settings, Screens, Login page. The public read answers only what the signed-out pages render. */

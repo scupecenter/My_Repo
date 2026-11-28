@@ -453,6 +453,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/ops-limits'],
   ['put', '/settings/ops-limits'],
   ['get', '/settings/login-page/public'],
+  // Contract 0.15.595 (migration 0666; apps/api: capacity): resource capacity planning (settings and the weekly plan).
+  ['get', '/settings/capacity-plan'],
+  ['put', '/settings/capacity-plan'],
+  ['get', '/capacity/plan'],
   // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
   ['get', '/media/settings'],
   ['put', '/media/settings'],

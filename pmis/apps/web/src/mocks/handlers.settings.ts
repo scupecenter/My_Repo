@@ -7,7 +7,7 @@ import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLo
 import { tripoliToday } from '@/lib/today';
 import { weightIssues } from '@/lib/weights';
 import { NAV_SIDE } from '@/lib/navLayout';
-import { accountKeyOf, cred, db, identity, loginPage, loginPagePublic, putUiAssetBytes, save, stepUpValid, uiAssetBytesOf, viewer } from './db';
+import { accountKeyOf, capacityPlan, cred, db, identity, loginPage, loginPagePublic, putUiAssetBytes, save, stepUpValid, uiAssetBytesOf, viewer } from './db';
 import { BRANDS, isBrand } from '@/lib/brands';
 import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { guard, page, problem, stepUp } from './handlers';
@@ -907,6 +907,59 @@ export const settingsHandlers = [
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
     const j = identityView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.595: resource capacity planning (settings and the weekly plan). The mock plan puts 2 tasks per effort entry in week 2 of region 1.
+  http.get(`${B}/settings/capacity-plan`, () => { const g = guard(); if (g) return g; const j = { ...capacityPlan(), can_edit: isAdmin() }; return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/capacity-plan`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ skills?: { code: string; name_en: string; name_ar: string }[]; crews?: { id: string; region_id: number; name: string; size: number; skills: string[] }[]; efforts?: { task_code: string; skill: string; person_days: number }[]; days_per_week?: number; utilization_pct?: number; horizon_weeks?: number; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['skills', 'crews', 'efforts', 'days_per_week', 'utilization_pct', 'horizon_weeks', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    const skills = Array.isArray(b.skills) ? b.skills : null, crews = Array.isArray(b.crews) ? b.crews : null, efforts = Array.isArray(b.efforts) ? b.efforts : null;
+    if (!skills || skills.length > 30 || !skills.every((s) => /^[a-z0-9_]{2,30}$/.test(s.code) && s.name_en?.trim()) || new Set(skills.map((s) => s.code)).size !== skills.length) errs.push({ path: '/skills', code: 'invalid' });
+    const codes = (skills ?? []).map((s) => s.code);
+    if (!crews || crews.length > 200 || !crews.every((c) => c.id?.trim() && c.name?.trim() && c.region_id >= 1 && c.region_id <= 7 && c.size >= 1 && c.size <= 200 && c.skills.every((x) => codes.includes(x))) || new Set((crews ?? []).map((c) => c.id)).size !== crews.length) errs.push({ path: '/crews', code: 'invalid' });
+    if (!efforts || efforts.length > 500 || !efforts.every((e) => e.task_code?.trim() && codes.includes(e.skill) && e.person_days > 0 && e.person_days <= 365) || new Set((efforts ?? []).map((e) => e.task_code)).size !== efforts.length) errs.push({ path: '/efforts', code: 'invalid' });
+    if (!Number.isInteger(b.days_per_week) || b.days_per_week! < 1 || b.days_per_week! > 7) errs.push({ path: '/days_per_week', code: 'invalid' });
+    if (!Number.isInteger(b.utilization_pct) || b.utilization_pct! < 10 || b.utilization_pct! > 100) errs.push({ path: '/utilization_pct', code: 'invalid' });
+    if (!Number.isInteger(b.horizon_weeks) || b.horizon_weeks! < 1 || b.horizon_weeks! > 26) errs.push({ path: '/horizon_weeks', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, capacityPlan().version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const cur = capacityPlan();
+    const nxt = { skills: skills!, crews: crews!, efforts: efforts!, days_per_week: b.days_per_week!, utilization_pct: b.utilization_pct!, horizon_weeks: b.horizon_weeks! };
+    if (JSON.stringify(nxt) === JSON.stringify({ skills: cur.skills, crews: cur.crews, efforts: cur.efforts, days_per_week: cur.days_per_week, utilization_pct: cur.utilization_pct, horizon_weeks: cur.horizon_weeks }))
+      return problem(409, 'invalid_transition', 'These are already the capacity planning settings.');
+    const v = viewer()!;
+    Object.assign(cur, { ...nxt, version: cur.version + 1, updated_at: new Date().toISOString(), updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
+    const j = { ...cur, can_edit: isAdmin() };
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.get(`${B}/capacity/plan`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const c = capacityPlan(), only = new URL(request.url).searchParams.get('region_id');
+    const monday = new Date(`${tripoliToday()}T00:00:00Z`); monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+    const weeks = Array.from({ length: c.horizon_weeks }, (_, i) => { const d = new Date(monday); d.setUTCDate(d.getUTCDate() + 7 * i); return d.toISOString().slice(0, 10); });
+    const cell = (cap: number, dem: number) => {
+      if (cap === 0 && dem === 0) return { capacity_days: 0, demand_days: 0, load_pct: null, status: 'none' as const };
+      if (cap === 0) return { capacity_days: 0, demand_days: dem, load_pct: null, status: 'over' as const };
+      const l = Math.round((dem / cap) * 100); return { capacity_days: cap, demand_days: dem, load_pct: l, status: l > 100 ? 'over' as const : l > 85 ? 'tight' as const : 'ok' as const };
+    };
+    const regionNames = ['', 'Tripoli', 'Middle', 'WM', 'Zawia', 'Benghazi', 'GM', 'Sebha'];
+    const ids = [...new Set(c.crews.map((x) => x.region_id))].filter((id) => !only || String(id) === only).sort();
+    const regions = ids.map((id) => {
+      const crews = c.crews.filter((x) => x.region_id === id);
+      const cap = new Map<string, number>();
+      for (const x of crews) for (const s of x.skills) cap.set(s, (cap.get(s) ?? 0) + (x.size * c.days_per_week * c.utilization_pct / 100) / x.skills.length);
+      const dem = new Map<string, number>();
+      if (id === 1) for (const e of c.efforts) dem.set(e.skill, (dem.get(e.skill) ?? 0) + 2 * e.person_days);
+      const codes = [...new Set([...cap.keys(), ...dem.keys()])];
+      return { region_id: id, code: regionNames[id] ?? String(id), name_en: regionNames[id] ?? String(id), name_ar: null, crews: crews.length, unestimated: weeks.map(() => 0),
+        skills: codes.map((s) => { const k = c.skills.find((x) => x.code === s); return { skill: s, name_en: k?.name_en ?? s, name_ar: k?.name_ar ?? '', cells: weeks.map((_, i) => cell(cap.get(s) ?? 0, i === 1 ? dem.get(s) ?? 0 : 0)) }; }) };
+    });
+    return HttpResponse.json({ horizon_weeks: c.horizon_weeks, weeks, regions, undated_tasks: 0 });
   }),
 
   // ------------------------------------------------------------------ 0.15.97: Settings, Screens, Login page (the sign-in page settings); the public door answers only what the page renders

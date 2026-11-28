@@ -31,6 +31,7 @@ The system models the standard telecom site-delivery pipeline:
 - **Dashboards and reporting**: operational KPIs, workload, status updates, and scheduled exports.
 - **Collaboration**: inbox, approvals queue, messages, announcements, and notifications.
 - **Auditability**: a full audit log of data and configuration changes.
+- **Resource capacity planning**: planned load against capacity per team and period (plan `pmis/docs/plans/2026-11-28-capacity-planning.md`).
 - **Operations**: installer and update scripts, automated database and file backups, and a tested disaster-recovery procedure.
 
 ## Modules and Records

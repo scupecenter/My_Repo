@@ -16,7 +16,7 @@ export { staffRef, uid };
 
 /** Accounts offered on the fake Microsoft page. `linked=false` = first sign-in (needs employee ID). */
 export const ACCOUNTS: Record<string, { employee_id: string | null; name: string; email: string; status: 'active' | 'pending_assignment'; nav: string[] }> = {
-  pm: { employee_id: '1001', name: 'Demo User 01', email: 'demo.user.01@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'deliverables', 'tools_equipment'] },
+  pm: { employee_id: '1001', name: 'Demo User 01', email: 'demo.user.01@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'capacity', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'deliverables', 'tools_equipment'] },
   reviewer: { employee_id: '1102', name: 'Demo User 02', email: 'demo.user.02@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'templates', 'absence', 'messages', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'warehouse', 'as_built'] },
   auditor: { employee_id: '1103', name: 'Demo User 03', email: 'demo.user.03@example.com', status: 'active', nav: ['my_work', 'inbox', 'approvals', 'admin.security_log', 'messages'] },
   newbie: { employee_id: null, name: 'New Employee', email: 'new.employee@example.com', status: 'pending_assignment', nav: [] },
@@ -109,6 +109,7 @@ const fresh = () => ({
   identity: initIdentity(),
   /** 0.15.97 (migration 0242): Settings, Screens, Login page (setting ui.login_page). */
   loginPage: initLoginPage(),
+  capacityPlan: initCapacityPlan(),
   emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
     /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
     code?: string | null; attempts?: number; verify_sent_at?: string | null; verify_expires_at?: string | null; verified_at?: string | null; verified_via?: 'code' | 'admin_check' | null; identity_check?: string | null }[],
@@ -185,6 +186,12 @@ function initLoginPage() {
     version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
   };
 }
+type CapacityState = { skills: { code: string; name_en: string; name_ar: string }[]; crews: { id: string; region_id: number; name: string; size: number; skills: string[] }[]; efforts: { task_code: string; skill: string; person_days: number }[]; days_per_week: number; utilization_pct: number; horizon_weeks: number; version: number; updated_at: string | null; updated_by: null | { id: string; display_name: string; employee_id: string | null } };
+function initCapacityPlan(): CapacityState {
+  return { skills: [], crews: [], efforts: [], days_per_week: 5, utilization_pct: 80, horizon_weeks: 8, version: 1, updated_at: null, updated_by: null };
+}
+/** 0.15.595: the capacity planning settings (older saved mock states have none). */
+export const capacityPlan = () => (db().capacityPlan ??= initCapacityPlan());
 /** 0.15.97: the login page settings (older saved mock states have none). */
 export const loginPage = () => (db().loginPage ??= initLoginPage());
 /** 0.15.97: the public door answers only what the signed-out pages render (login_page_public). */
