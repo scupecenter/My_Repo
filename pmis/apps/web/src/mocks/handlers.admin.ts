@@ -650,6 +650,8 @@ const PARTS = ([
 const COLUMNS: Record<string, string[]> = {
   sites: ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'],
   tasks: ['site_code', 'task_code', 'task_name', 'stage', 'task_state', 'holder', 'due_date', 'sla_status', 'approved_at'],
+  permits_hse: ['site_code', 'region', 'record_type', 'state', 'permit_type', 'status', 'valid_to'],
+  quality: ['site_code', 'region', 'record_type', 'state', 'inspection_date', 'result'],
 };
 // A reviewer lacks the export grant for the commercial and finance registers.
 const denied = (): string[] => (viewer()?.key === 'pm' ? [] : ['procurement', 'contractors', 'warehouse', 'financial_advances', 'invoices']);
