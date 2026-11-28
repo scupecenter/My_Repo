@@ -589,6 +589,8 @@ export class FilterCatalogService {
         field('version', 'Version', 'الإصدار', 'number', Prisma.sql`s.version`, undefined, doc),
         field('file_name', 'File name', 'اسم الملف', 'text', Prisma.sql`s.file_name`, undefined, doc),
         field('candidate_label', 'Candidate', 'المرشح', 'text', Prisma.sql`s.candidate_label`, undefined, doc),
+        field('signed', 'Signed copy', 'نسخة موقعة', 'bool', Prisma.sql`s.signed`, undefined, doc),
+        field('stamped', 'Stamped copy', 'نسخة مختومة', 'bool', Prisma.sql`s.stamped`, undefined, doc),
         field('task_code', 'Task code', 'رمز المهمة', 'text', Prisma.sql`s.task_code`, undefined, G.task),
         field('uploaded_at', 'Upload date', 'تاريخ الرفع', 'date', Prisma.sql`(s.uploaded_at AT TIME ZONE 'Africa/Tripoli')::date`, undefined, G.dates),
         field('approved_at', 'Approval date', 'تاريخ الاعتماد', 'date', Prisma.sql`s.approved_at`, undefined, G.dates),
