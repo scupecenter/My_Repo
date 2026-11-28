@@ -6914,6 +6914,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/geo/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The geotag settings of the Media gallery (0.15.539)
+         * @description Every signed-in user may read them. `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit.
+         */
+        get: operations["getMediaGeoSettings"];
+        /**
+         * Set the geotag settings (reason, step-up, If-Match, audited) (0.15.539)
+         * @description A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and invalid values are 422; saving the values in force is 409 `invalid_transition`. Audited `media_geo_update` with before and after.
+         */
+        put: operations["setMediaGeoSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/geo/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How many images have been scanned for a location (0.15.539)
+         * @description Needs `settings` view. `pending` counts the current images without a row yet.
+         */
+        get: operations["getMediaGeoStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/geo/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read the location of older images (0.15.539)
+         * @description A System Admin or an all-regions delegate of `settings` edit. Reads up to `limit` (1 to 200, default 50) images that have no row yet, oldest first, and writes one row each. Nothing in the file or its record changes. Audited in the system log as `media_geo_scan`. Does nothing while the setting is off.
+         */
+        post: operations["scanMediaGeo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/data-quality": {
         parameters: {
             query?: never;
@@ -20316,6 +20380,67 @@ export interface components {
             link: Record<string, never>;
             has_thumbnail: boolean;
             download_url: string;
+            /**
+             * @description 0.15.539.
+             * @enum {string}
+             */
+            media_kind?: "photo" | "panorama" | "drone";
+            /** @description 0.15.539. null until the image is scanned (or when the setting is off). */
+            geo?: {
+                lat: number | null;
+                lon: number | null;
+                altitude_m: number | null;
+                /** Format: date-time */
+                taken_at: string | null;
+                /** @enum {string} */
+                source: "exif" | "device" | "none";
+                make: string | null;
+                model: string | null;
+                width_px: number | null;
+                height_px: number | null;
+                /** @description Metres from the photo to the site. */
+                distance_m: number | null;
+                /** @description distance_m over the setting max_distance_m; null without a distance. */
+                far: boolean | null;
+            } | null;
+        };
+        MediaGeoSettingsInput: {
+            enabled: boolean;
+            max_distance_m: number;
+            flag_missing: boolean;
+            panorama: boolean;
+            panorama_min_ratio: number;
+            panorama_min_width_px: number;
+            drone_makes: string[];
+            reason: string;
+        };
+        /** @description 0.15.539. Setting `media.geotag` (migration 0477). */
+        MediaGeoSettings: {
+            enabled: boolean;
+            max_distance_m: number;
+            flag_missing: boolean;
+            panorama: boolean;
+            panorama_min_ratio: number;
+            panorama_min_width_px: number;
+            drone_makes: string[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: Record<string, never> | null;
+            version: number;
+            can_edit: boolean;
+        };
+        MediaGeoStatus: {
+            scanned: number;
+            with_location: number;
+            panorama: number;
+            drone: number;
+            pending: number;
+            /** Format: date-time */
+            last_scanned_at?: string | null;
+        };
+        MediaGeoScanResult: components["schemas"]["MediaGeoStatus"] & {
+            /** @description Images read by this call. */
+            done: number;
         };
         MediaItemPage: {
             enabled: boolean;
@@ -37112,6 +37237,112 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getMediaGeoSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaGeoSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setMediaGeoSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaGeoSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaGeoSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getMediaGeoStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaGeoStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    scanMediaGeo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description What was done and what is left. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaGeoScanResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getDataQualitySettings: {
         parameters: {
             query?: never;
@@ -37207,6 +37438,10 @@ export interface operations {
                 uploaded_by?: string;
                 uploaded_from?: string;
                 uploaded_to?: string;
+                /** @description 0.15.539. far and near compare the distance to the site with the setting `max_distance_m`; has has a point; missing was scanned and has none; unscanned has no row yet. */
+                geo?: "far" | "near" | "has" | "missing" | "unscanned";
+                /** @description 0.15.539. */
+                media_kind?: "photo" | "panorama" | "drone";
                 q?: string;
                 cursor?: string;
                 limit?: number;

@@ -23,3 +23,12 @@ The image engine ships as an unmodified shared library under LGPL-3.0-or-later; 
 
 ## View modes (Library > Media)
 The Layout panel of the screen offers four modes: grid (cards, the default), list (one row per photo), by site (groups by the site code, photos without a site last) and by date (groups by upload day, newest first). The mode is kept per user in the same server store as the other remembered views (screen key `library-media`), so it follows the person to any device. An address that names a layout (`?layout=list`) wins over the remembered one. Filters, search and saved views apply in every mode, and the original download, record link and state chip are the same in all four. No setting, table or migration is added: the mode is a personal view choice, not a policy.
+
+## Location, panorama and drone files (contract 0.15.539, migration 0477)
+The place a photo was taken is read from the image itself (EXIF GPS, with XMP as a second source) when the file is uploaded. For a snag photo the device point sent with the upload is used when the image has none. Older files are read by an admin scan in Settings. The result is kept in a derived table `media_geo`; the file tables are not changed. The row goes with its file and is covered by the data reset plan.
+
+Each card shows the distance to the site and a "far" flag when it is over the limit set in Settings. A panorama (wide equirectangular ratio and width) or a drone file (maker in the configured list) gets a kind mark. The viewer dialog shows the image, the point on a small map with the site, the distance, height, camera and date. A panorama opens in a drag-to-look viewer (WebGL), with a sideways-scrolling image when the browser has no WebGL.
+
+Filters: location (far, near, has a point, no point, not scanned yet) and kind (photo, panorama, drone). Both are in the filter catalog and saved views. A fourth layout, map, draws the points around their sites.
+
+Settings (Settings > Documents > Media): on/off, far distance in metres, flag files without a point, panorama on/off with minimum ratio and width, drone makers list, a scan button with the count still waiting. A change needs a reason and is audited (`media_geo_update`).

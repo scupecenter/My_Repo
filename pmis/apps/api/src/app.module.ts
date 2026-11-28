@@ -158,6 +158,8 @@ import { DataQualityController } from './data-quality/data-quality.controller';
 import { DataQualityService } from './data-quality/data-quality.service';
 import { MediaController } from './media/media.controller';
 import { MediaService } from './media/media.service';
+import { MediaGeoController } from './media/geo.controller';
+import { GeoService } from './media/geo.service';
 import { SettingsScreensController } from './settings/settings-screens.controller';
 import { SettingsScreensService } from './settings/settings-screens.service';
 import { AlertRulesController } from './settings/alert-rules.controller';
@@ -268,6 +270,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       PartialCreditController, // 0.15.269 progress standards
       DashboardFinanceController, // 0.15.206 (own line: the restricted financial summary)
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
+      MediaGeoController, // 0.15.539 (own line)
       DataQualityController, // 0.15.538
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
@@ -308,6 +311,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       PartialCreditService, // 0.15.269 progress standards
       DashboardFinanceService, // 0.15.206 (own line)
       MediaService, // 0.15.292
+      GeoService, // 0.15.539 (own line)
       DataQualityService, // 0.15.538
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)

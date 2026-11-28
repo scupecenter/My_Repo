@@ -463,6 +463,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/media/items'],
   ['get', '/media/facets'],
   ['get', '/media/items/:kind/:id/thumbnail'],
+  ['get', '/media/geo/settings'],
+  ['put', '/media/geo/settings'],
+  ['get', '/media/geo/status'],
+  ['post', '/media/geo/scan'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/dashboard-target-policy'],
   ['put', '/settings/dashboard-target-policy'],

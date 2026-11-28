@@ -1,3 +1,4 @@
+import { GeoService } from '../media/geo.service';
 import { Injectable, StreamableFile } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -203,6 +204,7 @@ export class DocumentsService {
     private readonly access: AccessService,
     private readonly view: TaskViewService,
     private readonly storage: StorageService,
+    private readonly geo: GeoService,
   ) {}
 
   // ----------------------------------------------------------------------------------------------------------------- task context
@@ -661,6 +663,8 @@ export class DocumentsService {
       await this.storage.store.remove(key).catch(() => undefined);
       throw e;
     }
+    // Media geotag (0477): the point, the capture time and the media kind of an image are read from the bytes in hand (never fails the upload)
+    if (sn.image) await this.geo.record('document_file', fileId, file.buffer, sn.mime);
     // 0555: the uploader may mark this version as the signed and the stamped copy (form fields signed and stamped)
     const flag = (v: unknown) => v === true || v === 'true' || v === '1';
     if (body && (body.signed !== undefined || body.stamped !== undefined)) {

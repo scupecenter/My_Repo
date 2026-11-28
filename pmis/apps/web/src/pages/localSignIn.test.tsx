@@ -370,6 +370,8 @@ describe('hybrid mode list', () => {
       // contract 0.15.292: the media gallery
       'GET /settings/data-quality', 'PUT /settings/data-quality', 'GET /reports/data-quality',
       'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
+      // contract 0.15.539: the media geotag
+      'GET /media/geo/settings', 'PUT /media/geo/settings', 'GET /media/geo/status', 'POST /media/geo/scan',
       'GET /settings/dashboard-target-policy', 'PUT /settings/dashboard-target-policy', 'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',
       'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass', 'GET /settings/passkeys', 'PUT /settings/passkeys', 'GET /me/passkeys', 'POST /me/passkeys/register/options', 'POST /me/passkeys/register/verify', 'DELETE /me/passkeys/:id', 'POST /users/:id/passkeys/revoke',
       // contract 0.15.232 (migration 0243): the workspace logo and where it shows outside the app
