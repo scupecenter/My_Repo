@@ -1,5 +1,6 @@
 // MSW handlers for phase 3b: work calendar, rules, freeze, DLP, idle days, notification policy, log retention,
 // staff visibility, security log, integrity, online now. Synthetic data; validation mirrors the contract.
+import { isSafeTileTemplate } from '@/lib/tileMap';
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, TeamScopeMatch, TeamScopeMatchInput, TeamSpecialization, WeightSet } from '@/api/types';
@@ -21,7 +22,7 @@ const B = API_BASE;
 const TODAY = '2026-10-25';
 const C = () => db().cfg;
 /** W8 (0.15.64): the defaults of the Display menu, the seed look until an admin saves them. */
-const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true }, version: 0 } as TableDisplaySetting);
+const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true }, version: 0 } as TableDisplaySetting);
 /** 0.15.102: the interface features, the seed until an admin saves them. */
 const UF = () => (C().uiFeatures ??= { sections: structuredClone(UI_FEATURES_SEED), version: 0 } as UiFeaturesSetting);
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
@@ -1527,12 +1528,13 @@ export const settingsHandlers = [
     const errs: { path: string; code: string }[] = [];
     for (const k of Object.keys(b)) if (k !== 'defaults' && k !== 'reason') errs.push({ path: `/${k}`, code: 'unknown_key' });
     const d = b.defaults ?? {};
-    for (const k of Object.keys(d)) if (!['size', 'align', 'density', 'wrap', 'zebra'].includes(k)) errs.push({ path: `/defaults/${k}`, code: 'unknown_key' });
+    for (const k of Object.keys(d)) if (!['size', 'align', 'density', 'wrap', 'zebra', 'groupbar'].includes(k)) errs.push({ path: `/defaults/${k}`, code: 'unknown_key' });
     if (!['sm', 'md', 'lg'].includes(String(d.size))) errs.push({ path: '/defaults/size', code: 'invalid' });
     if (!['start', 'center'].includes(String(d.align))) errs.push({ path: '/defaults/align', code: 'invalid' });
     if (!['compact', 'normal', 'comfortable'].includes(String(d.density))) errs.push({ path: '/defaults/density', code: 'invalid' });
     if (typeof d.wrap !== 'boolean') errs.push({ path: '/defaults/wrap', code: 'invalid' });
     if (typeof d.zebra !== 'boolean') errs.push({ path: '/defaults/zebra', code: 'invalid' });
+    if (d.groupbar !== undefined && typeof d.groupbar !== 'boolean') errs.push({ path: '/defaults/groupbar', code: 'invalid' });
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
     if (errs.length) return fields(...errs);
     C().tableDisplay = { defaults: d as TableDisplaySetting['defaults'], version: TD().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();
@@ -1588,6 +1590,15 @@ export const settingsHandlers = [
           if (!['templates', 'uploads', 'exports', 'master_import'].includes(k)) errs.push({ path: `${path}/default_view/${k}`, code: 'unknown_key' });
           else if (!['cards', 'rows', 'table', 'compact'].includes(String(v[k]))) errs.push({ path: `${path}/default_view/${k}`, code: 'invalid' });
         }
+      } else if (name === 'map') {
+        for (const k of Object.keys(o)) if (!['enabled', 'tile_url', 'min_zoom', 'max_zoom', 'attribution', 'center_lat', 'center_lon', 'default_zoom'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });
+        if (typeof o.tile_url !== 'string' || !isSafeTileTemplate(o.tile_url)) errs.push({ path: `${path}/tile_url`, code: 'invalid' });
+        for (const k of ['min_zoom', 'max_zoom', 'default_zoom'] as const) { const n = o[k]; if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 19) errs.push({ path: `${path}/${k}`, code: 'invalid' }); }
+        if (typeof o.min_zoom === 'number' && typeof o.max_zoom === 'number' && o.max_zoom < o.min_zoom) errs.push({ path: `${path}/max_zoom`, code: 'out_of_range' });
+        if (typeof o.attribution !== 'string' || o.attribution.length > 200) errs.push({ path: `${path}/attribution`, code: 'invalid' });
+        if (typeof o.center_lat !== 'number' || o.center_lat < -85 || o.center_lat > 85) errs.push({ path: `${path}/center_lat`, code: 'invalid' });
+        if (typeof o.center_lon !== 'number' || o.center_lon < -180 || o.center_lon > 180) errs.push({ path: `${path}/center_lon`, code: 'invalid' });
       } else if (name === 'finance_hub') {
         for (const k of Object.keys(o)) if (!['widgets', 'settle_warn_days', 'aging_days'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         const w = o.widgets as Record<string, unknown> | undefined;
