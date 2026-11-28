@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { DUPLICATE_EVENT } from '@/lib/registerDuplicate';
 import { isTyping } from '@/lib/shortcuts';
 import { rowFrom, rowsOf, rowText, stepRow } from '@/lib/rowNav';
 
@@ -64,6 +65,9 @@ export function RowActions() {
     items.push({ key: 'open', label: t('rowActions.open'), run: () => row.click() });
     if (link) items.push({ key: 'tab', label: t('rowActions.open_tab'), run: () => window.open(link.href, '_blank', 'noopener') });
     if (pick) items.push({ key: 'select', label: pick.checked ? t('rowActions.unselect') : t('rowActions.select'), run: () => pick.click() });
+    const dup = row.dataset.rowDuplicate;
+    // a register row names its record: the register page starts the copy (the server still decides who may create)
+    if (dup) items.push({ key: 'duplicate', label: t('rowActions.duplicate'), run: () => window.dispatchEvent(new CustomEvent(DUPLICATE_EVENT, { detail: { id: dup } })) });
     items.push({ key: 'copy', label: t('rowActions.copy'), run: () => { void navigator.clipboard?.writeText(rowText(row)).then(() => setNote(t('rowActions.copied'))); } });
   }
   useEffect(() => { if (!note) return; const id = window.setTimeout(() => setNote(''), 1800); return () => window.clearTimeout(id); }, [note]);

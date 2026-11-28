@@ -61,6 +61,7 @@ import {
   useGridColumnMenu,
 } from "@/components/GridColumnAdmin";
 import { HlcLegacyDialog } from "@/components/P4cPanels";
+import { setDuplicateSource, DUPLICATE_EVENT } from "@/lib/registerDuplicate";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
 import { RegisterDrawer, RegisterRecordBody, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
 import {
@@ -439,6 +440,17 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       toast(t("registers.bulk_refused", { list: notDone.join(", ") }), "err");
     setBulk(null);
   };
+  const startCopy = (id: string) => {
+    const src = real.find((x) => x.id === id);
+    if (!src) return;
+    setDuplicateSource(key, src);
+    setRecord("new");
+  };
+  useEffect(() => {
+    const on = (e: Event) => startCopy(String((e as CustomEvent<{ id: string }>).detail?.id ?? ""));
+    window.addEventListener(DUPLICATE_EVENT, on);
+    return () => window.removeEventListener(DUPLICATE_EVENT, on);
+  });
   const colLock = (code: string, locked: boolean, reason: string) =>
     lockCol.mutate(
       { code, locked, reason },
@@ -1140,6 +1152,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                           if (!tmp) setRecord(r.id);
                         }
                       }}
+                      data-row-duplicate={tmp ? undefined : r.id}
                       data-testid={`reg-row-${r.id}`}
                       data-state={r.state}
                       data-locked={r.locked || undefined}
@@ -1232,6 +1245,16 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             >
               {t("registers.void_selected")}
             </button>
+            {picked.size === 1 && (
+              <button
+                type="button"
+                className="btn"
+                data-testid="register-bulk-duplicate"
+                onClick={() => startCopy([...picked][0])}
+              >
+                {t("registers.duplicate")}
+              </button>
+            )}
             {picked.size === 1 && (
               <button
                 type="button"
