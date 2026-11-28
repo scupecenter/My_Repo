@@ -58,7 +58,7 @@ export function TemplatesPage() {
     <div data-testid="page-templates">
       <PageHeader title={t('tpl.title')} subtitle={t('tpl.subtitle')} settings="templates" context={
         <span className="ms-auto flex flex-wrap gap-1">
-          <Link className="btn px-2 py-1 text-xs" to="/templates/mapping" data-testid="tpl-mapping-link">{t('tmap.title')}</Link>
+          <Link className="btn px-2 py-1 text-xs" to="/admin/settings/data/mapping" data-testid="tpl-mapping-link">{t('tmap.title')}</Link>
           {isAdmin(me.data) && <Link className="btn px-2 py-1 text-xs" to="/templates/master-import" data-testid="tpl-master-import-link">{t('mi.title')}</Link>}
         </span>} />
       <div role="tablist" aria-label={t('tpl.title')} className="mb-4 flex gap-1 border-b border-line" data-testid="tpl-tabs">

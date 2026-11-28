@@ -5,7 +5,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useNavLayout } from '@/api/settings';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
-import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
+import { headingIcon, headingName, keysOf, NO_PAGE_GROUPS, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
 import { applySidebarOverlay, sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
 import { SITE_MASTER_SUBMENUS } from '@/lib/siteMasterMenus';
 import { NavLayoutEditor } from './NavLayoutEditor';
@@ -198,8 +198,10 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
   const renderHeading = (h: NavHead | NavSub, sub: boolean): ReactNode => {
     const visible = keysOf(h).filter((k) => byKey(k));
     if (!visible.length) return null;
-    // A heading whose only screen is the Site Register entry is not drawn twice: that entry is the one "Site Master" row (owner request 2026-11-22).
-    const solo = !sub && h.children.length === 1 && (h.children[0] === 'sites' || h.id === 'home');
+    // "Site Master" is a top-level group with no page of its own: its first child is "Site 360°" (the register), then the six sub-menus (Ahmed's decision, 2026-11-27).
+    // A heading with one screen and nothing else is still drawn as that single row (Dashboard has its own first row above and is not in any heading).
+    const siteGroup = !sub && NO_PAGE_GROUPS.includes(h.id);
+    const solo = !sub && h.children.length === 1 && h.id === 'home';
     const open = compact || solo || !collapsed.includes(h.id);
     const hasActive = visible.some((k) => k === activeKey) || (visible.includes('sites') && loc.pathname.startsWith('/sites'));
     const concept = headingIcon(h);
@@ -216,6 +218,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
                     <Link key={k} to={n.to} onClick={close} data-testid={`nav-flyout-${h.id}-${k}`} aria-current={k === activeKey ? 'page' : undefined}
                       className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${k === activeKey ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}><Icon {...ICON_PROPS} size={16} className="shrink-0" />{label(n)}</Link>
                   ); })}
+                  {visible.includes('sites') && <SiteSubmenus onNavigate={close} />}
                 </div>
               )}>
             <div className={`flex w-full items-center gap-1 rounded-md px-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
@@ -224,10 +227,12 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
                 <span className="sr-only">{headingName(h, i18n.language)}</span>
                 <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
               </button>
-              <Link to={`/menu/${h.id}`} onClick={onNavigate} data-testid={`nav-group-open-${h.id}`} aria-current={loc.pathname === `/menu/${h.id}` ? 'page' : undefined} className="flex min-w-0 flex-1 items-center gap-1 py-1">
+{siteGroup
+                ? <span data-testid={`nav-group-name-${h.id}`} className="flex min-w-0 flex-1 items-center gap-1 px-1 py-1 text-xs font-semibold">{Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}<span className="truncate">{headingName(h, i18n.language)}</span></span>
+                :               <Link to={`/menu/${h.id}`} onClick={onNavigate} data-testid={`nav-group-open-${h.id}`} aria-current={loc.pathname === `/menu/${h.id}` ? 'page' : undefined} className="flex min-w-0 flex-1 items-center gap-1 py-1">
                 {Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}
                 <span className="truncate">{headingName(h, i18n.language)}</span>
-              </Link>
+              </Link>}
             </div>
             </SubmenuFlyout>
           )}
