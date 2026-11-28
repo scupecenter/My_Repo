@@ -45,3 +45,19 @@ describe('contractor companies', () => {
     expect((await db.query(`SELECT count(*)::int AS n FROM external_parties`)).rows[0].n).toBe(before.rows[0].n);
   });
 });
+
+describe('company status (K2b, migration 0775)', () => {
+  it('refuses a caller without view, 404 for an unknown company, and returns the status and reason of a company record', async () => {
+    const a = await actor(app, db, { grants: [['sites', 'view']] });
+    expect((await a.api.call('get', '/registers/contractor-companies/00000000-0000-4000-8000-000000000001/status')).status).toBe(403);
+    const api = await loggedIn(app, await makeAdmin(db));
+    expect((await api.call('get', '/registers/contractor-companies/00000000-0000-4000-8000-000000000001/status')).status).toBe(404);
+    const name = `K2B${Date.now()} Co`;
+    const p = await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', false) RETURNING id`, [name]);
+    const none = await api.call('get', `/registers/contractor-companies/${p.rows[0].id}/status`);
+    expect(none.status).toBe(200);
+    expect(none.body).toMatchObject({ status: null, history: [] });
+    const f = await db.query(`SELECT code FROM register_fields WHERE register_key IN ('contractors', 'procurement') AND code IN ('status_reason', 'status_date', 'po_value', 'po_currency') ORDER BY code`);
+    expect(f.rows.map((r) => r.code)).toEqual(['po_currency', 'po_value', 'status_date', 'status_reason']);
+  });
+});

@@ -98,6 +98,8 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 - Each agent writes only in its own folders (`ORCHESTRATION.md`).
 - Unknown business rule → add it to `docs/spec/open-questions.md` and use a configurable default. Never invent one.
 
+- Company status (K2b, 0775): a Suspended or Blacklisted company needs a reason and a date; `GET /registers/contractor-companies/{id}/status` returns the status and history (approver = approving person of the version); the order screen warns. Procurement has `po_value` and `po_currency`. Spec: `docs/plans/specs/k2b-company-status-orders.md`.
+
 ## 7. Next
 
 There is no fixed list here any more. Open work is in the open pull requests and in the `open` (مفتوح) lines of the newest `CHANGELOG.md` entries. Still planned for a later phase: the CPE / end-user installation module and the mobile app.

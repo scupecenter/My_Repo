@@ -1,6 +1,6 @@
 # Spec: company status details, order warning and order value (K2b, automation 2, gap 5)
 
-Status: DRAFT-SPEC. Approved by the owner (relayed by Main 2026-11-28 15:32: "build now, nothing dropped"). Source of the requirement text: docs/plans/2026-11-28-companies-report-center-automation.md (K2b, automation item 2, gap review item 5). Code follows in the same PR after the spec is read.
+Status: DRAFT (spec and first code). Approved by the owner (relayed by Main 2026-11-28 15:32: "build now, nothing dropped"). Source of the requirement text: docs/plans/2026-11-28-companies-report-center-automation.md (K2b, automation item 2, gap review item 5). Migration 0775 (mirror db/sql/774) and the first code are in this PR.
 
 ## Requirement (as written in the plan)
 K2b: reason, date and approver for suspend and blacklist (additive fields); a warning when a purchase request or order picks such a company; duplicate check; order value field; status history line. Blocking on new orders already exists (a suspended or blacklisted company deactivates its party, Q294) and is not rebuilt.
@@ -31,3 +31,11 @@ API: fields saved and required when suspended; approver set by the server; warni
 Connections checked: Q294 deactivation, #620 compliance chip, #621 tabs, procurement register, audit log.
 Docs in this PR: this spec, plan table row K2b, HANDOVER and relations-map lines (with the code).
 Arabic changelog entry (PR body only): تفاصيل حالة الشركة (السبب والتاريخ والمعتمد)، تحذير عند اختيار شركة موقوفة أو في القائمة السوداء، فحص التكرار، وقيمة أمر الشراء.
+
+## As built (differences from the design)
+- No typed approver field: the approver is the approving person of the record version (`approved_by`), read by `company_status_json` into the status history. Nothing typed, nothing to forge.
+- `status_reason` and `status_date` are required at submit only when the status is Suspended or Blacklisted (the validation function is patched in place; the migration stops loudly if its anchors are missing).
+- Warning: `GET /registers/contractor-companies/{id}/status` (view on Procurement, GECOL, HLC or Contractors) and a warning chip beside the company of an order. A suspended company is already inactive and not in the pick list, so the chip shows on an existing order whose company was suspended later.
+- Duplicate check: already enforced today as an error on the exact company name (024, 'This company is registered already.'); not rebuilt. Registration number does not exist as a field, so name only (question 2 answered by the data).
+- Order value: `po_value` and `po_currency` (LYD, USD, EUR) are register fields on Procurement, shown by the generic form.
+- Not in this commit: the status history line and the Orders tab totals on `/companies/:id` (that page is #621); the history is already returned by the endpoint. Warehouse PO value display follows.

@@ -243,6 +243,22 @@ export class RegistersService {
     return { items: rows };
   }
 
+  /**
+   * K2b (migration 0775): the status of one company with its reason, date and the status history (approver = the approving person of the version).
+   * Read only, for the warning on a Procurement order. Same access as the company list above.
+   */
+  async companyStatus(auth: AuthContext, id: string): Promise<{ status: string | null; reason: string | null; date: string | null; history: unknown[] }> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw problems.notFound('The company does not exist.');
+    const mods = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`
+      SELECT module_key FROM register_definitions WHERE register_key IN ('procurement', 'gecol', 'hlc', 'contractors') AND is_active AND enabled`);
+    let ok = false;
+    for (const m of mods) if (await this.access.hasGrant(auth, m.module_key, 'view')) { ok = true; break; }
+    if (!ok) throw problems.forbidden('action_forbidden', 'You need view on Procurement, GECOL, HLC or Contractors.');
+    const r = await this.db.tx.$queryRaw<{ j: { status: string | null; reason: string | null; date: string | null; history: unknown[] } | null }[]>(Prisma.sql`SELECT company_status_json(${id}::uuid) AS j`);
+    if (!r[0]?.j) throw problems.notFound('The company does not exist.');
+    return r[0].j;
+  }
+
   async list(auth: AuthContext): Promise<{ items: unknown[] }> {
     const defs = await this.db.tx.$queryRaw<DefRow[]>(Prisma.sql`
       SELECT register_key, name_en, name_ar, module_key, site_scoped, multiple_per_site, record_types, approval_levels, triage_enabled

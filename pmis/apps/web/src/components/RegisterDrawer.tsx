@@ -17,6 +17,7 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { FieldInput, fieldLabel, issueText, showValue, SiteCodeField, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
+import { CompanyStatusWarning } from './CompanyStatusWarning';
 import { DrawerFrame, DrawerTabs, panelProps, useDrawerSettled, useReportDirty } from './DrawerFrame';
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
@@ -408,8 +409,9 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
                     {party && !(companies.data ?? []).some((c) => c.id === party) && record?.external_party && <option value={party}>{record.external_party.name}</option>}
                   </select>
                   <p className="text-xs text-mute">{t('registers.contractor_hint')}</p>
+                  <CompanyStatusWarning partyId={party} />
                 </div>
-              ) : <div className="font-semibold" data-testid="reg-view-contractor">{(rk === 'procurement' ? record?.external_party?.name : record?.procurement_contractor?.name) ?? '—'}</div>}
+              ) : <div><div className="font-semibold" data-testid="reg-view-contractor">{(rk === 'procurement' ? record?.external_party?.name : record?.procurement_contractor?.name) ?? '—'}</div>{rk === 'procurement' && <CompanyStatusWarning partyId={record?.external_party?.id} />}</div>}
             </section>
           )}
         </form>
