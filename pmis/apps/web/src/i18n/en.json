@@ -2282,6 +2282,10 @@
     "bulk_set_pick": "Choose a field",
     "bulk_set_apply": "Apply to {{count}}",
     "bulk_exported": "Exported {{count}} rows",
+    "new_more": "More ways to add",
+    "new_blank": "New blank record",
+    "new_import": "Import rows from the template",
+    "new_import_off": "This register has no template yet, so there is nothing to import.",
     "tab_asb_cw": "BOQ CW (civil works)",
     "tab_asb_te": "BOQ TE (equipment)",
     "tab_dis_cw": "Dismantle CW",
@@ -7230,6 +7234,16 @@
     "display_pin": "Freeze the first columns"
   },
   "regviews": {
+    "board_drag_note": "Drag a card to another column to change its status. A refused drop says why.",
+    "drag_state": "The approval state moves only through the record's own actions.",
+    "drag_same": "Already in this column.",
+    "drag_locked": "This record is locked.",
+    "drag_field_locked": "This status field is locked.",
+    "drag_no_edit": "You cannot edit this record now.",
+    "drag_required": "This status cannot be empty.",
+    "moved": "Status changed.",
+    "preview_hint": "Space or Escape closes the preview.",
+    "preview_open": "Open the record",
     "group_record": "Record",
     "group_workflow": "Workflow",
     "record": "Record",
@@ -8762,5 +8776,6 @@
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
   },
-  "activity": {"title": "Activity", "filter": "Filter the activity", "kind_all": "All", "kind_comment": "Comments", "kind_step": "Workflow", "kind_change": "Field changes", "empty": "No activity yet."}
+  "activity": {"title": "Activity", "filter": "Filter the activity", "kind_all": "All", "kind_comment": "Comments", "kind_step": "Workflow", "kind_change": "Field changes", "empty": "No activity yet."},
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
 }

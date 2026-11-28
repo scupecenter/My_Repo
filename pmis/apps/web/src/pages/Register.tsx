@@ -63,6 +63,9 @@ import {
 import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
 import { BulkSetFieldDialog } from "@/components/BulkSetFieldDialog";
+import { RegisterQuickPreview } from "@/components/RegisterQuickPreview";
+import { SplitNewButton } from "@/components/SplitNewButton";
+import { WhatsNewHint } from "@/components/WhatsNewHint";
 import { RegisterDrawer, RegisterRecordBody, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
 import {
   ALL_CAP,
@@ -400,6 +403,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const [bulk, setBulk] = useState<null | "lock" | "unlock" | "void">(null);
   const [pickOpen, setPickOpen] = useState(false);
   const [bulkSet, setBulkSet] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [colDlg, setColDlg] = useState<null | {
     code: string;
     locked: boolean;
@@ -477,6 +481,31 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     a.click();
     URL.revokeObjectURL(url);
     toast(t("registers.bulk_exported", { count: picked.size }));
+  };
+  // a card dragged to another board column: the status field is saved through the normal edit path (If-Match); the server may still refuse; undo for 8 seconds
+  const moveCard = (r: RegisterRecord, code: string, value: string | null) => {
+    const before = r.data[code];
+    save.mutate(
+      { record: r, patch: { data: { [code]: value } } },
+      {
+        onError: (e) => toast(registerErrorMessage(t, e), "err"),
+        onSuccess: (saved) =>
+          toast(t("regviews.moved"), "ok", {
+            ms: 8000,
+            action: {
+              label: t("common.undo"),
+              onClick: () =>
+                save.mutate(
+                  { record: saved, patch: { data: { [code]: before ?? null } } },
+                  {
+                    onSuccess: () => toast(t("registers.inline_undone")),
+                    onError: (e) => toast(registerErrorMessage(t, e), "err"),
+                  },
+                ),
+            },
+          }),
+      },
+    );
   };
   const colLock = (code: string, locked: boolean, reason: string) =>
     lockCol.mutate(
@@ -808,14 +837,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           />
         }
         primary={
-          <button
-            className="btn btn-primary"
-            data-testid="register-new"
-            onClick={() => setRecord("new")}
-          >
-            <Plus size={16} />
-            {t("registers.new")}
-          </button>
+          <SplitNewButton
+            onNew={() => setRecord("new")}
+            onImport={() => setUploading(true)}
+            canImport={!!tpl}
+          />
         }
         columns={view === "vertical" ? <ColumnMenu density={false} api={tbl} label={label} /> : undefined}
         exporter={
@@ -965,6 +991,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       {key === "hlc" && (
         <HlcLegacyDialog open={legacy} onClose={() => setLegacy(false)} />
       )}
+      <WhatsNewHint id="register-board-preview-2026-11">{t("whatsnew.register_traits")}</WhatsNewHint>
       <ActiveChips chips={chips} onClear={clearAll} />
       {view === "grid" && (
         <RegisterGrid
@@ -1113,6 +1140,10 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
               partial={partial}
+              admin={admin}
+              onMove={moveCard}
+              onRefused={(why) => toast(why, "err")}
+              onPreview={setPreviewId}
             />
           )}
           {layout === "feed" && (
@@ -1176,7 +1207,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                           e.target === e.currentTarget
                         ) {
                           e.preventDefault();
-                          if (!tmp) setRecord(r.id);
+                          // Enter opens the record, Space shows the quick preview
+                          if (!tmp) {
+                            if (e.key === " ") setPreviewId(r.id);
+                            else setRecord(r.id);
+                          }
                         }
                       }}
                       data-testid={`reg-row-${r.id}`}
@@ -1321,6 +1356,12 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             fields={fieldCols.filter((c) => INLINE_TYPES.includes(c.type) && !c.read_only)}
             onClose={() => setBulkSet(false)}
             onApply={(c, v) => void runBulkSet(c, v)}
+          />
+          <RegisterQuickPreview
+            def={def}
+            record={real.find((x) => x.id === previewId) ?? null}
+            onClose={() => setPreviewId(null)}
+            onOpen={setRecord}
           />
           <RejectDialog
             open={bulk !== null}
