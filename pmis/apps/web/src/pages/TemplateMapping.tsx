@@ -7,7 +7,6 @@ import {
   useImportAliases, useSaveAlias, useSaveMapping, useTemplateMapping,
   type ImportAlias, type TemplateMappingChange, type TemplateMappingResult, type TemplateTaskField,
 } from '@/api/masterImport';
-import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -20,13 +19,13 @@ const fieldErrors = (e: unknown): string[] => (e instanceof ApiError && Array.is
  * Q207 (contract 0.12.8): the template mapping screen, and Q8 / Q10: the role and region aliases of the import. Every change needs a reason; a test runs the
  * change and shows its impact without saving; a save issues the next template versions. The database refuses a calculated field as a typed column.
  */
-export function TemplateMappingPage() {
+export function TemplateMappingPanel() {
   const { t } = useTranslation();
   const [sp, setSp] = useSearchParams();
   const tab = (TABS as readonly string[]).includes(sp.get('tab') ?? '') ? (sp.get('tab') as Tab) : 'fields';
   return (
     <div data-testid="page-template-mapping">
-      <PageHeader title={t('tmap.title')} subtitle={t('tmap.subtitle')} settings="template_mapping" />
+      <p className="mb-3 text-sm text-mute">{t('tmap.subtitle')}</p>
       <div role="tablist" className="mb-3 flex gap-1">
         {TABS.map((x) => (
           <button key={x} role="tab" aria-selected={tab === x} data-testid={`tmap-tab-${x}`} className={`btn px-3 py-1 text-sm ${tab === x ? 'btn-primary' : ''}`}

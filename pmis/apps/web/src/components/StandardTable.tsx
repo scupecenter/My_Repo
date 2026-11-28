@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import type { ColDef } from '@/lib/tablePrefs';
@@ -30,7 +30,7 @@ export type StdCol<T> = {
   multi?: boolean;
 };
 
-export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId, rowAttrs, noun = 'items', loading, error, onRetry, empty, onOpen, activeId, extra, primary, more, exportName, query, onQuery, searchTestId, hasMore, onMore, loadingMore, total, children }: {
+export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId, rowAttrs, views, filter, rowExpand, headTestId, noun = 'items', loading, error, onRetry, empty, onOpen, activeId, extra, primary, more, exportName, query, onQuery, searchTestId, hasMore, onMore, loadingMore, total, children }: {
   screen: string;
   testid: string;
   cols: StdCol<T>[];
@@ -47,6 +47,14 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
   activeId?: string | null;
   /** quick filters of the screen, placed with the search */
   extra?: ReactNode;
+  /** saved views of the screen (P9: the warehouse tabs keep theirs), first in the toolbar */
+  views?: ReactNode;
+  /** the + Filter tree of the screen, where it has one */
+  filter?: ReactNode;
+  /** a test id for the header cell of a column */
+  headTestId?: (id: string) => string | undefined;
+  /** a panel opened in place under a row (an inline edit); null for the rows that have none */
+  rowExpand?: (r: T) => ReactNode;
   primary?: ReactNode;
   more?: ReactNode;
   exportName: string;
@@ -76,6 +84,8 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
   const exportCols = tbl.cols.map((c) => byId.get(c.id)).filter((c): c is StdCol<T> => !!c && !c.action);
   const bar = (
     <TableToolbar testid={`${testid}-toolbar`} kind="grid"
+      views={views}
+      filter={filter}
       search={<SearchBox value={q} onChange={setQ} testid={searchTestId ?? `${testid}-search`} placeholder={t('tstd.search_table')} />}
       extra={extra}
       count={<TableCount testid={`${testid}-count`} noun={noun} total={total ?? rows.length} filtered={needle ? shown.length : total ?? rows.length} active={!!q.trim()} onClear={() => setQ('')} />}
@@ -91,12 +101,13 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
       {bar}
       {children}
       <div className="card overflow-x-auto" role="table" aria-label={testid} {...displayAttrs(tbl.display)}>
-        <HeaderRow api={tbl} label={label} testid={`${testid}-head`} />
+        <HeaderRow api={tbl} label={label} testid={`${testid}-head`} colTestId={headTestId} />
         <div role="rowgroup" data-testid={`${testid}-body`}>
           {shown.map((r) => {
             const id = rowId(r), on = id === activeId;
             return (
-              <div key={id} role="row" tabIndex={onOpen ? 0 : undefined} data-testid={rowTestId ? rowTestId(r) : `${testid}-row-${id}`} aria-selected={onOpen ? on : undefined} {...rowAttrs?.(r)}
+              <Fragment key={id}>
+              <div role="row" tabIndex={onOpen ? 0 : undefined} data-testid={rowTestId ? rowTestId(r) : `${testid}-row-${id}`} aria-selected={onOpen ? on : undefined} {...rowAttrs?.(r)}
                 onClick={onOpen ? () => onOpen(r) : undefined} onKeyDown={onOpen ? (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(r); } : undefined}
                 style={{ gridTemplateColumns: tracks(tbl.cols, false), minWidth: totalWidth(tbl.cols, false) }}
                 className={`grid items-start border-b border-line text-sm ${rowPad(tbl.density)} ${onOpen ? 'cursor-pointer' : ''} ${on ? 'bg-accentSoft' : 'bg-card hover:bg-hover'}`}>
@@ -105,6 +116,8 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
                   return <div key={c.id} role="cell" data-col={c.id} className={`min-w-0 px-2 ${byId.get(c.id)?.multi ? 'py-1' : 'truncate'} ${p.className}`} style={p.style}>{byId.get(c.id)?.cell(r)}</div>;
                 })}
               </div>
+              {rowExpand?.(r)}
+              </Fragment>
             );
           })}
         </div>

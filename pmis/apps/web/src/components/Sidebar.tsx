@@ -86,7 +86,12 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
   const nav = useMemo(() => sanitizeUiNav(side ?? {}), [side]);
   const badgeStyle = nav.badge_style ?? 'full';
   const hiddenSet = useMemo(() => new Set(nav.hidden ?? []), [nav]);
-  const layout = useMemo(() => applySidebarOverlay(resolveLayout(saved), nav), [saved, nav]);
+  // Dashboard is the fixed first entry (own row above Favourites and Recent): it leaves the headings, whatever the layout or the personal choices say.
+  const layout = useMemo(() => {
+    const l = applySidebarOverlay(resolveLayout(saved), nav);
+    const strip = (cs: (string | NavSub)[]): (string | NavSub)[] => cs.filter((c) => c !== 'dashboard').map((c) => (typeof c === 'string' ? c : { ...c, children: c.children.filter((k) => k !== 'dashboard') }));
+    return { headings: l.headings.map((h) => ({ ...h, children: strip(h.children) })) };
+  }, [saved, nav]);
   const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(() => loadList(K.collapsed));
   const [sitesOpen, setSitesOpen] = useState<boolean>(() => loadPref<boolean>(K.sites, true) !== false);
@@ -248,6 +253,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
           </div>
         ) : (
           <>
+            {byKey('dashboard') && <div className="mb-2 border-b border-line pb-2" data-testid="nav-first">{row(byKey('dashboard')!, { testid: 'nav-dashboard' })}</div>}
             {!compact && favItems.length > 0 && (
               <div className="mb-3" data-testid="nav-favourites">
                 <div className="px-2 py-1 text-xs font-semibold text-mute">{t('nav.favourites')}</div>
