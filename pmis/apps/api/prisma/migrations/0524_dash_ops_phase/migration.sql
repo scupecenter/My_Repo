@@ -6,7 +6,7 @@
 -- appears by default. One setting is added: dashboard.target_policy {manual_override: false}, with its read and write doors (a reason of 3+ characters, the version, one audit row dashboard_target_policy_update with before and after), written like dashboard.view_defaults (0510). No table, no grant and no permission change; the figures come from the sites table
 -- through GET /dashboard/ops.
 
-mpotent: nothing happens when the card is already there.
+-- Idempotent: nothing happens when the card is already there.
 DO $$
 DECLARE def text;
 BEGIN
