@@ -232,6 +232,13 @@ describe('Q12 and Q111: Meetings with structured fields', () => {
     expect(real.body.refs.files[file.rows[0].id]).toBe('minutes.pdf');
     const done = await approveFlex(t, res.body.id, real.body.version);
     expect(done.state).toBe('approved');
+    // LIB-1: a newer version of the same file replaces the old one and the field follows it (name and latest id), the stored id stays
+    const v2 = await db.query(`INSERT INTO document_files (slot_id, file_group_id, version, original_name, stored_name, storage_key, mime_type, size_bytes, sha256, uploaded_by)
+      SELECT slot_id, file_group_id, 2, 'minutes-v2.pdf', 'minutes-v2.pdf', $2, mime_type, 10, 'y', uploaded_by FROM document_files WHERE id = $1 RETURNING id`, [file.rows[0].id, `p5/${U}/v2`]);
+    await db.query('UPDATE document_files SET superseded_by = $2 WHERE id = $1', [file.rows[0].id, v2.rows[0].id]);
+    const moved = await t.entry.api.call('get', recPath('meetings', res.body.id));
+    expect(moved.body.refs.files[file.rows[0].id]).toBe('minutes-v2.pdf');
+    expect(moved.body.refs.files_latest[file.rows[0].id]).toBe(v2.rows[0].id);
   });
 
   it('converts the old text once, after review, without duplicating an action; the proposal saves nothing', async () => {

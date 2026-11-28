@@ -26,7 +26,7 @@ describe('the layout model (lib/navLayout)', () => {
     const d = defaultLayout();
     expect(d.headings.map((h) => h.id)).toEqual(['home', 'work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs']);
     expect(d.headings[0]!.children).toEqual(['dashboard']); // Dashboard is the first main entry on its own (owner, 2026-11-25)
-    expect(d.headings[2]).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] });
+    expect(d.headings[2]).toMatchObject({ name_en: 'Site Master', name_ar: 'سجل المواقع', children: ['sites'] });
     expect(d.headings[1]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'messages', 'absence']);
     expect(resolveLayout(null)).toEqual(d);
   });
@@ -127,7 +127,7 @@ describe('the side menu with a shared layout', () => {
       headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle').reverse() } : h)),
     };
     const r = resolveLayout(saved);
-    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] }); // a layout saved under the old name shows the current one
+    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'Site Master', name_ar: 'سجل المواقع', children: ['sites'] }); // a layout saved under the old name shows the current one
     const regs = r.headings.find((h) => h.id === 'registers')!;
     expect(regs.children.at(-1)).toBe('dismantle');
     expect(regs.children.filter((k) => k === 'dismantle')).toHaveLength(1);
@@ -151,15 +151,14 @@ describe('the side menu with a shared layout', () => {
     expect(r3.headings[0]!.children).toEqual(['dismantle']);
   });
 
-  it('a saved Site Master heading holding sites and dismantle renders as the one Site Master row, with six sub-menus and Dismantle under Registers & Logs', async () => {
+  it('a saved Site Master heading holding sites and dismantle renders as the Site Master group: Site 360° then six sub-menus and Dismantle under Registers & Logs', async () => {
     const d = defaultLayout();
     store({ headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', name_ar: 'سايت 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle') } : h)) });
     await signIn('pm');
     app();
     await screen.findByTestId('nav-sites');
-    expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
     expect(screen.queryByText('SITE 360')).not.toBeInTheDocument();
-    expect(screen.getByTestId('nav-sites')).toHaveTextContent(/^Site Master$/);
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent(/^Site 360°$/);
     expect(screen.getByTestId('nav-site-master-menus').querySelectorAll('a')).toHaveLength(6);
     expect(screen.queryByTestId('nav-site-master-dismantle')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-group-registers')).toContainElement(screen.getByTestId('nav-dismantle'));
@@ -194,7 +193,9 @@ describe('the side menu with a shared layout', () => {
     expect(screen.getByTestId('nav-group-toggle-talk')).toHaveTextContent('تواصل');
     const day = screen.getByTestId('nav-group-day');
     expect(within(day).getByTestId('nav-group-talk')).toContainElement(screen.getByTestId('nav-inbox'));
-    expect(keysIn('nav-group-day')).toEqual(['nav-dashboard', 'nav-messages', 'nav-inbox', 'nav-my_work']);
+    // Dashboard is the fixed first row above the groups (nav-first), not a child of any heading
+    expect(keysIn('nav-group-day')).toEqual(['nav-messages', 'nav-inbox', 'nav-my_work']);
+    expect(screen.getByTestId('nav-first')).toContainElement(screen.getByTestId('nav-dashboard'));
     expect(screen.getByTestId('nav-edit')).toHaveTextContent('تعديل القائمة');
   });
 

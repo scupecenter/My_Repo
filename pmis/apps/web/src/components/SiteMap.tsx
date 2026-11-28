@@ -251,7 +251,7 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
 
       <p className="mt-2 text-sm text-mute" data-testid="map-no-coords">
         {noCoords > 0
-          ? <Link className="text-link hover:underline" to="/sites?coordinates=missing" data-testid="map-no-coords-link">{t('siteMap.no_coords', { count: noCoords })}</Link>
+          ? <Link className="text-link underline" to="/sites?coordinates=missing" data-testid="map-no-coords-link">{t('siteMap.no_coords', { count: noCoords })}</Link>
           : t('siteMap.all_coords')}
         {' · '}{t('siteMap.offline_note')}
       </p>

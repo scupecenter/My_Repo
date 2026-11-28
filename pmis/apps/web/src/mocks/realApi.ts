@@ -322,6 +322,11 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/warehouse/dispatch-status/:id'],
   ['get', '/warehouse/region-vendors'],
   ['put', '/warehouse/region-vendors/:id'],
+  ['get', '/warehouse/reorder-limits'],
+  ['put', '/warehouse/reorder-limits/:id'],
+  ['get', '/warehouse/rma'],
+  ['post', '/warehouse/rma'],
+  ['post', '/warehouse/rma/:id/status'],
   ['get', '/warehouse/config-gaps'],
   // Contract 0.13.1 (follow-up B, Q270, migration 0067): the quarantine exit documents.
   ['post', '/warehouse/quarantine-exits'],
@@ -541,6 +546,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/site-master/columns/:ord/reactivate'],
   ['get', '/custom-fields'],
   ['get', '/custom-fields/:id'],
+  ['post', '/custom-fields'],
+  ['patch', '/custom-fields/:id'],
   ['get', '/site-master/sites/:siteId/sources'],
   ['post', '/sites/:id/admin-edits'],
   ['get', '/sites/:id/admin-edits'],
@@ -674,6 +681,7 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.67 (migration 0149): My Work > Daily Plan and its settings.
   ['get', '/daily-plans'],
   ['get', '/daily-plans/export'],
+  ['post', '/daily-plans/import'],
   ['post', '/daily-plans/:date/regions/:regionId/sites'],
   ['patch', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
   ['delete', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
@@ -714,6 +722,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/settings/data-reset/requests/:id/cancel'],
   ['post', '/settings/data-reset/requests/:id/run'],
   ['post', '/settings/data-reset/requests/:id/retry-files'],
+  ['post', '/settings/data-reset/requests/:id/archive'],
+  ['get', '/settings/data-reset/requests/:id/archive/download'],
   // Contract 0.15.70 (migration 0151; apps/api: library): Library > Forms and Archive, Settings > Documents > Form templates and Archive (W5).
   ['get', '/library/forms'],
   ['post', '/library/forms/:id/preview'],

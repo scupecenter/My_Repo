@@ -60,6 +60,33 @@ const seqPatch = z
 const vendorPut = z
   .object({ wl_vendor: z.enum(["Cambium", "Intracom"]).nullable(), reason })
   .strict();
+const limitPut = z
+  .object({
+    reorder_level: z.number().min(0).max(999_999_999).nullable(),
+    reorder_qty: z.number().gt(0).max(999_999_999).nullable().optional(),
+    reason,
+  })
+  .strict();
+const RMA_STATUSES = ["sent", "replaced", "credited", "rejected", "closed"];
+const rmaCreate = z
+  .object({
+    item_id: uuidSchema,
+    qty: z.number().gt(0).max(999_999_999),
+    supplier: z.string().trim().min(1).max(200),
+    reason,
+    movement_id: uuidSchema.nullable().optional(),
+    sent_on: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+  })
+  .strict();
+const rmaStatus = z
+  .object({
+    status: z.enum(["replaced", "credited", "rejected", "closed"]),
+    note: z.string().trim().max(1000).optional(),
+  })
+  .strict();
 const NEED_STATUSES = [
   "complete",
   "short",
@@ -163,6 +190,85 @@ export class WarehouseConfigService {
     const b = parse(vendorPut, raw);
     return this.call(
       Prisma.sql`SELECT admin_save_region_vendor(${Number(rawRegion)}::int, ${b.wl_vendor}::text, ${b.reason}::text, ${version}::int) AS r`,
+    );
+  }
+
+  // ------------------------------------------------------------------ reorder limits (contract 0.15.342)
+  /** Items with a reorder limit, with the available stock; `below_reorder` is true when the stock is at or under the level. Needs the warehouse view. */
+  async listReorderLimits(
+    auth: AuthContext,
+    q: Query,
+  ): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions("warehouse", "view");
+    const below = oneParam(q, "below") === "true";
+    const rows = await this.db.tx.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+      SELECT l.item_id::text AS item_id, i.item_code, i.name AS item_name, i.unit AS uom, l.reorder_level::float8 AS reorder_level, l.reorder_qty::float8 AS reorder_qty,
+        coalesce(s.available, 0)::float8 AS available, (coalesce(s.available, 0) <= l.reorder_level) AS below_reorder, l.version
+      FROM warehouse_reorder_limits l JOIN warehouse_items i ON i.id = l.item_id LEFT JOIN wh_stock_levels(NULL::uuid, NULL::uuid) s ON s.item_id = l.item_id
+      WHERE i.is_active ${below ? Prisma.sql`AND coalesce(s.available, 0) <= l.reorder_level` : Prisma.empty}
+      ORDER BY i.item_code COLLATE "C"`);
+    return { items: rows };
+  }
+
+  async putReorderLimit(
+    rawItem: string,
+    ifMatch: string | undefined,
+    raw: unknown,
+  ): Promise<unknown> {
+    const version =
+      ifMatch === undefined || ifMatch.trim() === ""
+        ? null
+        : parseIfMatch(ifMatch);
+    await this.access.requireAdmin("warehouse_items", "edit");
+    if (!uuidSchema.safeParse(rawItem).success)
+      throw problems.notFound("Unknown item.");
+    const b = parse(limitPut, raw);
+    return this.call(
+      Prisma.sql`SELECT admin_save_reorder_limit(${rawItem}::uuid, ${b.reorder_level}::numeric, ${b.reorder_qty ?? null}::numeric, ${b.reason}::text, ${version}::int) AS r`,
+    );
+  }
+
+  // ------------------------------------------------------------------ supplier returns (RMA, contract 0.15.342)
+  async listRma(auth: AuthContext, q: Query): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions("warehouse", "view");
+    const status = oneParam(q, "status");
+    if (status !== undefined && !RMA_STATUSES.includes(status))
+      throw problems.validation([
+        { path: "/status", code: "invalid", message: "sent, replaced, credited, rejected or closed." },
+      ]);
+    const rows = await this.db.tx.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+      SELECT r.id::text AS id, r.rma_no, r.item_id::text AS item_id, i.item_code, i.name AS item_name, r.qty::float8 AS qty, r.supplier, r.status, r.reason,
+        r.movement_id::text AS movement_id, r.sent_on::text AS sent_on, r.resolved_on::text AS resolved_on, r.resolution_note, r.version, r.created_at
+      FROM wh_rma r JOIN warehouse_items i ON i.id = r.item_id
+      ${status ? Prisma.sql`WHERE r.status = ${status}` : Prisma.empty}
+      ORDER BY r.created_at DESC, r.rma_no DESC LIMIT 500`);
+    return { items: rows };
+  }
+
+  async createRma(auth: AuthContext, raw: unknown): Promise<unknown> {
+    await this.access.requireRegions("warehouse", "view");
+    const b = parse(rmaCreate, raw);
+    return this.call(
+      Prisma.sql`SELECT wh_rma_create(${b.item_id}::uuid, ${b.qty}::numeric, ${b.supplier}::text, ${b.reason}::text, ${b.movement_id ?? null}::uuid, ${b.sent_on ?? null}::date) AS r`,
+    );
+  }
+
+  async setRmaStatus(
+    auth: AuthContext,
+    rawId: string,
+    ifMatch: string | undefined,
+    raw: unknown,
+  ): Promise<unknown> {
+    await this.access.requireRegions("warehouse", "view");
+    const version =
+      ifMatch === undefined || ifMatch.trim() === ""
+        ? null
+        : parseIfMatch(ifMatch);
+    if (!uuidSchema.safeParse(rawId).success)
+      throw problems.notFound("Unknown RMA.");
+    const b = parse(rmaStatus, raw);
+    return this.call(
+      Prisma.sql`SELECT wh_rma_set_status(${rawId}::uuid, ${b.status}::text, ${b.note ?? null}::text, ${version}::int) AS r`,
     );
   }
 
