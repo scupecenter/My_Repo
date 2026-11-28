@@ -286,6 +286,7 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
   { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
   { key: 'media.thumbnails_per_minute', group: 'media', unit: 'per_minute', default: 120, min: 0, max: 6000 },
+  { key: 'registers.custom_max', group: 'registers', unit: 'registers', default: 20, min: 1, max: 100 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
