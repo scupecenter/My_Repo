@@ -69,6 +69,46 @@ describe('Settings, data reset', () => {
     expect(screen.getByTestId('dr-restore')).toHaveTextContent('db-restore.sh');
   });
 
+  it('archive before delete (0.15.266): the form offers three modes (download once is the default); the run waits for the archive, which is made, downloaded once, then the run is open', async () => {
+    await signIn('pm'); await stepUpDone();
+    await api.post('/__mock/data-reset/request-by-other', { body: { archive: 'download' } });
+    const u = userEvent.setup();
+    page();
+    expect(await screen.findByTestId('dr-request-archive')).toHaveAttribute('data-mode', 'download');
+    expect(screen.getByTestId('dr-archive-state')).toHaveTextContent(en.dr.archive_after_approval);
+    await u.click(screen.getByTestId('dr-approve'));
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+    expect(screen.getByTestId('dr-archive-state')).toHaveTextContent(en.dr.archive_not_made);
+    expect(screen.getByTestId('dr-run')).toBeDisabled();                          // the run waits for the archive
+    const make = screen.getByTestId('dr-archive-make');
+    expect(make).toHaveAttribute('aria-label', en.dr.archive_make);
+    expect(make).toHaveAttribute('title', en.dr.archive_make_hint);
+    await u.click(make);
+    await waitFor(() => expect(screen.getByTestId('dr-request-archive')).toHaveAttribute('data-status', 'ready'));
+    expect(screen.getByTestId('dr-archive-need-download')).toBeInTheDocument();    // mode download: once is required
+    expect(screen.getByTestId('dr-run')).toBeDisabled();
+    const dl = screen.getByTestId('dr-archive-download-btn');
+    expect(dl).toHaveAttribute('aria-label', en.dr.archive_download_btn);
+    expect(dl).toHaveAttribute('title', en.dr.archive_download_btn_hint);
+    await u.click(dl);
+    await waitFor(() => expect(screen.getByTestId('dr-run')).toBeEnabled());
+    expect(screen.queryByTestId('dr-archive-need-download')).not.toBeInTheDocument();
+  });
+
+  it('archive before delete: the new request form carries the choice (EN and AR), download once by default, none is sent as chosen', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page({ locale: 'ar' });
+    expect(await screen.findByTestId('dr-archive-choice')).toHaveAttribute('data-mode', 'download');
+    expect(screen.getByTestId('dr-archive-choice')).toHaveTextContent(ar.dr.archive_choice);
+    expect(screen.getByTestId('dr-archive-restore-note')).toHaveTextContent(ar.dr.archive_restore_note);
+    await u.click(screen.getByTestId('dr-archive-none-option'));
+    expect(screen.getByTestId('dr-archive-choice')).toHaveAttribute('data-mode', 'none');
+    expect(en.dr.archive_download_btn_hint).not.toEqual(ar.dr.archive_download_btn_hint);
+  });
+
   it('without a recent backup the run button is disabled and says why', async () => {
     await signIn('pm'); await stepUpDone();
     await api.post('/__mock/data-reset/backup', { body: { ok: false } });
