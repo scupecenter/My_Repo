@@ -12755,10 +12755,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The ready reports the caller may run (0.15.598)
+         * @description 0.15.598. Groups and the reports whose register the caller can view in at least one region.
+         */
+        get: operations["getReportLibrary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{key}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a ready report (0.15.598)
+         * @description 0.15.598. Reads through the register list service, so the caller's grants, regions and row rules apply. Unknown key is 404.
+         */
+        post: operations["runReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ReportRunInput: {
+            region_id?: number;
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+            /** Format: uuid */
+            company_id?: string;
+            /** @enum {string} */
+            group_by?: "state" | "region" | "record_type" | "site_code";
+        };
+        ReportLibrary: {
+            groups: {
+                key: string;
+                label_en: string;
+                label_ar: string;
+            }[];
+            items: {
+                key: string;
+                group: string;
+                title_en: string;
+                title_ar: string;
+                /** @enum {string} */
+                group_by: "state" | "region" | "record_type" | "site_code";
+                /** @enum {string} */
+                default_view: "table" | "grouped" | "chart" | "cards";
+            }[];
+        };
+        ReportRun: {
+            key: string;
+            title_en: string;
+            title_ar: string;
+            /** Format: date-time */
+            as_of: string;
+            /** @enum {string} */
+            freshness: "live";
+            params: {
+                region_id: number | null;
+                from: string | null;
+                to: string | null;
+                company_id: string | null;
+                group_by: string;
+            };
+            columns: {
+                code: string;
+                label_en: string;
+                label_ar: string;
+                /** @enum {string} */
+                kind: "text" | "number" | "date";
+            }[];
+            rows: {
+                [key: string]: unknown;
+            }[];
+            truncated: boolean;
+            groups: {
+                key: string;
+                label: string;
+                count: number;
+                sums: {
+                    [key: string]: number;
+                };
+            }[];
+            totals: {
+                count: number;
+                sums: {
+                    [key: string]: number;
+                };
+            };
+            chart: {
+                /** @enum {string} */
+                type: "bar";
+                series: {
+                    label: string;
+                    value: number;
+                }[];
+            };
+        };
         /** @description The setting `registers.structure_change` (0.15.403). */
         StructurePolicy: {
             /** @enum {string} */
@@ -47076,6 +47193,57 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getReportLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The library. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportLibrary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    runReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReportRunInput"];
+            };
+        };
+        responses: {
+            /** @description The result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
 }

@@ -685,6 +685,9 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
+  // Contract 0.15.598: Report Center library and run.
+  ['get', '/reports/library'],
+  ['post', '/reports/:key/run'],
   ['get', '/exports/schedules'],
   ['put', '/exports/schedules'],
   ['delete', '/exports/schedules/:id'],
