@@ -5384,6 +5384,18 @@
       "structure_decision": "Your structure proposal was decided"
     }
   },
+  "oldVersions": {
+    "title": "Old published versions",
+    "note": "A published version that is not in force and that no site uses can be deleted. A full snapshot of it is archived first, so it can be restored. Needs the publish right, your password, a reason and the typed version number.",
+    "sites": "{{count}} sites",
+    "has_sites": "A site is on this version, so it cannot be deleted.",
+    "delete": "Delete version",
+    "delete_aria": "Delete version {{version}}",
+    "dialog_title": "Delete version {{version}}",
+    "hint": "The version, its milestones, gates, tasks, links, SLA rules and views are archived as one snapshot, then removed. Nothing a site uses is touched; the server refuses the delete if a site, a site task or a site migration still depends on it.",
+    "confirm": "Type v{{version}} to confirm",
+    "deleted": "Version deleted; its snapshot is archived."
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",

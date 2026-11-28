@@ -44,6 +44,12 @@ export class WorkflowEditorController {
     return this.editor.removeItem(auth, version, ifMatch, body);
   }
 
+  @Post('versions/:version/delete')
+  @HttpCode(200)
+  async deleteVersion(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.deleteVersion(auth, version, ifMatch, body);
+  }
+
   @Post('versions/:version/discard')
   @HttpCode(200)
   async discardDraft(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {

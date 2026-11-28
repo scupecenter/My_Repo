@@ -356,6 +356,18 @@ export const workflowEditorHandlers = [
     v.etag += 1;
     return HttpResponse.json({ outcome: why.length ? 'deactivated' : 'deleted', why, version: json(v) });
   }),
+  http.post(`${B}/workflow/versions/:version/delete`, async ({ params, request }) => {
+    const b = (await request.json()) as { reason?: string; confirm_text?: string };
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    if (b.confirm_text !== `v${String(params.version)}`) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match', { errors: [{ path: '/confirm_text', code: 'confirmation_mismatch' }] });
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    const cur = Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version));
+    const reasons = [...(w.v.status !== 'published' ? ['not_published'] : []), ...(w.v.version === cur ? ['current'] : []), ...(w.v.version === 1 ? ['sites'] : [])];
+    if (reasons.length) return problem(409, 'invalid_transition', `This version cannot be deleted: ${reasons.join(', ')}.`);
+    state = state.filter((x) => x !== w.v);
+    return HttpResponse.json({ version: w.v.version, deleted: true, archive_id: crypto.randomUUID() });
+  }),
   http.post(`${B}/workflow/versions/:version/discard`, async ({ params, request }) => {
     const b = (await request.json()) as { reason?: string };
     const w = write(params, request, b); if ('r' in w) return w.r;

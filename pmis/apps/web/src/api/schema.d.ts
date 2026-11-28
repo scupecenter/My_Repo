@@ -3465,6 +3465,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete an old published version after archiving a full snapshot (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions, a reason, `If-Match`, a step-up and `confirm_text` = `v<version>` (422 `confirmation_mismatch`). 409 `invalid_transition` when the version is a draft, is in force, has not started, has sites, site tasks or site migrations (`reasons`). The snapshot is archived before the delete, in the same transaction.
+         */
+        post: operations["deleteWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/discard": {
         parameters: {
             query?: never;
@@ -29919,6 +29941,51 @@ export interface operations {
                         outcome: "deleted" | "deactivated";
                         why: string[];
                         version: components["schemas"]["WorkflowVersion"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    deleteWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                    /** @description The text v<version>. */
+                    confirm_text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Deleted; the snapshot is archived. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        deleted: boolean;
+                        /** Format: uuid */
+                        archive_id: string;
                     };
                 };
             };

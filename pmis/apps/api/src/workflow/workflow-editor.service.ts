@@ -83,6 +83,7 @@ const migrateBody = z.object({ preview_hash: z.string().min(8).max(100), selecti
 const revertBody = z.object({ reason }).strict();
 const removeBody = z.object({ kind: z.enum(['task', 'milestone', 'gate']), code, reason }).strict();
 const discardBody = z.object({ reason }).strict();
+const deleteVersionBody = z.object({ reason, confirm_text: z.string().max(200) }).strict();
 const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
 const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
 type Json = Record<string, unknown>;
@@ -153,6 +154,17 @@ export class WorkflowEditorService {
     const b = parse(discardBody, raw);
     const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_discard_draft(${version}::int, ${etag}::int, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0575 (contract 0.15.436): delete an old published version after its full snapshot is archived. The publish right (workflow_versions administer), a step-up, the typed confirmation `v<version>`, a reason and an audit row. */
+  async deleteVersion(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(deleteVersionBody, raw);
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    if (b.confirm_text !== `v${version}`) {
+      throw new ProblemException(422, 'confirmation_mismatch', { detail: `Type v${version} to confirm.`, errors: [{ path: '/confirm_text', code: 'confirmation_mismatch' }] });
+    }
+    const etag = await this.gate(auth, 'workflow_versions', 'administer', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_delete_version(${version}::int, ${etag}::int, ${b.reason}::text) AS r`);
   }
 
   async updateTask(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

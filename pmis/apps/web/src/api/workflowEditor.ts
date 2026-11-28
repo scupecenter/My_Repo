@@ -91,6 +91,8 @@ export type { Wrap };
 
 export type RemoveResult = { outcome: 'deleted' | 'deactivated'; why: string[] };
 export const useRemoveItem = (v: number, etag: number) => useWrite<{ kind: 'task' | 'milestone' | 'gate'; code: string; reason: string }, RemoveResult>(v, etag, (body, e) => api.post(`${base(v)}/remove`, { body, version: e }));
+/** 0.15.436 (migration 0575): delete an old published version after the server archived a full snapshot of it. */
+export const useDeleteVersion = (v: number, etag: number) => useWrite<{ reason: string; confirm_text: string }, { version: number; deleted: boolean; archive_id: string }>(v, etag, (body, e) => api.post(`${base(v)}/delete`, { body, version: e }));
 export const useDiscardDraft = (v: number, etag: number) => useWrite<{ reason: string }, unknown>(v, etag, (body, e) => api.post(`${base(v)}/discard`, { body, version: e }));
 
 /** The SLA (target and limit in working days) of each task in force today, read-only here: the SLA rules are a versioned set with its own publishing (Settings, SLA). */
