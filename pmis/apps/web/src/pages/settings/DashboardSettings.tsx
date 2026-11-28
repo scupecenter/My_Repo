@@ -19,6 +19,7 @@ import { QueryFallback } from '@/components/States';
 import { FinanceReadersPanel } from "./FinanceReadersPanel";
 import { ProgressRag } from "./ProgressRag";
 import { SettingsChangeLog } from "./SettingsChangeLog";
+import { ForecastMethod } from "./ForecastMethod";
 import { ForecastWindow } from "./ForecastWindow";
 import { SnapshotSchedule } from "./SnapshotSchedule";
 import { HealthBands } from "./HealthBands";
@@ -158,6 +159,7 @@ export function DashboardSettings() {
 
       <SnapshotSchedule />
       <ProgressRag />
+      <ForecastMethod />
       <ForecastWindow />
       <HealthBands />
       <SettingsChangeLog scope="dashboard" />
