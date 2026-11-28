@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import { MODULES } from '../permissions/catalogue';
+import { customModuleDefs } from '../permissions/custom-modules';
 import { parseIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
 import { parse } from '../common/zod';
@@ -72,7 +73,7 @@ export class AlertRulesService {
         kpis,
         audiences: ['system_admin', 'module'],
         registers,
-        modules: MODULES.map((m) => ({ key: m.key, name_en: m.name_en })),
+        modules: [...MODULES, ...(await customModuleDefs(this.db, true))].map((m) => ({ key: m.key, name_en: m.name_en })),
       },
     };
   }
