@@ -310,6 +310,7 @@
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
     "deliverables": "Deliverables",
+    "tools_equipment": "Tools & Equipment",
     "incidents": "Incidents & Security"
   },
   "toast": {
@@ -1760,6 +1761,15 @@
     "end_task_layout_submitted_date": "Layout Submitted Date"
   },
   "wtSet": {
+    "diffTitle": "Changes against the set in force",
+    "diffNone": "No item differs from the set in force.",
+    "diff_added": "Added",
+    "diff_removed": "Removed",
+    "diff_changed": "Changed",
+    "diffField_name": "Name",
+    "diffField_weight": "Weight",
+    "diffField_unit": "Unit",
+    "diffField_measure_rule": "Measure rule",
     "rule": {
       "method": "How the item is counted",
       "m_off": "Not counted automatically",
@@ -2214,6 +2224,9 @@
     "execution": "Execution",
     "lesson": "Lesson",
     "follow_up": "Follow-up",
+    "equipment": "Equipment",
+    "custody": "Custody",
+    "calibration_inspection": "Calibration and inspection",
     "invoice": "Invoice",
     "payment": "Payment",
     "deliverable": "Deliverable",
@@ -2261,6 +2274,10 @@
     "grid": "Grid"
   },
   "registers": {
+    "new_more": "More ways to add",
+    "new_blank": "New blank record",
+    "new_import": "Import rows from the template",
+    "new_import_off": "This register has no template yet, so there is nothing to import.",
     "tab_asb_cw": "BOQ CW (civil works)",
     "tab_asb_te": "BOQ TE (equipment)",
     "tab_dis_cw": "Dismantle CW",
@@ -2463,6 +2480,11 @@
     "order_required": "Settings require this invoice to name its Procurement order.",
     "unknown_rule": "This register has no such rule.",
     "supplier_required": "Settings require an invoice to name its supplier company.",
+    "link_invalid": "This is not a record id of the linked register.",
+    "link_not_found": "The linked record does not exist, is not approved when that is required, or you may not see it.",
+    "link_other_site": "The linked record belongs to another site.",
+    "no_delete": "A link is switched off, never removed.",
+    "unknown_field": "Choose a text field of the source register.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -4828,6 +4850,22 @@
     "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
     "saved": "Rule saved",
     "change_title": "Change: {{rule}}"
+  },
+  "links": {
+    "title": "Register links",
+    "note": "Settings for the links between registers (the D60 declaration). A link draws the picker of the record form, fills the Related records panel and, when Check on save is on, is checked on every save while the record is in entry. A link is switched off, never removed. Every change needs a reason and is audited.",
+    "from": "From register",
+    "field": "Field",
+    "to": "To register",
+    "enabled": "On",
+    "enforce": "Check on save",
+    "same_site": "Same site only",
+    "state": "Record state needed",
+    "saved": "Links saved",
+    "add": "Add a link",
+    "add_title": "Add a link between registers",
+    "choose": "Choose",
+    "toggle_title": "Change a link"
   },
   "regstate": {
     "title": "Register state",
@@ -7202,6 +7240,7 @@
     "display_wrap": "Wrap long text",
     "display_zebra": "Zebra rows",
     "display_groupbar": "Group summary: count and status bar on each group header",
+    "display_colors": "Value colours",
     "display_reset": "Back to the defaults",
     "display_settings": "Defaults in Settings",
     "size_sm": "Small",
@@ -7234,6 +7273,16 @@
     "pivot_row_hint": "Click to list all rows of {{rows}}.",
     "pivot_other_hint": "Several values are folded here, so they cannot be listed together.",
     "pivot_split_label": "How the {{total}} of {{rows}} split across the columns",
+    "board_drag_note": "Drag a card to another column to change its status. A refused drop says why.",
+    "drag_state": "The approval state moves only through the record's own actions.",
+    "drag_same": "Already in this column.",
+    "drag_locked": "This record is locked.",
+    "drag_field_locked": "This status field is locked.",
+    "drag_no_edit": "You cannot edit this record now.",
+    "drag_required": "This status cannot be empty.",
+    "moved": "Status changed.",
+    "preview_hint": "Space or Escape closes the preview.",
+    "preview_open": "Open the record",
     "group_record": "Record",
     "group_workflow": "Workflow",
     "record": "Record",
@@ -7923,10 +7972,14 @@
   },
   "gantt": {
     "title": "Timeline (read only)",
-    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. Dates change only through the normal change flow.",
+    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. A thin line joins each stage to the one it waits for (red when it is dated earlier). The vertical line is today. Dates change only through the normal change flow.",
     "baseline": "Baseline",
     "planned": "Planned",
-    "actual": "Actual"
+    "actual": "Actual",
+    "today": "Today",
+    "conflicts": "{{count}} order conflict(s)",
+    "dep_ok": "Waits for the stage before it",
+    "dep_conflict": "Dated before the stage it waits for"
   },
   "siteActivity": {
     "c_entity": "Entity",
@@ -8762,5 +8815,6 @@
     "note": "Note",
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
-  }
+  },
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
 }
