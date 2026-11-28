@@ -12832,6 +12832,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/assignment-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assignment rules (0.15.481)
+         * @description 0.15.481 (migration 0622). System Admin only. The rules that name who a level opens to, oldest first (hidden ones are left out).
+         */
+        get: operations["listAssignmentRules"];
+        put?: never;
+        /**
+         * Add an assignment rule (0.15.481)
+         * @description System Admin only. A rule names a person for a task or register level, optionally limited to a region, a task code or register key, and a level kind. It never adds a holder. At run time the person must already be eligible by the matrix, the grants and the region, or the rule is skipped. Audit `assign_rule_create`.
+         */
+        post: operations["createAssignmentRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/assignment-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change, switch off or remove an assignment rule (0.15.481)
+         * @description System Admin only. If-Match is the rule `version` (412 when it moved). Sending removed true hides it (never deleted). Audit `assign_rule_update` or `assign_rule_remove`.
+         */
+        patch: operations["updateAssignmentRule"];
+        trace?: never;
+    };
     "/me/default-views": {
         parameters: {
             query?: never;
@@ -15514,6 +15560,41 @@ export interface components {
             resolved?: components["schemas"]["CommentResolved"];
             /** Format: date-time */
             created_at: string;
+        };
+        AssignmentRuleInput: {
+            /** @enum {string} */
+            applies_to?: "task" | "record";
+            region_id?: number | null;
+            /** @description A task definition code (task) or a register key (record); empty means any. */
+            item_key?: string | null;
+            /** @enum {string|null} */
+            level_kind?: "entry" | "review" | "approve" | null;
+            /** Format: uuid */
+            user_id?: string;
+            enabled?: boolean;
+            note?: string | null;
+            /** @description true hides the rule (PATCH only). */
+            removed?: boolean;
+        };
+        AssignmentRuleSaved: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+        };
+        AssignmentRule: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            applies_to: "task" | "record";
+            region_id?: number | null;
+            item_key?: string | null;
+            level_kind?: string | null;
+            /** Format: uuid */
+            user_id: string;
+            user_name?: string | null;
+            enabled: boolean;
+            note?: string | null;
+            version: number;
         };
         CommentReactionInput: {
             /**
@@ -47586,6 +47667,91 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listAssignmentRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AssignmentRule"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createAssignmentRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateAssignmentRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getDefaultViews: {

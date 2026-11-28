@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.481 (2026-11-28) assignment rules, auto-assign on top of the Responsibility Matrix (migration 0622, mirror `db/sql/621_assignment_rules.sql`). Additive. `GET`/`POST /settings/assignment-rules` and `PATCH /settings/assignment-rules/{rule_id}` (System Admin). When a level opens with the rule any one and nobody was named, the most specific enabled rule (region 4, task code or register key 2, level kind 1; older first) whose person is already eligible for that level names that person as the one holding the ball and notifies them; the same pin an assignment by hand sets. A rule never adds a holder and all-members levels are untouched. Hide, never delete. Audit `assign_rule_create`, `assign_rule_update`, `assign_rule_remove`. No grant, role or permission change.
     - 0.15.473 (2026-11-28): the Automation centre over the alert rules (migration 0614, mirror `db/sql/613_automation_centre.sql`). Additive, notifications only. New `GET /settings/alert-rules/runs` (`getAlertRuleRuns`, System Admin): the last 50 runs of the rules (`rule_code`, `kind`, `run_at`, `fired` targets). The catalogue of `GET /settings/alert-rules` gains `templates`: the closed list of ready-made rules the centre offers (they only fill the form; saving goes through the existing create call with its checks and reason). The daily job now records one run row per enabled rule (new table `alert_rule_runs`, a LOG table of the data reset) and, when a rule fired, one audit row `alert_rule_run` written by the system (no actor, via job, job_name `alert_rules`). No rule, kind, audience, permission or grant changes.
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
@@ -19785,6 +19786,74 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /settings/assignment-rules:
+    get:
+      tags: [settings]
+      operationId: listAssignmentRules
+      summary: Assignment rules (0.15.481)
+      description: 0.15.481 (migration 0622). System Admin only. The rules that name who a level opens to, oldest first (hidden ones are left out).
+      x-db-path: assignment_rules_json
+      responses:
+        '200':
+          description: The rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/AssignmentRule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [settings]
+      operationId: createAssignmentRule
+      summary: Add an assignment rule (0.15.481)
+      description: System Admin only. A rule names a person for a task or register level, optionally limited to a region, a task code or register key, and a level kind. It never adds a holder. At run time the person must already be eligible by the matrix, the grants and the region, or the rule is skipped. Audit `assign_rule_create`.
+      x-db-path: assignment_rule_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignmentRuleInput'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssignmentRuleSaved'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/assignment-rules/{rule_id}:
+    parameters:
+      - {name: rule_id, in: path, required: true, schema: {type: string, format: uuid}}
+    patch:
+      tags: [settings]
+      operationId: updateAssignmentRule
+      summary: Change, switch off or remove an assignment rule (0.15.481)
+      description: System Admin only. If-Match is the rule `version` (412 when it moved). Sending removed true hides it (never deleted). Audit `assign_rule_update` or `assign_rule_remove`.
+      x-db-path: assignment_rule_save
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignmentRuleInput'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssignmentRuleSaved'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /me/default-views:
     get:
       tags: [saved-views]
@@ -22855,6 +22924,38 @@ components:
         reactions: { type: array, items: { $ref: '#/components/schemas/CommentReaction' }, description: '0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted.' }
         resolved: { $ref: '#/components/schemas/CommentResolved' }
         created_at: { type: string, format: date-time }
+    AssignmentRuleInput:
+      type: object
+      additionalProperties: false
+      properties:
+        applies_to: { type: string, enum: [task, record] }
+        region_id: { type: [integer, 'null'] }
+        item_key: { type: [string, 'null'], maxLength: 80, description: 'A task definition code (task) or a register key (record); empty means any.' }
+        level_kind: { type: [string, 'null'], enum: [entry, review, approve, null] }
+        user_id: { type: string, format: uuid }
+        enabled: { type: boolean }
+        note: { type: [string, 'null'], maxLength: 300 }
+        removed: { type: boolean, description: 'true hides the rule (PATCH only).' }
+    AssignmentRuleSaved:
+      type: object
+      required: [id, version]
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer }
+    AssignmentRule:
+      type: object
+      required: [id, applies_to, user_id, enabled, version]
+      properties:
+        id: { type: string, format: uuid }
+        applies_to: { type: string, enum: [task, record] }
+        region_id: { type: [integer, 'null'] }
+        item_key: { type: [string, 'null'] }
+        level_kind: { type: [string, 'null'] }
+        user_id: { type: string, format: uuid }
+        user_name: { type: [string, 'null'] }
+        enabled: { type: boolean }
+        note: { type: [string, 'null'] }
+        version: { type: integer }
     CommentReactionInput:
       type: object
       required: [emoji]

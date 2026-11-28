@@ -607,6 +607,23 @@ export const useUpdateAlertRule = () => {
   });
 };
 
+/** 0.15.481 (migration 0622): assignment rules, who a level opens to. System Admin only. */
+export const useAssignmentRules = () => useQuery({ queryKey: ['assignmentRules'], queryFn: () => api.get<{ items: import('./types').AssignmentRule[] }>('/settings/assignment-rules').then((r) => r.items) });
+export const useCreateAssignmentRule = () => {
+  const qc = useQueryClient();
+  return useMutation<import('./types').AssignmentRuleSaved, ApiError, import('./types').AssignmentRuleInput>({
+    mutationFn: (body) => api.post('/settings/assignment-rules', { body }),
+    onSettled: () => refresh(qc, 'assignmentRules'),
+  });
+};
+export const useUpdateAssignmentRule = () => {
+  const qc = useQueryClient();
+  return useMutation<import('./types').AssignmentRuleSaved, ApiError, { id: string; version: number; body: import('./types').AssignmentRuleInput }>({
+    mutationFn: ({ id, version, body }) => api.patch(`/settings/assignment-rules/${id}`, { version, body }),
+    onSettled: () => refresh(qc, 'assignmentRules'),
+  });
+};
+
 /** 0.15.367 (migration 0524): whether the typed dashboard targets may override the derived ones (off by default). */
 export const useDashboardTargetPolicy = () => useQuery({ queryKey: ['dash-target-policy'], queryFn: () => api.get<DashboardTargetPolicy>('/settings/dashboard-target-policy') });
 export const useSetDashboardTargetPolicy = () => {

@@ -82,6 +82,7 @@ const isAdmin = () => viewer()?.key === 'pm';
 const targetPolicy: { manual_override: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { manual_override: false, version: 1, updated_at: null, updated_by: null };
 const targetPolicyView = () => ({ ...targetPolicy, can_edit: isAdmin() });
+export const ASSIGN_RULES: { id: string; applies_to: string; region_id: number | null; item_key: string | null; level_kind: string | null; user_id: string; user_name: string; enabled: boolean; note: string | null; version: number; removed?: boolean }[] = [];
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 const reasonErr = (r?: string) => ((r ?? '').trim().length < 3 || (r ?? '').length > 1000 ? fields({ path: '/reason', code: 'required' }) : null);
@@ -1709,6 +1710,31 @@ export const settingsHandlers = [
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
   // ------------------------------------------------------------------ alert rules (0.15.242, migration 0342): notifications only
+  http.get(`${B}/settings/assignment-rules`, () => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({ items: ASSIGN_RULES.filter((x) => !x.removed) });
+  }),
+  http.post(`${B}/settings/assignment-rules`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<Record<string, unknown>>(request);
+    if (!b.user_id) return fields({ path: '/user_id', code: 'invalid' });
+    if (b.applies_to !== 'task' && b.applies_to !== 'record') return fields({ path: '/applies_to', code: 'invalid' });
+    const id = `00000000-0000-4000-8000-${String(900000000000 + ASSIGN_RULES.length + 1)}`;
+    ASSIGN_RULES.push({ id, applies_to: b.applies_to as string, region_id: (b.region_id as number | null) ?? null, item_key: (b.item_key as string | null) ?? null, level_kind: (b.level_kind as string | null) ?? null, user_id: b.user_id as string, user_name: 'Picked user', enabled: b.enabled !== false, note: (b.note as string | null) ?? null, version: 1 });
+    return HttpResponse.json({ id, version: 1 }, { status: 201 });
+  }),
+  http.patch(`${B}/settings/assignment-rules/:id`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match.');
+    const row = ASSIGN_RULES.find((x) => x.id === params.id && !x.removed);
+    if (!row) return problem(404, 'not_found', 'The rule.');
+    const p = ver(request, row.version); if (p) return p;
+    const b = await body<Record<string, unknown>>(request);
+    if (b.removed === true) row.removed = true;
+    else if (typeof b.enabled === 'boolean') row.enabled = b.enabled;
+    row.version += 1;
+    return HttpResponse.json({ id: row.id, version: row.version });
+  }),
   http.get(`${B}/settings/alert-rules/link-orphans`, () => {
     const g = needAdmin(); if (g) return g;
     return HttpResponse.json({ links: [
