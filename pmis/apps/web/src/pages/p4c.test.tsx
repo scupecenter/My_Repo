@@ -138,7 +138,9 @@ describe('Q151: the GECOL order warnings (Settings)', () => {
     renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/registers/gecol' });
     const u = userEvent.setup();
     const on = await screen.findByTestId('gow-enabled') as HTMLInputElement;
-    expect(screen.getByTestId('settings-section-registers-gecol')).toHaveTextContent('GECOL order warnings');
+    // M1: the GECOL tab is hidden from the menu (route kept); Order warnings serves every register
+    expect(screen.queryByTestId('settings-section-registers-gecol')).toBeNull();
+    expect(screen.getByTestId('settings-section-registers-order')).toHaveTextContent('Order warnings');
     expect(on.checked).toBe(false);
     expect(screen.getByTestId('gow-step-0-1')).toHaveTextContent('Survey Date');
     const g = await api.post<RegisterRecord>('/registers/gecol/records', { body: { site_id: siteIdOf(3), data: { pr_no: 'GP-T', request_date: '2026-10-05', survey_date: '2026-10-01' } } });

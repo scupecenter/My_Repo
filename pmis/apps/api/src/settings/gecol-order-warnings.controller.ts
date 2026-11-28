@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Put, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Put, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -22,5 +22,26 @@ export class GecolOrderWarningsController {
     const r = await this.svc.put(auth, ifMatch, body);
     res.setHeader('ETag', etagHeader(r.version));
     return r;
+  }
+
+  /** M1 (0.15.464): the same setting for every register; GECOL is served by the same writer as its old route. */
+  @Get('registers/:key/order-warnings')
+  async getFor(@Auth() auth: AuthContext, @Param('key') key: string, @Res({ passthrough: true }) res: Response) {
+    const r = await this.svc.getFor(auth, key);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('registers/:key/order-warnings')
+  async putFor(@Auth() auth: AuthContext, @Param('key') key: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.svc.putFor(auth, key, ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  /** Read only counts of every register (the generic view that replaces the GECOL / HLC tab). */
+  @Get('register-counts')
+  counts(@Auth() auth: AuthContext) {
+    return this.svc.counts(auth);
   }
 }

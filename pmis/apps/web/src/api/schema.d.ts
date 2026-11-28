@@ -8105,6 +8105,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/registers/{key}/order-warnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The order warnings of one register (0.15.464)
+         * @description 0.15.464. The chains of date fields of the register, in their expected order. A step without a date is skipped; a later step dated before an earlier one is a
+         *     reviewer warning (`order`, `gecol_order` for GECOL), never blocking. `billing_field` is the date that must not be before `billing_after` (GECOL: the billing
+         *     conversion date). Off by default. Reading needs the Settings screen. 404 for a register that does not exist.
+         */
+        get: operations["getRegisterOrderWarnings"];
+        /**
+         * Save the order warnings of one register (reason, If-Match, audited)
+         * @description 0.15.464. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_field` (not a date field of the register),
+         *     `duplicate`, `invalid` (also: give both the billing field and the event it follows, or neither), `too_many`. For GECOL `billing_field` must be null.
+         */
+        put: operations["setRegisterOrderWarnings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/register-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts of the records of every register (read only)
+         * @description 0.15.464. Read only. For every register: `total` (the latest version of each logical record), `versions` (all stored versions) and the records by state.
+         *     Needs the Settings screen (`admin.settings` view). Changes nothing. The GECOL / HLC specific figures stay in `/reports/gecol-hlc-counts`.
+         */
+        get: operations["getRegisterCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/derive-rules": {
         parameters: {
             query?: never;
@@ -20481,6 +20531,41 @@ export interface components {
                 code: string;
                 label_en: string;
                 label_ar?: string | null;
+            }[];
+        };
+        RegisterOrderWarningsInput: {
+            enabled: boolean;
+            chains: string[][];
+            /** @description The date field the billing field follows (the contract event), or null. */
+            billing_after: string | null;
+            /** @description The date field that must not be before billing_after, or null. GECOL: always the billing conversion date. */
+            billing_field: string | null;
+        };
+        /** @description 0.15.464 (M1). Off by default; GECOL keeps its seeded chains. */
+        RegisterOrderWarnings: components["schemas"]["RegisterOrderWarningsInput"] & {
+            register_key: string;
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The active date fields of the register (custom fields included) that a chain may name. */
+            fields: {
+                code: string;
+                label_en: string;
+                label_ar?: string | null;
+            }[];
+        };
+        RegisterCounts: {
+            /** Format: date-time */
+            as_of: string;
+            registers: {
+                register_key: string;
+                total: number;
+                versions: number;
+                by_state: {
+                    state: string;
+                    count: number;
+                }[];
             }[];
         };
         RegisterRecordStep: {
@@ -38092,6 +38177,90 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getRegisterOrderWarnings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setRegisterOrderWarnings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["RegisterOrderWarningsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getRegisterCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterCounts"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getDeriveRules: {

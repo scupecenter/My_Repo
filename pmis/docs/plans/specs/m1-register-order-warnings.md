@@ -1,6 +1,6 @@
 # M1: order warnings and counts for every register (generalise GECOL order warnings and the GECOL/HLC counts)
 
-Status: spec. Source: the parent's relay of the owner's voice message of 2026-11-27 22:47.
+Status: built (migration 0604, contract 0.15.464; docs/ops/register-order-warnings.md). Source: the parent's relay of the owner's voice message of 2026-11-27 22:47.
 
 ## Requirement
 1. Generalise the GECOL order-warnings mechanism (Q151, migration 0063, contract 0.12.11, `GecolOrderWarnings.tsx`, `gecol-order-warnings.service.ts`) to every register that has dates in a sequence (permits, readiness, and any other register with date fields). Same behaviour: ordered chains of fields, a later step dated before an earlier one warns the reviewer and never blocks, enable toggle (off by default), billing-after field, unsaved guard, mandatory reason, audit, If-Match.

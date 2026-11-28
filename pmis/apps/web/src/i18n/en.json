@@ -1361,6 +1361,8 @@
     "section_registers_contractors": "Contractor rules",
     "section_registers_derive": "Derived values (between registers)",
     "section_registers_gecol": "GECOL order warnings",
+    "section_registers_order": "Order warnings",
+    "section_registers_counts": "Register counts",
     "section_registers_issue-map": "Issue category by task",
     "section_registers_team-scope": "Team / scope match",
     "section_documents_library": "Document Library",
@@ -5452,6 +5454,26 @@
     "add": "Add a rule",
     "remove": "Remove",
     "key": "Rule code"
+  },
+  "regOrder": {
+    "title": "Order warnings",
+    "note": "Each chain lists date fields of the register in their expected order. A step without a date is skipped; a later step dated before an earlier one warns the reviewer and never blocks. Off by default. The warnings show on the reviewer list of the register; the data upload does not run them.",
+    "register": "Register",
+    "enabled": "Warn the reviewer when the dates of this register are out of order",
+    "no_dates": "This register has fewer than two date columns, so there is no order to check.",
+    "billing_after": "The billing date follows (contract event)",
+    "billing_field": "Billing date (must not be before that event)",
+    "billing_field_none": "No check"
+  },
+  "regCounts": {
+    "title": "Register counts",
+    "note": "Read only. Counts the latest version of each record of every register, by state. Nothing here changes any data.",
+    "as_of": "As of",
+    "register": "Register",
+    "total": "Records",
+    "versions": "Stored versions",
+    "by_state": "By state",
+    "empty": "No records yet"
   },
   "gecolOrder": {
     "title": "GECOL order warnings",
