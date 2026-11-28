@@ -14140,6 +14140,40 @@ paths:
               schema: {$ref: '#/components/schemas/ContractorCompanyList'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /registers/contractor-companies/{party_id}/status:
+    parameters:
+    - {name: party_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [registers]
+      operationId: getContractorCompanyStatus
+      summary: The status of one company with its reason, date and status history
+      description: 'K2b (migration 0775). Read only. Needs view on Procurement, GECOL, HLC or Contractors. `status` is the company status of its current approved record (null when the company has no record); `reason` and `date` are required there for Suspended and Blacklisted. `history` lists the approved versions where the status changed, with the approving person. Used for the warning beside the company of an order.'
+      responses:
+        '200':
+          description: The status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, reason, date, history]
+                properties:
+                  status: {type: [string, 'null']}
+                  reason: {type: [string, 'null']}
+                  date: {type: [string, 'null']}
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        version_no: {type: integer}
+                        status: {type: [string, 'null']}
+                        reason: {type: [string, 'null']}
+                        date: {type: [string, 'null']}
+                        approved_at: {type: [string, 'null']}
+                        approved_by: {type: [string, 'null']}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /registers/{register_key}/records:
     parameters:
     - {$ref: '#/components/parameters/RegisterKeyPath'}

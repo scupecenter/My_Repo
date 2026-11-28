@@ -7571,6 +7571,12 @@
     "reminder_hint": "In-app notice to the L1 holders of the region, once a day.",
     "defaults": "Columns of the owner sheet"
   },
+  "companyStatus": {
+    "warn_suspended": "This company is suspended.",
+    "warn_blacklisted": "This company is blacklisted.",
+    "reason": "Reason: {{reason}}.",
+    "since": "Since {{date}}."
+  },
   "lib": {
     "forms_title": "Forms",
     "forms_sub": "Every approved document form. Pick a form and a site to see it filled, then download or print it.",

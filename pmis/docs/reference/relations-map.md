@@ -74,6 +74,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 
 **Orphans alert (0650, D60 follow-up).** `register_link_orphans()` (0409) counts, per declared link, the current rows whose id is no current record of the target. The alert kind `link_orphans` of the generic alert rules (`Settings > Alerts > Rules`; params `register_key`, `field_code`, `min_rows`) sends one in-app notification per link at or above `min_rows`, once per working week while it keeps dangling, to the rule's audience. `GET /settings/alert-rules/link-orphans` (System Admin) returns the same counts with up to 20 example record ids per link. Nothing is changed or cleared by the alert (hide, never delete), and no `enforce` value moves: the report is what the owner checks before switching a link on. The Settings editor of the links (#359) is not on main yet, so the per-link badge and the warning when switching `enforce` on are for that editor to add.
 
+- Company (contractors record) to order (procurement record, `external_party_id`): the status, its reason and date show as a warning on the order (K2b, 0775). The order value (`po_value`) is read per company from approved orders.
+
 ## 4. Gaps and proposals
 
 1. **Warehouse receipt to Procurement order.** A PL / OPEN receipt (stock coming in) names no order, so what arrived against a PO is not visible in

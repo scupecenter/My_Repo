@@ -325,3 +325,8 @@ export function useHandoverOpenCounts(siteId: string | null | undefined, enabled
   const snags = site.data?.counts?.open_snags ?? 0, issues = site.data?.counts?.open_issues ?? 0, q = quality.data ?? 0;
   return { ready: on && !site.isPending && !quality.isPending, snags, issues, quality: q, total: snags + issues + q };
 }
+
+/** K2b (migration 0775): the status of one company with its reason, date and status history (read only; the warning on an order). */
+export type CompanyStatus = { status: string | null; reason: string | null; date: string | null; history: { version_no: number; status: string | null; reason: string | null; date: string | null; approved_at: string | null; approved_by: string | null }[] };
+export const useCompanyStatus = (partyId: string | null | undefined) =>
+  useQuery({ queryKey: ['company-status', partyId], enabled: !!partyId, staleTime: 60_000, queryFn: () => api.get<CompanyStatus>(`/registers/contractor-companies/${partyId}/status`) });
