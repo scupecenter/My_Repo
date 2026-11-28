@@ -342,7 +342,7 @@ describe('hybrid mode list', () => {
       'GET /saved-views', 'POST /saved-views', 'POST /saved-views/import', 'GET /saved-views/filter-fields', 'GET /saved-views/filter-fields/:field/values', 'GET /saved-views/:id', 'PATCH /saved-views/:id', 'POST /saved-views/:id/deactivate',
       'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions',
       // contract 0.15.246 (item 17, migration 0345): the soft "... is editing this record" notice
-      'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing',
+      'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing', 'GET /me/dashboard-layout', 'PUT /me/dashboard-layout/:tab', 'DELETE /me/dashboard-layout/:tab', 'GET /me/dashboard-templates', 'POST /me/dashboard-templates', 'POST /me/dashboard-templates/:id/apply', 'DELETE /me/dashboard-templates/:id',
       // contract 0.15.245 (0344): pin a saved view as a personal home card
       'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin',
       // contract 0.15.582 (0655): a default saved view per screen
