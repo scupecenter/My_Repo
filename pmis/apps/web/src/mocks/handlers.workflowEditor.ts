@@ -20,7 +20,7 @@ const seed = (): Ver[] => [{
 }];
 let state = seed();
 /** The archive of deleted versions (contract 0.15.436): the version object itself, so a restore puts it back as it was. */
-let archive: { id: string; at: string; reason: string; v: (typeof state)[number]; restored: boolean }[] = [];
+const archive: { id: string; at: string; reason: string; v: (typeof state)[number]; restored: boolean }[] = [];
 interface Mig { id: string; site_id: string; site_code: string; from_version: number; to_version: number; reason: string; migrated_at: string; reverted_at: string | null; revertible: boolean }
 let migrations: Mig[] = [];
 type SlaWeightMock = { counts: boolean; value: number; group: string | null; sla: Record<string, unknown> | null };
