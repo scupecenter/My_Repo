@@ -61,3 +61,26 @@ export function forecastFull(points: ScurvePoint[], velocity: number | null): st
   const ms = dayMs(last.date) + Math.ceil(((100 - last.actual) / velocity) * 7) * DAY;
   return new Date(ms).toISOString().slice(0, 10);
 }
+
+/**
+ * The burndown view of the same snapshots (remaining work against time): remaining % = 100 - actual, the ideal line =
+ * 100 - planned, and the projection from the last actual point to zero at the forecast date. Nothing new is read;
+ * the figures are the S-curve ones turned upside down.
+ */
+export function burndownSeries(points: ScurvePoint[], forecast: string | null): {
+  date: string;
+  remaining: number | null;
+  ideal: number | null;
+  projected: number | null;
+}[] {
+  const s = scurveSeries(points);
+  const rows: { date: string; remaining: number | null; ideal: number | null; projected: number | null }[] = s.map((p, i) => ({
+    date: p.date,
+    remaining: Math.max(0, Math.min(100, 100 - p.actual)),
+    ideal: p.planned === null ? null : Math.max(0, Math.min(100, 100 - p.planned)),
+    projected: i === s.length - 1 ? Math.max(0, Math.min(100, 100 - p.actual)) : null,
+  }));
+  const last = s[s.length - 1];
+  if (last && forecast && forecast > last.date && last.actual < 100) rows.push({ date: forecast, remaining: null, ideal: null, projected: 0 });
+  return rows;
+}

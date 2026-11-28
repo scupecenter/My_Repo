@@ -3867,7 +3867,18 @@
       "forecast": "100% forecast",
       "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
       "chart_label": "Progress curve: {{list}}",
-      "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
+      "basis": "{{n}} saved weekly snapshots, values frozen at their dates.",
+      "burndown_title": "Progress curve and burndown",
+      "burndown_hint": "Work remaining against time: remaining = 100% minus actual, the ideal line from the plan, and the dotted line to zero at the current velocity. Read only.",
+      "view_label": "Chart view",
+      "mode_progress": "Progress",
+      "mode_burndown": "Burndown",
+      "mode_progress_hint": "Planned and actual progress over time",
+      "mode_burndown_hint": "Work remaining over time, with the ideal line and the projection to zero",
+      "remaining": "Remaining",
+      "ideal": "Ideal remaining",
+      "projected": "Projected at current velocity",
+      "burndown_chart_label": "Burndown: {{list}}"
     },
     "pins": {
       "title": "Pinned views",
