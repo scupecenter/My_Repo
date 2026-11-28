@@ -14100,7 +14100,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -19153,7 +19153,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment";
         RegisterField: {
             code: string;
             label_en: string;
@@ -21306,6 +21306,11 @@ export interface components {
             slot_status?: "uploaded" | "in_review" | "approved" | "rejected";
             /** @default false */
             include_superseded: boolean;
+            /**
+             * @description 0.15.472 (phase 4). The consolidated site acceptance pack: needs `site_id` and no other filter (422 `/pack` `pack_scope`); carries the approved current files of the PAC, FAC and HOTO document types, one folder per document type, with `INDEX.txt` (English and Arabic) and `manifest.csv`. Same job, same rights, same export lock.
+             * @enum {string}
+             */
+            pack?: "acceptance";
         };
         /** @description Common publish body (ADR 0007 §1). */
         PublishRequest: components["schemas"]["WithReason"] & {
