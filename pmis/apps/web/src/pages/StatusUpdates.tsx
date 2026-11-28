@@ -7,6 +7,7 @@ import type { StatusHealth, StatusUpdate } from '@/api/types';
 import { useRegionHealth, useStatusOps, useStatusUpdates, type StatusFilter } from '@/api/x';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { StatusUpdatePhotos } from '@/components/PhotoField';
 import { PersonTag } from '@/components/PersonTag';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { useToast } from '@/components/Toast';
@@ -141,6 +142,7 @@ export function StatusUpdates() {
                     {u.editable && <button className="btn px-2 py-1 text-xs" data-testid={`status-edit-${u.id}`} onClick={() => setDialog({ edit: u })}><Pencil size={14} aria-hidden />{t('common.edit')}</button>}
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm" data-testid={`status-summary-${u.id}`}>{u.summary}</p>
+                  <div className="mt-2"><StatusUpdatePhotos updateId={u.id} region={u.region_id} /></div>
                 </li>
               ))}
             </ul>

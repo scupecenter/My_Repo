@@ -231,6 +231,7 @@ info:
     - 0.14.5 (2026-11-05): the site map of the dashboard (OV-12, SC-10; gap G-D05; owner request 2026-11-05 and the technical decision "site map" in `docs/spec/technical-decisions-2026-11-04.md`; no migration; CHANGELOG 107). Additive. (1) `GET /dashboard/site-map` (`getDashboardSiteMap`): one compact row per visible active site (`SiteMapItem`: id, Site ID, names EN/AR, region, sub-region, cluster, latitude and longitude with `has_coordinates` (lat 18 to 34.5, lon 8 to 26, as OV-12), overall status, delivery scenario, tower owner, the current stream and milestone (the first milestone of the site's own workflow version that is neither reached nor N/A), the last milestone reached, `on_air_reached` (the On-Air milestone MS6 reached), `late_task_count`, `behind_baseline` and `late`, `task_progress_pct`), the stream and milestone names of the workflow versions in use, the regions of the list and `counts` (total, cancelled, with and without valid coordinates). The sites are those of the caller's `dashboard.view` regions that are also in the caller's `sites.view` regions (B3; the row-level filter as for `GET /sites`); a caller without `sites.view` anywhere is 403 `module_forbidden`. Cancelled sites are listed (the map hides them unless asked). No custom field, no landlord or contact data. Not audited (a read, like `GET /dashboard`). (2) `GET /sites` takes `coordinates=missing` (sites not cancelled without valid coordinates, the link of the map) and `coordinates=valid`. (3) `SiteDetail` adds `tower_owner`, `tower_type` and `tower_height_m` (the site card of the map).
     - 0.14.4 (2026-11-05): big New sites batches run in the background (technical decision of 2026-11-05, `docs/spec/technical-decisions-2026-11-04.md`; migration 0074; CHANGELOG 106). Additive. (1) `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (action `approve`) of a New sites batch (`entity` = `site`) with more rows to send or to approve than the setting `imports.async_rows` (default 50) answer **202** with the batch in the new status `processing` and its `progress` (`ImportBatchProgress`: rows done of rows total, percent, sites created); every check of the request is made before the 202 (uploader, If-Match, state, note, L1 / L2 of the Matrix row with the grid right, the step-up of a final approval or a self-approval: 401 `step_up_required`, nothing is queued). The rows are then done in chunks of 25, each committed on its own under the same person (the step-up verified at the request counts; nobody else can continue the run), so the counts and the rows move while the page polls; a row that fails gets its error and the others go on; at the end the batch has its usual status (`approved`, `partially_approved`, `in_approval`) and its usual audit row and notices. A run left behind by a restart is resumed by the API. While `processing`, a second send, a decision or a discard answers 409 `batch_processing` (new `ErrorCode`). Smaller batches, returns and the other templates answer 200 as before. (2) `ImportBatch.status` adds `processing`; `ImportBatch.progress` (null when the batch never ran in the background). (3) No request changes; a client that only reads 200 keeps working for small batches and sees 202 + `processing` for big ones.
     - 0.14.3 (2026-11-05): the one-time historical-load document waiver (decision on owner question Q462, `docs/spec/technical-decisions-2026-11-04.md`; migration 0073; CHANGELOG 102). Additive. (1) `GET /settings/historical-waiver` (`getHistoricalWaiver`, any signed-in user: open or closed, cutoff date, expiry, whether the caller may manage it) and `PUT /settings/historical-waiver` (`setHistoricalWaiver`: a System Admin only, never a delegate, 403 `action_forbidden`; step-up; a reason; opening needs a cutoff date that is not in the future, 422 `validation_failed`; it closes itself after 30 days or by hand; every change is audited with the admin-override flag; the setting `load.historical_waiver` is written by no other path). (2) While it is open, a System Admin may mark a batch "historical load: accept without documents": `POST /import-batches` (a Site Register stream template) takes the form field `historical_load_reason`, and `POST /master-import/runs/{run_id}/apply` takes `historical_load: {reason}`; both need a step-up (401 `step_up_required`) and the open waiver (409 `invalid_transition`). For the rows of that batch the mandatory-document check is skipped only when the task's actual date is on or before the cutoff date; every other check runs; rows after the cutoff and every other batch are unchanged (the preview row carries the warning `historical_no_documents`). `ImportBatch.historical_load` shows the mark. (3) A task submitted that way has `TaskSummary.historical_no_documents` = true (the "Admin override" badge in the task and in the task grid; `TaskDetail.historical_load` has the batch, the cutoff and the missing document codes) and an audit row `task_historical_no_documents` (before and after values, the batch reference, `is_admin_override`). (4) Reversible: uploading the missing documents later is allowed on a flagged task even after its approval (`POST /tasks/{task_id}/slots/{slot_id}/files`) and, when no mandatory slot is missing any more, clears the flag by itself (audited `task_historical_no_documents_cleared`); a task that goes back to Data Entry loses the flag too. (5) KPIs: a flagged task is treated like an admin override. It is left out of the SLA and on-time figures when `exclude_overrides` is on (the default), counted otherwise; `KpiMeta.override_flagged_count` includes it and the new `KpiMeta.historical_flagged_count` counts only these; the health index leaves it out of documentation completeness and first-time approval; Project Status progress is unchanged.
+    - 0.15.535 (2026-11-28): photo fields in the Daily Plan and in Status Updates (migration 0473, mirror `db/sql/472_photo_daily_status.sql`). Additive. New `GET /photo-slots/daily-plan`, `GET /photo-slots/status-update` (`ScreenPhotos`), `POST /photo-slots/{daily-plan|status-update}/files` and `DELETE /photo-slots/{daily-plan|status-update}/{slot_id}/files/{file_id}`. Photos are document slots of two new owners, with two seeded document types (`PHOTO_DAILY_PLAN`, `PHOTO_STATUS_UPDATE`, kind photo) edited in Settings > Documents; a status update photo carries a site picked from the sites of its region. No new table, no new permission; the photos show in the Media gallery.
     - 0.15.536 (2026-11-28): signed and stamped copies in the Archive (migration 0474, mirror `db/sql/473_archive_marks.sql`). Additive. `LibraryArchiveRow` gains `signed`, `stamped`, `needs_signature`, `needs_stamp`; the Archive filter catalog gains the boolean fields `signed` and `stamped` (the existing `filter` parameter of `GET /library/archive/rows` and `POST /library/archive/zip`); `default_columns` of the Archive setting accepts `signed` and `stamped` (off for a project that already saved its list). The zip `manifest.csv` gets two last columns, `signed` and `stamped` (yes or no). No new table, no permission change; nothing is blocked by the markers.
     - 0.14.2 (2026-11-05): the settings screens of Q440 and Q441 and the decisions Q476 and Q477 (`docs/spec/technical-decisions-2026-11-04.md`, "Decided 2026-11-05 (2)"; migration 0072; CHANGELOG 101). Additive. (1) Q440: the official calendar is confirmed in Settings, Work calendar. `GET /settings/calendar-confirmation` and `PUT /settings/calendar-confirmation` (`CalendarConfirmation`, `CalendarConfirmationInput`: `confirmed` true or false and a `reason`; If-Match; audited as `calendar_official_confirmed` or `calendar_official_unconfirmed`; a System Admin, or a delegate of `settings` edit for all regions). Confirming is refused (422 `validation_failed`, path `/confirmed`) while the current or the next year has no holiday (`no_holidays`) or a holiday of those years is still tentative (`tentative_remaining`); the same blockers are in `CalendarConfirmation.blockers`. Unconfirming is always allowed. `HolidaySummary` gains `official_confirmed_at` and `official_confirmed_by` (who and when); `official_calendar_pending` is false while the setting is true, so the banner disappears. (2) Q441: the mail notification kinds are set in Settings. `GET /settings/mail-notification-kinds` and `PUT /settings/mail-notification-kinds` (`MailNotificationKinds`, `MailNotificationKindsInput`: `kinds` and a `reason`; If-Match; step-up; audited as `mail_notification_kinds_update`; System Admin only, a delegate gets 403 `action_forbidden`). The catalogue lists the kinds the code writes, with the six go-live kinds marked `recommended`; an unknown kind is refused (`unknown_kind`), and so is a kind reserved for security (`reserved_kind`: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`) and a duplicate (`duplicate`). (3) Q476: no HTTP change. The approved RF & Design feed fills `latitude` and `longitude` of the site only while the site has no coordinates (audited as `site_coordinates_fed`); afterwards they change only through a Change Control proposal (0.14.1). (4) Q477: no HTTP change. When an approved region move takes a site to another region, its open tasks keep their holders and SLA (B12b) and the holders of the `reassign` grant of the new region get an in-app notice of the new kind `site_region_moved` that lists the site and its open tasks; `NotificationKind` gains `site_region_moved`.
     - 0.14.1 (2026-11-05): technical decision Q473 (`docs/spec/technical-decisions-2026-11-04.md`, "Site creation"; migration 0071; CHANGELOG 100). Additive: no new path. The identity of a site changes only through a Change Control proposal (L1 proposes, L2 approves, audited with before and after values), never by a direct edit. `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`) gains the optional `identity` object (`SiteIdentityProposal`: `name`, `name_ar`, `latitude` with `longitude` as one pair, `region_id`, `cluster_code`, and `site_code`, which is always refused); `custom` becomes optional (send `custom`, `identity` or both; a reason is still required). One Change Control draft (Data Correction, Field) is opened per item (`field_item` `site.name`, `site.name_ar`, `site.coordinates`, `site.region` with the cluster, `site.cluster`); the result items carry `field` `name`, `name_ar`, `coordinates`, `region` or `cluster`. Field codes: `/identity/site_code` `immutable` (the Site ID never changes; also at submit of a hand-made Change Control record that names `site.site_code`), `unknown_field`, `required`, `too_long`, `invalid` (ranges of the site creation: latitude -90..90, longitude -180..180), `pair_required`, `unchanged`, `unknown_region`, `unknown_cluster`, `cluster_other_region` (a cluster must belong to the target region or be global; a region change names a cluster of the new region or none when the site's cluster would not fit). Region and cluster change who can see the site, so only a System Admin proposes or approves them: a Team Lead or a delegate gets 403 `action_forbidden` at the proposal, at submit and at the approval. On approval the site moves (its tasks and records follow), it is recalculated and the change is audited (`site_change_applied`, plus `site_region_moved_out` for the old region). Direct writes are closed: `pmis_app` can no longer update `sites.site_code`, `name`, `name_ar`, `region_id`, `cluster_id`, `latitude` or `longitude`, and the function `admin_transfer_site_region` is dropped. `PATCH /sites/{site_id}` writes custom values only (unchanged). `SiteDetail` and `GET /sites/{site_id}` are unchanged.
@@ -4661,6 +4662,144 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The slot after the change.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentSlot' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /photo-slots/daily-plan:
+    get:
+      tags: [documents]
+      operationId: listDailyPlanPhotos
+      summary: The photos of the Daily Plan (0.15.535)
+      description: Photo slots of the Daily Plan, one per site. `enabled` is false when the document type PHOTO_DAILY_PLAN is switched off in Settings > Documents (the field is then hidden). `can_upload` follows the write rules of the screen. Reads follow the region visibility of the screen.
+      parameters:
+        - { name: region_id, in: query, required: true, schema: { type: integer } }
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The photos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScreenPhotos' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /photo-slots/daily-plan/files:
+    post:
+      tags: [documents]
+      operationId: uploadDailyPlanPhoto
+      summary: Add a photo to a site of the Daily Plan (0.15.535)
+      description: |
+        Multipart. `region_id`, `date` and `site_id` (a site of the plan; an auto row is stored on first use, the plan version is not changed). Allowed to the L1 holders of the region (or a System Admin) on an unlocked day.
+        Same upload checks as every document (size, magic bytes, formats, number of files, virus scan, EXIF date). The photo appears in the Media gallery by itself. The audit row is `daily_plan.document_uploaded`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, site_id, region_id, date]
+              properties:
+                file: { type: string, contentMediaType: application/octet-stream }
+                site_id: { type: string, format: uuid }
+                region_id: { type: integer }
+                date: { type: string, format: date }
+                replaces_file_group_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentFile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /photo-slots/daily-plan/{slot_id}/files/{file_id}:
+    delete:
+      tags: [documents]
+      operationId: withdrawDailyPlanPhoto
+      summary: Withdraw a photo of the Daily Plan (0.15.535)
+      description: The photo is hidden, never deleted (`is_current` false); it stays on record and in the audit log. Same right as adding one.
+      parameters:
+        - { name: slot_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: file_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The slot after the change.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentSlot' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /photo-slots/status-update:
+    get:
+      tags: [documents]
+      operationId: listStatusUpdatePhotos
+      summary: The photos of the Status Update (0.15.535)
+      description: Photo slots of the Status Update, one per site. `enabled` is false when the document type PHOTO_STATUS_UPDATE is switched off in Settings > Documents (the field is then hidden). `can_upload` follows the write rules of the screen. Reads follow the region visibility of the screen.
+      parameters:
+        - { name: update_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The photos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScreenPhotos' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /photo-slots/status-update/files:
+    post:
+      tags: [documents]
+      operationId: uploadStatusUpdatePhoto
+      summary: Add a photo to a site of the Status Update (0.15.535)
+      description: |
+        Multipart. `update_id` and `site_id` (a site of the region of the update, 404 otherwise). Allowed to the author of the update inside its week.
+        Same upload checks as every document (size, magic bytes, formats, number of files, virus scan, EXIF date). The photo appears in the Media gallery by itself. The audit row is `status_update.document_uploaded`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, site_id, update_id]
+              properties:
+                file: { type: string, contentMediaType: application/octet-stream }
+                site_id: { type: string, format: uuid }
+                update_id: { type: string, format: uuid }
+                replaces_file_group_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentFile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /photo-slots/status-update/{slot_id}/files/{file_id}:
+    delete:
+      tags: [documents]
+      operationId: withdrawStatusUpdatePhoto
+      summary: Withdraw a photo of the Status Update (0.15.535)
+      description: The photo is hidden, never deleted (`is_current` false); it stays on record and in the audit log. Same right as adding one.
+      parameters:
+        - { name: slot_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: file_id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200':
           description: The slot after the change.
@@ -22874,6 +23013,22 @@ components:
               signature: {type: boolean}
               stamp: {type: boolean}
         version: {type: integer}
+    ScreenPhotos:
+      type: object
+      required: [enabled, can_upload, items]
+      description: The photo field of the Daily Plan or of Status Updates (0.15.535). One slot per site; the slot carries the files.
+      properties:
+        enabled: { type: boolean }
+        can_upload: { type: boolean }
+        items:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/DocumentSlot'
+              - type: object
+                required: [site_id]
+                properties:
+                  site_id: { type: string, format: uuid }
     DocumentSlot:
       type: object
       required: [id, doc_code, name_en, status, mandatory, files]

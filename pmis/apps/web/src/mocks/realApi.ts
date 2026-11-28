@@ -454,6 +454,13 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/ops-limits'],
   ['get', '/settings/login-page/public'],
   // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
+  // Contract 0.15.535 (migration 0473; apps/api: photo slots of the Daily Plan and Status Updates).
+  ['get', '/photo-slots/daily-plan'],
+  ['post', '/photo-slots/daily-plan/files'],
+  ['delete', '/photo-slots/daily-plan/:id/files/:fid'],
+  ['get', '/photo-slots/status-update'],
+  ['post', '/photo-slots/status-update/files'],
+  ['delete', '/photo-slots/status-update/:id/files/:fid'],
   // Contract 0.15.538 (migration 0476): the Data quality report and its settings.
   ['get', '/settings/data-quality'],
   ['put', '/settings/data-quality'],

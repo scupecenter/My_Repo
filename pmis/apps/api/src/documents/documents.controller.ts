@@ -76,6 +76,41 @@ export class DocumentsController {
     return this.docs.withdrawRecord(auth, key, id, slotId, fileId);
   }
 
+  // photo fields of the Daily Plan and of Status Updates (0473)
+  @Get('photo-slots/daily-plan')
+  dailyPlanPhotos(@Query('region_id') region: string, @Query('date') date: string) {
+    return this.docs.dailyPlanPhotos(region, date);
+  }
+
+  @Post('photo-slots/daily-plan/files')
+  @HttpCode(201)
+  @UseInterceptors(upload())
+  uploadDailyPlanPhoto(@UploadedFile() file: Uploaded, @Body() body: Record<string, unknown> | undefined) {
+    return this.docs.uploadDailyPlanPhoto(file, body);
+  }
+
+  @Delete('photo-slots/daily-plan/:slotId/files/:fileId')
+  withdrawDailyPlanPhoto(@Param('slotId') slotId: string, @Param('fileId') fileId: string) {
+    return this.docs.withdrawPhoto('daily_plan', slotId, fileId);
+  }
+
+  @Get('photo-slots/status-update')
+  statusUpdatePhotos(@Query('update_id') id: string) {
+    return this.docs.statusUpdatePhotos(id);
+  }
+
+  @Post('photo-slots/status-update/files')
+  @HttpCode(201)
+  @UseInterceptors(upload())
+  uploadStatusUpdatePhoto(@UploadedFile() file: Uploaded, @Body() body: Record<string, unknown> | undefined) {
+    return this.docs.uploadStatusUpdatePhoto(file, body);
+  }
+
+  @Delete('photo-slots/status-update/:slotId/files/:fileId')
+  withdrawStatusUpdatePhoto(@Param('slotId') slotId: string, @Param('fileId') fileId: string) {
+    return this.docs.withdrawPhoto('status_update', slotId, fileId);
+  }
+
   @Get('documents')
   list(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.docs.list(auth, q);
