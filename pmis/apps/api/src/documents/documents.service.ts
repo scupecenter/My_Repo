@@ -16,6 +16,7 @@ import { attachmentHeader, cleanOriginalName, displayName, NameParts } from './n
 import { evalRule } from './rules';
 import { formatAllowed, sniff } from './sniff';
 import { StorageService, newObjectKey } from './storage.service';
+import { thumbKeysOf } from '../media/thumbs';
 import { suggestSlots } from './suggest';
 
 export const SITE_DOCS = 'sites.documents';
@@ -38,6 +39,9 @@ export interface DocumentFileDto {
   capture_date: Date | null;
   unknown_capture_date: boolean;
   superseded_by: string | null;
+  /** 0555: this version is the signed and the stamped copy (markers set by the person who uploaded it); absent when never marked. */
+  signed?: boolean;
+  stamped?: boolean;
 }
 
 export interface DocumentSlotDto {
@@ -69,6 +73,10 @@ export interface DocumentSlotDto {
   /** Q227: the same requirement on the task or on the source record; a current file there fills this slot too. */
   shared_with: Record<string, unknown> | null;
   files: DocumentFileDto[];
+  /** 0555: the document type needs a signed copy and a stamped copy (setting documents.marks); awaiting = no current version carries what it needs yet. */
+  needs_signature: boolean;
+  needs_stamp: boolean;
+  awaiting_signed_copy: boolean;
 }
 
 interface TaskCtx {
@@ -295,6 +303,25 @@ export class DocumentsService {
 
   /** The slots of a task or of a register record (keyed on its logical record), as the screens show them. */
   async slotDtos(owner: SlotOwner): Promise<DocumentSlotDto[]> {
+    return this.withMarks(await this.slotDtosBase(owner));
+  }
+
+  /** 0555: the signed and stamped markers of the versions and what each slot's type needs. Never blocks anything: it only informs. */
+  private async withMarks(slots: Omit<DocumentSlotDto, 'needs_signature' | 'needs_stamp' | 'awaiting_signed_copy'>[]): Promise<DocumentSlotDto[]> {
+    if (slots.length === 0) return [];
+    const ids = slots.flatMap((s) => s.files.map((f) => f.id));
+    const cfg = (await this.db.tx.$queryRaw<{ j: { types: Record<string, { signature?: boolean; stamp?: boolean }> } }[]>(Prisma.sql`SELECT doc_marks_cfg() AS j`))[0]?.j.types ?? {};
+    const marks = ids.length ? ((await this.db.tx.$queryRaw<{ j: Record<string, { signed: boolean; stamped: boolean }> }[]>(Prisma.sql`SELECT doc_file_marks(${ids}::uuid[]) AS j`))[0]?.j ?? {}) : {};
+    return slots.map((s) => {
+      const need = cfg[s.doc_code] ?? {};
+      const needs_signature = need.signature === true, needs_stamp = need.stamp === true;
+      const files = s.files.map((f) => (marks[f.id] ? { ...f, signed: marks[f.id]!.signed, stamped: marks[f.id]!.stamped } : f));
+      const ok = (f: DocumentFileDto) => f.is_current && !f.superseded_by && (!needs_signature || f.signed === true) && (!needs_stamp || f.stamped === true);
+      return { ...s, files, needs_signature, needs_stamp, awaiting_signed_copy: (needs_signature || needs_stamp) && !files.some(ok) };
+    });
+  }
+
+  private async slotDtosBase(owner: SlotOwner): Promise<Omit<DocumentSlotDto, 'needs_signature' | 'needs_stamp' | 'awaiting_signed_copy'>[]> {
     const where = owner.kind === 'task' ? Prisma.sql`ds.task_id = ${owner.key}::uuid` : Prisma.sql`ds.register_entity_id = ${owner.key}::uuid`;
     const slots = await this.db.tx.$queryRaw<SlotRow[]>(Prisma.sql`
       SELECT ds.id::text AS id, ds.doc_type_id::text AS doc_type_id, dt.code AS doc_code, dt.name_en, dt.name_ar, dt.kind::text AS kind, dt.form_kind, ds.status::text AS status, ds.reject_reason,
@@ -416,9 +443,23 @@ export class DocumentsService {
     const { task } = await this.slotOf(auth, taskId, slotId);
     if (!uuidSchema.safeParse(fileId).success) throw problems.notFound();
     await this.call(() => this.db.tx.$queryRaw(Prisma.sql`SELECT doc_withdraw_file(${slotId}::uuid, ${fileId}::uuid)`));
+    await this.dropThumbs(fileId);
     const slot = (await this.buildSlots(auth, task)).find((s) => s.id === slotId);
     if (!slot) throw problems.notFound();
     return slot;
+  }
+
+  /** A withdrawn file keeps its row and its original; its generated thumbnails (derived data) are removed. A failure here never fails the withdrawal. */
+  private async dropThumbs(fileId: string): Promise<void> {
+    try {
+      const r = await this.db.tx.$queryRaw<{ storage_key: string; cfg: { thumbnails?: { small_px: number; medium_px: number } } }[]>(
+        Prisma.sql`SELECT f.storage_key, media_gallery_state() AS cfg FROM document_files f WHERE f.id = ${fileId}::uuid`);
+      const th = r[0]?.cfg?.thumbnails;
+      if (!r[0] || !th) return;
+      for (const k of thumbKeysOf(r[0].storage_key, th)) await this.storage.store.remove(k).catch(() => undefined);
+    } catch {
+      /* derived data: it is made again on request */
+    }
   }
 
   async suggest(auth: AuthContext, taskId: string, raw: unknown): Promise<{ items: { file_name: string; suggestions: { slot_id: string; doc_code: string; score: number }[] }[] }> {
@@ -537,6 +578,7 @@ export class DocumentsService {
     const { r } = await this.recordSlotOf(auth, key, recordId, slotId);
     if (!uuidSchema.safeParse(fileId).success) throw problems.notFound();
     await this.call(() => this.db.tx.$queryRaw(Prisma.sql`SELECT doc_withdraw_file(${slotId}::uuid, ${fileId}::uuid)`));
+    await this.dropThumbs(fileId);
     const slot = (await this.recordSlotsFor(auth, r)).find((s) => s.id === slotId);
     if (!slot) throw problems.notFound();
     return slot;
@@ -612,6 +654,11 @@ export class DocumentsService {
     } catch (e) {
       await this.storage.store.remove(key).catch(() => undefined);
       throw e;
+    }
+    // 0555: the uploader may mark this version as the signed and the stamped copy (form fields signed and stamped)
+    const flag = (v: unknown) => v === true || v === 'true' || v === '1';
+    if (body && (body.signed !== undefined || body.stamped !== undefined)) {
+      await this.call(() => this.db.tx.$queryRaw(Prisma.sql`SELECT doc_mark_file(${fileId}::uuid, ${flag(body.signed)}::boolean, ${flag(body.stamped)}::boolean)`));
     }
     const after = (await reload()).find((s) => s.id === slotId);
     const dto = after?.files.find((f) => f.id === fileId);

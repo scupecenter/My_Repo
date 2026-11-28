@@ -319,8 +319,11 @@ export function HeaderRow({
   testid,
   colMenu,
   hint,
+  colTestId,
 }: {
   api: TableApi;
+  /** a test id for the header cell of a column (a screen that keeps its own header ids) */
+  colTestId?: (id: string) => string | undefined;
   label: (id: string) => string;
   /** A tooltip for a column header (for example the group of a Master column). */
   hint?: (id: string) => string | undefined;
@@ -373,6 +376,7 @@ export function HeaderRow({
             key={c.id}
             role="columnheader"
             data-col={c.id}
+            data-testid={colTestId?.(c.id)}
             draggable={!c.pinned}
             title={hint?.(c.id)}
             onDragStart={(e) => {
