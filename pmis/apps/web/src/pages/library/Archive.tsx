@@ -225,7 +225,7 @@ export function ArchiveList() {
     <div data-testid="page-library-archive-list" data-doc={docCode}>
       <PageHeader title={title} subtitle={t('lib.lifecycle_note')} context={<Link to="/library/archive" className="btn ms-auto px-2 py-1 text-xs" data-testid="lib-back"><ArrowLeft size={14} className="rtl:rotate-180" />{t('lib.back')}</Link>} />
       <TableToolbar testid="lib-archive-toolbar"
-        views={<SavedViews screen="library-archive" value={{ q, superseded: superseded ? 'true' : '', ...(advTree ? { advanced: advTree } : {}) }} empty={EMPTY} table={tbl}
+        views={<SavedViews screen="library-archive" sharedScreen value={{ q, superseded: superseded ? 'true' : '', ...(advTree ? { advanced: advTree } : {}) }} empty={EMPTY} table={tbl}
           onApply={(v) => { const x = v as Record<string, unknown>; setParams({ q: String(x.q ?? ''), superseded: String(x.superseded ?? ''), adv: encodeFilter((v as { advanced?: FilterTree }).advanced) }); }} />}
         search={<SearchBox testid="lib-archive-search" value={q} onChange={(v) => setParams({ q: v })} placeholder={t('lib.search_docs')} />}
         filter={<UnifiedFilter screen="library-archive" value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree) })} onClearAll={() => setParams({ adv: '', superseded: '' })}
@@ -233,7 +233,7 @@ export function ArchiveList() {
         extra={<PastedChip search={rows.data?.pages[0]?.search} />}
         count={<TableCount testid="lib-archive-count" noun="documents" total={counts?.total} filtered={counts?.filtered} active={active} onClear={() => setParams({ q: '', adv: '', superseded: '' })} />}
         primary={<Tip text={t('lib.zip')}><button type="button" className="btn" data-testid="lib-archive-zip" aria-label={t('lib.zip')} disabled={zipping || gate.exportLocked || !items.some((r) => r.file_id)} title={gate.note(gate.exportLocked)} onClick={() => void zip()}><FileArchive size={16} /></button></Tip>}
-        columns={<ColumnMenu api={tbl} label={label} />}
+        columns={<ColumnMenu density={false} api={tbl} label={label} />}
         layout={<LayoutPanel testid="lib-archive-layout" table={tbl} />}
         exporter={<Tip text={t('tstd.export_view')}><button type="button" className="btn" data-testid="lib-archive-export" aria-label={t('tstd.export_view')} disabled={gate.exportLocked} title={gate.note(gate.exportLocked)} onClick={() => void exportView()}><Download size={16} /></button></Tip>} />
       <div className="card gx overflow-auto" {...displayAttrs(tbl.display)} data-testid="lib-archive-table" role="table" aria-label={title}>

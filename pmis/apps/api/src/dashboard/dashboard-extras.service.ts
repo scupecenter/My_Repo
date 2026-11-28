@@ -6,6 +6,7 @@ import { Query } from "../common/query";
 import { DbService } from "../db/db.service";
 import { FilterCatalogService } from "../views/filter-catalog.service";
 import { SCENARIOS, dashboardParams } from "./dashboard.service";
+import { monthlyOnAirTarget } from "./dashboard-targets";
 import {
   aggregateGaps,
   kpiColour,
@@ -327,6 +328,19 @@ export class DashboardExtrasService {
   }
 
   /**
+   * 0348 (contract 0.15.249): the live KPI values system-wide for the daily alert-rules job. The job has no signed-in caller, so this
+   * skips the caller scoping of get(): the definer-role connection reads everything, the same queries the dashboard uses compute each
+   * catalogue KPI, and the alert_rules_kpi_run database function compares the values with each rule's own threshold. Null values stay
+   * null (a pending KPI alerts nobody).
+   */
+  async kpiValuesForJob(): Promise<Record<string, number | null>> {
+    const dq = await this.dataQuality(Prisma.empty);
+    const c = await this.counters(Prisma.empty, dq, { scope: null, region: null });
+    const kpis = (c as { kpis: { code: string; value: number | null }[] }).kpis;
+    return Object.fromEntries(kpis.map((k) => [k.code, k.value]));
+  }
+
+  /**
    * F20 (migration 0113, contract 0.15.29): the sources of the seven counters that had none before. Each reads the existing tables; the B3
    * scope applies (the regions of the caller; the site-based ones also the cluster and scenario filters). A count with no base answers null.
    *  The latest approved versions are read inline from register_records (not fa_latest, which is definer-only), so the reader's row security applies.
@@ -454,7 +468,8 @@ export class DashboardExtrasService {
       time_in_state_p85:
         Number(timeInState.n) > 0 ? roundDays(timeInState.p85) : null,
       stale_tasks: sharePct(Number(stale.stale), Number(stale.open_total)),
-      on_air_vs_target: targetPct(Number(onAir.n), cfg.targets.monthly_on_air),
+      // 0.15.367: the target in force, derived from the scope unless the manual override is on (then the typed number of Settings)
+      on_air_vs_target: targetPct(Number(onAir.n), (await monthlyOnAirTarget(this.db, siteWhere)).value),
     };
   }
 

@@ -53,6 +53,10 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Quality inspection | Snag | foreign key (0182, `_idfk`, ON DELETE SET NULL) | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
 | Financial advances (expense, settlement) | Advance | register link | `advance_id` | checked in entry (approved advance of the same site, 0407); disbursed rule at submit; picker `advance-options` |
+| Financial advances (advance page) | Expense / settlement draft | prefilled create (D59) | `advance_id`, site, today, balance to return | web buttons on an approved, disbursed advance; the draft goes through the normal create and the 0407 check |
+| Alert rules (Settings > Security > Alerts) | Advances, invoices | notification kinds (0408) | `advance_unsettled`, `invoice_due_soon` | weekly per open advance, once per invoice and due date; days default to the Finance hub `settle_warn_days` |
+| Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); picker `invoices/order-options`; listed in `record_related` |
+| Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; picker `invoices/supplier-options` |
 | Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); PR No. and PO / WO No. read from the order (`order_pr_no`, `order_po_wo_no`, 0430); required when Settings > Register rules says so (`order_required`); picker `invoices/order-options`; listed in `record_related` |
 | Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; required when Settings > Register rules says so (`supplier_required`, 0430); picker `invoices/supplier-options` |
 | HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |
@@ -62,6 +66,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Change Control | Procurement order, task | register link, typed by pick-list | `procurement_order_id`, `affected_task_code` (0325); the order shows the change-pending mark through `record_related` | chosen |
 | Issues | Task | text field filled by a task picker | `blocked_gate_or_task` (the task code) | chosen |
 | Register decisions, task approvals, snags | Notifications | `x_notify_watchers`, policy in setting `notifications.policy` | `notifications` | derived |
+
+**Declared links (0409, D60 phase 1).** Every register link field is declared once in `register_links` (register, field, target register, target record type, same site, label fields, `enforce`). `record_related()` reads the declaration, `GET /registers/{key}/links` and `GET /registers/{key}/link-options/{field}` serve the web (generic `RecordLinkSelect`, used for any declared field without a hand-coded picker), and a link with `enforce = true` is checked in entry (the id is a current approved record of the target that the caller can see, of the same site when `same_site`). The links above are declared with the check off (declared only, so no old row is refused); `register_link_orphans()` reports the ids that point nowhere, to decide when to switch a link on. A new link is one row. Phase 2 (0410) adds the filters `data_in` and `data_not_like` and the label tokens (`a|b`, `field>key`, `@party`), so the generic picker replaces the hand-coded order and advance pickers in the drawer (the Dismantle order and RN pickers, the risk picker and the supplier picker stay: they filter by part, by status or read another table).
 
 ## 4. Gaps and proposals
 
