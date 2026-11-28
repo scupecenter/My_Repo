@@ -66,7 +66,7 @@ describe('V4 register chart', () => {
 
   it('layoutsOf: the chart on every register, the map still only where the records carry a site', () => {
     const base = { register_key: 'x', name_en: 'X', name_ar: 'X', module_key: 'x', site_scoped: false, fields: [] } as unknown as RegisterDefinition;
-    expect(layoutsOf(base)).toEqual(['list', 'wide', 'board', 'feed', 'chart']);
-    expect(layoutsOf({ ...base, site_scoped: true })).toEqual(['list', 'wide', 'board', 'feed', 'map', 'chart']);
+    expect(layoutsOf(base)).toEqual(['list', 'wide', 'board', 'feed', 'chart', 'pivot']);
+    expect(layoutsOf({ ...base, site_scoped: true })).toEqual(['list', 'wide', 'board', 'feed', 'map', 'chart', 'pivot']);
   });
 });

@@ -7265,6 +7265,20 @@
     "display_pin": "Freeze the first columns"
   },
   "regviews": {
+    "pivot_title": "Pivot table",
+    "pivot_rows": "Rows",
+    "pivot_cols": "Columns",
+    "pivot_no_cols": "None (totals only)",
+    "pivot_region": "Region",
+    "pivot_total": "Total",
+    "pivot_split": "Split across the columns",
+    "pivot_note": "{{measure}}, rows by {{rows}}, columns by {{cols}}.",
+    "pivot_label": "Pivot table of {{measure}}: rows by {{rows}}, columns by {{cols}}",
+    "pivot_cell": "{{rows}}, {{cols}}: {{value}}",
+    "pivot_cell_hint": "{{rows}} / {{cols}}: {{value}}. Click to list these rows.",
+    "pivot_row_hint": "Click to list all rows of {{rows}}.",
+    "pivot_other_hint": "Several values are folded here, so they cannot be listed together.",
+    "pivot_split_label": "How the {{total}} of {{rows}} split across the columns",
     "board_drag_note": "Drag a card to another column to change its status. A refused drop says why.",
     "drag_state": "The approval state moves only through the record's own actions.",
     "drag_same": "Already in this column.",
@@ -7849,6 +7863,7 @@
     "feed_hint": "Latest changes first, one line per record",
     "map": "Map",
     "map_hint": "Items on the map",
+    "pivot_hint": "Summarise the rows by two fields, for example sites per region and status.",
     "chart_hint": "The rows as bars or a ring, by a field you choose",
     "calendar_hint": "On a month grid, by a date you choose"
   },

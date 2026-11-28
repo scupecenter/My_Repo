@@ -10,7 +10,7 @@ export type SummarySegment = { key: string; label: string; count: number; tone: 
  * "Group summary" is on (Settings > Screens > Tables for the default, the Layout panel for the person's own choice), so a screen without it shows the
  * plain header it had. Colours come from the status tones the app already uses; the segment order is the order of `segments`.
  */
-export function GroupSummary({ testid, group, segments, active, onPick, show }: {
+export function GroupSummary({ testid, group, segments, active, onPick, show, label }: {
   testid: string;
   /** the group's name, for the text alternative */
   group: string;
@@ -19,13 +19,15 @@ export function GroupSummary({ testid, group, segments, active, onPick, show }: 
   active: string | null;
   onPick: (key: string | null) => void;
   show: boolean;
+  /** the text alternative of the whole bar, when "tasks" is not the right noun (the pivot table counts records) */
+  label?: string;
 }) {
   const { t } = useTranslation();
   const total = segments.reduce((n, s) => n + s.count, 0);
   if (!show || total === 0) return null;
   const parts = segments.filter((s) => s.count > 0);
   return (
-    <span className="ms-auto flex min-w-0 items-center gap-2" data-testid={testid} role="group" aria-label={t('gsum.label', { total, group })}>
+    <span className="ms-auto flex min-w-0 items-center gap-2" data-testid={testid} role="group" aria-label={label ?? t('gsum.label', { total, group })}>
       <span className="flex h-3 w-40 overflow-hidden rounded-full border border-line bg-card" data-testid={`${testid}-bar`}>
         {parts.map((s) => (
           <Tip key={s.key} text={t('gsum.segment_hint', { label: s.label, count: s.count })}>
