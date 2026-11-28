@@ -10,6 +10,7 @@ import { boolParam, Query } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { TOP_LEVEL_KEYS } from '../permissions/catalogue';
+import { customModuleKeys } from '../permissions/custom-modules';
 
 const reason = z.string().trim().min(3).max(1000);
 /** Role capabilities (migration 0055, Q165): who reads the whole Audit Log, and who reads it as a Team Lead (their modules and regions). */
@@ -195,7 +196,8 @@ export class RolesService {
       errors.push({ path: '/default_profile_id', code: 'not_found', message: 'No such permission profile.' });
     }
     if (Array.isArray(modules)) {
-      modules.forEach((m, i) => { if (!TOP_LEVEL_KEYS.has(m)) errors.push({ path: `/default_module_keys/${i}`, code: 'unknown_module', message: `Unknown module ${m}.` }); });
+      const custom = await customModuleKeys(this.db);
+      modules.forEach((m, i) => { if (!TOP_LEVEL_KEYS.has(m) && !custom.has(m)) errors.push({ path: `/default_module_keys/${i}`, code: 'unknown_module', message: `Unknown module ${m}.` }); });
     }
     if (errors.length > 0) throw problems.validation(errors);
   }
