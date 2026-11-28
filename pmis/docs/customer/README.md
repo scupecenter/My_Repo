@@ -12,6 +12,7 @@
 | [05-training-ar.md](05-training-ar.md) | مادة التدريب | Arabic training material per role |
 | [06-admin-guide-ar.md](06-admin-guide-ar.md) | دليل مدير النظام | Arabic administrator guide |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
+| [07-reorder-limits-and-supplier-returns.md](07-reorder-limits-and-supplier-returns.md) | حدود إعادة الطلب ومرتجعات الموردين | Reorder limits and supplier returns (tracking only, no stock effect) |
 | [06-site-map-tiles.md](06-site-map-tiles.md) | خريطة المواقع على بلاطات من خادمك | Site map on map tiles served from your own server (off by default) |
 
 ## وثائق مخططة لاحقاً | Planned later
@@ -23,3 +24,4 @@
 | دليل التشغيل (Runbook) | P3 | Operations runbook | P3 |
 
 المصادر: `CLAUDE.md`، `CHANGELOG.md`، `docs/adr/`، `docs/spec/`، `db/erd.md`، `contracts/openapi.yaml`، `HANDOVER.md`. الإضافات المقترحة غير المؤكدة مكتوبة فيها «يُؤكَّد لاحقاً».
+| [shortage-draft-purchase-request.md](shortage-draft-purchase-request.md) | Draft purchase request from a material shortage line |
