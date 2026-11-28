@@ -882,7 +882,9 @@
     "claimed": "You claimed this level.",
     "released": "You released this level.",
     "resize": "Resize drawer",
-    "expand": "Full screen",
+    "copy_link": "Copy link to this record",
+    "link_copied": "Link copied",
+    "link_failed": "Could not copy the link",    "expand": "Full screen",
     "restore": "Restore size",
     "prev": "Previous",
     "next": "Next",
@@ -8249,6 +8251,10 @@
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   },
   "ui": {
+    "extras_title": "On this device",
+    "extras_note": "These switches affect only this browser. Nothing is saved on the server.",
+    "extra_copy_link": "Copy-link button in drawers",
+    "extra_copy_link_hint": "Shows a button in a task or record drawer that copies the address of that record.",
     "guard_title": "Unsaved changes",
     "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
     "guard_enabled": "Ask before leaving unsaved changes",
