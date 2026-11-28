@@ -30,8 +30,8 @@ const CR = () => (C().contractorRules ??= initCfg().contractorRules);
 /** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 interface AlertRuleRow {
-  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle'; params: Record<string, unknown>; audience: Record<string, unknown>;
-  title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; version: number;
+  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold'; params: Record<string, unknown>; audience: Record<string, unknown>;
+  title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; locked: boolean; version: number;
   created_at: string; updated_at: string;
 }
 const ALERT_RULES: AlertRuleRow[] = [
@@ -39,7 +39,7 @@ const ALERT_RULES: AlertRuleRow[] = [
     id: '00000000-0000-4000-8000-000000000001', code: 'weekly-status-missing', kind: 'weekly_status_missing', params: {}, audience: { type: 'system_admin' },
     title_en: 'Weekly status missing: {{region}}', title_ar: 'تحديث أسبوعي مفقود: {{region}}',
     body_en: 'No Weekly status update was filed for {{region}} this working week.', body_ar: 'لم يُقدَّم تحديث الحالة الأسبوعي لمنطقة {{region}} هذا الأسبوع.',
-    link: '/project-status', enabled: true, version: 1, created_at: '2026-11-27T00:00:00.000Z', updated_at: '2026-11-27T00:00:00.000Z',
+    link: '/project-status', enabled: true, locked: false, version: 1, created_at: '2026-11-27T00:00:00.000Z', updated_at: '2026-11-27T00:00:00.000Z',
   },
 ];
 let perf = { thresholds: structuredClone(PERF_DEFAULT), version: 1 };
@@ -511,6 +511,8 @@ let pmState = { version: 0, schedules: [] as MockPm[], updated_at: null as strin
 const PM_CATALOGUE = { registers: [{ key: 'procurement', name_en: 'Procurement', name_ar: 'المشتريات', site_scoped: false }], units: ['week', 'month'] };
 const pmView = () => ({ ...pmState, today: tripoliToday(), catalogue: PM_CATALOGUE });
 
+const DR = { default: 'first' as 'first' | 'last', registers: {} as Record<string, 'first' | 'last'>, version: 1, updated_at: null as string | null };
+const dupRowsView = () => ({ default: DR.default, registers: DR.registers, updated_at: DR.updated_at, updated_by: null, version: DR.version, can_edit: viewer()?.key === 'admin' || !!viewer()?.nav.includes('settings') });
 export const settingsHandlers = [
   http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
   http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
@@ -675,6 +677,23 @@ export const settingsHandlers = [
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.345 (0432): duplicate rows in one file (Settings, Imports)
+  http.get(`${B}/settings/duplicate-rows`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dupRowsView(), tag(DR.version)); }),
+  http.put(`${B}/settings/duplicate-rows`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, DR.version); if (p) return p;
+    const b = await body<{ default?: string; registers?: Record<string, string>; reason?: string }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (b.default !== 'first' && b.default !== 'last') errs.push({ path: '/default', code: 'invalid' });
+    Object.entries(b.registers ?? {}).forEach(([k, v]) => { if (v !== 'first' && v !== 'last') errs.push({ path: `/registers/${k}`, code: 'invalid' }); });
+    if (errs.length) return fields(...errs);
+    if (DR.default === b.default && JSON.stringify(DR.registers) === JSON.stringify(b.registers ?? {})) return problem(409, 'invalid_transition', 'These values are already set.');
+    Object.assign(DR, { default: b.default as 'first' | 'last', registers: (b.registers ?? {}) as Record<string, 'first' | 'last'>, version: DR.version + 1, updated_at: new Date().toISOString() });
+    return HttpResponse.json(dupRowsView(), tag(DR.version));
   }),
 
   // ------------------------------------------------------------------ 0.15.322: the upload policy of the imports (D49 part 3)
@@ -1434,6 +1453,18 @@ export const settingsHandlers = [
           if (!['templates', 'uploads', 'exports', 'master_import'].includes(k)) errs.push({ path: `${path}/default_view/${k}`, code: 'unknown_key' });
           else if (!['cards', 'rows', 'table', 'compact'].includes(String(v[k]))) errs.push({ path: `${path}/default_view/${k}`, code: 'invalid' });
         }
+      } else if (name === 'finance_hub') {
+        for (const k of Object.keys(o)) if (!['widgets', 'settle_warn_days', 'aging_days'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        const w = o.widgets as Record<string, unknown> | undefined;
+        if (!w || typeof w !== 'object') errs.push({ path: `${path}/widgets`, code: 'invalid' });
+        else for (const k of Object.keys(w)) {
+          if (!['advances', 'invoices', 'quick_links', 'templates'].includes(k)) errs.push({ path: `${path}/widgets/${k}`, code: 'unknown_key' });
+          else if (typeof w[k] !== 'boolean') errs.push({ path: `${path}/widgets/${k}`, code: 'invalid' });
+        }
+        if (!Number.isInteger(o.settle_warn_days)) errs.push({ path: `${path}/settle_warn_days`, code: 'invalid' });
+        else if ((o.settle_warn_days as number) < 1 || (o.settle_warn_days as number) > 365) errs.push({ path: `${path}/settle_warn_days`, code: 'out_of_range' });
+        const a = o.aging_days;
+        if (!Array.isArray(a) || a.length !== 2 || !a.every((x) => Number.isInteger(x) && x >= 1 && x <= 365) || (a[0] as number) >= (a[1] as number)) errs.push({ path: `${path}/aging_days`, code: 'invalid' });
       } else errs.push({ path, code: 'unknown_key' });
     }
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
@@ -1524,7 +1555,8 @@ export const settingsHandlers = [
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }],
+        kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
         modules: [{ key: 'sites', name_en: 'Sites' }, { key: 'procurement', name_en: 'Procurement' }],
@@ -1535,14 +1567,14 @@ export const settingsHandlers = [
     const g = needAdmin(); if (g) return g;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
-    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
+    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
     if (ALERT_RULES.some((x) => x.code === b.code)) return fields({ path: '/code', code: 'conflict' });
     const row = {
       id: `00000000-0000-4000-8000-${String(ALERT_RULES.length + 1).padStart(12, '0')}`,
-      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle',
+      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold',
       params: (b.params ?? {}) as Record<string, unknown>, audience: (b.audience ?? { type: 'system_admin' }) as Record<string, unknown>,
       title_en: String(b.title_en ?? ''), title_ar: String(b.title_ar ?? ''), body_en: String(b.body_en ?? ''), body_ar: String(b.body_ar ?? ''),
-      link: (b.link ?? null) as string | null, enabled: b.enabled !== false, version: 1,
+      link: (b.link ?? null) as string | null, enabled: b.enabled !== false, locked: b.locked === true, version: 1,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     };
     ALERT_RULES.push(row);
@@ -1556,10 +1588,11 @@ export const settingsHandlers = [
     const p = ver(request, row.version); if (p) return p;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
+    if (row.locked && b.locked !== false) return fields({ path: '/locked', code: 'rule_locked' });
     Object.assign(row, {
       kind: b.kind ?? row.kind, params: b.params ?? row.params, audience: b.audience ?? row.audience,
       title_en: b.title_en ?? row.title_en, title_ar: b.title_ar ?? row.title_ar, body_en: b.body_en ?? row.body_en, body_ar: b.body_ar ?? row.body_ar,
-      link: b.link === undefined ? row.link : b.link, enabled: b.enabled ?? row.enabled, version: row.version + 1, updated_at: new Date().toISOString(),
+      link: b.link === undefined ? row.link : b.link, enabled: b.enabled ?? row.enabled, locked: b.locked ?? row.locked, version: row.version + 1, updated_at: new Date().toISOString(),
     });
     return HttpResponse.json({ id: row.id, version: row.version });
   }),
