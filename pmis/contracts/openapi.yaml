@@ -37,6 +37,8 @@ info:
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
     - 0.15.269 (2026-11-27): progress calculation standards (owner approval 2026-11-27; migrations 0540-0545; PR #458). Additive. (1) Register and LOE measure rules for weight items (0540): an item can be measured by a register record's state or as level-of-effort (excluded from plan figures). (2) Draft calibrated weight set v2 (0541, DRAFT, never auto-published). (3) Task estimated man-days and planned duration with a suggested weight in the editor (0542; `PUT /workflow/versions/{version}/tasks/{task_code}/estimate`; advice only, never auto-applied). (4) Partial credit for in-progress tasks, OFF by default (0543; `GET`/`PUT /settings/partial-credit`, System Admin). (5) Warehouse-linked central equipment items measured from central warehouse movements (0544). (6) Per-region forecast completion date on the dashboard regions card and project-status rows (0545; `DashboardRegion.forecast_date`, rows `forecast_date`). The Arabic names of all 45 weight items are backfilled (0546) and remain editable on draft sets in the weight-set editor.
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
+    - 0.15.332 (2026-11-27): the generic link declaration (D60, phase 1; migration 0409, mirror `db/sql/408_register_links.sql`). Additive. New table `register_links` (one row per link field), `GET /registers/{key}/links` (`listRegisterLinks`) and `GET /registers/{key}/link-options/{field}` (`listRegisterLinkOptions`); `record_related` also reads the declared links; links flagged `enforce` are checked in entry. Existing links are declared with the check off.
+    - 0.15.333 (2026-11-27): the link declaration learns the filters and labels of the hand-coded pickers (D60, phase 2; migration 0410, mirror `db/sql/409_register_links_filters.sql`). Additive, no new path. `GET /registers/{key}/link-options/{field}` applies the link's data filters (for example advances in disbursed or settlement, orders not cancelled) and labels items with the PO / WO No. and the contractor; the web register drawer uses it instead of the hand-coded order and advance pickers. Links stay declared with the check off.
     - 0.15.322 (2026-11-27): the upload policy of the imports, Enforce or Accept incomplete (owner decision D49 part 3, 2026-11-27; migration 0492, mirror `db/sql/491_upload_policy.sql`). Additive; the default is `enforce`, which is today's behaviour. (1) `GET /settings/imports/upload-policy` (every signed-in user) and `PUT /settings/imports/upload-policy` (a System Admin or an all-regions delegate of `settings` edit, a reason, If-Match, audited `imports_upload_policy_update` with before and after): the setting `imports.upload_policy`, `enforce` or `accept_incomplete`. (2) `POST /master-import/runs/{run_id}/apply` reads it. With `accept_incomplete` (and no historical-load option, which opens its sites itself) the sites of the file are opened first through the same door as `POST /sites/workflow-locks`: the unlock right of each region (403 `action_forbidden` otherwise), a step-up (401 `step_up_required`), an audit row per site; the tasks approved on an open site while a lock would have held them are flagged `lock_bypassed` (Admin override). Sites that a `create_sites` apply creates are not in the file yet and keep their locks. No right, role or grant changes. (3) `SiteImportStatus` (`GET /master-import/runs/{run_id}/sites`, `GET /import-batches/{batch_id}/sites`) gains `data_gap_items`: the items of `site_data_gaps` of each site, the per-row missing-data indicator. The third mode (valid rows only) is not part of this change.
     - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
     - 0.15.262 (2026-11-27): the unsaved-changes guard joins `ui.features` as the section `unsaved_guard` (migration 0401, mirror `db/sql/400_ui_unsaved_guard.sql`; CHANGELOG UnsavedGuard, Decision 11). Additive: `UiFeatures` and `UiFeaturesPatch` gain `unsaved_guard` (`UiUnsavedGuard`: `enabled` and one boolean per area); a stored value without the section takes the seed (guard on everywhere). No new path.
@@ -127,9 +129,11 @@ info:
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.365 (2026-11-27): two financial alert kinds for the generic alert rules (D59; migration 0408, mirror `db/sql/407_finance_alert_kinds.sql`): `advance_unsettled` (current approved advances still disbursed or in settlement for at least `days` days; `days` defaults to the Finance hub value `settle_warn_days`, else 30) and `invoice_due_soon` (approved invoices not Paid or Cancelled with a due date within `days` days, default 7, or past). The kind enum of the alert-rule schemas and the catalogue list grow; no new route, notifications only, same audience and dedupe journal. The advance page also gets buttons that create an expense or a settlement draft filled from the advance (web only, through the existing register create route).
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
+    - 0.15.370 (2026-11-27): the personal sidebar mode (migration 0527, mirror `db/sql/526_sidebar_mode.sql`; Ahmed's decision 2026-11-25). Additive. `UiNav` gains `mode` (`pinned` default, `autohide`); `ui_nav_check` is patched in place; a stored sidebar without it is unchanged. Audited like the other sidebar keys.
     - 0.15.371 (2026-11-27): weight item measure rule checked (migration 0552, mirror `db/sql/551_weight_rule_check.sql`; Settings review gap 1). Additive, no new path. `PUT /settings/weight-sets/{id}`: a measure rule that looks like JSON but does not parse is 422 `validation_failed` (it was 500). Publish and preview: `weight_set_errors` adds `measure_rule_invalid` (path `/activities/{n}/items`) for a rule that is not an object, has an unknown method (none, tasks, register), names no task, names a task code that is in no workflow, has a plan outside MS1 to MS10, or has a `central` that is not true/false.
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
+    - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
     - 0.15.434 (2026-11-28): the weights preview lists the item level differences against the set in force (Settings review gap 7, approved by the owner 2026-11-27; no migration). Web only, no path or schema change: Settings > Weights > Preview now also shows, from the saved draft and the set in force (`GET /settings/weight-sets/{id}` and the list), which activities and items are added, removed or changed (name, weight, unit, measure rule). Nothing is written.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
@@ -11694,6 +11698,64 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{key}/links:
+    get:
+      tags: [registers]
+      operationId: listRegisterLinks
+      summary: The declared links of a register (0.15.332)
+      description: |
+        0.15.332 (D60). One row per link field of the register in the declaration table `register_links`: the field, the target register, the target record type when given, whether the target must be of the same site, and whether the database checks the id in entry (`enforce`). Needs the register view.
+      parameters:
+      - {name: key, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: The links.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [field, target_register, same_site, enforce]
+                      properties:
+                        field: {type: string}
+                        target_register: {type: string}
+                        target_record_type: {type: [string, 'null']}
+                        same_site: {type: boolean}
+                        enforce: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{key}/link-options/{field}:
+    get:
+      tags: [registers]
+      operationId: listRegisterLinkOptions
+      summary: The records a declared link field may name (0.15.332)
+      description: |
+        0.15.332 (D60). The current records of the target register in the state the link requires (approved by default), of the site `site_id` when the link is same-site and the site is given, filtered by `q` on the label, in the regions the caller may read. Needs the view of the register and of the target. Each item has `entity_id`, `record_id`, `label`, and `site_id` / `record_type` when set.
+      parameters:
+      - {name: key, in: path, required: true, schema: {type: string}}
+      - {name: field, in: path, required: true, schema: {type: string}}
+      - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
+      - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+      responses:
+        '200':
+          description: The options.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/financial_advances/advance-options:
     get:
       tags: [registers]
@@ -12654,6 +12716,58 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SnapshotSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard/progress-rag:
+    get:
+      tags: [settings]
+      operationId: getProgressRag
+      summary: Green and amber thresholds of the progress figures (0.15.432)
+      description: |
+        0.15.432. The setting `dashboard.progress_rag`: for the SPI (`spi`), the progress against plan in points (`progress_gap`, progress minus planned, can be negative) and the weekly velocity of the
+        progress curve (`velocity`, points per week): `enabled`, `green`, `amber` (higher is better, green is not below amber). A figure is coloured only while `enabled` is true; nothing is enabled until an admin saves it.
+        `default_green` and `default_amber` are suggestions shown in the editor (`green` and `amber` carry them until the first save). `version` is 0 until the first save and moves on every save (the ETag).
+        Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+      responses:
+        '200':
+          description: The thresholds.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProgressRag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setProgressRag
+      summary: Save the thresholds of the progress figures (reason, If-Match, audited)
+      description: |
+        0.15.432. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). All three figures are sent. Field errors (422 `validation_failed`): `required`
+        (`enabled` boolean, `green` and `amber` numbers), `invalid` (outside the range of the figure: `spi` 0 to 5, `progress_gap` and `velocity` -100 to 100), `invalid_order` (green below amber), `unknown_key`.
+        One audit row with before and after values and the reason. Nothing stored is rewritten: the colour is worked out when the figure is drawn.
+      x-db-path: admin_save_progress_rag
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/ProgressRagInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProgressRag'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
@@ -26292,6 +26406,7 @@ components:
         order: { type: array, maxItems: 200, items: { type: string, pattern: '^[a-z0-9_.]{1,60}$' } }
         badge_style: { type: string, enum: [full, dot, none] }
         pins: { type: array, maxItems: 20, items: { type: string, pattern: '^[a-z0-9_.]{1,60}$' } }
+        mode: { type: string, enum: [pinned, autohide], description: '0.15.370 (0527): pinned (the menu stays open, the default) or autohide (a rail that opens on hover, focus or Ctrl+B).' }
     UiPrefsSelf:
       allOf:
         - $ref: '#/components/schemas/UiPrefs'
@@ -27317,6 +27432,50 @@ components:
           version: { type: integer, minimum: 0 }
           updated_at: { type: [string, 'null'], format: date-time }
           updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    ProgressRagItemInput:
+      type: object
+      required: [enabled, green, amber]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean, description: 'True: the figure is coloured by green and amber. False: no colour (the stored numbers are kept).' }
+        green: { type: number }
+        amber: { type: number }
+    ProgressRagInput:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: object
+          required: [spi, progress_gap, velocity]
+          additionalProperties: false
+          properties:
+            spi: { $ref: '#/components/schemas/ProgressRagItemInput' }
+            progress_gap: { $ref: '#/components/schemas/ProgressRagItemInput' }
+            velocity: { $ref: '#/components/schemas/ProgressRagItemInput' }
+    ProgressRagItem:
+      allOf:
+      - $ref: '#/components/schemas/ProgressRagItemInput'
+      - type: object
+        required: [code, label_en, label_ar, unit, min, max, default_green, default_amber]
+        properties:
+          code: { type: string, enum: [spi, progress_gap, velocity] }
+          label_en: { type: string }
+          label_ar: { type: string }
+          unit: { type: string, enum: [index, points, points_per_week] }
+          min: { type: number }
+          max: { type: number }
+          default_green: { type: number, description: 'The suggested green (not stored).' }
+          default_amber: { type: number, description: 'The suggested amber (not stored).' }
+    ProgressRag:
+      description: '0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity.'
+      type: object
+      required: [items, version]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProgressRagItem' } }
+        version: { type: integer, minimum: 0 }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     DashboardSettings:
       description: '0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order.'
       allOf:
