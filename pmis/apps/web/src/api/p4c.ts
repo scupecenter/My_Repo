@@ -130,3 +130,15 @@ export function useSetDeriveRules() {
     onSettled: () => { void qc.invalidateQueries({ queryKey: ['deriveRules'] }); void qc.invalidateQueries({ queryKey: ['register-records'] }); },
   });
 }
+
+/** D60: the declared links of a register (GET /registers/{key}/links): the fields that name a record of another register. */
+export type RegisterLink = { field: string; target_register: string; target_record_type?: string | null; same_site: boolean; enforce: boolean };
+export const useRegisterLinks = (key: string) =>
+  useQuery({ queryKey: ['register-links', key], staleTime: 5 * 60_000, queryFn: () => api.get<{ items: RegisterLink[] }>(`/registers/${key}/links`).then((r) => r.items) });
+
+/** D60: the generic picker of one declared link field (GET /registers/{key}/link-options/{field}). */
+export const useRegisterLinkOptions = (key: string, field: string, siteId: string | null | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['register-link-options', key, field, siteId ?? null], enabled,
+    queryFn: () => api.get<{ items: { entity_id: string; label: string; site_id?: string; record_type?: string }[] }>(`/registers/${key}/link-options/${field}`, { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
+  });
