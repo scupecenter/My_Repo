@@ -514,4 +514,42 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
       await admin.api.call('put', PO, { reason: 'restore the defaults', max_items: 200, two_person: 'risky_only' }, ifm(cur.body.version));
     }
   });
+
+  it('alternative names (0640): they travel through the sheet and a proposal, are stored on the column, and the data upload accepts them as the header', async () => {
+    const { wb, ws } = await sheetOf();
+    const head: Record<string, number> = {};
+    ws.getRow(1).eachCell((c, n) => { head[String(c.value)] = n; });
+    expect(head['Import aliases']).toBeGreaterThan(0);
+    const add = ws.actualRowCount + 1;
+    ws.getCell(add, 1).value = 'x_alias_col';
+    ws.getCell(add, 2).value = 'Alias test column';
+    ws.getCell(add, 4).value = 'text';
+    ws.getCell(add, head['Import aliases']!).value = 'Other name; Remarks ; Other name';
+    const res = await upload(wb);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(await field('x_alias_col')).toBeUndefined();
+    const ok = await admin.api.call('post', `${SP}/${res.body.id}/decision`, { action: 'approve', note: 'aliases' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect((await field('x_alias_col'))?.import_aliases).toEqual(['Other name', 'Remarks']);
+    // the next download carries them in the Structure sheet, and a header written as an alias passes the header check; any other name does not
+    const again = await sheetOf();
+    expect(String(again.ws.getCell(rowOf(again.ws, 'x_alias_col'), head['Import aliases']!).value)).toBe('Other name; Remarks');
+    const data = again.wb.getWorksheet('Data') as import('exceljs').Worksheet;
+    let col = 0;
+    data.getRow(1).eachCell((c, n) => { if (String(c.value) === 'Alias test column') col = n; });
+    expect(col).toBeGreaterThan(0);
+    const send = async () => {
+      const buffer = Buffer.from((await again.wb.xlsx.writeBuffer()) as ArrayBuffer);
+      const t2 = admin.api.raw('post', '/import-batches');
+      if (admin.api.csrf) t2.set('X-CSRF-Token', admin.api.csrf);
+      return t2.field('template_id', 'TPL-GECOL').attach('file', buffer, { filename: 'alias.xlsx', contentType: 'application/octet-stream' });
+    };
+    data.getCell(1, col).value = ' remarks ';
+    const viaAlias = await send();
+    expect(viaAlias.body.code, JSON.stringify(viaAlias.body)).not.toBe('template_rejected');
+    data.getCell(1, col).value = 'Some other name';
+    const bad = await send();
+    expect(bad.status).toBe(422);
+    expect(bad.body.code).toBe('template_rejected');
+  });
 });

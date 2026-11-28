@@ -106,8 +106,8 @@ export const useRunDataReset = () =>
 export const useRetryDataResetFiles = () =>
   useAct((b: { id: string; reason: string }) => api.post(`/settings/data-reset/requests/${b.id}/retry-files`, { body: { reason: b.reason } }));
 export const useSetDataResetSettings = () =>
-  useAct((b: { version: number; reason: string; request_expiry_minutes: number; backup_max_age_hours: number }) =>
-    api.put('/settings/data-reset/settings', { body: { reason: b.reason, request_expiry_minutes: b.request_expiry_minutes, backup_max_age_hours: b.backup_max_age_hours }, version: b.version }));
+  useAct((b: { version: number; reason: string; request_expiry_minutes: number; backup_max_age_hours: number; cooloff_minutes?: number }) =>
+    api.put('/settings/data-reset/settings', { body: { reason: b.reason, request_expiry_minutes: b.request_expiry_minutes, backup_max_age_hours: b.backup_max_age_hours, ...(b.cooloff_minutes === undefined ? {} : { cooloff_minutes: b.cooloff_minutes }) }, version: b.version }));
 
 /** Contract 0.15.266: makes the archive of an approved request (the build runs on the server; the request is polled until it is ready or failed). */
 export const useMakeDataResetArchive = () => useAct((b: { id: string }) => api.post(`/settings/data-reset/requests/${b.id}/archive`));

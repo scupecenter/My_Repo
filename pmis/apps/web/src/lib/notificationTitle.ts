@@ -44,6 +44,8 @@ const EXACT: Record<string, string> = {
   "A new site waits for approval": "t_a_new_site_waits_for_approval",
   "A new site was returned to you": "t_a_new_site_was_returned_to_you",
   "A project data reset waits for your approval": "t_a_project_data_reset_waits_for_your_approval",
+  "The project data reset can run soon": "t_the_project_data_reset_can_run_soon",
+  "The project data reset is waiting before it can run": "t_the_project_data_reset_is_waiting_before_it_can_run",
   "A running order no longer matches its team or contract": "t_a_running_order_no_longer_matches_its_team_or_contract",
   "An email could not be delivered": "t_an_email_could_not_be_delivered",
   "Assignment requested": "t_assignment_requested",
