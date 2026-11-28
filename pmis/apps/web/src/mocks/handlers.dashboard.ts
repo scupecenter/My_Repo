@@ -246,6 +246,20 @@ export const dashboardHandlers = [
         total: { phase: null, sites: 105, completed: 16, in_progress: 51, not_started: 34, on_hold: 4, on_air: 27, progress_pct: 25.7, target_sites: 105 },
         monthly_on_air_auto: { value: 20, source: 'derived', derived: 20, remaining: 78, planned_end: '2027-03-15', months_left: 4 },
       },
+      // 0.15.563: invoices, pending warehouse movements, stale open risks and issues, synthetic figures
+      invoices_due: {
+        available: true, open: 31, overdue: 9, due_soon: 6, no_due_date: 2,
+        overdue_aging: { buckets: [{ key: 'd0_7', count: 4 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 1 }], total: 9, oldest_days: 52 },
+        age_aging: { buckets: [{ key: 'd0_7', count: 8 }, { key: 'd8_14', count: 9 }, { key: 'd15_30', count: 8 }, { key: 'over_30', count: 6 }], total: 31, oldest_days: 77 },
+      },
+      warehouse_pending: {
+        available: true, pending: 12, by_state: [{ state: 'entry', count: 5 }, { state: 'in_review', count: 4 }, { state: 'in_approval', count: 3 }],
+        aging: { buckets: [{ key: 'd0_7', count: 6 }, { key: 'd8_14', count: 3 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 1 }], total: 12, oldest_days: 33 },
+      },
+      stale_open: {
+        available: true, stale_days: 30, risks: { open: 14, stale: 5 }, issues: { open: 22, stale: 7 },
+        idle_aging: { buckets: [{ key: 'd0_7', count: 0 }, { key: 'd8_14', count: 0 }, { key: 'd15_30', count: 8 }, { key: 'over_30', count: 4 }], total: 12, oldest_days: 91 },
+      },
       // 0.15.205: change requests and overdue meeting actions, synthetic figures
       changes_meetings: {
         available: true,

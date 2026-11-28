@@ -487,3 +487,98 @@ export function targetInForce(override: boolean, manual: number | null, derived:
   if (override && manual !== null && manual > 0) return { value: manual, source: "manual" };
   return { value: derived, source: "derived" };
 }
+
+// ---------------------------------------------------------------- L4 (0.15.563): invoices, pending warehouse movements, stale open risks and issues
+
+export const STALE_DAYS = 30;
+export const DUE_SOON_DAYS = 7;
+
+export interface InvoiceRow {
+  /** days until the due date (negative when late), null when the invoice has no due date */
+  days_to_due: number | null;
+  /** days since the invoice date, null when it has none */
+  age_days: number | null;
+}
+
+export interface InvoicesSummary {
+  open: number;
+  overdue: number;
+  due_soon: number;
+  no_due_date: number;
+  overdue_aging: AgeBuckets;
+  age_aging: AgeBuckets;
+}
+
+/**
+ * The open invoices (approved, not paid, not cancelled): how many are late (due date before today, aged in days late), due within
+ * DUE_SOON_DAYS days, without a due date, and the ages since the invoice date in the usual buckets.
+ */
+export function invoicesSummary(rows: InvoiceRow[]): InvoicesSummary {
+  const late: number[] = [];
+  const ages: number[] = [];
+  let soon = 0;
+  let none = 0;
+  for (const r of rows) {
+    if (r.days_to_due === null) none += 1;
+    else if (r.days_to_due < 0) late.push(-r.days_to_due);
+    else if (r.days_to_due <= DUE_SOON_DAYS) soon += 1;
+    if (r.age_days !== null) ages.push(r.age_days > 0 ? r.age_days : 0);
+  }
+  return { open: rows.length, overdue: late.length, due_soon: soon, no_due_date: none, overdue_aging: bucketAges(late), age_aging: bucketAges(ages) };
+}
+
+export interface WarehousePendingRow {
+  state: string;
+  days: number | null;
+}
+
+export interface WarehousePending {
+  pending: number;
+  by_state: { state: string; count: number }[];
+  aging: AgeBuckets;
+}
+
+const WH_STATES = ["entry", "in_review", "in_approval"];
+
+/** The warehouse movements not yet approved (versions in entry, review or approval), per state in the flow order, aged in days since the level opened. */
+export function warehousePending(rows: WarehousePendingRow[]): WarehousePending {
+  const counts = new Map<string, number>();
+  const ages: number[] = [];
+  let pending = 0;
+  for (const r of rows) {
+    if (!WH_STATES.includes(r.state)) continue;
+    pending += 1;
+    counts.set(r.state, (counts.get(r.state) ?? 0) + 1);
+    ages.push(r.days !== null && r.days > 0 ? r.days : 0);
+  }
+  return { pending, by_state: WH_STATES.filter((s) => counts.has(s)).map((state) => ({ state, count: counts.get(state)! })), aging: bucketAges(ages) };
+}
+
+export interface StaleRow {
+  register_key: string;
+  days_idle: number | null;
+}
+
+export interface StaleSummary {
+  stale_days: number;
+  risks: { open: number; stale: number };
+  issues: { open: number; stale: number };
+  idle_aging: AgeBuckets;
+}
+
+/** The open risks and issues, and how many have not changed for STALE_DAYS days or more (the idle days of the stale ones in the usual buckets). */
+export function staleSummary(rows: StaleRow[]): StaleSummary {
+  const out: StaleSummary = { stale_days: STALE_DAYS, risks: { open: 0, stale: 0 }, issues: { open: 0, stale: 0 }, idle_aging: bucketAges([]) };
+  const idle: number[] = [];
+  for (const r of rows) {
+    const part = r.register_key === "risks" ? out.risks : r.register_key === "issues" ? out.issues : null;
+    if (!part) continue;
+    part.open += 1;
+    if (r.days_idle !== null && r.days_idle >= STALE_DAYS) {
+      part.stale += 1;
+      idle.push(r.days_idle);
+    }
+  }
+  out.idle_aging = bucketAges(idle);
+  return out;
+}

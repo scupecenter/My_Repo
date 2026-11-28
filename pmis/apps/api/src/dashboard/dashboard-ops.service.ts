@@ -15,6 +15,12 @@ import {
   financeSummary,
   actionsSummary,
   ApprovalWaitRow,
+  InvoiceRow,
+  invoicesSummary,
+  StaleRow,
+  staleSummary,
+  WarehousePendingRow,
+  warehousePending,
   ChangeWaitRow,
   changesSummary,
   approvalsByRole,
@@ -106,6 +112,12 @@ export class DashboardOpsService {
     const approvalsRegions = await this.access.regions("approvals", "view");
     const sitesRegions = await this.access.regions("sites", "view");
     const dashOk = dash === null || dash.length > 0;
+    const invoiceRegions = await this.access.regions("invoices", "view");
+    const riskRegions = await this.access.regions("risks", "view");
+    const issueRegions = await this.access.regions("issues", "view");
+    const invoicesOk = invoiceRegions === null || invoiceRegions.length > 0;
+    const risksOk = riskRegions === null || riskRegions.length > 0;
+    const issuesOk = issueRegions === null || issueRegions.length > 0;
     const changeRegions = await this.access.regions("change_control", "view");
     const meetingRegions = await this.access.regions("meetings", "view");
     const finRegions = await this.access.regions("financial_advances", "view");
@@ -161,6 +173,11 @@ export class DashboardOpsService {
       : null;
     const approvals = approvalsOk
       ? await this.approvalsSection(approvalsScope, p.region_id ?? null)
+      : null;
+    const invoices = invoicesOk ? await this.invoicesSection(intersect(dash, invoiceRegions), p.region_id ?? null) : null;
+    const warehouseWait = whOk ? await this.warehousePendingSection(whScope, p.region_id ?? null) : null;
+    const stale = risksOk || issuesOk
+      ? await this.staleSection(risksOk ? intersect(dash, riskRegions) : [], issuesOk ? intersect(dash, issueRegions) : [], p.region_id ?? null, risksOk, issuesOk)
       : null;
     const changes = changesOk
       ? await this.changesSection(changeScope, p.region_id ?? null)
@@ -241,6 +258,28 @@ export class DashboardOpsService {
         waiting: approvals?.waiting ?? null,
         by_role: approvals?.by_role ?? null,
         unassigned: approvals?.unassigned ?? null,
+      },
+      invoices_due: {
+        available: invoicesOk,
+        open: invoices?.open ?? null,
+        overdue: invoices?.overdue ?? null,
+        due_soon: invoices?.due_soon ?? null,
+        no_due_date: invoices?.no_due_date ?? null,
+        overdue_aging: invoices?.overdue_aging ?? null,
+        age_aging: invoices?.age_aging ?? null,
+      },
+      warehouse_pending: {
+        available: whOk,
+        pending: warehouseWait?.pending ?? null,
+        by_state: warehouseWait?.by_state ?? null,
+        aging: warehouseWait?.aging ?? null,
+      },
+      stale_open: {
+        available: risksOk || issuesOk,
+        stale_days: stale?.stale_days ?? null,
+        risks: risksOk && stale ? stale.risks : null,
+        issues: issuesOk && stale ? stale.issues : null,
+        idle_aging: stale?.idle_aging ?? null,
       },
       finance: {
         available: financeOk,
@@ -572,6 +611,43 @@ export class DashboardOpsService {
       ${scope === null ? Prisma.empty : Prisma.sql`AND t.region_id = ANY(${scope}::int[])`}
       ${region ? Prisma.sql`AND t.region_id = ${region}` : Prisma.empty}`);
     return approvalsByRole(rows);
+  }
+
+  /** L4 (0.15.563): the open invoices (approved, current, not Paid or Cancelled) of the regions in scope; due dates and invoice dates are read only when they are real dates. */
+  private async invoicesSection(scope: number[] | null, region: number | null) {
+    const rows = await this.db.tx.$queryRaw<InvoiceRow[]>(Prisma.sql`
+      SELECT CASE WHEN r.data ->> 'due_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN ((r.data ->> 'due_date')::date - CURRENT_DATE)::int END AS days_to_due,
+             CASE WHEN r.data ->> 'invoice_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (CURRENT_DATE - (r.data ->> 'invoice_date')::date)::int END AS age_days
+      FROM register_records r
+      WHERE r.register_key = 'invoices' AND r.is_current AND r.state = 'approved' AND coalesce(r.data ->> 'invoice_state', '') NOT IN ('Paid', 'Cancelled')
+      ${scope === null ? Prisma.empty : Prisma.sql`AND r.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND r.region_id = ${region}` : Prisma.empty}`);
+    return invoicesSummary(rows);
+  }
+
+  /** L4: the warehouse movements still in entry, review or approval, aged from the level opening (the last update when it has none). */
+  private async warehousePendingSection(scope: number[] | null, region: number | null) {
+    const rows = await this.db.tx.$queryRaw<WarehousePendingRow[]>(Prisma.sql`
+      SELECT r.state::text AS state, (CURRENT_DATE - coalesce(r.level_opened_at, r.updated_at)::date)::int AS days
+      FROM register_records r
+      WHERE r.register_key = 'warehouse' AND r.state IN ('entry', 'in_review', 'in_approval')
+      ${scope === null ? Prisma.empty : Prisma.sql`AND r.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND r.region_id = ${region}` : Prisma.empty}`);
+    return warehousePending(rows);
+  }
+
+  /** L4: the open risks (Open, Monitoring) and issues (Open, In Progress) that have not changed for STALE_DAYS days. Each register answers only with its own view right. */
+  private async staleSection(riskScope: number[] | null, issueScope: number[] | null, region: number | null, risksOk: boolean, issuesOk: boolean) {
+    const rows = await this.db.tx.$queryRaw<StaleRow[]>(Prisma.sql`
+      SELECT r.register_key, (CURRENT_DATE - r.updated_at::date)::int AS days_idle
+      FROM register_records r
+      WHERE r.is_current AND r.state = 'approved' AND (
+        (${risksOk} AND r.register_key = 'risks' AND coalesce(r.data ->> 'status', '') IN ('Open', 'Monitoring')
+          ${riskScope === null ? Prisma.empty : Prisma.sql`AND r.region_id = ANY(${riskScope}::int[])`})
+        OR (${issuesOk} AND r.register_key = 'issues' AND coalesce(r.data ->> 'issue_status', '') IN ('Open', 'In Progress')
+          ${issueScope === null ? Prisma.empty : Prisma.sql`AND r.region_id = ANY(${issueScope}::int[])`}))
+      ${region ? Prisma.sql`AND r.region_id = ${region}` : Prisma.empty}`);
+    return staleSummary(rows);
   }
 
   /** Does the caller see the restricted financial summary (the setting dashboard.finance_readers, role based). */

@@ -51,6 +51,7 @@ import { OpsScorecardCard } from "./dashboardScorecard";
 import { OpsQualityCard } from "./dashboardQuality";
 import { OpsApprovalsCard } from "./dashboardApprovals";
 import { OpsChangesCard } from "./dashboardChanges";
+import { OpsInvoicesCard, OpsStaleCard, OpsWarehouseCard } from "./dashboardL4";
 import { OpsFinanceCard } from "./dashboardFinance";
 import { useDashboardSettings, useProgressRag } from "@/api/dashboardSettings";
 import { RAG_CLASS, ragTone } from "@/lib/progressRag";
@@ -1527,6 +1528,10 @@ export function Dashboard() {
                   <OpsPhaseCard ops={ops.data} />
                 </>
               ),
+
+              ops_invoices: <OpsInvoicesCard ops={ops.data} />,
+              ops_warehouse: <OpsWarehouseCard ops={ops.data} />,
+              ops_stale: <OpsStaleCard ops={ops.data} />,
 
               ops_changes: (
                 <>
