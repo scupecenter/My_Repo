@@ -26,6 +26,7 @@ export const SCREEN_SETTINGS = {
   library_archive: { tab: 'documents', section: 'archive' },
   library_templates: { tab: 'documents', section: 'types' },
   data_hub: { tab: 'screens', section: 'data-hub' },
+  field_forms: { tab: 'screens', section: 'field-forms' },
   field_pwa: { tab: 'screens', section: 'field-mode' },
   site_map: { tab: 'screens', section: 'map' },
   finance_hub: { tab: 'screens', section: 'finance-hub' },

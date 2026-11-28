@@ -37,7 +37,7 @@ export async function syncOutbox(store: FieldStore, send: Sender): Promise<SyncR
     }
     const out = await send(a);
     if (out.kind === 'ok' || out.kind === 'skip') {
-      await store.put({ ...a, state: 'done', blob: undefined, reason: undefined, message: out.kind === 'skip' ? out.note : undefined });
+      await store.put({ ...a, state: 'done', blob: undefined, signature: undefined, reason: undefined, message: out.kind === 'skip' ? out.note : undefined });
       res.sent++;
     } else if (out.kind === 'refused') {
       await store.put({ ...a, state: 'attention', reason: out.reason, message: out.message });
@@ -67,6 +67,11 @@ const REFUSED = new Set([403, 404, 409, 412, 413, 422]);
 /** The real sender: the same endpoints the Quality screen uses, with the action id as Idempotency-Key. */
 export const apiSender: Sender = async (a) => {
   try {
+    if (a.kind === 'form_submit') {
+      if (!a.siteId || !a.formCode) return { kind: 'skip', note: 'no form' };
+      await api.post(`/sites/${a.siteId}/field-forms`, { body: { client_id: a.id, form_code: a.formCode, answers: a.answers ?? {}, signature: a.signature ?? null, signer_name: a.signerName ?? null, captured_at: a.capturedAt ?? a.createdAt }, idempotencyKey: a.id });
+      return { kind: 'ok' };
+    }
     if (a.kind === 'snag_photo') {
       if (!a.blob) return { kind: 'skip', note: 'no file' };
       const f = new FormData();

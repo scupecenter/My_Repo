@@ -7062,6 +7062,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/field-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The field form kinds (0.15.596)
+         * @description Every signed-in user may read it (Field mode lists the enabled kinds). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getFieldForms"];
+        /**
+         * Set the field form kinds (reason, step-up, If-Match, audited) (0.15.596)
+         * @description A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and invalid values are 422 (codes and field keys are unique, a choice field has 2 to 20 options); saving the values in force is 409 `invalid_transition`. Audited `field_forms_update`.
+         */
+        put: operations["setFieldForms"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/field-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The filled field forms of a site, newest first, at most 100 (0.15.596)
+         * @description Needs the view right on `sites` in the region of the site (403 `action_forbidden`). The signature image is not included; `GET /field-forms/{id}/signature` reads it.
+         */
+        get: operations["listFieldForms"];
+        put?: never;
+        /**
+         * Fill a field form (0.15.596)
+         * @description Needs the view right on `sites` in the region of the site. `client_id` is the id of the queued action on the device: a replay returns the first row with `replayed` true and writes nothing. The answers are checked against the form kind (unknown key, required, type, option) and a kind with a signature needs `signature` and `signer_name` (422). Answers are never changed afterwards.
+         */
+        post: operations["submitFieldForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/field-forms/{id}/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signature image of a filled field form (0.15.596)
+         * @description Needs the view right on `sites` in the region of the form (404 otherwise).
+         */
+        get: operations["getFieldFormSignature"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/login-page": {
         parameters: {
             query?: never;
@@ -20151,6 +20221,69 @@ export interface components {
                 limit: number;
                 next_cursor: string | null;
             };
+        };
+        FieldFormField: {
+            key: string;
+            label_en: string;
+            label_ar: string;
+            /** @enum {string} */
+            type: "text" | "longtext" | "number" | "yesno" | "choice";
+            required: boolean;
+            /** @description The choices of a `choice` field (2 to 20); empty for the other types. */
+            options: string[];
+        };
+        FieldFormKind: {
+            code: string;
+            name_en: string;
+            name_ar: string;
+            enabled: boolean;
+            /** @description The form is signed on the screen. */
+            signature: boolean;
+            fields: components["schemas"]["FieldFormField"][];
+        };
+        /** @description 0.15.596. Setting `field.forms` (migration 0667). */
+        FieldForms: {
+            forms: components["schemas"]["FieldFormKind"][];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        FieldFormsInput: components["schemas"]["WithReason"] & {
+            forms: components["schemas"]["FieldFormKind"][];
+        };
+        FieldFormSubmit: {
+            /** Format: uuid */
+            client_id: string;
+            form_code: string;
+            answers: {
+                [key: string]: unknown;
+            };
+            /** @description A PNG data URL (data:image/png;base64,...). */
+            signature?: string | null;
+            signer_name?: string | null;
+            /**
+             * Format: date-time
+             * @description The moment the form was signed or filled on the device.
+             */
+            captured_at: string;
+        };
+        FieldFormSubmission: {
+            /** Format: uuid */
+            id: string;
+            form_code: string;
+            answers: {
+                [key: string]: unknown;
+            };
+            signed: boolean;
+            signer_name?: string | null;
+            /** Format: date-time */
+            captured_at: string;
+            /** Format: date-time */
+            submitted_at: string;
+            submitted_by?: components["schemas"]["UserRef"] | null;
         };
         /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197). */
         LoginPage: {
@@ -37115,6 +37248,151 @@ export interface operations {
                     "image/jpeg": string;
                     "image/svg+xml": string;
                     "image/webp": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getFieldForms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form kinds. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldForms"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setFieldForms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldFormsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldForms"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listFieldForms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The forms. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FieldFormSubmission"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    submitFieldForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldFormSubmit"];
+            };
+        };
+        responses: {
+            /** @description Saved (or the first answer of a replay). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        replayed: boolean;
+                        /** Format: date-time */
+                        submitted_at: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getFieldFormSignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image as a PNG data URL. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        signature: string;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];

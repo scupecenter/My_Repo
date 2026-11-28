@@ -29,3 +29,19 @@ Limits to know: the server remembers an Idempotency-Key for 24 hours in memory; 
 ما يُخزَّن على الجهاز: هيكل التطبيق (دون بيانات الـ API في الـ service worker) وقوائم المهام والملاحظات والطابور في قاعدة باسم المستخدم. وإيقاف الإعداد يزيل الـ worker وذاكرته.
 
 حدود يجب معرفتها: يحفظ الخادم مفتاح Idempotency-Key 24 ساعة في الذاكرة؛ وإعادة تشغيله تنسى المفاتيح فقد تُخزَّن صورة مُعادة مرتين ويستطيع المراجع سحب الزائدة. وتنتهي الجلسة بعد 8 ساعات خمول أو 12 ساعة إجمالًا؛ وتبقى الإجراءات المنتظرة وتُرسل بعد تسجيل الدخول من جديد.
+
+## Field forms with a signature (EN)
+
+An admin defines the form kinds in Settings > Screens > Field forms: a code, an English and an Arabic name, whether the kind is on, whether it needs a signature, and its fields (text, long text, number, yes/no, choice; each can be required). Saving needs a reason and the step-up, like any setting.
+
+On the Field screen, pick a site, pick a form kind, fill it and, if the kind needs it, type the signer's name and draw the signature with a finger or a stylus (undo and clear are on the pad). "Save and send" puts the form in the same outbox as photos and fixes: it works offline and is sent in order when the connection is back. Each form is sent once, even if the answer is lost and it is retried. The signature bytes are dropped from the device once the form is sent.
+
+Who can see it: anyone with the view right on the site's region can fill and read the forms of that site. Nothing is public and nothing is deleted.
+
+## نماذج الميدان مع التوقيع (AR)
+
+يعرّف المدير أنواع النماذج من الإعدادات > الشاشات > نماذج الميدان: الرمز والاسم بالعربية والإنجليزية، وهل النوع مفعّل، وهل يحتاج توقيعًا، وحقوله (نص، نص طويل، رقم، نعم/لا، اختيار؛ ويمكن جعل أي حقل مطلوبًا). الحفظ يحتاج سببًا وتأكيد الهوية كأي إعداد.
+
+في شاشة الميدان اختر الموقع ثم نوع النموذج واملأه، وإن كان يحتاج توقيعًا فاكتب اسم الموقّع وارسم التوقيع بالإصبع أو القلم (مع تراجع ومسح). زر «حفظ وإرسال» يضع النموذج في طابور الصور والإصلاحات نفسه: يعمل دون اتصال ويُرسل بالترتيب عند عودة الاتصال. يُرسل كل نموذج مرة واحدة حتى لو ضاع الرد وأعيدت المحاولة. تُحذف بيانات التوقيع من الجهاز بعد الإرسال.
+
+من يراه: كل من له صلاحية العرض على منطقة الموقع يستطيع ملء نماذج هذا الموقع وقراءتها. لا شيء عام ولا شيء يُحذف.

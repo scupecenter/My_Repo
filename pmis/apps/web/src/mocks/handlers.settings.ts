@@ -7,7 +7,7 @@ import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLo
 import { tripoliToday } from '@/lib/today';
 import { weightIssues } from '@/lib/weights';
 import { NAV_SIDE } from '@/lib/navLayout';
-import { accountKeyOf, cred, db, identity, loginPage, loginPagePublic, putUiAssetBytes, save, stepUpValid, uiAssetBytesOf, viewer } from './db';
+import { accountKeyOf, cred, fieldFormRows, fieldForms, db, identity, loginPage, loginPagePublic, putUiAssetBytes, save, stepUpValid, uiAssetBytesOf, viewer } from './db';
 import { BRANDS, isBrand } from '@/lib/brands';
 import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { guard, page, problem, stepUp } from './handlers';
@@ -82,6 +82,10 @@ const isAdmin = () => viewer()?.key === 'pm';
 const targetPolicy: { manual_override: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { manual_override: false, version: 1, updated_at: null, updated_by: null };
 const targetPolicyView = () => ({ ...targetPolicy, can_edit: isAdmin() });
+type FieldFormsBody = { code: string; name_en: string; name_ar: string; enabled: boolean; signature: boolean; fields: { key: string; label_en: string; label_ar: string; type: string; required: boolean; options: string[] }[] }[];
+const formKindOk = (f: FieldFormsBody[number]): boolean => /^[a-z0-9_]{2,30}$/.test(f.code) && !!f.name_en?.trim() && typeof f.enabled === 'boolean' && typeof f.signature === 'boolean' && Array.isArray(f.fields) && f.fields.length <= 30
+  && new Set(f.fields.map((x) => x.key)).size === f.fields.length
+  && f.fields.every((x) => /^[a-z0-9_]{2,30}$/.test(x.key) && !!x.label_en?.trim() && ['text', 'longtext', 'number', 'yesno', 'choice'].includes(x.type) && typeof x.required === 'boolean' && Array.isArray(x.options) && (x.type === 'choice' ? x.options.length >= 2 && x.options.length <= 20 : x.options.length === 0));
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 const reasonErr = (r?: string) => ((r ?? '').trim().length < 3 || (r ?? '').length > 1000 ? fields({ path: '/reason', code: 'required' }) : null);
@@ -890,6 +894,61 @@ export const settingsHandlers = [
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
     const j = identityView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.596: field forms (kinds, fill, list, signature)
+  http.get(`${B}/settings/field-forms`, () => { const g = guard(); if (g) return g; const j = { ...fieldForms(), can_edit: isAdmin() }; return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/field-forms`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ forms?: FieldFormsBody; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['forms', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (!Array.isArray(b.forms) || b.forms.length > 20 || !b.forms.every(formKindOk) || new Set(b.forms.map((f) => f.code)).size !== b.forms.length) errs.push({ path: '/forms', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, fieldForms().version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const cur = fieldForms();
+    if (JSON.stringify(b.forms) === JSON.stringify(cur.forms)) return problem(409, 'invalid_transition', 'These are already the field forms.');
+    const v = viewer()!;
+    Object.assign(cur, { forms: b.forms, version: cur.version + 1, updated_at: new Date().toISOString(), updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
+    const j = { ...cur, can_edit: isAdmin() };
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.post(`${B}/sites/:id/field-forms`, async ({ request, params }) => {
+    const g = guard(); if (g) return g;
+    const b = await body<{ client_id?: string; form_code?: string; answers?: Record<string, unknown>; signature?: string | null; signer_name?: string | null; captured_at?: string }>(request);
+    const first = fieldFormRows().find((r) => r.client_id === b.client_id);
+    if (first) return HttpResponse.json({ id: first.id, replayed: true, submitted_at: first.submitted_at }, { status: 201 });
+    const kind = fieldForms().forms.find((f) => f.code === b.form_code && f.enabled);
+    if (!kind || typeof b.client_id !== 'string' || !b.answers || typeof b.answers !== 'object') return fields({ path: '/form_code', code: 'unknown_form' });
+    const errs: { path: string; code: string }[] = [];
+    for (const k of Object.keys(b.answers)) if (!kind.fields.some((f) => f.key === k)) errs.push({ path: `/answers/${k}`, code: 'unknown_field' });
+    for (const f of kind.fields) {
+      const v = b.answers[f.key];
+      const empty = v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
+      if (empty) { if (f.required) errs.push({ path: `/answers/${f.key}`, code: 'required' }); continue; }
+      if ((f.type === 'number' && typeof v !== 'number') || (f.type === 'yesno' && typeof v !== 'boolean') || (f.type === 'choice' && !f.options.includes(String(v)))) errs.push({ path: `/answers/${f.key}`, code: 'invalid' });
+    }
+    if (kind.signature && (!b.signature || !b.signer_name)) errs.push({ path: '/signature', code: 'required' });
+    if (!kind.signature && b.signature) errs.push({ path: '/signature', code: 'invalid' });
+    if (errs.length) return fields(...errs);
+    const v = viewer()!;
+    const row = { id: crypto.randomUUID(), client_id: b.client_id, site_id: String(params.id), form_code: kind.code, answers: b.answers, signature: b.signature ?? null, signer_name: b.signer_name ?? null,
+      captured_at: b.captured_at ?? new Date().toISOString(), submitted_at: new Date().toISOString(), submitted_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } };
+    fieldFormRows().push(row); save();
+    return HttpResponse.json({ id: row.id, replayed: false, submitted_at: row.submitted_at }, { status: 201 });
+  }),
+  http.get(`${B}/sites/:id/field-forms`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const items = fieldFormRows().filter((r) => r.site_id === String(params.id)).sort((a, b) => (a.submitted_at < b.submitted_at ? 1 : -1))
+      .map((r) => ({ id: r.id, form_code: r.form_code, answers: r.answers, signed: r.signature !== null, signer_name: r.signer_name, captured_at: r.captured_at, submitted_at: r.submitted_at, submitted_by: r.submitted_by }));
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${B}/field-forms/:id/signature`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const r = fieldFormRows().find((x) => x.id === String(params.id));
+    return r?.signature ? HttpResponse.json({ signature: r.signature }) : problem(404, 'not_found', 'Not found');
   }),
 
   // ------------------------------------------------------------------ 0.15.97: Settings, Screens, Login page (the sign-in page settings); the public door answers only what the page renders

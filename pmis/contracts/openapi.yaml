@@ -155,6 +155,7 @@ info:
     - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
     - 0.15.69 (2026-11-24): W2 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 204; 0.15.62 to 0.15.68 are used by the work merged before it). Documentation only, no path, schema or rule changes. A saved view of a register screen (`register-<register key>`) keeps the layout of the screen's view switcher as quick parameters of `filters`, as `site360-<menu>` does since 0.15.49: `layout` = empty (the list), `wide`, `board` or `map`; `board_by` = the code of the register field the board's columns follow, or `state` (the approval state); `lane` = empty, `region` or `type`. They are stored as given, like any other quick parameter; the filter tree in `filters.advanced` keeps its validation. `RegisterDefinition.site_scoped` also decides whether the screen offers the map. Inline edits of the wide table use `PATCH /registers/{register_key}/records/{record_id}` with `If-Match`, the same route, rights, field rules and locks as the record form.
     - 0.15.582 (2026-11-28): a default saved view per screen, chosen by each person (migration 0655, table `user_default_views`). Additive. `POST /saved-views/{view_id}/set-default` makes the view the caller's default for its screen (one per screen; a view the caller may not read answers 404, like `GET /saved-views/{view_id}`), `POST /saved-views/{view_id}/clear-default` clears it (a missing default is a no-op) and `GET /me/default-views` lists the caller's defaults (a deactivated or unreadable view drops out, and the screen then opens on its built-in view). Personal display preference: no grant, role, permission, visibility or audit change.
+    - 0.15.596 (2026-11-28): offline field forms with a signature pad (owner approval 2026-11-28, expert suggestion list item 1; migration 0667, mirror `db/sql/666_field_forms.sql`). Additive; stacked on Field mode (0.15.340). `GET`/`PUT /settings/field-forms` (setting `field.forms`: up to 20 form kinds, each with up to 30 fields of type text, longtext, number, yesno or choice, and an optional signature; written by a System Admin or an all-regions delegate of `settings` edit with a reason, step-up and If-Match, audited `field_forms_update`). `POST /sites/{site_id}/field-forms` (fill a form; `client_id` is the id of the queued action on the device, a replay returns the first row with `replayed` true; answers are checked against the kind; the signature is a PNG data URL up to 300000 characters), `GET /sites/{site_id}/field-forms` (the filled forms of a site, no image) and `GET /field-forms/{id}/signature`. Filling and reading need the view right on `sites` in the region of the site. New table `field_form_submissions` (door table, kept by the data reset).
     - 0.15.68 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; renumbered from 0.15.64 at the merge with main, which holds 0.15.62 to 0.15.67). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site-master/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site-master/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
     - 0.15.561 (2026-11-28): item 9, the group summary row of grouped tables. Additive. `TableDisplay` (GET/PUT `/settings/table-display`, the `display` of a saved view) gains the optional boolean `groupbar` (default true): the count and a status distribution bar on every group header of a grouped table, on the same framework as text size, wrap and zebra rows (organization default in Settings > Screens > Tables, personal choice per screen in the Layout panel). Migration 0652 (mirror `db/sql/651_group_summary_display.sql`) changes `table_display_seed()` and `admin_set_table_display` in place; no table, no new route, no permission change.
     - 0.15.67 (2026-11-24): My Work > Daily Plan, the daily progress and the plan of the next working day (plan W7, owner decisions 2026-11-23; migration 0149, mirror `db/sql/148_daily_plan.sql`; CHANGELOG 203; 0.15.62 to 0.15.66 are used by other branches). Additive. New tag `daily-plan`: (1) `GET /daily-plans?date=&region_id=` returns one plan per region per day for the regions the caller sees (the Project Manager and the System Admins see all), with the auto-filled rows (Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW; the Procurement assignment of the day: Vendor / Contractor and AAT SE; a CW permit or B3: Access Valid; tasks and field work of the day: Planned Work and Actual Work), the manual values over them, Reason and Remark, the counts and the flags `below_target` and `reason_missing`, plus `next_working_day` (weekend Friday and Saturday, holidays of the calendar). (2) `PATCH`, `POST` and `DELETE` under `/daily-plans/{date}/regions/{region_id}/sites` change a row, add a site or remove one: `view` on `daily_plan` or `sites` for the region and L1 of the new Matrix row `daily_plan` (or a System Admin), `If-Match` = the plan version (`0` before the first change), a row below target without a reason is 422 (`/reason` `required`), a locked day is 409 `plan_locked`, every change audited with before and after. (3) `POST .../lock` (L2 of the row or a System Admin; 422 with the sites that lack a reason) freezes the day; `POST .../unlock` is an admin override (System Admin or a delegate of `overrides.unlock` for the region, reason, step-up, flagged). (4) `GET /daily-plans/export` downloads both tables as one Excel sheet in the exact column order of the owner's sheet (`export` on `daily_plan` or `sites` per region, audited). Reading needs `view` on `daily_plan` or `sites` for the region, as the menu does. (5) `GET`/`PUT /settings/daily-plan`: visible columns and their order per tab, default region scope, automatic lock time, reminder hour (System Admin or an all-regions `admin.settings` delegate, reason, `If-Match`, closed body). The automatic lock and the reminder (notification kind `daily_plan_reminder`) run in the background job.
@@ -11071,6 +11072,125 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /settings/field-forms:
+    get:
+      tags: [settings]
+      operationId: getFieldForms
+      summary: The field form kinds (0.15.596)
+      description: Every signed-in user may read it (Field mode lists the enabled kinds). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+      x-db-path: field_forms_state
+      responses:
+        '200':
+          description: The form kinds.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FieldForms'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setFieldForms
+      summary: Set the field form kinds (reason, step-up, If-Match, audited) (0.15.596)
+      description: 'A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and invalid values are 422 (codes and field keys are unique, a choice field has 2 to 20 options); saving the values in force is 409 `invalid_transition`. Audited `field_forms_update`.'
+      x-step-up: true
+      x-db-path: admin_set_field_forms
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FieldFormsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FieldForms'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /sites/{site_id}/field-forms:
+    parameters:
+    - name: site_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    get:
+      tags: [sites]
+      operationId: listFieldForms
+      summary: The filled field forms of a site, newest first, at most 100 (0.15.596)
+      description: Needs the view right on `sites` in the region of the site (403 `action_forbidden`). The signature image is not included; `GET /field-forms/{id}/signature` reads it.
+      x-db-path: field_forms_of_site
+      responses:
+        '200':
+          description: The forms.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/FieldFormSubmission' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [sites]
+      operationId: submitFieldForm
+      summary: Fill a field form (0.15.596)
+      description: 'Needs the view right on `sites` in the region of the site. `client_id` is the id of the queued action on the device: a replay returns the first row with `replayed` true and writes nothing. The answers are checked against the form kind (unknown key, required, type, option) and a kind with a signature needs `signature` and `signer_name` (422). Answers are never changed afterwards.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FieldFormSubmit'}
+      responses:
+        '201':
+          description: Saved (or the first answer of a replay).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, replayed, submitted_at]
+                properties:
+                  id: { type: string, format: uuid }
+                  replayed: { type: boolean }
+                  submitted_at: { type: string, format: date-time }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /field-forms/{id}/signature:
+    get:
+      tags: [sites]
+      operationId: getFieldFormSignature
+      summary: The signature image of a filled field form (0.15.596)
+      description: Needs the view right on `sites` in the region of the form (404 otherwise).
+      x-db-path: field_form_signature
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The image as a PNG data URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signature]
+                properties:
+                  signature: { type: string }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /settings/login-page:
     get:
       tags: [settings]
@@ -27213,6 +27333,65 @@ components:
         enabled: { type: boolean }
         items: { type: array, items: { $ref: '#/components/schemas/MediaItem' } }
         page: { type: object, required: [limit, next_cursor], properties: { limit: { type: integer }, next_cursor: { type: [string, 'null'] } } }
+    FieldFormField:
+      type: object
+      required: [key, label_en, label_ar, type, required, options]
+      properties:
+        key: { type: string, pattern: '^[a-z0-9_]{2,30}$' }
+        label_en: { type: string, minLength: 1, maxLength: 80 }
+        label_ar: { type: string, maxLength: 80 }
+        type: { type: string, enum: [text, longtext, number, yesno, choice] }
+        required: { type: boolean }
+        options: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 60 }, description: 'The choices of a `choice` field (2 to 20); empty for the other types.' }
+    FieldFormKind:
+      type: object
+      required: [code, name_en, name_ar, enabled, signature, fields]
+      properties:
+        code: { type: string, pattern: '^[a-z0-9_]{2,30}$' }
+        name_en: { type: string, minLength: 1, maxLength: 80 }
+        name_ar: { type: string, maxLength: 80 }
+        enabled: { type: boolean }
+        signature: { type: boolean, description: 'The form is signed on the screen.' }
+        fields: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/FieldFormField' } }
+    FieldForms:
+      type: object
+      description: '0.15.596. Setting `field.forms` (migration 0667).'
+      required: [forms, version, can_edit]
+      properties:
+        forms: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/FieldFormKind' } }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    FieldFormsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [forms]
+          properties:
+            forms: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/FieldFormKind' } }
+    FieldFormSubmit:
+      type: object
+      required: [client_id, form_code, answers, captured_at]
+      properties:
+        client_id: { type: string, format: uuid }
+        form_code: { type: string }
+        answers: { type: object, additionalProperties: true }
+        signature: { type: [string, 'null'], maxLength: 300000, description: 'A PNG data URL (data:image/png;base64,...).' }
+        signer_name: { type: [string, 'null'], minLength: 1, maxLength: 120 }
+        captured_at: { type: string, format: date-time, description: The moment the form was signed or filled on the device. }
+    FieldFormSubmission:
+      type: object
+      required: [id, form_code, answers, signed, captured_at, submitted_at]
+      properties:
+        id: { type: string, format: uuid }
+        form_code: { type: string }
+        answers: { type: object, additionalProperties: true }
+        signed: { type: boolean }
+        signer_name: { type: [string, 'null'] }
+        captured_at: { type: string, format: date-time }
+        submitted_at: { type: string, format: date-time }
+        submitted_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     LoginPage:
       type: object
       description: '0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197).'
