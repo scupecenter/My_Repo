@@ -11,7 +11,7 @@ import { useToast } from '@/components/Toast';
 import { fmtDateTime } from '@/lib/time';
 
 /**
- * Settings, Alerts, Automation (admin only): the "when ... do" view over the alert rules (contract 0.15.473, migration 0612). It adds no engine: a
+ * Settings, Alerts, Automation (admin only): the "when ... do" view over the alert rules (contract 0.15.473, migration 0614). It adds no engine: a
  * rule is an alert rule (0.15.242), the only action is a notification, and a template only creates a normal alert rule through the same call as the
  * Rules screen, with a reason. Runs are done by the system (no actor) and show here and in the Audit Log as `alert_rule_run`.
  */
