@@ -142,3 +142,20 @@ describe('bulk zip', () => {
     expect(gone.body.code).toBe('export_expired');
   });
 });
+
+describe('site acceptance pack (field mode phase 4)', () => {
+  it('needs one site and no other filter, and a site without approved acceptance documents has nothing to pack', async () => {
+    const f = await docFlow(app, db, 'A2', { region: 2 });
+    await upload(f.e.api, f.taskId, (await slotOf(f.e.api, f.taskId, 'A2')).id, PDF, 'not-acceptance.pdf');
+    const noSite = await f.e.api.call('post', '/exports/zip', { pack: 'acceptance', stage_code: 'MS1' });
+    expect(noSite.status).toBe(422);
+    expect(noSite.body.errors[0]).toMatchObject({ path: '/pack', code: 'pack_scope' });
+    const filtered = await f.e.api.call('post', '/exports/zip', { pack: 'acceptance', site_id: f.site.id, doc_code: 'A2' });
+    expect(filtered.status).toBe(422);
+    const empty = await f.e.api.call('post', '/exports/zip', { pack: 'acceptance', site_id: f.site.id });
+    expect(empty.status).toBe(422);
+    expect(empty.body.errors[0]).toMatchObject({ code: 'no_files' });
+    const unknown = await f.e.api.call('post', '/exports/zip', { pack: 'other', site_id: f.site.id });
+    expect(unknown.status).toBe(422);
+  });
+});
