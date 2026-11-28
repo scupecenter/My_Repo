@@ -23890,7 +23890,7 @@ components:
     # ---------------------------------------------------------- freeze and DLP
     DataResetSettings:
       type: object
-      required: [request_expiry_minutes, backup_max_age_hours, version]
+      required: [request_expiry_minutes, backup_max_age_hours, cooloff_minutes, version]
       properties:
         request_expiry_minutes: {type: integer, description: 'Minutes a request stays open (default 30).'}
         backup_max_age_hours: {type: integer, description: 'Age limit of the last successful database backup (default 24).'}
@@ -24061,7 +24061,7 @@ components:
             first_downloaded_at: {type: [string, 'null'], format: date-time}
     DataResetRequest:
       type: object
-      required: [id, status, version, database_name, requested_by, requested_at, request_reason, expires_at, expired, stalled, files]
+      required: [id, status, version, database_name, requested_by, requested_at, request_reason, expires_at, expired, stalled, files, cooloff]
       properties:
         id: {type: string, format: uuid}
         status: {type: string, enum: [requested, approved, running, files_pending, completed, failed, cancelled, expired]}

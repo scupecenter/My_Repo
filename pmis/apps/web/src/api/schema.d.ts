@@ -17409,7 +17409,7 @@ export interface components {
             /** @description Age limit of the last successful database backup (default 24). */
             backup_max_age_hours: number;
             /** @description 0.15.268. Waiting period between the approval and the run (default 1440; 0 = immediately). */
-            cooloff_minutes?: number;
+            cooloff_minutes: number;
             version: number;
         };
         /** @description 0.15.268 (migration 0372). The waiting period of a request, inherited when it was made. */
@@ -17655,7 +17655,7 @@ export interface components {
              */
             require_backup: boolean;
             archive?: components["schemas"]["DataResetArchiveInfo"];
-            cooloff?: components["schemas"]["DataResetCooloff"];
+            cooloff: components["schemas"]["DataResetCooloff"];
             /** @description 0.15.71. The hash the approval bound to (always equal to `scope_hash`). */
             approved_scope_hash?: string | null;
             /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table), and since 0.15.72 `require_backup`. */

@@ -187,7 +187,7 @@ export const dataResetHandlers = [
   http.post(`${B}/settings/data-reset/requests/:id/approve`, async ({ params, request }) => {
     const g = admin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const r = st().request;
+    const s = st(), r = s.request;
     if (!r || r.id !== params.id) return problem(404, 'not_found', 'Not found');
     const v = version(request, r); if (v) return v;
     const body = await request.json() as { reason?: string; scope_hash?: string };
@@ -196,9 +196,10 @@ export const dataResetHandlers = [
     if (r.requested_by.id === me().id) return problem(403, 'self_approval_forbidden', 'You may not approve this yourself', { detail: 'A different System Admin must approve the reset.' });
     if (r.status !== 'requested') return problem(409, 'invalid_transition', 'Not possible now');
     Object.assign(r, { status: 'approved', version: r.version + 1, approved_by: me(), approved_at: now(), approve_reason: 'approved', approved_scope_hash: r.scope_hash });
-    if (r.cooloff.minutes > 0) {
-      const at = Date.now() + r.cooloff.minutes * 60_000;
-      r.cooloff = { minutes: r.cooloff.minutes, run_after: new Date(at).toISOString(), active: true, remaining_seconds: r.cooloff.minutes * 60 };
+    const cool = r.cooloff;
+    if (cool && cool.minutes > 0) {
+      const at = Date.now() + cool.minutes * 60_000;
+      r.cooloff = { minutes: cool.minutes, run_after: new Date(at).toISOString(), active: true, remaining_seconds: cool.minutes * 60 };
       r.expires_at = new Date(at + s.settings.request_expiry_minutes * 60_000).toISOString();
     }
     return json(r);
@@ -223,7 +224,7 @@ export const dataResetHandlers = [
     const v = version(request, r); if (v) return v;
     if ((await request.json() as { confirm_text?: string }).confirm_text !== PHRASE) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match');
     if (r.status !== 'approved') return problem(409, 'invalid_transition', 'Not possible now');
-    if (r.cooloff.run_after && new Date(r.cooloff.run_after).getTime() > Date.now()) return problem(409, 'cooloff_active', 'The waiting period is not over');
+    if (r.cooloff?.run_after && new Date(r.cooloff.run_after).getTime() > Date.now()) return problem(409, 'cooloff_active', 'The waiting period is not over');
     if (!archiveOk(r)) return problem(409, 'archive_required', 'The archive of this reset is not ready', { detail: 'Make the archive first (mode download: and download it once).' });
     if ((r.require_backup ?? true) && !s.backupOk) return problem(409, 'backup_missing', 'No recent successful database backup', { detail: 'No successful database backup in the last 24 hours.' });
     const t0 = now();
