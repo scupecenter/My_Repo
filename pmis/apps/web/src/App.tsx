@@ -31,6 +31,7 @@ import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage, RegisterRecordPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { DataHubPage } from '@/pages/DataHub';
+import { FinanceHubPage } from '@/pages/FinanceHub';
 import { TemplatesPage } from '@/pages/Templates';
 import { LibraryForms } from '@/pages/library/Forms';
 import { LibraryTemplates } from '@/pages/library/Templates';
@@ -129,6 +130,7 @@ function gated(session: Session) {
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="data-hub" element={<DataHubPage />} />
+        <Route path="finance-hub" element={<FinanceHubPage />} />
         <Route path="templates" element={<TemplatesPage />} />
         {/* W5: Library (Forms and Archive) */}
         <Route path="library" element={<Navigate to="/library/forms" replace />} />

@@ -32,6 +32,7 @@ import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { DataReset } from './DataReset';
 import { Imports, TemplateNoticeCard } from './Imports';
+import { DuplicateRowsCard } from './DuplicateRows';
 import { KanbanWip } from './KanbanWip';
 import { NumberSequences } from './NumberSequences';
 import { Studio } from './studio/Studio';
@@ -51,6 +52,7 @@ import { MotionSettings } from './MotionSettings';
 import { AlertRules } from './AlertRules';
 import { LoginPageSettings } from './LoginPage';
 import { DataHubSettings } from './DataHubSettings';
+import { FinanceHubSettings } from './FinanceHubSettings';
 import { InterfaceSettings } from './InterfaceSettings';
 import { OpenRecordSettings } from './OpenRecordSettings';
 
@@ -72,7 +74,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -189,6 +191,7 @@ export function SettingsRoutes() {
           <Route path="login" element={<LoginPageSettings />} />
           <Route path="interface" element={<InterfaceSettings />} />
           <Route path="data-hub" element={<DataHubSettings />} />
+          <Route path="finance-hub" element={<FinanceHubSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
@@ -235,7 +238,7 @@ export function SettingsRoutes() {
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>
           <Route index element={<Navigate to="imports" replace />} />
-          <Route path="imports" element={<><Imports /><TemplateNoticeCard /></>} />
+          <Route path="imports" element={<><Imports /><TemplateNoticeCard /><DuplicateRowsCard /></>} />
           <Route path="historical" element={<HistoricalWaiver />} />
           <Route path="counts" element={<GecolHlcCounts />} />
           <Route path="export" element={<ExportSchedulesScreen />} />
