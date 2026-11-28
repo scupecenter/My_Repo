@@ -19,6 +19,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { ManualItems } from '@/pages/ManualItems';
 import { ChangePassword } from '@/pages/ChangePassword';
 import { InviteAccept } from '@/pages/InviteAccept';
+import { PublicIntake } from '@/pages/PublicIntake';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
 import { ForgotPassword } from '@/pages/ForgotPassword';
@@ -198,6 +199,7 @@ export function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/invite/:token" element={<InviteAccept />} />
+      <Route path="/intake/:token" element={<PublicIntake />} />
       <Route path="/step-up-done" element={<StepUpDone />} />
       {USE_MOCKS && <Route path="/mock-m365" element={<MockM365 />} />}
       {USE_MOCKS && <Route path="/mock-m365/step-up" element={<MockStepUp />} />}
