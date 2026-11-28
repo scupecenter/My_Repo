@@ -21,7 +21,8 @@ export function useSaveTableDisplay() {
   return useMutation({
     mutationFn: (v: { defaults: Display; reason: string; version: number }) => {
       // V8 (0.15.573): `colors` is a personal Layout-panel choice per screen, never an organisation default; the setting keeps its known keys
-      const { colors: _colors, ...defaults } = v.defaults;
+      const { colors, ...defaults } = v.defaults;
+      void colors; // stripped above on purpose
       return api.put<TableDisplaySetting>('/settings/table-display', { version: v.version, body: { defaults, reason: v.reason } });
     },
     onSuccess: (r) => qc.setQueryData(['table-display'], r),
