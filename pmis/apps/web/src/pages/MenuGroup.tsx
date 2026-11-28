@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavLayout } from '@/api/settings';
 import type { NavItem } from '@/components/navItems';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
+import { useMe } from '@/api/hooks';
+import { applySidebarOverlay, sanitizeUiNav } from '@/lib/sidebarPrefs';
 import { headingName, resolveLayout, type NavSub } from '@/lib/navLayout';
 
 /**
@@ -14,7 +16,9 @@ export function MenuGroup() {
   const { id } = useParams();
   const { items } = useOutletContext<{ items: NavItem[] }>();
   const navQ = useNavLayout();
-  const layout = resolveLayout(navQ.data?.layout ?? null);
+  const me = useMe(true);
+  // the page lists what the menu lists: the personal hide and order apply here too
+  const layout = applySidebarOverlay(resolveLayout(navQ.data?.layout ?? null), sanitizeUiNav(me.data?.user.ui_prefs?.sidebar ?? {}));
   const head = layout.headings.find((h) => h.id === id);
   if (!head) return navQ.isLoading ? null : <Navigate to="/my-work" replace />;
   const byKey = (k: string) => items.find((i) => i.key === k);
