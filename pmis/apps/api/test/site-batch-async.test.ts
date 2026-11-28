@@ -212,6 +212,12 @@ describe('a big New sites batch: L1 sends (drafts), L2 approves all in the backg
     expect(ret.body.code).toBe('batch_processing');
     await jobs.process(await runOf(b.id));
     const done = await l2.api.call('get', `/import-batches/${b.id}`);
+    if (done.body.status !== 'approved' || done.body.counts?.approved !== ROWS) {
+      // diagnostics for a flaky short approval: which rows were left and what the database recorded for them
+      const left = await q<Record<string, unknown>>(db, `SELECT row_no, site_code, action::text AS action, decision::text AS decision, errors, decision_note, diff
+        FROM import_batch_rows WHERE batch_id = $1 AND decision::text <> 'approved' ORDER BY row_no LIMIT 8`, [b.id]);
+      throw new Error(`approve all left rows: status ${done.body.status}; counts ${JSON.stringify(done.body.counts)}; progress ${JSON.stringify(done.body.progress)}; rows ${JSON.stringify(left)}`);
+    }
     expect(done.body).toMatchObject({ status: 'approved', counts: { approved: ROWS, pending: 0 }, progress: { state: 'done', approved: ROWS } });
     const sites = await sitesOf(b.codes);
     expect(sites).toHaveLength(ROWS);
