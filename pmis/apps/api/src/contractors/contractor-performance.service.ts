@@ -122,21 +122,26 @@ export class ContractorPerformanceService {
   async report(auth: AuthContext) {
     await this.access.requireModuleView(auth, 'contractors');
     // the penalty amount is money: it follows the right to see the money registers (financial advances); the late days are always shown
-    return this.reportData(await this.access.hasGrant(auth, 'financial_advances', 'view'));
+    return this.reportData(null, await this.access.hasGrant(auth, 'financial_advances', 'view'));
   }
 
   /**
    * The report without the module gate, for surfaces that gate on their own: the scorecard section of
    * GET /dashboard/ops (0.15.202, item 5) answers available false when the caller lacks contractors view. Same rows,
-   * same rules, so the dashboard card and this screen never disagree.
+   * same rules, so the dashboard card and this screen never disagree. 0.15.368: `phase` (the dashboard's phase quick
+   * filter) keeps only the rows whose site is in one of those phases; without it nothing changes.
    */
-  async reportData(showAmounts = false) {
+  async reportData(phase: string[] | null = null, showAmounts = false) {
     const th = await this.thresholdsJson();
     const t = th.thresholds;
+    const inPhase = (col: string) =>
+      phase && phase.length
+        ? Prisma.sql`AND EXISTS (SELECT 1 FROM sites psx WHERE psx.id = ${Prisma.raw(col)} AND psx.project_phase = ANY(${phase}::text[]))`
+        : Prisma.empty;
     const rows = await this.db.tx.$queryRaw<Row[]>(Prisma.sql`
       WITH cfg AS (SELECT closed_order_statuses AS cl FROM contractor_rules LIMIT 1),
       iss AS (SELECT party_id, count(*)::int AS total, (count(*) FILTER (WHERE status::text <> 'closed'))::int AS open, coalesce(sum(delay_days), 0)::int AS delay
-              FROM issues WHERE party_id IS NOT NULL GROUP BY party_id),
+              FROM issues WHERE party_id IS NOT NULL ${inPhase('site_id')} GROUP BY party_id),
       sn AS (SELECT responsible_party_id AS party_id, count(*)::int AS total,
                     (count(*) FILTER (WHERE status::text NOT IN ('closed', 'cancelled')))::int AS open,
                     (count(*) FILTER (WHERE target_date IS NOT NULL AND ((status::text NOT IN ('closed', 'cancelled') AND target_date < CURRENT_DATE)
@@ -145,12 +150,12 @@ export class ContractorPerformanceService {
                     coalesce(sum(CASE WHEN target_date IS NULL THEN 0
                                       WHEN status::text NOT IN ('closed', 'cancelled') AND target_date < CURRENT_DATE THEN CURRENT_DATE - target_date
                                       WHEN status::text = 'closed' AND closed_at::date > target_date THEN closed_at::date - target_date ELSE 0 END), 0)::int AS late_days
-             FROM snags WHERE responsible_party_id IS NOT NULL AND status::text <> 'cancelled' GROUP BY responsible_party_id),
+             FROM snags WHERE responsible_party_id IS NOT NULL AND status::text <> 'cancelled' ${inPhase('site_id')} GROUP BY responsible_party_id),
       q AS (SELECT party_id, count(*)::int AS total, (count(*) FILTER (WHERE lower(btrim(result)) = 'fail'))::int AS failed
-            FROM quality_inspections WHERE party_id IS NOT NULL AND lower(btrim(result)) IN ('pass', 'fail') GROUP BY party_id),
+            FROM quality_inspections WHERE party_id IS NOT NULL AND lower(btrim(result)) IN ('pass', 'fail') ${inPhase('site_id')} GROUP BY party_id),
       o AS (SELECT pr.party_id, count(*)::int AS total,
                    (count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM cfg, unnest(cfg.cl) x WHERE public.p4b_norm(x) = public.p4b_norm(pr.order_status))))::int AS open
-            FROM procurement_records pr WHERE pr.party_id IS NOT NULL GROUP BY pr.party_id),
+            FROM procurement_records pr WHERE pr.party_id IS NOT NULL ${inPhase('pr.site_id')} GROUP BY pr.party_id),
       c AS (SELECT party_id, (count(*))::int AS active, min(end_date) FILTER (WHERE end_date IS NOT NULL) AS end_date
             FROM external_party_contracts WHERE status = 'active' GROUP BY party_id)
       SELECT p.id::text AS party_id, p.name, p.type::text AS type, p.is_active,

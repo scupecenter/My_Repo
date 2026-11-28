@@ -565,7 +565,8 @@ export const adminHandlers = [
   }),
   http.post(`${B}/exports/master`, async ({ request }) => {
     const g = guard(); if (g) return g;
-    const b = ((await request.json().catch(() => ({}))) ?? {}) as { parts?: string[]; view?: { source: string; filters: object; columns: string[] }; regions?: number[]; as_of?: string };
+    const b = ((await request.json().catch(() => ({}))) ?? {}) as { parts?: string[]; view?: { source: string; filters: object; columns: string[] }; regions?: number[]; as_of?: string; site_pack?: { site_id: string; parts?: string[] } };
+    if (b.site_pack && (b.parts?.length || b.view || b.regions)) return bad('/site_pack', 'site_pack_exclusive');
     if (b.parts?.length && b.view) return bad('/view', 'parts_and_view_exclusive');
     if (b.view && (!b.view.source || !b.view.columns?.length)) return bad('/view/columns', 'required');
     if (b.as_of && b.as_of > TODAY) return bad('/as_of', 'future_date');
@@ -576,7 +577,7 @@ export const adminHandlers = [
     if (no.length) return problem(403, 'action_forbidden', 'You may not export these parts', { errors: no.map((p) => ({ path: `/parts/${p}`, code: 'export_denied' })) });
     const id = crypto.randomUUID();
     A().exports.unshift({
-      id, kind: b.view ? 'view' : b.parts?.length ? 'partial' : 'full', parts: b.view ? [] : (b.parts ?? []), view: b.view, job_id: id, created_at: now(), status: 'queued', regions: b.regions ?? [1, 2, 3, 4, 5, 6, 7],
+      id, kind: b.site_pack ? 'site_pack' : b.view ? 'view' : b.parts?.length ? 'partial' : 'full', ...(b.site_pack ? { site_id: b.site_pack.site_id } : {}), parts: b.view ? [] : (b.parts ?? []), view: b.view, job_id: id, created_at: now(), status: 'queued', regions: b.regions ?? [1, 2, 3, 4, 5, 6, 7],
       as_of: b.as_of ?? TODAY, row_count: null, expires_at: null, progress: 0, polls: 0, size: 2048,
     } as never);
     save();
@@ -634,7 +635,7 @@ const PARTS = ([
   ['as_built', 'As-Built', 'كما بُني', 'As-Built'], ['meetings', 'Meetings', 'الاجتماعات', 'Meetings'], ['contractors', 'Contractors', 'المقاولون', 'Contractors'],
   ['rf_design', 'RF & Design', 'التصميم الراديوي', 'RF & Design'], ['acquisition', 'Acquisition', 'الاستحواذ', 'Acquisition'], ['dismantle', 'Dismantle', 'الإزالة', 'Master'],
   ['car_dispatcher', 'Car Dispatcher', 'حجز وتوزيع السيارات', 'Car Dispatcher'], ['financial_advances', 'Financial Advances', 'السلف المالية', 'Financial Advances'], ['incidents', 'Incidents', 'الحوادث', 'Incidents'],
-  ['lessons_learned', 'Lessons Learned', 'الدروس المستفادة', 'Lessons Learned'], ['invoices', 'Invoices', 'الفواتير', 'Invoices'], ['deliverables', 'Deliverables', 'المخرجات', 'Deliverables'],
+  ['lessons_learned', 'Lessons Learned', 'الدروس المستفادة', 'Lessons Learned'], ['invoices', 'Invoices', 'الفواتير', 'Invoices'], ['deliverables', 'Deliverables', 'المخرجات', 'Deliverables'], ['tools_equipment', 'Tools & Equipment', 'الأدوات والمعدات', 'Tools & Equipment'],
 ] as const).map(([key, label_en, label_ar, master_sheet]) => ({ key, label_en, label_ar, master_sheet }));
 const COLUMNS: Record<string, string[]> = {
   sites: ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'],
