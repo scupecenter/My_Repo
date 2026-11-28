@@ -65,6 +65,7 @@ describe('Workflow Studio, Site Master columns of a task', () => {
     expect(screen.getByTestId('studio-col-menu-O-sow')).toHaveTextContent('SOW');
     expect(screen.getByTestId('studio-col-state-N')).toHaveTextContent('Active');
     expect(screen.getByTestId('studio-col-protected-P')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-col-protected-P').getAttribute('title')).toBeTruthy(); // hover explains why it is protected
     expect(screen.queryByTestId('studio-col-protected-N')).toBeNull();
     // another task: its own columns, one of them inactive
     await u.click(screen.getByTestId('studio-task-A4'));

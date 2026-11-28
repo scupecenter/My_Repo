@@ -63,7 +63,7 @@ export function TaskColumnsCard({ c, code }: { c: Ctx; code: string }) {
                     <td className="p-2">
                       <span data-testid={`studio-col-name-${letter}`}>{colName(col, ar)}</span>
                       <span className="ms-2 inline-flex flex-wrap gap-1 align-middle">
-                        {col.is_protected && <span className="chip bg-lockBg text-lockInk" title={col.protected_reason ?? undefined} data-testid={`studio-col-protected-${letter}`}>{t('studio.columns.protected')}</span>}
+                        {col.is_protected && <span className="chip bg-lockBg text-lockInk" title={col.protected_reason ?? t('studio.columns.protected_why')} data-testid={`studio-col-protected-${letter}`}>{t('studio.columns.protected')}</span>}
                         {col.is_added && <span className="chip bg-hover text-ink">{t('studio.columns.added')}</span>}
                       </span>
                       <div className="text-xs text-mute" dir="ltr">{col.source.input_label ?? col.source.field_key}</div>
@@ -72,7 +72,7 @@ export function TaskColumnsCard({ c, code }: { c: Ctx; code: string }) {
                     <td className="p-2" data-testid={`studio-col-list-${letter}`}>{col.value_type === 'list' ? <>{listName(col.list_catalogue)} <span className="mono text-xs text-mute" dir="ltr">{col.list_catalogue}</span></> : <span className="text-mute">{t('studio.columns.no_list')}</span>}</td>
                     <td className="p-2" data-testid={`studio-col-menus-${letter}`}>
                       <span className="flex flex-wrap gap-1">
-                        {col.sections.includes('status') ? <span className="chip bg-hover text-ink">{t('studio.columns.protected')}</span>
+                        {col.sections.includes('status') ? <span className="chip bg-hover text-ink" title={t('studio.columns.protected_why')}>{t('studio.columns.protected')}</span>
                           : col.sections.length === 0 ? <span className="text-mute">{t('studio.columns.no_menus')}</span>
                             : col.sections.map((s) => <span key={s} className="chip bg-accentSoft text-accentText" data-testid={`studio-col-menu-${letter}-${s}`}>{t(`studio.columns.menu_${s}`)}</span>)}
                       </span>

@@ -16,4 +16,17 @@ describe('AutoHints', () => {
     expect(screen.getByTestId('b')).toHaveAttribute('title', 'Own words');
     expect(screen.getByTestId('c')).not.toHaveAttribute('title');
   });
+
+  it('gives a chip with no hint its full text on hover, and keeps its own title and a Tip', () => {
+    render(<><AutoHints />
+      <span className="chip" data-testid="a">  In   progress </span>
+      <span className="chip" title="Why" data-testid="b">Protected</span>
+      <Tip text="Explains"><span className="chip" data-testid="c">Late</span></Tip></>);
+    fireEvent.pointerOver(screen.getByTestId('a'));
+    fireEvent.pointerOver(screen.getByTestId('b'));
+    fireEvent.pointerOver(screen.getByTestId('c'));
+    expect(screen.getByTestId('a')).toHaveAttribute('title', 'In progress');
+    expect(screen.getByTestId('b')).toHaveAttribute('title', 'Why');
+    expect(screen.getByTestId('c')).not.toHaveAttribute('title');
+  });
 });
