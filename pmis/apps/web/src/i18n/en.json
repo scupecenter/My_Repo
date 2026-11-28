@@ -8359,6 +8359,12 @@
     "panel_width_wide": "Wide",
     "panel_tabs": "Show the tabs (All, Unread, Priority) in the panel"
   },
+  "lessonSuggest": {
+    "title": "Lessons learned that may apply",
+    "hint": "Approved lessons that share words with this issue. Open one in a new tab; nothing is linked or changed.",
+    "open_hint": "Open this lesson in a new tab",
+    "same_site": "Same site"
+  },
   "related": {
     "change_pending": "Change pending",
     "title": "Related records",

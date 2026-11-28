@@ -7906,6 +7906,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/issues/lesson-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lessons learned that may apply to a new Issue (0.15.645)
+         * @description 0.15.645. Approved, current Lessons Learned records that share words with `q` (the title, description and remark being typed), at most 5, best first (more shared words, then closer text, then the same site, then the newest). A lesson needs two shared words (one when `q` has one usable word); words under 3 letters and common English words are ignored; no stemming or translation. Needs the Issue log module; the lessons come only from the regions where the caller holds the Lessons Learned view right (an empty list otherwise). Read only.
+         */
+        get: operations["listIssueLessonSuggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/risks/{entity_id}/issues": {
         parameters: {
             query?: never;
@@ -19732,6 +19752,26 @@ export interface components {
             po_wo_date?: string;
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
+        };
+        IssueLessonSuggestion: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The Lessons Learned record to open.
+             */
+            entity_id: string;
+            title: string | null;
+            category?: string | null;
+            /** @description First 300 characters. */
+            lesson?: string | null;
+            /** @description First 300 characters. */
+            recommendation?: string | null;
+            lesson_date?: string | null;
+            site_code?: string | null;
+            same_site: boolean;
+            /** @description Number of shared words. */
+            matches: number;
         };
         IssueRiskOption: {
             /** Format: uuid */
@@ -38559,6 +38599,34 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listIssueLessonSuggestions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["IssueLessonSuggestion"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listRiskRealisedIssues: {

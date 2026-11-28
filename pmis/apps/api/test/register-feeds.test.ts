@@ -241,6 +241,12 @@ describe('Issue to Risk link (0322)', () => {
     expect(none.status, JSON.stringify(none.body)).toBe(201);
     const opts = await t.entry.api.call('get', '/registers/issues/risk-options');
     expect([200, 403], JSON.stringify(opts.body)).toContain(opts.status);
+    // 0765: lesson suggestions are read only, validate their input and never fail for a caller without the Lessons view right
+    const les = await t.entry.api.call('get', '/registers/issues/lesson-suggestions?q=cable%20theft%20at%20the%20tower');
+    expect([200, 403], JSON.stringify(les.body)).toContain(les.status);
+    if (les.status === 200) expect(Array.isArray((les.body as { items: unknown[] }).items)).toBe(true);
+    const lesBad = await t.entry.api.call('get', '/registers/issues/lesson-suggestions?site_id=nope&q=cable');
+    expect([403, 422]).toContain(lesBad.status);
     const badId = await t.entry.api.call('get', '/registers/risks/not-an-id/issues');
     expect([403, 422]).toContain(badId.status);
   });

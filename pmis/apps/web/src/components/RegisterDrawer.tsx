@@ -22,6 +22,7 @@ import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { RelatedRecords } from './RelatedRecords';
+import { LessonSuggestions } from './LessonSuggestions';
 import { SiteTaskField } from './SiteTaskField';
 import { SiteGateField } from './SiteGateField';
 import { useRegisterLinks } from '@/api/p4c';
@@ -413,6 +414,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
             </section>
           )}
         </form>
+        {!record && rk === 'issues' && <LessonSuggestions siteId={site?.id} text={[data.title, data.description, data.remark].filter((x) => typeof x === 'string').join(' ')} />}
         {rk === 'procurement' && (
           <section aria-labelledby="rs-assignment" data-testid="reg-section-assignment" className="space-y-2">
             <h3 id="rs-assignment" className="font-semibold">{t('procAssign.title')}</h3>

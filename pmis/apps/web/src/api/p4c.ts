@@ -68,6 +68,14 @@ export const useIssueRisks = (enabled: boolean) =>
     queryFn: () => api.get<{ items: S['IssueRiskOption'][] }>('/registers/issues/risk-options').then((r) => r.items),
   });
 
+/** GET /registers/issues/lesson-suggestions: approved Lessons Learned sharing words with the Issue being written (0765). */
+export const useIssueLessonSuggestions = (siteId: string | null | undefined, text: string) =>
+  useQuery({
+    queryKey: ['issue-lessons', siteId ?? '', text], enabled: text.trim().length >= 6,
+    queryFn: () => api.get<{ items: S['IssueLessonSuggestion'][] }>('/registers/issues/lesson-suggestions', { query: { ...(siteId ? { site_id: siteId } : {}), q: text } }).then((r) => r.items),
+    staleTime: 60_000,
+  });
+
 /** GET /registers/risks/{entity_id}/issues: the issues that realise a risk (0322). */
 export const useRiskIssues = (entityId: string | null | undefined) =>
   useQuery({
