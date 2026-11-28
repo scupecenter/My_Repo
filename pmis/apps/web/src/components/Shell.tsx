@@ -1,5 +1,6 @@
 import * as Popover from '@radix-ui/react-popover';
 import { AutoHints } from './AutoHints';
+import { PageTitle } from './PageTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { Download, Palette, Plus, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -278,6 +279,7 @@ function ShellFrame() {
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
         <AutoHints />
+        <PageTitle />
         <main className="p-6"><Outlet context={{ items: sideItems }} /></main>
       </div>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
