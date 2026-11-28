@@ -61,6 +61,22 @@ describe('Q473: Propose a change on the site page', () => {
     expect(screen.getByTestId('site-title')).not.toHaveTextContent('Corrected name');          // the site keeps its approved values until L2 decides
   });
 
+  it('proposes the address (A1b) as its own draft, and a text over 500 characters is refused next to the field', async () => {
+    await signIn('engineer');
+    const u = userEvent.setup();
+    renderApp(<SiteAt />, { route: `/sites/${SITE}` });
+    const form = await open(u);
+    const address = within(form).getByTestId('site-identity-address');
+    await u.clear(address);
+    await u.type(address, 'x');
+    await u.type(within(form).getByTestId('site-identity-reason'), 'address from the survey');
+    const long = await refused({ address: 'y'.repeat(501) });
+    expect(long.problem.errors).toEqual([{ path: '/identity/address', code: 'too_long' }]);
+    await u.click(within(form).getByTestId('site-identity-send'));
+    expect(await screen.findByText(/1 proposal created in Change Control/)).toBeInTheDocument();
+    expect(siteProposals.map((p) => [p.field, p.new_value])).toEqual([['address', 'x']]);
+  });
+
   it('shows region and cluster to a System Admin only; a region change that leaves the old cluster behind is refused next to the cluster field', async () => {
     await signIn('pm');
     const u = userEvent.setup();

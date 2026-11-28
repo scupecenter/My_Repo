@@ -114,6 +114,37 @@ describe('Q473: the names and the coordinates change through a proposal', () => 
     expect((await siteRow(site.id)).name_ar).toBeNull();
   });
 
+  it('proposes the address (A1b, migration 0611): set, clear, 500 characters at most, control characters stripped, nothing changes until L2 decides', async () => {
+    const site = await makeSite(db, R, { prefix: 'SI' });
+    await db.query('UPDATE sites SET address = NULL WHERE id = $1', [site.id]);
+    const set = await propose(lead, site.id, { address: '  12 Test Road,\u0007 Tripoli ' });
+    expect(set.status).toBe(201);
+    expect(set.body.items).toHaveLength(1);
+    expect(set.body.items[0]).toMatchObject({ field: 'address', old_value: '(none)', new_value: '12 Test Road, Tripoli' });
+    expect((await q<{ address: string | null }>(db, 'SELECT address FROM sites WHERE id = $1', [site.id]))[0]!.address).toBeNull();
+    const rec = await record(lead, set.body.items[0].record_id);
+    expect(rec.data).toMatchObject({ field_item: 'site.address' });
+    await approveFlex(teamOf(site, false), rec.id, rec.version);
+    expect((await q<{ address: string | null }>(db, 'SELECT address FROM sites WHERE id = $1', [site.id]))[0]!.address).toBe('12 Test Road, Tripoli');
+    const applied = await auditOf('site_change_applied', site.id);
+    expect(applied.at(-1)!.after).toBeTruthy();
+
+    expect((await propose(lead, site.id, { address: 'y'.repeat(501) })).body.errors[0]).toMatchObject({ path: '/identity/address', code: 'too_long' });
+    expect((await propose(lead, site.id, { address: '12 Test Road, Tripoli' })).body.errors[0]).toMatchObject({ path: '/identity/address', code: 'unchanged' });
+    expect((await propose(lead, site.id, { address: true })).body.errors[0]).toMatchObject({ path: '/identity/address', code: 'invalid' });
+
+    const clear = await propose(lead, site.id, { address: null });
+    expect(clear.status).toBe(201);
+    expect(clear.body.items[0]).toMatchObject({ field: 'address', old_value: '12 Test Road, Tripoli', new_value: '(none)' });
+    const rec2 = await record(lead, clear.body.items[0].record_id);
+    await approveFlex(teamOf(site, false), rec2.id, rec2.version);
+    expect((await q<{ address: string | null }>(db, 'SELECT address FROM sites WHERE id = $1', [site.id]))[0]!.address).toBeNull();
+
+    const both = await propose(lead, site.id, { name_ar: `عنوان ${tag()}`, address: 'Both Street' });
+    expect(both.status).toBe(201);
+    expect(both.body.items.map((i: any) => i.field).sort()).toEqual(['address', 'name_ar']);
+  });
+
   it('proposes the coordinates as one pair and checks the ranges as the site creation does', async () => {
     const site = await makeSite(db, R, { prefix: 'SI' });
     const bad = await propose(lead, site.id, { latitude: 91, longitude: 13.1 });

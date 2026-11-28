@@ -2682,7 +2682,7 @@ export interface paths {
          *     Old Value is refused at submit (`old_value_changed`). Field codes: `unknown_field`, `no_approval_needed` (edit it with PATCH), `field_read_only`, `invalid`,
          *     `required`, `unchanged`; `/reason` `required`.
          *
-         *     **The identity of the site (0.14.1, Q473).** `identity` proposes the English name (`name`), the Arabic name (`name_ar`, null clears it), the coordinates (`latitude`
+         *     **The identity of the site (0.14.1, Q473).** `identity` proposes the English name (`name`), the Arabic name (`name_ar`, null clears it), the address (`address`, 0.15.471, at most 500 characters, null clears it), the coordinates (`latitude`
          *     and `longitude` together, six decimals; a pair is replaced, never cleared), the region (`region_id`) and the cluster (`cluster_code`, null clears it). One Change Control
          *     draft (Data Correction, scope Field) per item, entered by the caller as L1 like the drafts above; the site keeps its values until L2 approves, and nothing is
          *     proposed when one field is refused. A region change carries the cluster in the same draft (the cluster named in `cluster_code`, else the site's cluster when it is
@@ -15298,6 +15298,8 @@ export interface components {
             identity?: {
                 name?: string;
                 name_ar?: string | null;
+                /** @description 0.15.471 (A1b). The address of the site; null or empty clears it. */
+                address?: string | null;
                 latitude?: number | null;
                 /** @description With latitude; both null clears the coordinates. */
                 longitude?: number | null;
@@ -21823,6 +21825,8 @@ export interface components {
             name?: string;
             /** @description The Arabic site name; null or empty clears it. */
             name_ar?: string | null;
+            /** @description 0.15.471 (A1b). The address of the site (the column `address`); null or empty clears it. */
+            address?: string | null;
             /** @description With `longitude`: the pair is replaced as a whole (six decimals). */
             latitude?: number;
             longitude?: number;
