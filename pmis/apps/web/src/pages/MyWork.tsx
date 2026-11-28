@@ -1,5 +1,6 @@
 import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -110,7 +111,8 @@ export function MyWork() {
           <h1 className="text-2xl font-bold">{t('myWork.title')}</h1>
           <p className="text-mute">{t('myWork.hello', { name: me.data?.user.display_name.split(' ')[0] ?? '' })}</p>
         </div>
-        <button type="button" className="btn ms-auto" data-testid="my-work-ics" onClick={() => { void downloadFile('/me/tasks.ics').catch(() => undefined); }}><CalendarDays size={16} />{t('myWork.ics')}</button>
+        <span className="ms-auto"><ScreenSettingsLink screen="my_work" /></span>
+        <button type="button" className="btn" data-testid="my-work-ics" onClick={() => { void downloadFile('/me/tasks.ics').catch(() => undefined); }}><CalendarDays size={16} />{t('myWork.ics')}</button>
         <Link to="/approvals" data-testid="my-work-go-approvals" className="btn btn-accent"><Inbox size={16} />{t('myWork.go_approvals')}<span className="chip bg-card text-ink">{doNow.data?.items.length ?? 0}</span></Link>
       </div>
       <MyWorkCalendar late={late.data?.items ?? []} doNow={doNow.data?.items ?? []} onOpen={setOpen} />
