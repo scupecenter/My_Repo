@@ -118,4 +118,15 @@ describe('Settings, alert rules', () => {
     await u.selectOptions(screen.getByTestId('ar-register'), 'issues');
     expect(screen.getByTestId('ar-field-code')).toBeInTheDocument();
   });
+
+  it('offers the consistency alert kind with the same register, field and minimum rows', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    await u.click(await screen.findByTestId('ar-new'));
+    await u.selectOptions(screen.getByTestId('ar-kind'), 'link_conflict');
+    expect(screen.getByTestId('ar-min-rows')).toHaveValue(1);
+    await u.selectOptions(screen.getByTestId('ar-register'), 'issues');
+    expect(screen.getByTestId('ar-field-code')).toBeInTheDocument();
+  });
 });

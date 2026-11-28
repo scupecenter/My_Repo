@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.485 (2026-11-28) consistency alert for register links (migration 0626, mirror `db/sql/625_link_conflict_alert.sql`). Additive, notifications only. New alert rule kind `link_conflict` {register_key?, field_code?, min_rows 1..100000}: once a week, for every declared register link with at least `min_rows` approved current rows whose linked record in the target register is still open (neither approved nor voided), a notification to the audience of the rule; `AlertRuleInput.kind` and `AlertRule.kind` gain `link_conflict`, `GET /settings/alert-rules` lists the kind and a template. No record is changed. No grant, role or permission change.
     - 0.15.484 (2026-11-28) weekly data-completeness reminder and default idle rules (migration 0625, mirror `db/sql/624_alert_defaults.sql`). Additive, notifications only. New alert rule kind `data_gaps` {min_sites 1..100000}: once a week, for every region with at least `min_sites` active sites that have a data gap (a delivery scenario not set, or a task with no actual date that a later task of the site already has), a notification to the module audience of the rule (the people who work on the module in that region); `AlertRuleInput.kind` and `AlertRule.kind` gain `data_gaps`, `GET /settings/alert-rules` lists the kind and a template. The daily run now puts default rules in place once if a System Admin exists: one `record_idle` rule per main register that exists and is enabled (acquisition, procurement, change_control, issues, risks, rf_design, permits, gecol, hlc; entry state for 14 days; audience the register's module) and the `data-completeness-weekly` rule; they are ordinary rules that an admin edits or switches off and the change is kept. No grant, role or permission change.
     - 0.15.473 (2026-11-28): the Automation centre over the alert rules (migration 0614, mirror `db/sql/613_automation_centre.sql`). Additive, notifications only. New `GET /settings/alert-rules/runs` (`getAlertRuleRuns`, System Admin): the last 50 runs of the rules (`rule_code`, `kind`, `run_at`, `fired` targets). The catalogue of `GET /settings/alert-rules` gains `templates`: the closed list of ready-made rules the centre offers (they only fill the form; saving goes through the existing create call with its checks and reason). The daily job now records one run row per enabled rule (new table `alert_rule_runs`, a LOG table of the data reset) and, when a rule fired, one audit row `alert_rule_run` written by the system (no actor, via job, job_name `alert_rules`). No rule, kind, audience, permission or grant changes.
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
@@ -25573,7 +25574,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, link_orphans, data_gaps] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, link_orphans, data_gaps, link_conflict] }
         params: { type: object, additionalProperties: true, description: 'Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}.' }
         audience: { type: object, additionalProperties: true, description: '{"type":"system_admin"} or {"type":"module","module":"<module key>"}.' }
         title_en: { type: string, maxLength: 200 }
@@ -25591,7 +25592,7 @@ components:
       required: [code, kind, params, audience, title_en, title_ar, body_en, body_ar]
       properties:
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, link_orphans, data_gaps] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, link_orphans, data_gaps, link_conflict] }
         params: { type: object, additionalProperties: true }
         audience: { type: object, additionalProperties: true }
         title_en: { type: string, maxLength: 200 }
