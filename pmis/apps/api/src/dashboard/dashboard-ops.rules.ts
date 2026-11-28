@@ -446,6 +446,7 @@ export function compareContractors(items: ScorecardItem[], limit = 10): CompareC
     quality_failed: it.quality.failed,
     quality_fail_pct: it.quality.total > 0 ? Math.round((it.quality.failed * 1000) / it.quality.total) / 10 : null,
   }));
+}
 
 /** Phase scope (0.15.367): one registered phase with its site counts. Counts only; every figure is derived from the sites. */
 export interface PhaseScopeRow {
