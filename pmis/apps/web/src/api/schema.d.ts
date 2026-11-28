@@ -18929,6 +18929,18 @@ export interface components {
             parts: components["schemas"]["DataResetPart"][];
             /** @description 0.15.265. The narrowing the counts are for. */
             narrow?: components["schemas"]["DataResetNarrow"] | null;
+            /** @description 0.15.570 (migration 0641). Links of records outside the scope that point at records inside it; empty when none. Information only, never blocks. With a narrowing the counts are an upper bound. */
+            dangling_links?: components["schemas"]["DataResetDanglingLink"][];
+        };
+        /** @description 0.15.570. Records of the part `source_part` (not in the scope) that point at records of `target_part` (in the scope). */
+        DataResetDanglingLink: {
+            source_part: string;
+            target_part: string;
+            links: number;
+            source_label_en: string;
+            source_label_ar: string;
+            target_label_en: string;
+            target_label_ar: string;
         };
         DataResetFiles: {
             total: number;

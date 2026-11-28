@@ -309,6 +309,34 @@ describe('Settings, data reset', () => {
     await waitFor(() => expect(screen.getByTestId('dr-request-narrow')).toHaveTextContent('Tripoli'));
   });
 
+  it('dangling links (0.15.570): the preview counts records outside the scope that point at records inside it, never blocks, and one click adds the part (EN and AR)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-scope-custom'));
+    expect(screen.queryByTestId('dr-dangling')).not.toBeInTheDocument();
+    await u.click(screen.getByTestId('dr-part-procurement'));
+    const box = await screen.findByTestId('dr-dangling');
+    expect(box).toHaveTextContent(en.dr.dangling_title);
+    expect(screen.getByTestId('dr-dangling-issues')).toHaveTextContent('Issue Log');
+    expect(screen.getByTestId('dr-dangling-issues')).toHaveTextContent('2 records point at them');
+    expect(screen.getByTestId('dr-submit')).toBeDefined();                    // information only: nothing is blocked
+    await u.click(screen.getByTestId('dr-dangling-add-issues'));
+    await waitFor(() => expect(screen.queryByTestId('dr-dangling')).not.toBeInTheDocument());
+    expect(screen.getByTestId('dr-part-issues')).toBeChecked();
+  });
+
+  it('the dangling-links strings exist in English and Arabic, and the Arabic screen shows the part names in Arabic', async () => {
+    for (const k of Object.keys(en.dr).filter((x) => x.startsWith('dangling_'))) expect((ar.dr as Record<string, string>)[k]).toBeTruthy();
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page({ locale: 'ar' });
+    await u.click(await screen.findByTestId('dr-scope-custom'));
+    await u.click(screen.getByTestId('dr-part-procurement'));
+    expect(await screen.findByTestId('dr-dangling-issues')).toHaveTextContent('سجل المشاكل');
+    expect(screen.getByTestId('dr-dangling')).toHaveTextContent(ar.dr.dangling_title);
+  });
+
   it('the narrowing strings exist in English and Arabic', () => {
     for (const k of Object.keys(en.dr).filter((x) => x.startsWith('narrow_'))) expect((ar.dr as Record<string, string>)[k]).toBeTruthy();
   });
