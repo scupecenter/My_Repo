@@ -8187,6 +8187,15 @@
     "progress": "Progress"
   },
   "media": {
+    "view_grid": "Grid",
+    "view_grid_hint": "Cards with a thumbnail",
+    "view_list": "List",
+    "view_list_hint": "One row per photo",
+    "view_site": "By site",
+    "view_site_hint": "Grouped by site",
+    "view_date": "By date",
+    "view_date_hint": "Grouped by upload day, newest first",
+    "group_none": "No site",
     "title": "Media",
     "sub": "The photos and images of every enabled source in one gallery, read live from their records.",
     "all": "All",
