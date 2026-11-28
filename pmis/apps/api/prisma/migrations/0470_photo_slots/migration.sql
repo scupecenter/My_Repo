@@ -25,6 +25,7 @@ BEGIN
     INSERT INTO document_types (code, name_en, kind, is_active, lib_managed, published_version, needs_review, updated_at)
     VALUES (r.code, r.name_en, 'photo', false, true, 0, false, now()) RETURNING id INTO did;
     PERFORM doc_apply_spec(did, spec);
+    UPDATE document_types SET is_active = true WHERE id = did;   -- doc_apply_spec does not read is_active
     PERFORM doc_snapshot_version(did, 'new_only', DATE '2024-01-01', 'seed: migration 0470 (decision 32 photo fields)', 0);
   END LOOP;
 END $$;
