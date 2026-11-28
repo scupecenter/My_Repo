@@ -86,16 +86,10 @@ test('media walk #364: upload, gallery list, filters, settings, EN and AR', asyn
   await page.getByTestId('media-f-to').fill('');
   await expect(card).toBeVisible();
 
-  // Open record (finding 1): the card link lands on the register page; record the landing state (the id-space question is under review).
+  // Open record (finding 1): the card link must open the record's drawer directly (link now carries the row id).
   await card.getByTestId('media-open').click();
   await page.waitForTimeout(1200);
   console.log('media-open landed on:', page.url());
-  console.log('drawer opened:', await page.getByTestId('register-drawer-body').isVisible().catch(() => false));
-  console.log('not-found dialog:', await page.getByText('This record or register was not found.').isVisible().catch(() => false));
-  await page.screenshot({ path: 'test-results/walk364-media-openrecord-en.png' });
-
-  // The record's Documents tab shows the uploaded file (the upload door), opening the record by its row id.
-  await page.goto(`/registers/financial_advances?record=${rec.id}`);
   await expect(page.getByTestId('register-drawer-body')).toBeVisible({ timeout: 20000 });
   await page.screenshot({ path: 'test-results/walk364-media-openrecord-en.png' });
   await page.getByRole('tab', { name: /Documents|المستندات/ }).click();
