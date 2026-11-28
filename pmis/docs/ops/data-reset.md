@@ -614,7 +614,7 @@ The approval does not open the run at once. Settings > Data > Data reset has a s
 - Both admins (the requester and the approver) get an in-app notice at the approval and another shortly before the wait ends (an hour before, or half way for a short wait). `data_reset_cooloff_notify()` sends it; the API calls it with the state of the page and from a one-minute timer when jobs are on. It is safe to call by hand.
 - The setting can be changed only while no request is open, as the other two.
 
-## Links that would dangle (contract 0.15.540, migration 0641)
+## Links that would dangle (contract 0.15.570, migration 0641)
 
 The preview of a chosen scope lists `dangling_links`: records of a part that is NOT in the scope and that point at records of a part that is (today the Procurement link,
 `data ->> 'procurement_record_id'`). The closure of the parts already takes the parts that depend on a chosen part (invoices, advances and car bookings after a procurement

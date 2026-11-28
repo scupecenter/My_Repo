@@ -309,7 +309,7 @@ describe('Settings, data reset', () => {
     await waitFor(() => expect(screen.getByTestId('dr-request-narrow')).toHaveTextContent('Tripoli'));
   });
 
-  it('dangling links (0.15.540): the preview counts records outside the scope that point at records inside it, never blocks, and one click adds the part (EN and AR)', async () => {
+  it('dangling links (0.15.570): the preview counts records outside the scope that point at records inside it, never blocks, and one click adds the part (EN and AR)', async () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
     page();

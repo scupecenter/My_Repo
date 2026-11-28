@@ -1,4 +1,4 @@
--- 0641: the data reset preview shows the links that would dangle (contract 0.15.540). Information first, never blocking.
+-- 0641: the data reset preview shows the links that would dangle (contract 0.15.570). Information first, never blocking.
 -- A record of a register that is NOT in the scope can point at a record that IS (today: data ->> 'procurement_record_id', the link the closure of the parts follows
 -- for invoices, advances and car bookings). The closure already takes the parts that depend on a chosen part; this counts what is left outside it, per part that
 -- points and per part pointed at, so the System Admin sees it before asking for the reset and can add the part to the scope with one click (the screen only changes the
