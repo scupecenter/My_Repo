@@ -91,7 +91,7 @@
     }
   },
   "tileMap": {"zoom_in": "Zoom in", "zoom_out": "Zoom out", "show_outline": "Outline map", "show_tiles": "Map tiles", "missing": "The map tiles could not be loaded. Check the tile address and that the tiles are installed on the server."},
-  "maps": {"title": "Map", "note": "The site map on real map tiles. Off by default. The tiles come from your own server, so no other website is contacted. When this is off or the address is empty, the outline map is shown.", "enabled": "Show the site map on map tiles", "tile_url": "Tile address", "tile_url_note": "A path on this server with {z}, {x} and {y}, for example /tiles/{z}/{x}/{y}.png. Leave empty for no tiles.", "tile_url_bad": "Empty, or a path on this server with {z}, {x} and {y}. Another website is not allowed.", "min_zoom": "Smallest zoom", "max_zoom": "Largest zoom", "default_zoom": "Start zoom", "zoom_bad": "The largest zoom cannot be below the smallest.", "center_lat": "Start latitude", "center_lon": "Start longitude", "attribution": "Credit line", "attribution_note": "Shown in the corner of the map, for example the source of the map data."},
+  "maps": {"title": "Map", "note": "The site map on real map tiles. Off by default. The tiles come from your own server, so no other website is contacted. When this is off or the address is empty, the outline map is shown.", "enabled": "Show the site map on map tiles", "tile_url": "Tile address", "tile_url_note": "A path on this server with {z}, {x} and {y}, for example /tiles/{z}/{x}/{y}.png. Leave empty for no tiles.", "tile_url_bad": "Empty, or a path on this server with {z}, {x} and {y}. Another website is not allowed.", "min_zoom": "Smallest zoom", "max_zoom": "Largest zoom", "default_zoom": "Start zoom", "zoom_bad": "The largest zoom cannot be below the smallest.", "center_lat": "Start latitude", "center_lon": "Start longitude", "attribution": "Credit line", "attribution_note": "Shown in the corner of the map, for example the source of the map data.", "coords_title": "Site coordinates check", "coords_note": "Every site needs valid coordinates inside the country to appear on the map. Fix the sites below on their page.", "coords_ok": "{{ok}} of {{total}} sites have coordinates", "coords_ok_hint": "Live sites whose coordinates are valid and drawn on the map", "coords_missing_one": "{{count}} site without valid coordinates", "coords_missing_other": "{{count}} sites without valid coordinates", "coords_missing_hint": "Empty, zero or outside the country: not drawn on the map", "coords_all_good": "All live sites have valid coordinates.", "coords_more_one": "and {{count}} more site", "coords_more_other": "and {{count}} more sites", "coords_error": "The coordinates check could not be loaded."},
   "fhs": {
     "title": "Finance hub settings",
     "widgets_title": "Cards of the page",
@@ -781,6 +781,8 @@
     "awaiting_confirmation": "Awaiting"
   },
   "site": {
+    "no_coords": "No coordinates",
+    "no_coords_hint": "This site has no valid coordinates, so it is not drawn on the map. Add them in the site details.",
     "not_found": "This site does not exist or is outside your regions.",
     "cluster": "Cluster {{code}}: {{at}} of {{total}} sites at TE PAC (information only)",
     "tasks": "Tasks",

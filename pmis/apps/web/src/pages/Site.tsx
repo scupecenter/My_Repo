@@ -1,3 +1,5 @@
+import { MapPinOff } from 'lucide-react';
+import { validCoords } from '@/lib/libya';
 import { SiteActivity } from '@/components/SiteActivity';
 import { LayoutPanel } from '@/components/LayoutPanel';
 import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
@@ -121,6 +123,7 @@ export function Site() {
               <p className="text-mute" data-testid="site-meta">{(i18n.language === 'ar' && region?.name_ar) || region?.name_en} · {s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : ''}{s.cluster_code ? ` · ${s.cluster_code}` : ''}</p>
             </div>
             {/* 0.15.4 (migration 0085): the workflow locks of the site (chip and, for an authorized user, the switch) and its data gaps */}
+            {!validCoords(s.latitude, s.longitude) && s.overall_status !== 'cancelled' && <span className="chip bg-lateBg text-lateInk" title={t('site.no_coords_hint')} data-testid="site-no-coords"><MapPinOff size={14} aria-hidden /> {t('site.no_coords')}</span>}
             <LocksChip siteId={s.id} locked={s.workflow_locks !== false} canManage={!!s.workflow_locks_info?.can_manage} />
             <DataGapsChip count={s.data_gaps ?? 0} items={s.data_gap_items} />
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />

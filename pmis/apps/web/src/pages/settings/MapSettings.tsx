@@ -8,6 +8,7 @@ import { canEditDisplayDefaults } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 import { isSafeTileTemplate } from '@/lib/tileMap';
+import { CoordsCheck } from '@/components/CoordsCheck';
 import { FieldErr } from './Calendar';
 
 const ZOOMS: { key: 'min_zoom' | 'max_zoom' | 'default_zoom'; min: number; max: number }[] = [
@@ -36,6 +37,7 @@ export function MapSettings() {
   const zoomBad = v.max_zoom < v.min_zoom;
   return (
     <div className="space-y-4" data-testid="page-map-settings">
+      <CoordsCheck />
       <section className="card space-y-3 p-4">
         <div><h2 className="font-bold">{t('maps.title')}</h2><p className="text-sm text-mute">{t('maps.note')}</p></div>
         <label className="flex items-center gap-2 text-sm">
