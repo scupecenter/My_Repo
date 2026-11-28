@@ -12,10 +12,10 @@ import { REAL_API_AUTH_USERS } from '@/mocks/realApi';
 import { server } from '@/mocks/server';
 import { renderApp, signIn } from '@/test/utils';
 import { ActivityReport } from './ActivityReport';
-import { weakens } from './AlertRules';
+import { weakens } from '../settings/AlertSettings';
 import { IntegrityRuns } from './IntegrityRuns';
 import { MailDelivery } from './MailDelivery';
-import { SecurityAlerts } from './SecurityAlerts';
+import { AlertSettingsPanel } from '../settings/AlertSettings';
 
 /** Work package P9 (contract 0.12.3): mail delivery, integrity checks as jobs, alert rules and the activity workbook. */
 beforeEach(() => resetP9Mocks());
@@ -98,7 +98,7 @@ describe('Integrity checks screen', () => {
   });
 });
 
-describe('Alert rules on the security alerts screen', () => {
+describe('Alert settings (Settings > Security > Alerts)', () => {
   it('saves severities, the mail floor and trusted networks with a reason; warns when it weakens', async () => {
     await signIn('pm');
     const u = userEvent.setup();
@@ -106,7 +106,7 @@ describe('Alert rules on the security alerts screen', () => {
     server.events.on('request:start', async ({ request }) => {
       if (request.method === 'PUT' && request.url.endsWith('/settings/security-alerts')) sent = (await request.clone().json()) as Record<string, unknown>;
     });
-    renderApp(<SecurityAlerts />);
+    renderApp(<AlertSettingsPanel />);
     const nets = await screen.findByTestId('rules-networks');
     await u.type(nets, '10.0.0.1');
     expect(screen.getByTestId('rules-bad-net')).toBeInTheDocument();

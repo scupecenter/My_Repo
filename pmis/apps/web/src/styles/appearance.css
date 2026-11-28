@@ -79,3 +79,7 @@ html[data-theme=dark][data-ui-contrast=high]{
     --line2:oklch(0.55 0 0);
   }
 }
+
+/* Floating inbox (0526): the docked notification panel gives the page room at the inline-end edge instead of covering it. */
+html[data-inbox-docked] body { padding-inline-end: 26rem; }
+@media (max-width: 1024px) { html[data-inbox-docked] body { padding-inline-end: 0; } }

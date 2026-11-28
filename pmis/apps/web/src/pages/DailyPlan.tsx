@@ -1,8 +1,10 @@
-import { ChevronLeft, ChevronRight, ClipboardCopy, Download, Lock, LockOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, ClipboardCopy, Download, FileSpreadsheet, Lock, LockOpen, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { exportDailyPlan, useDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
+import { downloadDailyPlanTemplate, exportDailyPlan, useDailyPlan, useImportDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
+import { HistoryDialog } from '@/components/HistoryDialog';
+import { usePlanHistory, usePlanTriage, usePlanTriageOps } from '@/api/history';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { MoreMenu, PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
@@ -73,6 +75,8 @@ export function DailyPlan() {
   const [locking, setLocking] = useState<DailyPlanRegion | null>(null);
   const fail = (e: unknown) => toast(errText(e, t), 'err');
   const shownDate = tab === 'progress' ? date : (next ?? '');
+  const [hist, setHist] = useState<DailyPlanRegion | null>(null);
+  const histQ = usePlanHistory(hist ? shownDate : null, hist?.region_id ?? null);
 
   const copy = async () => {
     if (!progress.data || !tomorrow.data) return;
@@ -87,6 +91,10 @@ export function DailyPlan() {
       toast(t('dailyPlan.copy_failed'), 'err');
     }
   };
+  const importer = useImportDailyPlan();
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const doTemplate = () => { downloadDailyPlanTemplate(date, scope(progress.data)).then((n) => toast(t('grid.downloaded', { name: n })), fail); };
   const doExport = () => {
     const filtered = Object.entries(filters).some(([k, v]) => k !== 'region' && !!v);
     const sites = filtered ? [...new Set([...rowsOf(progress.data), ...rowsOf(tomorrow.data)].map((r) => r.site_id))] : undefined;
@@ -119,7 +127,7 @@ export function DailyPlan() {
       {isWeek ? <WeekCycle date={date} regions={scope(progress.data)} onDate={(d) => setParams({ date: d })} /> : <>
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2" data-testid="daily-plan-toolbar">
-        <SavedViews screen={SCREEN} value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
+        <SavedViews screen={SCREEN} sharedScreen value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
           onApply={(v) => setParams({ region: v.region || 'all', contractor: v.contractor, aat_se: v.aat_se, sow: v.sow, q: v.q })} />
         <UnifiedFilter screen={SCREEN} value={null} onChange={() => undefined} onClearAll={() => setParams({ region: 'all', contractor: '', aat_se: '', sow: '', q: '' })}
           extras={[
@@ -138,11 +146,13 @@ export function DailyPlan() {
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
           <LayoutPanel testid="daily-plan-layout" table={table} />
-          <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
+          <ColumnMenu density={false} api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
           <MoreMenu
             settings="daily_plan"
             items={[
               { id: 'export', label: t('dailyPlan.export'), icon: <Download size={16} aria-hidden />, testid: 'daily-plan-export', disabled: !progress.data, onSelect: doExport },
+              { id: 'template', label: t('dailyPlan.template'), icon: <FileSpreadsheet size={16} aria-hidden />, testid: 'daily-plan-template', disabled: !progress.data, onSelect: doTemplate },
+              ...(plans.some((p) => p.can_edit) ? [{ id: 'import', label: t('dailyPlan.import'), icon: <Upload size={16} aria-hidden />, testid: 'daily-plan-import', onSelect: () => importInput.current?.click() }] : []),
               { id: 'copy', label: t('dailyPlan.copy'), icon: <ClipboardCopy size={16} aria-hidden />, testid: 'daily-plan-copy', disabled: !progress.data || !tomorrow.data, onSelect: () => void copy() },
             ]} />
         </span>
@@ -159,6 +169,8 @@ export function DailyPlan() {
                 : p.reason_missing_count > 0 && <span className="chip bg-lateBg text-lateInk">{t('dailyPlan.reasons_missing', { count: p.reason_missing_count })}</span>}
               {p.can_lock && <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-lock-${p.region_id}`} onClick={() => setLocking(p)}><Lock size={12} aria-hidden />{t('dailyPlan.lock')}</button>}
               {p.can_unlock && <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-unlock-${p.region_id}`} onClick={() => setUnlocking(p)}><LockOpen size={12} aria-hidden />{t('dailyPlan.unlock')}</button>}
+              <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-history-${p.region_id}`} onClick={() => setHist(p)}>{t('history.open')}</button>
+              <PlanTriageChip date={shownDate} region={p.region_id} name={regionName(p)} />
             </li>
           ))}
         </ul>
@@ -206,10 +218,21 @@ export function DailyPlan() {
         </div>
       )}
 
+      <input ref={importInput} type="file" accept=".xlsx" className="sr-only" tabIndex={-1} data-testid="daily-plan-import-file" aria-label={t('dailyPlan.import')}
+        onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); importer.reset(); e.target.value = ''; }} />
+      {importFile && (
+        <FormDialog open withReason={false} onClose={() => setImportFile(null)} testid="daily-plan-import-dialog" title={t('dailyPlan.import')} submitLabel={t('dailyPlan.import_apply')} busy={importer.isPending}
+          error={importer.isError ? errText(importer.error, t) : null}
+          onSubmit={() => importer.mutate({ file: importFile }, { onSuccess: (r) => { setImportFile(null); toast(t('dailyPlan.imported', { updated: r.updated, added: r.added, removed: r.removed, unchanged: r.unchanged })); } })}>
+          <p className="mono text-sm" dir="ltr" data-testid="daily-plan-import-name">{importFile.name}</p>
+          <p className="mt-2 text-sm text-mute">{t('dailyPlan.import_note')}</p>
+        </FormDialog>
+      )}
       {edit && <RowDialog row={edit} tab={tab} onClose={() => setEdit(null)} busy={ops.save.isPending} error={ops.save.isError ? errText(ops.save.error, t) : null}
         onSave={(body) => { const p = planOf(edit.region_id); if (p) ops.save.mutate({ date: shownDate, region: edit.region_id, site: edit.site_id, version: p.version, body }, { onSuccess: () => { setEdit(null); toast(t('dailyPlan.saved')); } }); }} />}
       {adding && <AddDialog plans={plans.filter((p) => p.can_edit)} name={regionName} onClose={() => setAdding(false)} busy={ops.add.isPending} error={ops.add.isError ? errText(ops.add.error, t) : null}
         onAdd={(region, code) => { const p = planOf(region); if (p) ops.add.mutate({ date: shownDate, region, version: p.version, site_code: code }, { onSuccess: () => { setAdding(false); toast(t('dailyPlan.added')); } }); }} />}
+      {hist && <HistoryDialog testid="daily-plan-history-dialog" title={t('history.title_plan', { region: regionName(hist), date: shownDate })} entries={histQ.data} loading={histQ.isLoading} onClose={() => setHist(null)} />}
       {locking && (
         <FormDialog open withReason={false} onClose={() => setLocking(null)} testid="daily-plan-lock-dialog" title={t('dailyPlan.lock_title', { region: regionName(locking), date: shownDate })}
           submitLabel={t('dailyPlan.lock')} busy={ops.lock.isPending} error={ops.lock.isError ? errText(ops.lock.error, t) : null}
@@ -300,5 +323,33 @@ function AddDialog({ plans, name, onClose, onAdd, busy, error }: {
         <input className="input mt-1 font-normal" data-testid="daily-plan-add-code" value={code} onChange={(e) => setCode(e.target.value)} />
       </label>
     </FormDialog>
+  );
+}
+
+/** Claim and triage of a plan day (target: region + date). Never blocks editing or the lock. */
+function PlanTriageChip({ date, region, name }: { date: string; region: number; name: string }) {
+  const { t } = useTranslation();
+  const q = usePlanTriage(date, region);
+  const ops = usePlanTriageOps(date, region);
+  const [deciding, setDeciding] = useState<'accepted' | 'deferred' | null>(null);
+  const d = q.data;
+  if (!d) return null;
+  return (
+    <>
+      <span className="chip" data-testid={`daily-plan-triage-${region}`}>{t(`dpTriage.${d.triage_state ?? 'pending'}`)}</span>
+      {d.claimed_by?.display_name && <span className="chip" data-testid={`daily-plan-claimed-${region}`}>{t('dpTriage.claimed_by', { name: d.claimed_by.display_name })}</span>}
+      {d.can_triage && <>
+        {d.claimed_by
+          ? <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-release-${region}`} onClick={() => ops.release.mutate()}>{t('dpTriage.release')}</button>
+          : <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-claim-${region}`} onClick={() => ops.claim.mutate()}>{t('dpTriage.claim')}</button>}
+        <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-accept-${region}`} onClick={() => setDeciding('accepted')}>{t('dpTriage.accept')}</button>
+        <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-defer-${region}`} onClick={() => setDeciding('deferred')}>{t('dpTriage.defer')}</button>
+      </>}
+      {deciding && (
+        <FormDialog open onClose={() => setDeciding(null)} testid="daily-plan-triage-dialog" title={t('dpTriage.title', { region: name, date })} submitLabel={t(deciding === 'accepted' ? 'dpTriage.accept' : 'dpTriage.defer')}
+          busy={ops.decide.isPending} error={ops.decide.isError ? errText(ops.decide.error, t) : null}
+          onSubmit={(note) => ops.decide.mutate({ state: deciding, note }, { onSuccess: () => setDeciding(null) })} />
+      )}
+    </>
   );
 }

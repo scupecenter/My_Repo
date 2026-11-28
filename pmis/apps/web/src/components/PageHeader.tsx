@@ -3,6 +3,7 @@ import { Ellipsis } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useMe } from '@/api/hooks';
 import type { ScreenKey } from '@/lib/screenSettings';
 import { ICONS } from '@/lib/icons';
 import { ScreenSettingsLink, useScreenSettings } from './ScreenSettingsLink';
@@ -39,7 +40,10 @@ export type MoreItem = { id: string; label: string; icon?: ReactNode; onSelect: 
 export function MoreMenu({ items, settings }: { items: MoreItem[]; settings?: ScreenKey }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
   const nav = useNavigate();
+  // personal appearance dimension more_menu (list = default, grid = icon grid with search)
+  const grid = (useMe(true).data?.user.appearance as { more_menu?: string } | undefined)?.more_menu === 'grid';
   const gear = useScreenSettings(settings ?? 'dashboard');
   const showGear = !!settings && gear.allowed;
   if (!items.length) return settings ? <ScreenSettingsLink screen={settings} /> : null;
@@ -55,10 +59,27 @@ export function MoreMenu({ items, settings }: { items: MoreItem[]; settings?: Sc
         <Popover.Trigger asChild><button type="button" className="btn" data-testid="more-menu" aria-label={t('table.more')}><Ellipsis size={16} /></button></Popover.Trigger>
       </Tip>
       <Popover.Portal>
-        <Popover.Content align="end" sideOffset={6} role="menu" className="card z-50 min-w-48 p-1 shadow-lg" data-testid="more-panel">
+        <Popover.Content align="end" sideOffset={6} role="menu" className={`card z-50 p-1 shadow-lg ${grid ? 'w-[min(22rem,92vw)]' : 'min-w-48'}`} data-testid="more-panel" data-mode={grid ? 'grid' : 'list'}>
+          {grid ? (
+            <>
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('table.more_search')} aria-label={t('table.more_search')} className="input mb-1 w-full" data-testid="more-search" />
+              <div className="grid grid-cols-3 gap-1">
+                {all.filter((i) => i.label.toLowerCase().includes(q.trim().toLowerCase())).map((i) => (
+                  <button key={i.id} type="button" role="menuitem" disabled={i.disabled} data-testid={i.testid} title={i.label} className="flex flex-col items-center gap-1 rounded px-1 py-2 text-center text-xs hover:bg-hover disabled:opacity-50" onClick={() => { setOpen(false); setQ(''); i.onSelect(); }}>
+                    <span className="grid h-8 w-8 place-items-center rounded bg-accentSoft text-accentText" aria-hidden>{i.icon ?? i.label.slice(0, 1)}</span>
+                    <span className="line-clamp-2 break-words">{i.label}</span>
+                  </button>
+                ))}
+              </div>
+              {!all.some((i) => i.label.toLowerCase().includes(q.trim().toLowerCase())) && <p className="p-2 text-center text-sm text-mute" data-testid="more-none">{t('table.more_none')}</p>}
+            </>
+          ) : (
+            <>
           {all.map((i) => (
             <button key={i.id} type="button" role="menuitem" disabled={i.disabled} data-testid={i.testid} className={`${i.id === 'screen-settings' ? 'sm:hidden ' : ''}flex w-full items-center gap-2 rounded px-2 py-1.5 text-start text-sm hover:bg-hover disabled:opacity-50`} onClick={() => { setOpen(false); i.onSelect(); }}>{i.icon}{i.label}</button>
           ))}
+            </>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

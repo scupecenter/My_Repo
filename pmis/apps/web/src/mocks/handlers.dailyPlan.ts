@@ -40,6 +40,7 @@ let cfg: DailyPlanSettings = {
 /** Test hook: back to the seed. */
 export function resetDailyPlanMock(): void {
   plans.clear();
+  triages.clear();
   cfg = { ...cfg, columns: { progress: [...OWNER_COLUMNS.progress], tomorrow: [...OWNER_COLUMNS.tomorrow] }, default_region_scope: 'mine', auto_lock_time: null, reminder_hour: null, version: 0 };
 }
 
@@ -112,6 +113,15 @@ const pre = (req: Request, date: string, region: number) => {
   return { p };
 };
 
+type Triage = { region_id: number; plan_date: string; triage_state: 'pending' | 'accepted' | 'deferred' | null; triage_note: string | null; triage_by: { display_name: string } | null; triage_at: string | null; claimed_by: { display_name: string } | null; claimed_at: string | null; can_triage: boolean };
+const triages = new Map<string, Triage>();
+const triageOf = (date: string, region: number): Triage => {
+  const k = `${date}|${region}`;
+  if (!triages.has(k)) triages.set(k, { region_id: region, plan_date: date, triage_state: 'pending', triage_note: null, triage_by: null, triage_at: null, claimed_by: null, claimed_at: null, can_triage: false });
+  const t = triages.get(k)!; t.can_triage = isAdmin();
+  return t;
+};
+
 export const dailyPlanHandlers = [
   http.get(`${B}/daily-plans`, ({ request }) => {
     const g = guard(); if (g) return g;
@@ -120,6 +130,41 @@ export const dailyPlanHandlers = [
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fields({ path: '/date', code: 'required' });
     const r = u.searchParams.getAll('region_id').map(Number);
     return HttpResponse.json(day(date, r.length ? r : undefined));
+  }),
+  // 0567: history, claim and triage of a plan day (target: region + date); the state lives in this map in the mock
+  http.get(`${B}/daily-plans/:date/regions/:region/history`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!REGIONS[Number(params.region)]) return problem(404, 'not_found', 'The plan does not exist');
+    return HttpResponse.json([{ id: 'h1', at: '2026-11-01T08:00:00Z', action: 'daily_plan_row_save', actor: { display_name: 'Mock admin' }, changes: [{ field: 'status', from: 'planned', to: 'done' }] }]);
+  }),
+  http.get(`${B}/daily-plans/:date/regions/:region/triage`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!REGIONS[Number(params.region)]) return problem(404, 'not_found', 'The plan does not exist');
+    return HttpResponse.json(triageOf(String(params.date), Number(params.region)));
+  }),
+  http.post(`${B}/daily-plans/:date/regions/:region/claim`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'Only the L2 holders review the plan');
+    const t = triageOf(String(params.date), Number(params.region));
+    t.claimed_by = { display_name: viewer()?.key ?? 'pm' }; t.claimed_at = '2026-11-27T08:00:00Z';
+    return HttpResponse.json(t);
+  }),
+  http.delete(`${B}/daily-plans/:date/regions/:region/claim`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'Only the L2 holders review the plan');
+    const t = triageOf(String(params.date), Number(params.region));
+    t.claimed_by = null; t.claimed_at = null;
+    return HttpResponse.json(t);
+  }),
+  http.post(`${B}/daily-plans/:date/regions/:region/triage`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'Only the L2 holders review the plan');
+    const b = (await request.json()) as { state?: string; note?: string };
+    if (b.state !== 'accepted' && b.state !== 'deferred') return fields({ path: '/state', code: 'invalid' });
+    if (!b.note || b.note.trim().length < 3) return fields({ path: '/note', code: 'required' });
+    const t = triageOf(String(params.date), Number(params.region));
+    t.triage_state = b.state; t.triage_note = b.note; t.triage_by = { display_name: viewer()?.key ?? 'pm' }; t.triage_at = '2026-11-27T08:00:00Z';
+    return HttpResponse.json(t);
   }),
   http.get(`${B}/daily-plans/export`, () => {
     const g = guard(); if (g) return g;
