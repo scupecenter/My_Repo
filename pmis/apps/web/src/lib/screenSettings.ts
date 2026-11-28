@@ -25,6 +25,7 @@ export const SCREEN_SETTINGS = {
   library_archive: { tab: 'documents', section: 'archive' },
   library_templates: { tab: 'documents', section: 'types' },
   data_hub: { tab: 'screens', section: 'data-hub' },
+  finance_hub: { tab: 'screens', section: 'finance-hub' },
   audit_log: { tab: 'security', section: 'retention' },
   security_alerts: { tab: 'security', section: 'alerts' },
   users: { tab: 'security', section: 'limits' },

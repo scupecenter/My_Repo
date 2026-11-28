@@ -10,6 +10,7 @@ import { batchPath, type ImportBatch, type Template } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { WhatChangedButton } from '@/components/TemplateChanges';
+import { ExportLog } from '@/components/ExportLog';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { useToast } from '@/components/Toast';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -38,6 +39,7 @@ export function TemplatesPage() {
   const templates = useTemplates();
   const batches = useBatches({ status, template_id: '', register_key: register, stream });
   const [uploadFor, setUploadFor] = useState<Template | null>(null);
+  const tab = sp.get('tab') === 'exports' ? 'exports' : 'templates';
   const lang = i18n.language;
   const me = useMe(true);
   const nameOf = (x: { name_en: string; name_ar?: string | null }) => (lang === 'ar' && x.name_ar) || x.name_en;
@@ -59,7 +61,13 @@ export function TemplatesPage() {
           <Link className="btn px-2 py-1 text-xs" to="/admin/settings/data/mapping" data-testid="tpl-mapping-link">{t('tmap.title')}</Link>
           {isAdmin(me.data) && <Link className="btn px-2 py-1 text-xs" to="/templates/master-import" data-testid="tpl-master-import-link">{t('mi.title')}</Link>}
         </span>} />
-      <section aria-labelledby="tpl-cat" className="mb-6">
+      <div role="tablist" aria-label={t('tpl.title')} className="mb-4 flex gap-1 border-b border-line" data-testid="tpl-tabs">
+        {(['templates', 'exports'] as const).map((k) => (
+          <button key={k} role="tab" type="button" aria-selected={tab === k} data-testid={`tpl-tab-${k}`} className={`px-3 py-2 text-sm font-semibold ${tab === k ? 'border-b-2 border-accent text-ink' : 'text-mute'}`}
+            onClick={() => set('tab', k === 'templates' ? '' : k)}>{t(`tpl.tab_${k}`)}</button>
+        ))}
+      </div>
+      {tab === 'templates' && <section aria-labelledby="tpl-cat" className="mb-6">
         <h2 id="tpl-cat" className="mb-2 text-lg font-bold">{t('tpl.catalogue')}</h2>
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm" data-testid="tpl-table">
@@ -98,9 +106,10 @@ export function TemplatesPage() {
           {templates.isError && <ErrorState onRetry={() => void templates.refetch()} />}
         </div>
         <p className="mt-2 text-sm text-mute" data-testid="tpl-streams-note">{t('tpl.streams_note')}</p>
-      </section>
+      </section>}
 
-      <section aria-labelledby="tpl-batches">
+      {tab === 'exports' && <ExportLog canSchedule={isAdmin(me.data)} />}
+      {tab === 'templates' && <section aria-labelledby="tpl-batches">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <h2 id="tpl-batches" className="text-lg font-bold">{t('tpl.batches')}</h2>
           <select className="input ms-auto w-auto" aria-label={t('tpl.col_status')} data-testid="batches-filter-status" value={status} onChange={(e) => set('status', e.target.value)}>
@@ -139,7 +148,7 @@ export function TemplatesPage() {
           {batches.isSuccess && !items.length && <EmptyState testid="batches-empty" title={t('tpl.no_batches')} />}
           {batches.isError && <ErrorState onRetry={() => void batches.refetch()} />}
         </div>
-      </section>
+      </section>}
       {uploadFor && <TemplateUploadDialog open onClose={() => setUploadFor(null)} templateId={uploadFor.template_id} templateName={`${nameOf(uploadFor)} · v${uploadFor.current_version}`}
         kind={((k) => (ownScreen(k) ? undefined : k))(kindOf(uploadFor))} onDone={(b) => { setUploadFor(null); toast(t('grid.uploaded')); nav(batchPath(b, uploadFor.register_key)); }} />}
     </div>
