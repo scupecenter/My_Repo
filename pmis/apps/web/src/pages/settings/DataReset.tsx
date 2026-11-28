@@ -43,7 +43,7 @@ export function DataReset() {
   const [reason, setReason] = useState('');
   const [typed, setTyped] = useState('');
   const [runTyped, setRunTyped] = useState('');
-  const [cfg, setCfgForm] = useState<{ expiry: string; hours: string } | null>(null);
+  const [cfg, setCfgForm] = useState<{ expiry: string; hours: string; cool: string; coolNum: string; coolUnit: 'hours' | 'days' } | null>(null);
   const [mode, setMode] = useState<'everything' | 'custom'>('everything');
   const [chosen, setChosen] = useState<string[]>([]);
   const [requireBackup, setRequireBackup] = useState(true);
@@ -90,6 +90,7 @@ export function DataReset() {
           <li>{t('dr.rule_sessions')}</li>
           <li>{t('dr.rule_files')}</li>
           <li>{t('dr.rule_expiry', { minutes: s.settings.request_expiry_minutes })}</li>
+          <li>{t('dr.rule_cooloff', { wait: waitText(t, s.settings.cooloff_minutes) })}</li>
         </ul>
       </section>
 
@@ -130,6 +131,7 @@ export function DataReset() {
           <p className="font-semibold" data-testid="dr-request-status">{t(`dr.status_${req.status}`)}</p>
           <ScopeView r={req} catalogue={catalogue} />
           <BackupView r={req} hours={s.settings.backup_max_age_hours} />
+          <CooloffView r={req} when={when} />
           <ArchivePanel r={req} canMake={!!s.can.start && req.status === 'approved'} making={makeArchive.isPending} error={makeArchive.isError ? errText(makeArchive.error, t) : null}
             onMake={() => { makeArchive.reset(); makeArchive.mutate({ id: req.id }); }} when={when} />
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
@@ -144,7 +146,7 @@ export function DataReset() {
           {req.stalled && <p className="text-sm text-lateInk" data-testid="dr-stalled">{t('dr.stalled')}</p>}
           <div className="flex flex-wrap gap-2">
             {s.can.approve && <button className="btn btn-danger" data-testid="dr-approve" onClick={() => { approve.reset(); setDialog('approve'); }}>{t('dr.approve')}</button>}
-            {s.can.start && <button className="btn btn-danger" data-testid="dr-run" disabled={(needBackup && !s.backup.ok) || !s.storage.supported || !archiveReady(req)} onClick={() => { run.reset(); setRunTyped(''); setDialog('run'); }}>{t('dr.run')}</button>}
+            {s.can.start && <button className="btn btn-danger" data-testid="dr-run" disabled={(needBackup && !s.backup.ok) || !s.storage.supported || !archiveReady(req) || req.cooloff.active} onClick={() => { run.reset(); setRunTyped(''); setDialog('run'); }}>{t('dr.run')}</button>}
             {s.can.cancel && <button className="btn" data-testid="dr-cancel" onClick={() => { cancel.reset(); setDialog('cancel'); }}>{t('dr.cancel')}</button>}
             {req.status === 'files_pending' && s.can.retry_files && <button className="btn" data-testid="dr-retry-files" onClick={() => { retry.reset(); setDialog('retry'); }}>{t('dr.retry_files')}</button>}
           </div>
@@ -187,8 +189,8 @@ export function DataReset() {
 
       <section className="card space-y-2 p-4" data-testid="dr-settings">
         <h3 className="font-bold">{t('dr.settings')}</h3>
-        <p className="text-sm" data-testid="dr-settings-values">{t('dr.settings_values', { minutes: s.settings.request_expiry_minutes, hours: s.settings.backup_max_age_hours })}</p>
-        <button className="btn" data-testid="dr-settings-edit" disabled={!!req} onClick={() => { setCfg.reset(); setCfgForm({ expiry: String(s.settings.request_expiry_minutes), hours: String(s.settings.backup_max_age_hours) }); setDialog('settings'); }}>{t('common.edit')}</button>
+        <p className="text-sm" data-testid="dr-settings-values">{t('dr.settings_values', { minutes: s.settings.request_expiry_minutes, hours: s.settings.backup_max_age_hours })} <span data-testid="dr-settings-cooloff">{t('dr.cooloff_value', { wait: waitText(t, s.settings.cooloff_minutes) })}</span></p>
+        <button className="btn" data-testid="dr-settings-edit" disabled={!!req} onClick={() => { setCfg.reset(); setCfgForm(cfgFormOf(s.settings)); setDialog('settings'); }}>{t('common.edit')}</button>
       </section>
 
       {dialog === 'approve' && req && (
@@ -196,6 +198,7 @@ export function DataReset() {
           onSubmit={(r) => approve.mutate({ id: req.id, version: req.version, reason: r, scope_hash: req.scope_hash }, { onSuccess: () => { toast(t('dr.approved_toast')); close(); } })}>
           <ScopeView r={req} catalogue={catalogue} />
           <BackupView r={req} hours={s.settings.backup_max_age_hours} testid="dr-approve-backup" />
+          <p className="text-sm" data-testid="dr-approve-cooloff">{req.cooloff.minutes > 0 ? t('dr.cooloff_approve', { wait: waitText(t, req.cooloff.minutes) }) : t('dr.cooloff_approve_none')}</p>
         </ReasonDialog>
       )}
       {dialog === 'cancel' && req && (
@@ -219,14 +222,72 @@ export function DataReset() {
       )}
       {dialog === 'settings' && cfg && (
         <FormDialog open onClose={close} testid="dr-settings-dialog" title={t('dr.settings')} busy={setCfg.isPending} error={setCfg.isError ? errText(setCfg.error, t) : null}
-          onSubmit={(r) => setCfg.mutate({ version: s.settings.version, reason: r, request_expiry_minutes: Number(cfg.expiry), backup_max_age_hours: Number(cfg.hours) }, { onSuccess: () => { toast(t('settings.audited')); close(); } })}>
+          onSubmit={(r) => setCfg.mutate({ version: s.settings.version, reason: r, request_expiry_minutes: Number(cfg.expiry), backup_max_age_hours: Number(cfg.hours), cooloff_minutes: coolMinutes(cfg) }, { onSuccess: () => { toast(t('settings.audited')); close(); } })}>
           <label className="block text-sm font-semibold">{t('dr.expiry_label')}
             <input type="number" min={5} max={240} className="input mt-1 font-normal" data-testid="dr-expiry" value={cfg.expiry} onChange={(e) => setCfgForm({ ...cfg, expiry: e.target.value })} />
           </label>
           <label className="block text-sm font-semibold">{t('dr.hours_label')}
             <input type="number" min={1} max={72} className="input mt-1 font-normal" data-testid="dr-hours" value={cfg.hours} onChange={(e) => setCfgForm({ ...cfg, hours: e.target.value })} />
           </label>
+          <label className="block text-sm font-semibold">{t('dr.cooloff_label')}
+            <select className="input mt-1 font-normal" data-testid="dr-cooloff" value={cfg.cool} onChange={(e) => setCfgForm({ ...cfg, cool: e.target.value })}>
+              <option value="0">{t('dr.cooloff_now')}</option>
+              <option value="30">{t('dr.cd_minutes', { count: 30 })}</option>
+              <option value="1440">{t('dr.cd_hours', { count: 24 })}</option>
+              <option value="custom">{t('dr.cooloff_custom')}</option>
+            </select>
+          </label>
+          {cfg.cool === 'custom' && (
+            <div className="flex gap-2" data-testid="dr-cooloff-custom">
+              <input type="number" min={1} max={cfg.coolUnit === 'days' ? 30 : 720} className="input w-28" data-testid="dr-cooloff-num" aria-label={t('dr.cooloff_custom')} value={cfg.coolNum} onChange={(e) => setCfgForm({ ...cfg, coolNum: e.target.value })} />
+              <select className="input" data-testid="dr-cooloff-unit" aria-label={t('dr.cooloff_unit')} value={cfg.coolUnit} onChange={(e) => setCfgForm({ ...cfg, coolUnit: e.target.value as 'hours' | 'days' })}>
+                <option value="hours">{t('dr.cooloff_hours')}</option>
+                <option value="days">{t('dr.cooloff_days')}</option>
+              </select>
+            </div>
+          )}
+          <p className="text-xs text-mute">{t('dr.cooloff_hint')}</p>
         </FormDialog>
+      )}
+    </div>
+  );
+}
+
+type TFn = (k: string, o?: Record<string, unknown>) => string;
+/** The waiting period as words: immediately, or whole days, whole hours, else minutes. */
+function waitText(t: TFn, minutes: number): string {
+  if (minutes <= 0) return t('dr.cooloff_now');
+  if (minutes % 1440 === 0) return t('dr.cd_days', { count: minutes / 1440 });
+  if (minutes % 60 === 0) return t('dr.cd_hours', { count: minutes / 60 });
+  return t('dr.cd_minutes', { count: minutes });
+}
+function cfgFormOf(st: { request_expiry_minutes: number; backup_max_age_hours: number; cooloff_minutes: number }) {
+  const m = st.cooloff_minutes;
+  const preset = m === 0 || m === 30 || m === 1440;
+  const days = !preset && m % 1440 === 0;
+  return { expiry: String(st.request_expiry_minutes), hours: String(st.backup_max_age_hours), cool: preset ? String(m) : 'custom',
+    coolNum: preset ? '2' : String(days ? m / 1440 : Math.max(1, Math.round(m / 60))), coolUnit: (days ? 'days' : 'hours') as 'hours' | 'days' };
+}
+function coolMinutes(c: { cool: string; coolNum: string; coolUnit: 'hours' | 'days' }): number {
+  return c.cool === 'custom' ? Math.round(Number(c.coolNum) * (c.coolUnit === 'days' ? 1440 : 60)) : Number(c.cool);
+}
+
+/** The waiting period of a request: inherited at the request, started by the approval, live countdown to the moment the run opens. */
+function CooloffView({ r, when }: { r: DataResetRequest; when: (iso: string | null | undefined) => string }) {
+  const { t } = useTranslation();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { if (!r.cooloff.active) return; const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, [r.cooloff.active]);
+  if (r.cooloff.minutes <= 0) return <p className="text-sm" data-testid="dr-cooloff-view">{t('dr.cooloff_none')}</p>;
+  const left = r.cooloff.run_after ? Math.max(0, Math.ceil((new Date(r.cooloff.run_after).getTime() - now) / 1000)) : null;
+  const clock = left === null ? '' : `${Math.floor(left / 3600)}:${String(Math.floor((left % 3600) / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+  return (
+    <div className="rounded border border-line p-2 text-sm" data-testid="dr-cooloff-view" data-active={r.cooloff.active ? 'true' : 'false'}>
+      <p className="font-semibold">{t('dr.cooloff_wait', { wait: waitText(t, r.cooloff.minutes) })}</p>
+      {r.status === 'requested' && <p className="text-mute">{t('dr.cooloff_starts')}</p>}
+      {r.status === 'approved' && r.cooloff.run_after && (
+        r.cooloff.active
+          ? <p data-testid="dr-cooloff-left">{t('dr.cooloff_left')} <bdi dir="ltr" className="font-mono font-bold" data-testid="dr-cooloff-clock">{clock}</bdi> · {t('dr.cooloff_from')} <bdi>{when(r.cooloff.run_after)}</bdi> · {t('dr.cooloff_cancel_hint')}</p>
+          : <p data-testid="dr-cooloff-over">{t('dr.cooloff_over')}</p>
       )}
     </div>
   );
