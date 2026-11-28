@@ -38,7 +38,7 @@ export function OpsScorecardCard({ ops }: { ops: Ops }) {
       testid="dash-ops-scorecard"
       className="xl:col-span-2 print:break-inside-avoid"
       aside={
-        <Link to="/reports/contractors" className="text-sm text-accent underline">
+        <Link to="/companies?tab=ranking" className="text-sm text-accent underline">
           {t("dash.ops.open_performance")}
         </Link>
       }

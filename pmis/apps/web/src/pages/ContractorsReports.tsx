@@ -12,16 +12,18 @@ const forbidden = (e: unknown) => e instanceof ApiError && e.status === 403;
  * Reports, contractors and team / scope match (contract 0.12.9, P4b). Procurement sees the running orders that no longer match (Q145) and the match
  * table read-only (Q147); Contractors sees the data to complete (Q142, Q110). A section the caller may not read is left out.
  */
-export function ContractorsReports() {
+export type CompanySection = 'ranking' | 'mismatch' | 'complete' | 'match';
+export function ContractorsReports({ section }: { section?: CompanySection } = {}) {
   const { t } = useTranslation();
   const mm = useTeamScopeMismatch(), cc = useContractorsCompleteness();
+  const show = (k: CompanySection) => !section || section === k;
   return (
     <div className="space-y-4" data-testid="page-contractors-reports">
-      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t('contractorReports.title')}</h1><span className="ms-auto"><ScreenSettingsLink screen="contractor_reports" /></span></div>
+      {!section && <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t('contractorReports.title')}</h1><span className="ms-auto"><ScreenSettingsLink screen="contractor_reports" /></span></div>}
 
-      <ContractorPerformance />
+      {show('ranking') && <ContractorPerformance />}
 
-      {!forbidden(mm.error) && (
+      {show('mismatch') && !forbidden(mm.error) && (
         <section className="card space-y-2 p-4" data-testid="cr-mismatch">
           <h2 className="font-bold">{t('contractorReports.mismatch')}</h2>
           <p className="text-sm text-mute">{t('contractorReports.mismatch_note')}</p>
@@ -59,7 +61,7 @@ export function ContractorsReports() {
         </section>
       )}
 
-      {!forbidden(cc.error) && (
+      {show('complete') && !forbidden(cc.error) && (
         <section className="card space-y-2 p-4" data-testid="cr-completeness">
           <h2 className="font-bold">{t('contractorReports.completeness')}</h2>
           <p className="text-sm text-mute">{t('contractorReports.completeness_note')}</p>
@@ -74,7 +76,7 @@ export function ContractorsReports() {
         </section>
       )}
 
-      <TeamScopeMatch readOnly />
+      {show('match') && <TeamScopeMatch readOnly />}
     </div>
   );
 }
