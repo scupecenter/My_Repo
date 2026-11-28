@@ -129,6 +129,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
+  ['get', '/finance-hub/summary'],
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
@@ -321,6 +322,11 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/warehouse/dispatch-status/:id'],
   ['get', '/warehouse/region-vendors'],
   ['put', '/warehouse/region-vendors/:id'],
+  ['get', '/warehouse/reorder-limits'],
+  ['put', '/warehouse/reorder-limits/:id'],
+  ['get', '/warehouse/rma'],
+  ['post', '/warehouse/rma'],
+  ['post', '/warehouse/rma/:id/status'],
   ['get', '/warehouse/config-gaps'],
   // Contract 0.13.1 (follow-up B, Q270, migration 0067): the quarantine exit documents.
   ['post', '/warehouse/quarantine-exits'],
@@ -405,6 +411,8 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
   ['get', '/settings/imports'],
   ['put', '/settings/imports'],
+  ['get', '/settings/duplicate-rows'],
+  ['put', '/settings/duplicate-rows'],
   // Contract 0.15.322 (migration 0492; apps/api: settings): the upload policy of the imports (D49 part 3).
   ['get', '/settings/imports/upload-policy'],
   ['put', '/settings/imports/upload-policy'],
@@ -538,6 +546,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/site-master/columns/:ord/reactivate'],
   ['get', '/custom-fields'],
   ['get', '/custom-fields/:id'],
+  ['post', '/custom-fields'],
+  ['patch', '/custom-fields/:id'],
   ['get', '/site-master/sites/:siteId/sources'],
   ['post', '/sites/:id/admin-edits'],
   ['get', '/sites/:id/admin-edits'],
@@ -727,6 +737,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/library/form-templates/:id/retire'],
   ['get', '/settings/library-archive'],
   ['put', '/settings/library-archive'],
+  ['get', '/settings/document-marks'],
+  ['put', '/settings/document-marks/:code'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
