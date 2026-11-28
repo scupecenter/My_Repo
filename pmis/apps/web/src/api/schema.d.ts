@@ -12892,6 +12892,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/dashboard-layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's own dashboard card layouts (0.15.585)
+         * @description 0.15.585 (migration 0713). The tabs the caller customised, each with the card order, the hidden cards and the version to send back on save. A tab that is absent follows the global layout of `GET /settings/dashboard`.
+         */
+        get: operations["getMyDashboardLayouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/dashboard-layout/{tab}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tab: "pmo" | "cw" | "te";
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Arrange and hide the cards of one dashboard tab for the caller (0.15.585)
+         * @description 0.15.585 (migration 0713). Stores the caller's own order and hidden cards of the tab. `version` is the version read with the layout (0 when the tab was not customised yet); a stale version answers 412 `precondition_failed`. Unknown card code or a card listed twice answers 422 `validation_failed`. Personal: no audit row, no change for any other user.
+         */
+        put: operations["saveMyDashboardLayout"];
+        post?: never;
+        /**
+         * Back to the global layout of one tab (0.15.585)
+         * @description 0.15.585 (migration 0713). Removes the caller's own layout of the tab; the tab follows the global layout of Settings > Dashboard again. No error when there was none.
+         */
+        delete: operations["resetMyDashboardLayout"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/dashboard-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's dashboard layout templates (0.15.585)
+         * @description 0.15.585 (migration 0713). Named sets of the three tab layouts, oldest first.
+         */
+        get: operations["getMyDashboardTemplates"];
+        put?: never;
+        /**
+         * Save the caller's layouts as a named template (0.15.585)
+         * @description 0.15.585 (migration 0713). A name the caller already uses is replaced. At most 20 templates (422 `validation_failed`, `/name` `too_many`). A tab the template omits keeps the global layout when the template is applied.
+         */
+        post: operations["saveMyDashboardTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/dashboard-templates/{template_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a template to the caller's dashboard (0.15.585)
+         * @description 0.15.585 (migration 0713). Each tab the template holds replaces the caller's layout of that tab; a card the catalogue no longer has is dropped. A template of another user answers 404.
+         */
+        post: operations["applyMyDashboardTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/dashboard-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a dashboard template of the caller (0.15.585)
+         * @description 0.15.585 (migration 0713). Idempotent; a template of another user is never touched.
+         */
+        delete: operations["deleteMyDashboardTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/saved-views/{view_id}/pin": {
         parameters: {
             query?: never;
@@ -23196,6 +23306,59 @@ export interface components {
                 [key: string]: unknown;
             };
             position: number;
+        };
+        /** @description 0.15.585: the caller's own card order and hidden cards of one dashboard tab, with the version to send back on save. */
+        UserDashboardTab: {
+            /** @description The shown cards */
+            order: string[];
+            /** @description The hidden cards. */
+            hidden: string[];
+            version: number;
+        };
+        /** @description 0.15.585: the tabs the caller customised; a tab that is absent follows the global layout. */
+        UserDashboardLayouts: {
+            tabs: {
+                pmo?: components["schemas"]["UserDashboardTab"];
+                cw?: components["schemas"]["UserDashboardTab"];
+                te?: components["schemas"]["UserDashboardTab"];
+            };
+        };
+        /** @description 0.15.585: PUT /me/dashboard-layout/{tab} body. */
+        UserDashboardLayoutSave: {
+            order: string[];
+            hidden: string[];
+            /** @description The version read with the layout; 0 for a tab not customised yet. */
+            version: number;
+        };
+        UserDashboardLayoutSaved: {
+            /** @enum {string} */
+            tab: "pmo" | "cw" | "te";
+            order: string[];
+            hidden: string[];
+            version: number;
+        };
+        UserDashboardTemplateTab: {
+            order: string[];
+            hidden: string[];
+        };
+        /** @description 0.15.585: the tab layouts of a template; a tab it omits keeps the global layout when applied. */
+        UserDashboardTemplateLayouts: {
+            pmo?: components["schemas"]["UserDashboardTemplateTab"];
+            cw?: components["schemas"]["UserDashboardTemplateTab"];
+            te?: components["schemas"]["UserDashboardTemplateTab"];
+        };
+        /** @description 0.15.585: POST /me/dashboard-templates body. */
+        UserDashboardTemplateSave: {
+            name: string;
+            layouts: components["schemas"]["UserDashboardTemplateLayouts"];
+        };
+        UserDashboardTemplate: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            layouts: components["schemas"]["UserDashboardTemplateLayouts"];
+            /** Format: date-time */
+            created_at: string;
         };
         SavedView: {
             /** Format: uuid */
@@ -47622,6 +47785,198 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getMyDashboardLayouts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's layouts per tab. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDashboardLayouts"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveMyDashboardLayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tab: "pmo" | "cw" | "te";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserDashboardLayoutSave"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDashboardLayoutSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    resetMyDashboardLayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tab: "pmo" | "cw" | "te";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reset. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        tab: "pmo" | "cw" | "te";
+                        /** @enum {boolean} */
+                        reset: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMyDashboardTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's templates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["UserDashboardTemplate"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveMyDashboardTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserDashboardTemplateSave"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        name: string;
+                        layouts: components["schemas"]["UserDashboardTemplateLayouts"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    applyMyDashboardTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's layouts after the template was applied. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDashboardLayouts"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteMyDashboardTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {boolean} */
+                        deleted: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     pinSavedViewHome: {

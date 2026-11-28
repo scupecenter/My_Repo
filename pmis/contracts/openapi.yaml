@@ -44,6 +44,7 @@ info:
     - 0.15.262 (2026-11-27): the unsaved-changes guard joins `ui.features` as the section `unsaved_guard` (migration 0401, mirror `db/sql/400_ui_unsaved_guard.sql`; CHANGELOG UnsavedGuard, Decision 11). Additive: `UiFeatures` and `UiFeaturesPatch` gain `unsaved_guard` (`UiUnsavedGuard`: `enabled` and one boolean per area); a stored value without the section takes the seed (guard on everywhere). No new path.
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
     - 0.15.369 (2026-11-27): the floating Inbox panel joins the appearance profile as two dimensions, `inbox_panel` (overlay, floating, docked) and `inbox_anchor` (end-top, end-bottom, start-top, start-bottom), in `UiPrefs` (migration 0526, mirror `db/sql/525_inbox_panel_mode.sql`). Additive: the same personal door, organization defaults and lock apply; no new route.
+    - 0.15.585 (2026-11-28): per-user dashboard widgets (migration 0713, mirror `db/sql/712_dash_user_widgets.sql`). Additive. `GET /me/dashboard-layout` (`UserDashboardLayouts`) lists the tabs the caller customised; `PUT /me/dashboard-layout/{tab}` (`UserDashboardLayoutSave`, tab `pmo`, `cw` or `te`) stores the caller's own card order and hidden cards with the version read (0 for a tab not customised yet; a stale version answers 412 `precondition_failed`); `DELETE /me/dashboard-layout/{tab}` returns the tab to the global layout of Settings > Dashboard. `GET /me/dashboard-templates`, `POST /me/dashboard-templates` (a name the caller already uses is replaced; at most 20), `POST /me/dashboard-templates/{template_id}/apply` and `DELETE /me/dashboard-templates/{template_id}` keep named sets of the three tab layouts. Card codes come from the existing F20 catalogue (unknown code or a card listed twice answers 422 `validation_failed`). Personal display preference: needs dashboard.view only, touches the caller's own rows, no grant, role, permission, visibility or audit change; the data of every card is still filtered by the caller's own rights.
     - 0.15.530 (2026-11-28): the More menu joins the appearance profile as one dimension, `more_menu` (`list` default, `grid` = icon tiles with a search box), in `UiPrefs` (migration 0581, mirror `db/sql/580_more_menu_mode.sql`). Additive: the same personal door, organization default, personal-choice lock and audit as every other dimension; no table, column or permission change.
     - 0.15.531 (2026-11-28): personal notification settings on top of the applied policy (migration 0583, mirror `db/sql/582`): `GET/PUT /me/notification-prefs` (per type bell and e-mail choices, scheduled do-not-disturb, ETag), `POST /me/notification-prefs/snooze`, `POST /me/notification-prefs/test`, `GET /me/notification-prefs/decisions`, and the org switches `GET/PUT /admin/notification-personal` (System Admin). Quiet time holds e-mail and push, never the bell; a mandatory type is never held. Additive.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
@@ -19841,6 +19842,150 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: '#/components/schemas/HomeViewPin'}}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /me/dashboard-layout:
+    get:
+      tags: [dashboard]
+      operationId: getMyDashboardLayouts
+      summary: The caller's own dashboard card layouts (0.15.585)
+      description: >-
+        0.15.585 (migration 0713). The tabs the caller customised, each with the card order, the hidden cards and the version to send back on save.
+        A tab that is absent follows the global layout of `GET /settings/dashboard`.
+      responses:
+        '200':
+          description: The caller's layouts per tab.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserDashboardLayouts'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /me/dashboard-layout/{tab}:
+    parameters:
+      - {name: tab, in: path, required: true, schema: {type: string, enum: [pmo, cw, te]}}
+    put:
+      tags: [dashboard]
+      operationId: saveMyDashboardLayout
+      summary: Arrange and hide the cards of one dashboard tab for the caller (0.15.585)
+      description: >-
+        0.15.585 (migration 0713). Stores the caller's own order and hidden cards of the tab. `version` is the version read with the layout
+        (0 when the tab was not customised yet); a stale version answers 412 `precondition_failed`. Unknown card code or a card listed twice answers 422
+        `validation_failed`. Personal: no audit row, no change for any other user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserDashboardLayoutSave'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserDashboardLayoutSaved'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [dashboard]
+      operationId: resetMyDashboardLayout
+      summary: Back to the global layout of one tab (0.15.585)
+      description: 0.15.585 (migration 0713). Removes the caller's own layout of the tab; the tab follows the global layout of Settings > Dashboard again. No error when there was none.
+      responses:
+        '200':
+          description: Reset.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tab, reset]
+                properties:
+                  tab: {type: string, enum: [pmo, cw, te]}
+                  reset: {type: boolean, enum: [true]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /me/dashboard-templates:
+    get:
+      tags: [dashboard]
+      operationId: getMyDashboardTemplates
+      summary: The caller's dashboard layout templates (0.15.585)
+      description: 0.15.585 (migration 0713). Named sets of the three tab layouts, oldest first.
+      responses:
+        '200':
+          description: The caller's templates.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/UserDashboardTemplate'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [dashboard]
+      operationId: saveMyDashboardTemplate
+      summary: Save the caller's layouts as a named template (0.15.585)
+      description: >-
+        0.15.585 (migration 0713). A name the caller already uses is replaced. At most 20 templates (422 `validation_failed`, `/name` `too_many`).
+        A tab the template omits keeps the global layout when the template is applied.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserDashboardTemplateSave'}
+      responses:
+        '201':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, layouts]
+                properties:
+                  id: {type: string, format: uuid}
+                  name: {type: string}
+                  layouts: {$ref: '#/components/schemas/UserDashboardTemplateLayouts'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /me/dashboard-templates/{template_id}/apply:
+    post:
+      tags: [dashboard]
+      operationId: applyMyDashboardTemplate
+      summary: Apply a template to the caller's dashboard (0.15.585)
+      description: 0.15.585 (migration 0713). Each tab the template holds replaces the caller's layout of that tab; a card the catalogue no longer has is dropped. A template of another user answers 404.
+      parameters:
+        - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The caller's layouts after the template was applied.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserDashboardLayouts'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /me/dashboard-templates/{template_id}:
+    delete:
+      tags: [dashboard]
+      operationId: deleteMyDashboardTemplate
+      summary: Delete a dashboard template of the caller (0.15.585)
+      description: 0.15.585 (migration 0713). Idempotent; a template of another user is never touched.
+      parameters:
+        - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, deleted]
+                properties:
+                  id: {type: string, format: uuid}
+                  deleted: {type: boolean, enum: [true]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /saved-views/{view_id}/pin:
     post:
       tags: [saved-views]
@@ -30157,6 +30302,78 @@ components:
         screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
         filters: {type: object, additionalProperties: true, description: 'The view''s filters, scrubbed for the caller like a read of the view (hidden fields left out).' }
         position: {type: integer, minimum: 1}
+    UserDashboardTab:
+      type: object
+      description: '0.15.585: the caller''s own card order and hidden cards of one dashboard tab, with the version to send back on save.'
+      required: [order, hidden, version]
+      additionalProperties: false
+      properties:
+        order: {type: array, maxItems: 60, items: {type: string, maxLength: 60}, description: The shown cards, in display order.}
+        hidden: {type: array, maxItems: 60, items: {type: string, maxLength: 60}, description: The hidden cards.}
+        version: {type: integer, minimum: 1}
+    UserDashboardLayouts:
+      type: object
+      description: '0.15.585: the tabs the caller customised; a tab that is absent follows the global layout.'
+      required: [tabs]
+      additionalProperties: false
+      properties:
+        tabs:
+          type: object
+          additionalProperties: false
+          properties:
+            pmo: {$ref: '#/components/schemas/UserDashboardTab'}
+            cw: {$ref: '#/components/schemas/UserDashboardTab'}
+            te: {$ref: '#/components/schemas/UserDashboardTab'}
+    UserDashboardLayoutSave:
+      type: object
+      description: '0.15.585: PUT /me/dashboard-layout/{tab} body.'
+      required: [order, hidden, version]
+      additionalProperties: false
+      properties:
+        order: {type: array, maxItems: 60, items: {type: string, minLength: 1, maxLength: 60}}
+        hidden: {type: array, maxItems: 60, items: {type: string, minLength: 1, maxLength: 60}}
+        version: {type: integer, minimum: 0, description: The version read with the layout; 0 for a tab not customised yet.}
+    UserDashboardLayoutSaved:
+      type: object
+      required: [tab, order, hidden, version]
+      additionalProperties: false
+      properties:
+        tab: {type: string, enum: [pmo, cw, te]}
+        order: {type: array, items: {type: string}}
+        hidden: {type: array, items: {type: string}}
+        version: {type: integer, minimum: 1}
+    UserDashboardTemplateTab:
+      type: object
+      required: [order, hidden]
+      additionalProperties: false
+      properties:
+        order: {type: array, maxItems: 60, items: {type: string, minLength: 1, maxLength: 60}}
+        hidden: {type: array, maxItems: 60, items: {type: string, minLength: 1, maxLength: 60}}
+    UserDashboardTemplateLayouts:
+      type: object
+      description: '0.15.585: the tab layouts of a template; a tab it omits keeps the global layout when applied.'
+      additionalProperties: false
+      properties:
+        pmo: {$ref: '#/components/schemas/UserDashboardTemplateTab'}
+        cw: {$ref: '#/components/schemas/UserDashboardTemplateTab'}
+        te: {$ref: '#/components/schemas/UserDashboardTemplateTab'}
+    UserDashboardTemplateSave:
+      type: object
+      description: '0.15.585: POST /me/dashboard-templates body.'
+      required: [name, layouts]
+      additionalProperties: false
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        layouts: {$ref: '#/components/schemas/UserDashboardTemplateLayouts'}
+    UserDashboardTemplate:
+      type: object
+      required: [id, name, layouts, created_at]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        layouts: {$ref: '#/components/schemas/UserDashboardTemplateLayouts'}
+        created_at: {type: string, format: date-time}
     SavedView:
       type: object
       required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]

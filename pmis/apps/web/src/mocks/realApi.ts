@@ -393,6 +393,14 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/presence/editing'],
   ['post', '/presence/editing/stop'],
   ['get', '/presence/editing'],
+  // Contract 0.15.585 (0713): per-user dashboard widgets (own card order, hidden cards, layout templates).
+  ['get', '/me/dashboard-layout'],
+  ['put', '/me/dashboard-layout/:tab'],
+  ['delete', '/me/dashboard-layout/:tab'],
+  ['get', '/me/dashboard-templates'],
+  ['post', '/me/dashboard-templates'],
+  ['post', '/me/dashboard-templates/:id/apply'],
+  ['delete', '/me/dashboard-templates/:id'],
   // Contract 0.15.245 (0344): pin a saved view as a personal card on the home dashboard.
   ['get', '/me/home-pins'],
   ['post', '/saved-views/:id/pin'],
