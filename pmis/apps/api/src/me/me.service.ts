@@ -16,7 +16,7 @@ export const NAV_KEYS = [
   'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'dismantle',
   // 0149 (W7): My Work > Daily Plan
   'daily_plan',
-  // 0531: the hub of the custom registers (the menu entry opens the list of the enabled custom registers the caller may view)
+  // 0592: the hub of the custom registers (the menu entry opens the list of the enabled custom registers the caller may view)
   'registers.custom',
 ] as const;
 
@@ -156,7 +156,7 @@ export class MeService {
     if (nav.has('sites')) nav.add('status_updates');
     // 0149 (W7): the Daily Plan lists sites; the Site Register right opens it as well as its own module (the region scope applies in the database)
     if (nav.has('sites')) nav.add('daily_plan');
-    // 0531: view on any custom register opens its hub entry in the menu
+    // 0592: view on any custom register opens its hub entry in the menu
     if ([...nav].some((k) => k.startsWith('custom_'))) nav.add('registers.custom');
     if (nav.has('sites') && nav.has('reports')) nav.add('workload');
     if (await this.access.canSendAnnouncements()) nav.add('announcements');

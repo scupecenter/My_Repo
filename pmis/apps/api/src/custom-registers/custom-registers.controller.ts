@@ -7,7 +7,7 @@ import { CustomRegistersService } from './custom-registers.service';
 
 type Json = Record<string, unknown>;
 
-/** Migration 0531 (contract tag `registers`): admin-defined custom registers. The columns of a custom register use the ordinary column doors of /registers/{key}/fields. */
+/** Migration 0592 (contract tag `registers`): admin-defined custom registers. The columns of a custom register use the ordinary column doors of /registers/{key}/fields. */
 @Controller('custom-registers')
 export class CustomRegistersController {
   constructor(private readonly svc: CustomRegistersService) {}

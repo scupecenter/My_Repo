@@ -39,7 +39,7 @@ interface Row {
 }
 
 /**
- * Migration 0531: admin-defined custom registers. A custom register is a row of register_definitions (is_custom) run by the generic register framework: the columns are added with
+ * Migration 0592: admin-defined custom registers. A custom register is a row of register_definitions (is_custom) run by the generic register framework: the columns are added with
  * the existing column door (POST /registers/{key}/fields), the records are the ordinary register records. These doors (admin_register_*) create it disabled, rename or hide it
  * and enable it (menu key and upload/download template). System Admin or an all-regions delegate of the custom fields is checked in the database; the API adds the step-up.
  */

@@ -6,7 +6,7 @@ import type { ModuleDef } from './catalogue';
 const OPERATIONAL = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'import', 'download_documents', 'view_audit'];
 
 /**
- * Migration 0531: the permission modules of the custom registers. The module key of a custom register is its register key; the module catalogue in code lists the built-in modules,
+ * Migration 0592: the permission modules of the custom registers. The module key of a custom register is its register key; the module catalogue in code lists the built-in modules,
  * so the custom ones are read from the register definitions. `activeOnly` is for what the grid editor offers; a hidden register keeps its grants, so validation accepts every key.
  */
 export async function customModuleDefs(db: DbService, activeOnly: boolean): Promise<ModuleDef[]> {

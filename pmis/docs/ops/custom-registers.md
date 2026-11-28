@@ -24,7 +24,7 @@ counted. Lowering it never hides an existing register; it only stops new ones.
 
 ## Where it is stored
 
-- Migration `0531_custom_registers` (mirror `db/sql/530_custom_registers.sql`): `register_definitions.is_custom`, `created_by`, `created_at`, and the doors `admin_register_create`,
+- Migration `0592_custom_registers` (mirror `db/sql/591_custom_registers.sql`): `register_definitions.is_custom`, `created_by`, `created_at`, and the doors `admin_register_create`,
   `admin_register_update`, `admin_register_enable`. No new table.
 - `is_custom` is a flag, not a new `kind` value, so every place that filters by kind keeps working. A custom key must start with `custom_` and a built-in key must not.
 - Data reset: the part `custom_registers` (the records of every custom register) is in `data_reset_parts()` and `data_reset_register_part()`.

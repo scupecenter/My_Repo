@@ -6,7 +6,7 @@ import { resetCustomRegisters, setCustomRegisterColumns } from '@/mocks/handlers
 import { renderApp, signIn } from '@/test/utils';
 import { SettingsRoutes } from './Settings';
 
-/** Settings, Custom registers (migration 0531, contract 0.15.533): create, see the key, enable only with a required column, rename, hide and show; the limit row shows. */
+/** Settings, Custom registers (migration 0592, contract 0.15.533): create, see the key, enable only with a required column, rename, hide and show; the limit row shows. */
 const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/registers/custom' });
 
 describe('Settings, Custom registers', () => {

@@ -5,7 +5,7 @@ import { viewer } from './db';
 import { guard, problem } from './handlers';
 
 /**
- * Contract 0.15.533: custom registers, as admin_register_create, admin_register_update and admin_register_enable of migration 0531 decide them. Synthetic: only the System
+ * Contract 0.15.533: custom registers, as admin_register_create, admin_register_update and admin_register_enable of migration 0592 decide them. Synthetic: only the System
  * Admin (account `pm`) writes; a reason is needed; the key is `custom_` and letters from the English name; the limit is 20; enable needs a column and a required column
  * (the mock counts the columns the test sets with `setCustomRegisterColumns`).
  */

@@ -5,7 +5,7 @@ import { renderApp, signIn } from '@/test/utils';
 import { CustomRegistersHub } from './CustomRegistersHub';
 import { isCustomKey } from '@/lib/registerForms';
 
-/** The hub of the custom registers (migration 0531): it lists only custom register keys; with none enabled it says so. */
+/** The hub of the custom registers (migration 0592): it lists only custom register keys; with none enabled it says so. */
 describe('Custom registers hub', () => {
   it('says so when no custom register is available', async () => {
     await signIn('pm');

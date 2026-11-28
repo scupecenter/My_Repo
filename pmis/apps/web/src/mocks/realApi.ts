@@ -130,7 +130,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
   ['get', '/finance-hub/summary'],
-  // Migration 0531: custom registers (apps/api: custom-registers)
+  // Migration 0592: custom registers (apps/api: custom-registers)
   ['get', '/custom-registers'],
   ['post', '/custom-registers'],
   ['get', '/custom-registers/:key'],

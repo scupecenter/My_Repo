@@ -4,7 +4,7 @@ import { useRegisterDefs } from '@/api/registers';
 import { isCustomKey } from '@/lib/registerForms';
 
 /**
- * Migration 0531: the one side-menu entry of the custom registers. It lists the enabled custom registers the caller may view (the register list of the API already
+ * Migration 0592: the one side-menu entry of the custom registers. It lists the enabled custom registers the caller may view (the register list of the API already
  * leaves out a hidden or disabled register and one without the view right); each opens the ordinary register page. The permission grid, the matrix and the
  * exports work on the register key as for every other register.
  */

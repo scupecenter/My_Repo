@@ -7,7 +7,7 @@ import { approveAll, createRec, recPath, team, type Team } from './reg-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0531: admin-defined custom registers. Create (disabled), add columns through the ordinary column door, enable (menu key, template, permission module),
+ * Migration 0592: admin-defined custom registers. Create (disabled), add columns through the ordinary column door, enable (menu key, template, permission module),
  * run a record through submit and approve, rename, hide. A plain user cannot create; no permission is granted by the creation. The tests build on one another.
  */
 let app: NestExpressApplication;
@@ -38,16 +38,18 @@ describe('custom registers', () => {
     expect((await admin.api.call('post', '/custom-registers', { name_en: 'Tower Audit', site_scoped: true })).status).toBe(422);
   });
 
-  it('creates a disabled register with a key made from the name, and a second one with the same name gets another key', async () => {
+  it('creates a disabled register with a key made from the name, and the same name is refused and a name with the same letters gets a suffix', async () => {
     const r = await admin.api.call('post', '/custom-registers', { name_en: 'Tower Audit', name_ar: 'تدقيق الأبراج', site_scoped: true, multiple_per_site: true, reason: REASON });
     expect(r.status).toBe(201);
     key = r.body.register_key as string;
     expect(key).toMatch(/^custom_[a-z_]+$/);
     expect(r.body).toMatchObject({ module_key: key, enabled: false, is_active: true, field_count: 0, record_count: 0 });
     expect(r.headers.etag).toBeTruthy();
-    const again = await admin.api.call('post', '/custom-registers', { name_en: 'Tower Audit', site_scoped: false, reason: REASON });
+    const dup = await admin.api.call('post', '/custom-registers', { name_en: 'tower audit', site_scoped: false, reason: REASON });
+    expect(dup.status).toBe(422);
+    const again = await admin.api.call('post', '/custom-registers', { name_en: 'Tower-Audit', site_scoped: false, reason: REASON });
     expect(again.status).toBe(201);
-    expect(again.body.register_key).not.toBe(key);
+    expect(again.body.register_key).toBe(`${key}_aa`);
     await admin.api.call('patch', `/custom-registers/${again.body.register_key}`, { is_active: false, reason: REASON }, { 'If-Match': `"${again.body.version}"` });
     // the register is not in the register list until it is enabled
     const list = await admin.api.call('get', '/registers');
