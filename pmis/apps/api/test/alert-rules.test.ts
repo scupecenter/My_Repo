@@ -308,7 +308,7 @@ describe('date_approaching alert rules (0700)', () => {
     const today = await ins('approved', { valid_to: '2031-03-21' });
     const far = await ins('approved', { valid_to: '2031-04-30' });
     const past = await ins('approved', { valid_to: '2031-03-20' });
-    const draft = await ins('entry', { valid_to: '2031-03-25' });
+    const draft = await ins('in_review', { valid_to: '2031-03-25' });
     const bad = await ins('approved', { valid_to: 'soon' });
     await db.query(`SELECT alert_rules_run('2031-03-21'::date)`);
     expect(await targetFires(r.rows[0].j.id, 'due:2031-03-28', soon.rows[0].id)).toBe(1);
