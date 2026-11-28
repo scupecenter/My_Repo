@@ -31,6 +31,7 @@ The system models the standard telecom site-delivery pipeline:
 - **Dashboards and reporting**: operational KPIs, workload, status updates, and scheduled exports.
 - **Collaboration**: inbox, approvals queue, messages, announcements, and notifications.
 - **Auditability**: a full audit log of data and configuration changes.
+- **Mobile shell**: bottom bar, app banner and first-use tour below the tablet breakpoint (plan `pmis/docs/plans/2026-11-28-mobile-shell.md`).
 - **Operations**: installer and update scripts, automated database and file backups, and a tested disaster-recovery procedure.
 
 ## Modules and Records
