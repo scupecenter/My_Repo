@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { RejectDialog } from '@/components/RejectDialog';
 import { useToast } from '@/components/Toast';
 import { DateInput } from '@/components/DateInput';
+import { RequiredMark } from '@/components/RequiredMark';
 
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const SITE_SCENARIOS = ['Indoor', 'Outdoor'];
@@ -89,16 +90,16 @@ export function NewSite() {
   const act = (m: { mutate: (v: never, o: { onSuccess: () => void; onError: (e: unknown) => void }) => void }, v: unknown, done: string) => m.mutate(v as never, { onSuccess: () => toast(done), onError: fail });
   const field = (k: string, label: string, o: { dir?: 'rtl' | 'ltr'; type?: string; required?: boolean } = {}) => (
     <div>
-      <label htmlFor={`ns-${k}`} className="text-sm font-semibold">{label}{o.required && <span aria-hidden> *</span>}</label>
+      <label htmlFor={`ns-${k}`} className="text-sm font-semibold">{label}{o.required && <RequiredMark />}</label>
       {o.type === 'date'
         ? <DateInput id={`ns-${k}`} data-testid={`ns-${k}`} className="input mt-1" value={f[k] ?? ''} onChange={(e) => set(k)(e.target.value)} />
-        : <input id={`ns-${k}`} data-testid={`ns-${k}`} className="input mt-1" type={o.type ?? 'text'} dir={o.dir} value={f[k] ?? ''} onChange={(e) => set(k)(e.target.value)} aria-invalid={!!errors[k]} />}
+        : <input id={`ns-${k}`} data-testid={`ns-${k}`} className="input mt-1" type={o.type ?? 'text'} dir={o.dir} value={f[k] ?? ''} onChange={(e) => set(k)(e.target.value)} aria-invalid={!!errors[k]} aria-required={o.required || undefined} />}
       {errors[k] && <p role="alert" className="mt-1 text-sm text-lateInk" data-testid={`ns-error-${k}`}>{errors[k]}</p>}
     </div>
   );
   const select = (k: string, label: string, options: [string, string][], o: { blank?: string; required?: boolean } = {}) => (
     <div>
-      <label htmlFor={`ns-${k}`} className="text-sm font-semibold">{label}{o.required && <span aria-hidden> *</span>}</label>
+      <label htmlFor={`ns-${k}`} className="text-sm font-semibold">{label}{o.required && <RequiredMark />}</label>
       <select id={`ns-${k}`} data-testid={`ns-${k}`} className="input mt-1" value={f[k] ?? ''} onChange={(e) => set(k)(e.target.value)} aria-invalid={!!errors[k]}>
         {o.blank !== undefined && <option value="">{o.blank}</option>}
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -133,8 +134,8 @@ export function NewSite() {
           {select('site_scenario', t('newSite.site_scenario'), SITE_SCENARIOS.map((s) => [s, s]), { blank: '—' })}
           {field('site_type', t('newSite.site_type'))}
           {field('sub_region', t('newSite.sub_region'))}
-          {field('latitude', t('newSite.latitude'))}
-          {field('longitude', t('newSite.longitude'))}
+          {field('latitude', t('newSite.latitude'), { required: true })}
+          {field('longitude', t('newSite.longitude'), { required: true })}
           {field('address', t('newSite.address'))}
           {field('rf_survey_date', t('newSite.rf_survey_date'), { type: 'date' })}
         </fieldset>

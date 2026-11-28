@@ -70,7 +70,8 @@ function clean(raw: Record<string, unknown>, self?: string): { data: Record<stri
   const os = String(raw.overall_status ?? '').trim().toLowerCase().replace(/ /g, '_');
   if (os) { if (['not_started', 'cancelled'].includes(os)) data.overall_status = os; else err('overall_status', 'invalid', 'A new site is Not Started, or Cancelled.'); }
   const lat = raw.latitude, lon = raw.longitude, has = (v: unknown) => v !== undefined && v !== null && String(v).trim() !== '';
-  if (has(lat) !== has(lon)) err(has(lat) ? 'longitude' : 'latitude', 'pair_required', 'Latitude and longitude go together.');
+  if (!has(lat) && !has(lon)) err('latitude', 'required', 'The coordinates (latitude and longitude) are required for a new site.');
+  else if (has(lat) !== has(lon)) err(has(lat) ? 'longitude' : 'latitude', 'pair_required', 'Latitude and longitude go together.');
   else if (has(lat)) {
     if (!(Math.abs(Number(lat)) <= 90)) err('latitude', 'invalid', 'A latitude is a number from -90 to 90.');
     if (!(Math.abs(Number(lon)) <= 180)) err('longitude', 'invalid', 'A longitude is a number from -180 to 180.');

@@ -13,7 +13,7 @@
 -- @actor ADMIN
 -- @region *
 -- @expect ok
-SELECT 1 / (CASE WHEN site_draft_create('{"site_code":"SECSC001","region_id":1,"name":"Sec site Tripoli","delivery_scenario":"new_build"}'::jsonb) ->> 'status' = 'entry'
+SELECT 1 / (CASE WHEN site_draft_create('{"site_code":"SECSC001","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Sec site Tripoli","delivery_scenario":"new_build"}'::jsonb) ->> 'status' = 'entry'
                   AND NOT EXISTS (SELECT 1 FROM sites WHERE site_code = 'SECSC001') THEN 1 ELSE 0 END);
 -- @end
 
@@ -23,7 +23,7 @@ SELECT 1 / (CASE WHEN site_draft_create('{"site_code":"SECSC001","region_id":1,"
 -- @actor ADMIN
 -- @region *
 -- @expect ok
-SELECT 1 / (CASE WHEN site_draft_create('{"site_code":"SECSC002","region":"Benghazi Area","name":"Sec site Benghazi","delivery_scenario":"Expansion"}'::jsonb) ->> 'status' = 'entry' THEN 1 ELSE 0 END);
+SELECT 1 / (CASE WHEN site_draft_create('{"site_code":"SECSC002","region":"Benghazi Area","latitude":32.5,"longitude":13.2,"name":"Sec site Benghazi","delivery_scenario":"Expansion"}'::jsonb) ->> 'status' = 'entry' THEN 1 ELSE 0 END);
 -- @end
 
 -- @case SC-03
@@ -180,7 +180,7 @@ SELECT site_new_clean('{"site_code":"X1"}'::jsonb, NULL);
 -- @actor ALICE
 -- @region 1
 -- @expect error P0001 action_forbidden
-SELECT site_draft_create('{"site_code":"SECSC030","region_id":1,"name":"Alice site","delivery_scenario":"new_build"}'::jsonb);
+SELECT site_draft_create('{"site_code":"SECSC030","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Alice site","delivery_scenario":"new_build"}'::jsonb);
 -- @end
 
 -- @case SC-31
@@ -214,7 +214,7 @@ SELECT site_draft_discard(id, NULL) FROM site_drafts WHERE site_code = 'SECSC002
 -- @title No session at all: nobody creates a draft (no signed-in actor)
 -- @category site-creation
 -- @expect error 42501 no signed-in actor
-SELECT site_draft_create('{"site_code":"SECSC034","region_id":1,"name":"Nobody","delivery_scenario":"new_build"}'::jsonb);
+SELECT site_draft_create('{"site_code":"SECSC034","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Nobody","delivery_scenario":"new_build"}'::jsonb);
 -- @end
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -227,7 +227,7 @@ SELECT site_draft_create('{"site_code":"SECSC034","region_id":1,"name":"Nobody",
 -- @region *
 -- @expect error 42501 no signed-in actor
 SET app.user_id = '{{ADMIN}}';
-SELECT site_draft_create('{"site_code":"SECSC040","region_id":1,"name":"Forged","delivery_scenario":"new_build"}'::jsonb);
+SELECT site_draft_create('{"site_code":"SECSC040","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Forged","delivery_scenario":"new_build"}'::jsonb);
 -- @end
 
 -- @case SC-41
@@ -238,7 +238,7 @@ SELECT site_draft_create('{"site_code":"SECSC040","region_id":1,"name":"Forged",
 -- @expect error P0001 action_forbidden
 SET app.user_id = '{{ADMIN}}';
 SET app.region_ids = '*';
-SELECT site_draft_create('{"site_code":"SECSC041","region_id":1,"name":"Forged","delivery_scenario":"new_build"}'::jsonb);
+SELECT site_draft_create('{"site_code":"SECSC041","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Forged","delivery_scenario":"new_build"}'::jsonb);
 -- @end
 
 -- @case SC-42
@@ -270,7 +270,7 @@ SELECT site_draft_submit(id, NULL) FROM site_drafts WHERE site_code = 'SECSC002'
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 validation_failed
-SELECT site_draft_create('{"site_code":"SECSC050","region_id":1,"name":"Personal data","delivery_scenario":"new_build","landlord_phone":"+218910000000"}'::jsonb);
+SELECT site_draft_create('{"site_code":"SECSC050","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Personal data","delivery_scenario":"new_build","landlord_phone":"+218910000000"}'::jsonb);
 -- @end
 
 -- @case SC-51
@@ -279,7 +279,7 @@ SELECT site_draft_create('{"site_code":"SECSC050","region_id":1,"name":"Personal
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 validation_failed
-SELECT site_draft_create('{"site_code":" secsc001 ","region_id":1,"name":"Again","delivery_scenario":"new_build"}'::jsonb);
+SELECT site_draft_create('{"site_code":" secsc001 ","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Again","delivery_scenario":"new_build"}'::jsonb);
 -- @end
 
 -- @case SC-52
@@ -288,7 +288,7 @@ SELECT site_draft_create('{"site_code":" secsc001 ","region_id":1,"name":"Again"
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 validation_failed
-SELECT site_draft_create('{"site_code":"SECSC052","region":"Atlantis","name":"Nowhere","delivery_scenario":"new_build"}'::jsonb);
+SELECT site_draft_create('{"site_code":"SECSC052","region":"Atlantis","latitude":32.5,"longitude":13.2,"name":"Nowhere","delivery_scenario":"new_build"}'::jsonb);
 -- @end
 
 -- @case SC-53
@@ -297,7 +297,7 @@ SELECT site_draft_create('{"site_code":"SECSC052","region":"Atlantis","name":"No
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 validation_failed
-SELECT site_draft_create('{"site_code":"SECSC053","region_id":1,"name":"Swap","delivery_scenario":"Hot Swap","scope_gecol_power":"Yes"}'::jsonb);
+SELECT site_draft_create('{"site_code":"SECSC053","region_id":1,"latitude":32.5,"longitude":13.2,"name":"Swap","delivery_scenario":"Hot Swap","scope_gecol_power":"Yes"}'::jsonb);
 -- @end
 
 -- ---------------------------------------------------------------------------------------------------------------------

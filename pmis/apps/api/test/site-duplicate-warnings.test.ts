@@ -26,7 +26,8 @@ afterAll(async () => {
   await app.close();
 });
 
-const base = (over: Record<string, unknown>): Record<string, unknown> => ({ region_id: R, delivery_scenario: 'new_build', ...over });
+let spread = 0;   // the coordinates are required: each site gets its own point, well over 100 metres from the others, unless the test sets them
+const base = (over: Record<string, unknown>): Record<string, unknown> => ({ region_id: R, delivery_scenario: 'new_build', latitude: (25 + 0.01 * ++spread).toFixed(6), longitude: '12.000000', ...over });
 
 describe('duplicate-site warnings', () => {
   it('warns on the same name and on close coordinates of a waiting draft, never blocks, and names the site of the same region', async () => {

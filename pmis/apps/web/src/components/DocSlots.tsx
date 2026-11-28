@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { RequiredMark } from './RequiredMark';
 import { Camera, Download, FileUp, History, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -88,7 +89,7 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
     <li data-testid={`slot-${slot.id}`} data-status={slot.status} className="rounded-md border border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <b>{name}</b>{slot.candidate_label && <span className="chip bg-card2" data-testid={`slot-candidate-${slot.id}`}>{slot.candidate_label}</span>}
-        {slot.mandatory && slot.status !== 'not_required' && <span className="text-lateInk" title={t('drawer.mandatory')}>*</span>}
+        {slot.mandatory && slot.status !== 'not_required' && <RequiredMark />}
         {slot.conditional && <span className="chip bg-card2 text-xs" data-testid={`slot-conditional-${slot.id}`}>{t('docs.conditional')}</span>}
         <span className={`chip ms-auto ${SLOT_TONE[slot.status]}`} data-testid={`slot-status-${slot.id}`}>{t(`slotStatus.${slot.status}`)}</span>
       </div>

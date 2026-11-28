@@ -618,7 +618,7 @@ describe('a new site created Open', () => {
     const l2 = await actor(app, db, { level: 'approve', regions: [SR], grants: [['sites', 'view'], ['sites', 'approve']] });
     await siteCell('entry', [l1.user.id]);
     await siteCell('approve', [l2.user.id]);
-    const body = (over: Record<string, unknown>) => ({ site_code: code(), region_id: SR, name: 'Synthetic Site', delivery_scenario: 'new_build', ...over });
+    const body = (over: Record<string, unknown>) => ({ site_code: code(), region_id: SR, name: 'Synthetic Site', latitude: 32.5, longitude: 13.2, delivery_scenario: 'new_build', ...over });
 
     expect((await l1.api.call('post', '/sites', body({ workflow_locks: 'Sometimes' }))).status).toBe(422);
     const send = async (b: Record<string, unknown>) => {
