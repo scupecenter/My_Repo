@@ -1,3 +1,4 @@
+import { StageTimesRanking } from '@/components/StageTimes';
 import { UserRoundCog } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -155,6 +156,7 @@ export function Workload() {
       <Toolbar filters={<RegionSelect value={region} onChange={setRegion} />} />
       <WorkloadTable region={region} lead={canReassign(me.data)} />
       <TimeReport region={region} />
+      <StageTimesRanking region={region} />
       <StateDurations region={region} />
     </div>
   );

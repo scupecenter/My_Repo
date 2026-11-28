@@ -259,6 +259,27 @@ export const xHandlers = [
       : [{ region_id: 1, group_key: 'procurement', state: 'review', count: 9, median_working_days: 3, p85_working_days: 8 }];
     return HttpResponse.json({ entity_type: entity, items: rows.filter((r) => !region || String(r.region_id) === region) });
   }),
+  http.get(`${B}/sites/:siteId/stage-times`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!/^[0-9a-f-]{36}$/i.test(String(params.siteId))) return problem(404, 'not_found', 'Site not found');
+    return HttpResponse.json({ site_id: params.siteId, site_code: 'TRP-0001', as_of: '2026-11-28', stages: [
+      { code: 'MS1', seq: 1, name_en: 'Acquisition', name_ar: 'الاستحواذ', state: 'done', started: '2026-08-01', finished: '2026-09-10', days: 40, planned_days: 30, over_plan_days: 10, tasks: 4, done: 4, rank: 1 },
+      { code: 'MS2', seq: 2, name_en: 'Design', name_ar: 'التصميم', state: 'done', started: '2026-09-11', finished: '2026-09-25', days: 14, planned_days: 14, over_plan_days: 0, tasks: 3, done: 3, rank: 3 },
+      { code: 'MS3', seq: 3, name_en: 'Civil works', name_ar: 'الأعمال المدنية', state: 'open', started: '2026-09-26', finished: null, days: 63, planned_days: 45, over_plan_days: 18, tasks: 6, done: 2, rank: 2 },
+      { code: 'MS4', seq: 4, name_en: 'Installation', name_ar: 'التركيب', state: 'not_started', started: null, finished: null, days: null, planned_days: null, over_plan_days: null, tasks: 5, done: 0, rank: null },
+    ] });
+  }),
+  http.get(`${B}/reports/stage-times`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'module_forbidden', 'You cannot use reports');
+    const region = new URL(request.url).searchParams.get('region_id');
+    return HttpResponse.json({ as_of: '2026-11-28', region_id: region ? Number(region) : null,
+      stages: [
+        { code: 'MS3', seq: 3, name_en: 'Civil works', name_ar: 'الأعمال المدنية', finished: 22, avg_days: 51.5, p85_days: 80, worst_days: 120, open: 9, open_avg_days: 44, rank: 1 },
+        { code: 'MS1', seq: 1, name_en: 'Acquisition', name_ar: 'الاستحواذ', finished: 30, avg_days: 33, p85_days: 55, worst_days: 90, open: 3, open_avg_days: 20, rank: 2 },
+      ],
+      slowest_sites: [{ site_id: '00000000-0000-4000-8000-000000000001', site_code: 'TRP-0001', region_id: 1, code: 'MS3', name_en: 'Civil works', name_ar: 'الأعمال المدنية', days: 120, open: false }] });
+  }),
   http.get(`${B}/reports/time-in-state`, ({ request }) => {
     const g = guard(); if (g) return g;
     if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'module_forbidden', 'You cannot use reports');

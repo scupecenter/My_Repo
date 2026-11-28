@@ -280,3 +280,6 @@ export type AlertRuleSaved = S['AlertRuleSaved'];
 export type AlertRulesResponse = S['AlertRulesResponse'];
 
 export type DashboardTargetPolicy = S['DashboardTargetPolicy'];
+
+export type SiteStageTimes = S['SiteStageTimes'];
+export type StageTimesReport = S['StageTimesReport'];
