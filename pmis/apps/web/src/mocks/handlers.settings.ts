@@ -500,6 +500,10 @@ let fmState = { version: 0, method: 'mean', updated_at: null as string | null, u
 const fmView = () => ({ ...fmState });
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
+/** Outbound notifications (contract 0.15.475): the switch is OFF by default, no destination, version 0 until the first save. */
+type ObDest = { id: string; kind: 'webhook' | 'email'; label: string; target: string; has_secret: boolean; events: string[]; active: boolean; archived_at: string | null; updated_at: string; queued: number; dead: number };
+let obState = { version: 0, enabled: false, destinations: [] as ObDest[] };
+const obView = () => ({ enabled: obState.enabled, locked: false, version: obState.version, event_kinds: ['task_assigned', 'task_rejected', 'reassigned', 'assignment_request', 'followed_change', 'site_draft_assigned', 'site_draft_approved', 'site_draft_returned', 'absence_alert', 'import_batch'], destinations: obState.destinations });
 
 /** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
@@ -635,6 +639,44 @@ export const settingsHandlers = [
     return HttpResponse.json(snapView(), tag(snapState.version));
   }),
   // ------------------------------------------------------------------ progress figure colours (contract 0.15.432, settings review gap 5)
+  // ------------------------------------------------------------------ outbound notifications (contract 0.15.475, D8): off by default
+  http.get(`${B}/settings/integrations/outbound`, () => { const g = needAdmin(); if (g) return g; return HttpResponse.json(obView(), tag(obState.version)); }),
+  http.put(`${B}/settings/integrations/outbound/enabled`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, obState.version); if (p) return p;
+    const b = (await request.json()) as { enabled?: boolean; reason?: string };
+    if (typeof b.enabled !== 'boolean' || (b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    obState = { ...obState, version: obState.version + 1, enabled: b.enabled };
+    return HttpResponse.json(obView(), tag(obState.version));
+  }),
+  http.post(`${B}/settings/integrations/outbound/destinations`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { kind?: string; label?: string; target?: string; secret?: string; events?: string[]; active?: boolean; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (b.kind === 'webhook' && !(b.target ?? '').startsWith('https://')) errs.push({ path: '/target', code: 'invalid' });
+    if (b.kind === 'webhook' && (b.secret ?? '').length < 16) errs.push({ path: '/secret', code: 'required' });
+    if (!(b.events ?? []).length) errs.push({ path: '/events', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    obState = { ...obState, destinations: [...obState.destinations, { id: `d0000000-0000-4000-8000-00000000000${obState.destinations.length + 1}`, kind: b.kind as 'webhook' | 'email', label: b.label ?? '', target: b.target ?? '', has_secret: b.kind === 'webhook', events: b.events ?? [], active: b.active !== false, archived_at: null, updated_at: new Date().toISOString(), queued: 0, dead: 0 }] };
+    return HttpResponse.json(obView());
+  }),
+  http.put(`${B}/settings/integrations/outbound/destinations/:id`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { label?: string; target?: string; events?: string[]; active?: boolean; reason?: string };
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    obState = { ...obState, destinations: obState.destinations.map((d) => (d.id === params.id ? { ...d, label: b.label ?? d.label, target: b.target ?? d.target, events: b.events ?? d.events, active: b.active ?? d.active } : d)) };
+    return HttpResponse.json(obView());
+  }),
+  http.post(`${B}/settings/integrations/outbound/destinations/:id/archive`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { reason?: string };
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    obState = { ...obState, destinations: obState.destinations.map((d) => (d.id === params.id ? { ...d, active: false, archived_at: new Date().toISOString() } : d)) };
+    return HttpResponse.json(obView());
+  }),
+  http.get(`${B}/settings/integrations/outbound/deliveries`, () => { const g = needAdmin(); if (g) return g; return HttpResponse.json({ items: [] }); }),
   // ------------------------------------------------------------------ forecast method (contract 0.15.474, phase 5)
   http.get(`${B}/settings/dashboard/forecast-method`, () => { const g = guard(); if (g) return g; return HttpResponse.json(fmView(), tag(fmState.version)); }),
   http.put(`${B}/settings/dashboard/forecast-method`, async ({ request }) => {

@@ -8574,6 +8574,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/integrations/outbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outbound notifications, the switch and the destinations (0.15.475)
+         * @description 0.15.475. `admin.settings` view. The webhook secret is never returned (`has_secret` only).
+         */
+        get: operations["getOutbound"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/integrations/outbound/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn outbound sending on or off (reason, If-Match, audited)
+         * @description 0.15.475. `admin.settings` edit. Off by default. Audited as `outbound_enabled_update`.
+         */
+        put: operations["setOutboundEnabled"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/integrations/outbound/destinations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a destination (reason, audited)
+         * @description 0.15.475. `admin.settings` edit. A webhook needs an https URL that resolves to public addresses and a secret of 16 to 200 characters (422 `validation_failed`). Audited as `outbound_destination_save`; the audit row never holds the secret.
+         */
+        post: operations["createOutboundDestination"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/integrations/outbound/destinations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a destination (reason, audited)
+         * @description 0.15.475. `admin.settings` edit. The kind cannot change. An absent `secret` keeps the saved one. An archived destination answers 409.
+         */
+        put: operations["updateOutboundDestination"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/integrations/outbound/destinations/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a destination (hidden, never deleted)
+         * @description 0.15.475. `admin.settings` edit. Audited as `outbound_destination_archive`. Queued deliveries of an archived destination are not sent.
+         */
+        post: operations["archiveOutboundDestination"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/integrations/outbound/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The latest 100 deliveries (the log)
+         * @description 0.15.475. `admin.settings` view.
+         */
+        get: operations["listOutboundDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/dashboard/progress-rag": {
         parameters: {
             query?: never;
@@ -21079,6 +21199,61 @@ export interface components {
             };
             /** @description 0.15.29 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value. */
             stale_idle_days?: number;
+        };
+        /** @description 0.15.475. The outbound switch and the destinations. `locked` is true while the disable_export lock is on. */
+        OutboundOverview: {
+            enabled: boolean;
+            locked: boolean;
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            event_kinds: string[];
+            destinations: components["schemas"]["OutboundDestination"][];
+        };
+        OutboundDestination: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "webhook" | "email";
+            label: string;
+            /** @description The https URL or the email address. */
+            target: string;
+            has_secret: boolean;
+            events: string[];
+            active: boolean;
+            /** Format: date-time */
+            archived_at: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            queued: number;
+            dead: number;
+        };
+        OutboundDestinationInput: {
+            /** @enum {string} */
+            kind: "webhook" | "email";
+            label: string;
+            target: string;
+            /** @description Webhook only. Write-only. */
+            secret?: string;
+            events: string[];
+            /** @default true */
+            active: boolean;
+        };
+        OutboundDelivery: {
+            /** Format: uuid */
+            id: string;
+            destination: string;
+            kind: string;
+            event: string;
+            /** @enum {string} */
+            status: "queued" | "sent" | "dead" | "blocked";
+            attempts: number;
+            last_status?: number | null;
+            last_error?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at?: string | null;
         };
         HealthBandsInput: {
             /** @description Green from this score. */
@@ -39845,6 +40020,178 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getOutbound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setOutboundEnabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    createOutboundDestination: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["OutboundDestinationInput"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateOutboundDestination: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["OutboundDestinationInput"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    archiveOutboundDestination: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    /** @default true */
+                    archived?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listOutboundDeliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["OutboundDelivery"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getProgressRag: {

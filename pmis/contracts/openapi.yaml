@@ -140,6 +140,7 @@ info:
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.431 (2026-11-28): the number of weeks the dashboard forecast averages is editable (Settings review gap 4, approved by the owner 2026-11-27; migration 0572, mirror `db/sql/571_forecast_window.sql`). Additive. `GET /settings/dashboard/forecast-window` (`getForecastWindow`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-window` (`setForecastWindow`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_window_update` with before and after): the new setting `dashboard.forecast_window_weeks` (a whole number 2 to 12, default 4, the value that was fixed in the web code). The progress curve card reads it when it is drawn: the forecast date uses the mean weekly gain over that many last weeks of the saved snapshots. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
+    - 0.15.475 (2026-11-28): outbound notifications to a webhook or an email address (D8, approved by the owner as a Settings page, off by default; migration 0613, mirror `db/sql/612_outbound_integrations.sql`). Additive. `GET /settings/integrations/outbound` (`getOutbound`), `PUT .../enabled` (`setOutboundEnabled`, reason, If-Match), `POST .../destinations` (`createOutboundDestination`), `PUT .../destinations/{id}` (`updateOutboundDestination`), `POST .../destinations/{id}/archive` (`archiveOutboundDestination`) and `GET .../deliveries` (`listOutboundDeliveries`); all need `admin.settings` (view or edit, all regions); every change has a reason and an audit row. The switch `integrations.outbound_enabled` is OFF by default and nothing is sent while it is off or while the `disable_export` lock is on. A destination is an https webhook (signed with HMAC SHA-256 in `x-gsdn-signature` over `<x-gsdn-timestamp>.<body>`; the secret is encrypted with the existing key and never returned; private, loopback and link-local addresses are refused; redirects are not followed; 3 attempts) or an email address (sent through the existing mail outbox). The events are the existing notification kinds listed in `event_kinds`. The payload has the kind, the title, the notification id, the task id, the link and the time, never the recipient or the body. A destination is archived, never deleted. New tables `outbound_destinations` (configuration) and `outbound_deliveries` (a log), both classified in the data reset.
     - 0.15.434 (2026-11-28): the weights preview lists the item level differences against the set in force (Settings review gap 7, approved by the owner 2026-11-27; no migration). Web only, no path or schema change: Settings > Weights > Preview now also shows, from the saved draft and the set in force (`GET /settings/weight-sets/{id}` and the list), which activities and items are added, removed or changed (name, weight, unit, measure rule). Nothing is written.
     - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
     - 0.15.436 (2026-11-28): an old published workflow version can be deleted after a full snapshot is archived (owner request relayed 2026-11-27; migration 0575, mirror `db/sql/574_workflow_version_delete.sql`). Additive. `POST /workflow/versions/{version}/delete` (`deleteWorkflowVersion`): `workflow_versions` administer for all regions (the publish right), a reason, `If-Match`, a password step-up and the typed confirmation `v<version>`; audited as `workflow_version_delete`. Allowed only for a published version that is not the one in force, has started, has no site, no site task and no site migration (409 `invalid_transition` with `reasons`: `current`, `not_started`, `sites`, `site_tasks`, `migrations`). The version and all its milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views are written first as one snapshot (`workflow_version_archive`, kept on a data reset); the delete runs in the same transaction. `GET /workflow/version-archive` (`listWorkflowVersionArchive`, `administer`) lists the archived versions (no snapshot body); `POST /workflow/version-archive/{id}/restore` (`restoreWorkflowVersion`, `administer`, reason, step-up) puts one back as it was (published, same version number, same ids) in one transaction and answers 409 `invalid_transition` without changing anything when the version number or an id exists again, it was already restored, or a row it points to is gone. Drafts are still discarded with `/discard`; a published version stays immutable and tasks are still deactivated, not deleted.
@@ -13245,6 +13246,147 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/integrations/outbound:
+    get:
+      tags: [settings]
+      operationId: getOutbound
+      summary: Outbound notifications, the switch and the destinations (0.15.475)
+      description: 0.15.475. `admin.settings` view. The webhook secret is never returned (`has_secret` only).
+      responses:
+        '200':
+          description: OK.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/integrations/outbound/enabled:
+    put:
+      tags: [settings]
+      operationId: setOutboundEnabled
+      summary: Turn outbound sending on or off (reason, If-Match, audited)
+      description: 0.15.475. `admin.settings` edit. Off by default. Audited as `outbound_enabled_update`.
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [enabled]
+                additionalProperties: false
+                properties:
+                  enabled: {type: boolean}
+      responses:
+        '200':
+          description: OK.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/integrations/outbound/destinations:
+    post:
+      tags: [settings]
+      operationId: createOutboundDestination
+      summary: Add a destination (reason, audited)
+      description: 0.15.475. `admin.settings` edit. A webhook needs an https URL that resolves to public addresses and a secret of 16 to 200 characters (422 `validation_failed`). Audited as `outbound_destination_save`; the audit row never holds the secret.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/OutboundDestinationInput'}
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/integrations/outbound/destinations/{id}:
+    put:
+      tags: [settings]
+      operationId: updateOutboundDestination
+      summary: Change a destination (reason, audited)
+      description: 0.15.475. `admin.settings` edit. The kind cannot change. An absent `secret` keeps the saved one. An archived destination answers 409.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/OutboundDestinationInput'}
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /settings/integrations/outbound/destinations/{id}/archive:
+    post:
+      tags: [settings]
+      operationId: archiveOutboundDestination
+      summary: Archive a destination (hidden, never deleted)
+      description: 0.15.475. `admin.settings` edit. Audited as `outbound_destination_archive`. Queued deliveries of an archived destination are not sent.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                additionalProperties: false
+                properties:
+                  archived: {type: boolean, default: true}
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /settings/integrations/outbound/deliveries:
+    get:
+      tags: [settings]
+      operationId: listOutboundDeliveries
+      summary: The latest 100 deliveries (the log)
+      description: 0.15.475. `admin.settings` view.
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/OutboundDelivery'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /settings/dashboard/progress-rag:
     get:
       tags: [settings]
@@ -28351,6 +28493,57 @@ components:
           minimum: 1
           maximum: 30
           description: '0.15.29 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value.'
+    OutboundOverview:
+      description: '0.15.475. The outbound switch and the destinations. `locked` is true while the disable_export lock is on.'
+      type: object
+      required: [enabled, locked, version, event_kinds, destinations]
+      properties:
+        enabled: {type: boolean}
+        locked: {type: boolean}
+        version: {type: integer, minimum: 0}
+        updated_at: {type: [string, 'null'], format: date-time}
+        event_kinds: {type: array, items: {type: string}}
+        destinations: {type: array, items: {$ref: '#/components/schemas/OutboundDestination'}}
+    OutboundDestination:
+      type: object
+      required: [id, kind, label, target, has_secret, events, active, archived_at, updated_at, queued, dead]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [webhook, email]}
+        label: {type: string}
+        target: {type: string, description: 'The https URL or the email address.'}
+        has_secret: {type: boolean}
+        events: {type: array, items: {type: string}}
+        active: {type: boolean}
+        archived_at: {type: [string, 'null'], format: date-time}
+        updated_at: {type: string, format: date-time}
+        queued: {type: integer}
+        dead: {type: integer}
+    OutboundDestinationInput:
+      type: object
+      required: [kind, label, target, events]
+      additionalProperties: false
+      properties:
+        kind: {type: string, enum: [webhook, email]}
+        label: {type: string, minLength: 1, maxLength: 120}
+        target: {type: string, minLength: 5, maxLength: 500}
+        secret: {type: string, minLength: 16, maxLength: 200, description: 'Webhook only. Write-only.'}
+        events: {type: array, minItems: 1, items: {type: string}}
+        active: {type: boolean, default: true}
+    OutboundDelivery:
+      type: object
+      required: [id, destination, kind, event, status, attempts, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        destination: {type: string}
+        kind: {type: string}
+        event: {type: string}
+        status: {type: string, enum: [queued, sent, dead, blocked]}
+        attempts: {type: integer}
+        last_status: {type: [integer, 'null']}
+        last_error: {type: [string, 'null']}
+        created_at: {type: string, format: date-time}
+        sent_at: {type: [string, 'null'], format: date-time}
     HealthBandsInput:
       type: object
       required: [green, amber]
