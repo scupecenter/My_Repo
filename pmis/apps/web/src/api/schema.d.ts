@@ -12812,6 +12812,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/private-notes/{entity_type}/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_type: "task" | "register_record";
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * My private note on a task or a record (0.15.597)
+         * @description 0.15.597 (migration 0668). Always the caller's own note; an empty body and a null `updated_at` when there is none. Nobody else can read it.
+         */
+        get: operations["getPrivateNote"];
+        /**
+         * Save my private note on a task or a record (0.15.597)
+         * @description 0.15.597 (migration 0668). Replaces the caller's note; an empty text clears it (the row stays). The record must exist (404 otherwise); more than 4000 characters is 422.
+         */
+        put: operations["putPrivateNote"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/default-views": {
         parameters: {
             query?: never;
@@ -12936,6 +12963,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        PrivateNote: {
+            /** @enum {string} */
+            entity_type: "task" | "register_record";
+            /** Format: uuid */
+            entity_id: string;
+            body: string;
+            /** Format: date-time */
+            updated_at: string | null;
+        };
         /** @description The setting `registers.structure_change` (0.15.403). */
         StructurePolicy: {
             /** @enum {string} */
@@ -47517,6 +47553,63 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getPrivateNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_type: "task" | "register_record";
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The note. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivateNote"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putPrivateNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_type: "task" | "register_record";
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    body: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The saved note. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivateNote"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getDefaultViews: {

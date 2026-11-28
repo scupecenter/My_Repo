@@ -161,7 +161,30 @@ const fieldsOf = (screen: string) => screen === 'warehouse-movements' ? withGrou
   : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
   : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;
 
+// Contract 0.15.597: private notes. One note per signed-in account and record; nobody else's account sees it (the key holds the account).
+const notes = new WeakMap<Db, Map<string, { body: string; updated_at: string }>>();
+const noteStore = () => { const d = db(); let m = notes.get(d); if (!m) { m = new Map(); notes.set(d, m); } return m; };
+const noteShape = (type: string, id: string) => {
+  const n = noteStore().get(`${me().key}|${type}|${id}`);
+  return { entity_type: type, entity_id: id, body: n?.body ?? '', updated_at: n?.updated_at ?? null };
+};
+const noteOk = (type: string, id: string) => ['task', 'register_record'].includes(type) && /^[0-9a-f-]{36}$/i.test(id);
+
 export const viewsHandlers = [
+  http.get(`${B}/me/private-notes/:type/:id`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!noteOk(String(params.type), String(params.id))) return problem(404, 'not_found', 'Not found');
+    return HttpResponse.json(noteShape(String(params.type), String(params.id)));
+  }),
+  http.put(`${B}/me/private-notes/:type/:id`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const type = String(params.type), id = String(params.id);
+    if (!noteOk(type, id)) return problem(404, 'not_found', 'Not found');
+    const b = (await request.json().catch(() => null)) as { body?: unknown } | null;
+    if (typeof b?.body !== 'string' || b.body.length > 4000) return invalid('/body');
+    noteStore().set(`${me().key}|${type}|${id}`, { body: b.body, updated_at: now() });
+    return HttpResponse.json(noteShape(type, id));
+  }),
   // 0.15.49: the values of an enum field that match q (anywhere in the value or a label), at most `limit`, `truncated` when there are more
   http.get(`${B}/saved-views/filter-fields/:field/values`, ({ request, params }) => {
     const g = guard(); if (g) return g;

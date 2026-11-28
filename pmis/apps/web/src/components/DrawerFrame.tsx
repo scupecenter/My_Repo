@@ -15,6 +15,8 @@ import { useTranslation } from "react-i18next";
 import { loadPref, savePref } from "@/lib/localPref";
 import { copyText, useExtra } from "@/lib/uiExtras";
 import { Tip } from "./Tip";
+import { PrivateNotePanel } from "./PrivateNotePanel";
+import type { NoteEntity } from "@/api/privateNotes";
 
 export const DRAWER_MIN = 360;
 type Size = { w: number; full: boolean };
@@ -57,6 +59,7 @@ export function DrawerFrame({
   testid,
   nav,
   link,
+  note,
   wide = 560,
   children,
 }: {
@@ -67,6 +70,8 @@ export function DrawerFrame({
   nav?: DrawerNav;
   /** Path (and query) that opens this record again; shows the copy-link button. */
   link?: string;
+  /** The record this drawer shows, so a private note can be kept on it (needs a saved record). */
+  note?: { type: NoteEntity; id: string };
   wide?: number;
   children: ReactNode;
 }) {
@@ -262,6 +267,7 @@ export function DrawerFrame({
                 </Tip>
               </div>
               <div className="min-h-0 flex-1">{children}</div>
+              {note && <PrivateNotePanel type={note.type} id={note.id} />}
             </div>
           </Ctx.Provider>
         </Dialog.Content>

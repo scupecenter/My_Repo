@@ -501,7 +501,7 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
   const isNew = recordId === 'new';
   const q = useRegisterRecord(def.register_key, isNew ? null : recordId);
   return (
-    <DrawerFrame name="register" testid="register-drawer" link={recordId && !isNew ? `${window.location.pathname}?record=${recordId}` : undefined} wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
+    <DrawerFrame name="register" testid="register-drawer" note={recordId && !isNew ? { type: "register_record", id: recordId } : undefined} link={recordId && !isNew ? `${window.location.pathname}?record=${recordId}` : undefined} wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
       {isNew ? <RegisterRecordBody key="new" def={def} record={null} onCreated={onOpen} />
         : q.data ? <RegisterRecordBody key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
           : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}

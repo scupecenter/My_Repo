@@ -398,6 +398,9 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/saved-views/:id/pin'],
   ['post', '/saved-views/:id/unpin'],
   // Contract 0.15.582 (0655): the default saved view per screen.
+  // Contract 0.15.597 (0668): my private note on a task or a record.
+  ['get', '/me/private-notes/:type/:id'],
+  ['put', '/me/private-notes/:type/:id'],
   ['get', '/me/default-views'],
   ['post', '/saved-views/:id/set-default'],
   ['post', '/saved-views/:id/clear-default'],
