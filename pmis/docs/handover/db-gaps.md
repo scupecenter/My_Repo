@@ -1,5 +1,7 @@
 # DB gaps: contract 0.2.5 and 0.2.6 against the database
 
+> Historical note (2026-11-28): this list was written against contract 0.2.5 and 0.2.6 and migrations 001 to 008. The database has moved on by hundreds of migrations, so the unchecked boxes below are NOT a current to-do list; check a gap against `db/sql` before acting on it.
+
 For: database-engineer. Date: 2026-10-26.
 
 Checked against `apps/api/prisma/schema.prisma` (75 models) and `db/sql/001` to `008`. Source: `docs/adr/0011-contract-v0.2.md`, Amendment 0.2.5, "Security hardening of 0.2.5" and Amendment 0.2.6. Each item is one line: what is missing, the contract operation that needs it, and a suggested table or column. Names are proposals. Mirror every change in `db/sql/` and a Prisma migration, as HANDOVER section 2 requires.
