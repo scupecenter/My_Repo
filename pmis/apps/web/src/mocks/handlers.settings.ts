@@ -493,6 +493,9 @@ const ragView = () => ({
   items: RAG_CAT.map((c) => ({ ...c, enabled: ragState.saved[c.code]?.enabled ?? false, green: ragState.saved[c.code]?.green ?? c.default_green, amber: ragState.saved[c.code]?.amber ?? c.default_amber })),
   version: ragState.version, updated_at: ragState.updated_at, updated_by: null,
 });
+/** The number of weeks the dashboard forecast averages (contract 0.15.431): the setting dashboard.forecast_window_weeks, default 4, version 0 until the first save. */
+let fcState = { version: 0, weeks: 4, updated_at: null as string | null, updated_by: null as null };
+const fcView = () => ({ ...fcState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
@@ -650,6 +653,20 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     ragState = { version: ragState.version + 1, saved, updated_at: new Date().toISOString() };
     return HttpResponse.json(ragView(), tag(ragState.version));
+  }),
+  // ------------------------------------------------------------------ forecast window (contract 0.15.431, settings review gap 4)
+  http.get(`${B}/settings/dashboard/forecast-window`, () => { const g = guard(); if (g) return g; return HttpResponse.json(fcView(), tag(fcState.version)); }),
+  http.put(`${B}/settings/dashboard/forecast-window`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, fcState.version); if (p) return p;
+    const b = (await request.json()) as { weeks?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weeks) || b.weeks! < 2 || b.weeks! > 12) errs.push({ path: '/weeks', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    fcState = { ...fcState, version: fcState.version + 1, weeks: b.weeks!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(fcView(), tag(fcState.version));
   }),
   // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
   http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),

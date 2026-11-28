@@ -5,6 +5,7 @@ import {
   Columns3,
   Download,
   Grid3x3,
+  Rss,
   Lock,
   Map as MapIcon,
   Plus,
@@ -72,6 +73,7 @@ import {
   numericFields,
   RegisterChart,
   RegisterBoard,
+  RegisterFeed,
   RegisterCalendar,
   RegisterMap,
   RegisterWide,
@@ -273,7 +275,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   ];
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   // the board and the map show every record of the filters (their column counts and sites must not depend on paging), up to ALL_CAP records
-  const needAll = view === "vertical" && (layout === "board" || layout === "map");
+  const needAll = view === "vertical" && (layout === "board" || layout === "map" || layout === "feed");
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
   useEffect(() => {
     if (needAll && hasNextPage && !isFetchingNextPage && items.length < ALL_CAP)
@@ -333,6 +335,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     { id: "wide", label: t("sites.wide"), hint: t("view.wide_hint"), icon: <TableProperties size={14} />, testid: "register-layout-wide" },
     { id: "grid", label: t("view.grid"), hint: t("view.grid_hint"), icon: <Grid3x3 size={14} />, testid: "register-layout-grid" },
     { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
+    { id: "feed", label: t("view.feed"), hint: t("view.feed_hint"), icon: <Rss size={14} />, testid: "register-layout-feed" },
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
     { id: "chart", label: t("chartv.title"), hint: t("view.chart_hint"), icon: <BarChart3 size={14} />, testid: "register-layout-chart" },
     ...(layouts.includes("calendar") ? [{ id: "calendar", label: t("calview.title"), hint: t("view.calendar_hint"), icon: <CalendarDays size={14} />, testid: "register-layout-calendar" }] : []),
@@ -517,7 +520,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       const c = fieldCols.find((x) => `f:${x.code}` === id);
       if (!c) return <Empty />;
       const txt = showValue(c, r.data[c.code], i18n.language, t);
-      return txt === "-" ? <Empty /> : <FieldValue f={c} v={r.data[c.code]} testid={`reg-cell-${r.id}-${c.code}`} />;
+      return txt === "-" ? <Empty /> : <FieldValue f={c} v={r.data[c.code]} colors={tbl.display.colors} testid={`reg-cell-${r.id}-${c.code}`} />;
     }
     switch (id) {
       case "site":
@@ -1068,6 +1071,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               records={real}
               by={boardBy}
               lane={lane}
+              regionName={(id) => rname(id as number | null)}
+              onOpen={setRecord}
+              partial={partial}
+            />
+          )}
+          {layout === "feed" && (
+            <RegisterFeed
+              def={def}
+              records={real}
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
               partial={partial}
