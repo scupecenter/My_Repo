@@ -310,3 +310,18 @@ export function useColumnLock(key: string) {
 export type ContractorCompany = { id: string; name: string; type: string; scopes: string[] | null };
 export const useContractorCompanies = (enabled = true) =>
   useQuery({ queryKey: ['contractor-companies'], enabled, staleTime: 60_000, queryFn: () => api.get<{ items: ContractorCompany[] }>('/registers/contractor-companies').then((r) => r.items) });
+
+/**
+ * A8: what is still open on a site when its readiness handover (O&M acceptance) is submitted: open snags and open issues (as the site page counts them) and the
+ * quality records not yet approved or voided. Read only; nothing here blocks the submit, the screen only asks for a confirmation.
+ */
+export function useHandoverOpenCounts(siteId: string | null | undefined, enabled: boolean) {
+  const on = enabled && !!siteId;
+  const site = useQuery({ queryKey: ['site', siteId ?? ''], enabled: on, queryFn: () => api.get<{ counts?: { open_snags?: number; open_issues?: number } }>(`/sites/${siteId}`) });
+  const quality = useQuery({
+    queryKey: ['handover-open-quality', siteId ?? ''], enabled: on, retry: false,
+    queryFn: () => api.get<Page<RegisterRecord>>('/registers/quality/records', { query: { site_id: siteId, limit: 100 } }).then((r) => r.items.filter((x) => x.state !== 'approved' && x.state !== 'voided').length),
+  });
+  const snags = site.data?.counts?.open_snags ?? 0, issues = site.data?.counts?.open_issues ?? 0, q = quality.data ?? 0;
+  return { ready: on && !site.isPending && !quality.isPending, snags, issues, quality: q, total: snags + issues + q };
+}

@@ -7,6 +7,7 @@ import { DbService } from "../db/db.service";
 import { ContractorPerformanceService } from "../contractors/contractor-performance.service";
 import { FilterCatalogService } from "../views/filter-catalog.service";
 import { dashboardParams } from "./dashboard.service";
+import { monthlyOnAirTarget } from "./dashboard-targets";
 import {
   AgeBuckets,
   ActionDueRow,
@@ -25,6 +26,8 @@ import {
   ptwCheckGaps,
   receivePct,
   scorecardSummary,
+  phaseScope,
+  PhaseScopeRow,
 } from "./dashboard-ops.rules";
 
 interface OrderAges {
@@ -103,6 +106,7 @@ export class DashboardOpsService {
     const qualityRegions = await this.access.regions("quality", "view");
     const approvalsRegions = await this.access.regions("approvals", "view");
     const sitesRegions = await this.access.regions("sites", "view");
+    const dashOk = dash === null || dash.length > 0;
     const changeRegions = await this.access.regions("change_control", "view");
     const meetingRegions = await this.access.regions("meetings", "view");
     const finRegions = await this.access.regions("financial_advances", "view");
@@ -167,6 +171,10 @@ export class DashboardOpsService {
       : null;
     const actions = meetingsOk
       ? await this.actionsSection(meetingScope, p.region_id ?? null)
+      : null;
+
+    const phase = dashOk
+      ? await this.phaseSection(dash, p.region_id ?? null, await this.filters.fromQuery("dashboard", q))
       : null;
 
     return {
@@ -258,6 +266,12 @@ export class DashboardOpsService {
           no_due_date: actions?.no_due_date ?? null,
           overdue_aging: actions?.overdue_aging ?? null,
         },
+      },
+      phase_scope: {
+        available: dashOk,
+        phases: phase?.phases ?? null,
+        total: phase?.total ?? null,
+        monthly_on_air_auto: phase?.monthly_on_air_auto ?? null,
       },
       contractor_scorecard: {
         available: contractorsOk,
@@ -662,6 +676,50 @@ export class DashboardOpsService {
   }
 
   /** The materials position: the receive rate over every required line and the shortage lines with their contractor. */
+  /**
+   * Phase scope (0.15.367): the registered, not cancelled sites per project phase (sites.project_phase) and how many are on air (the approved
+   * On-Air task, as the monthly counter reads it). Only the sites table and its tasks are read, no typed number. monthly_on_air_auto is the
+   * target the monthly On-Air counter is measured against when no manual override is on.
+   */
+  private async phaseSection(
+    scope: number[] | null,
+    region: number | null,
+    adv: Prisma.Sql | null,
+  ) {
+    const siteWhere = Prisma.sql`
+      ${scope === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}
+      ${adv ? Prisma.sql`AND ${adv}` : Prisma.empty}`;
+    const rows = await this.db.tx.$queryRaw<
+      (Omit<PhaseScopeRow, "sites" | "completed" | "in_progress" | "not_started" | "on_hold" | "on_air"> & {
+        sites: bigint; completed: bigint; in_progress: bigint; not_started: bigint; on_hold: bigint; on_air: bigint;
+      })[]
+    >(Prisma.sql`
+      SELECT nullif(btrim(s.project_phase), '') AS phase,
+             count(*) AS sites,
+             count(*) FILTER (WHERE s.overall_status = 'completed') AS completed,
+             count(*) FILTER (WHERE s.overall_status = 'in_progress') AS in_progress,
+             count(*) FILTER (WHERE s.overall_status = 'not_started') AS not_started,
+             count(*) FILTER (WHERE s.overall_status = 'on_hold') AS on_hold,
+             count(*) FILTER (WHERE EXISTS (
+               SELECT 1 FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id
+               WHERE ti.site_id = s.id AND td.code = 'MS6' AND ti.state::text = 'approved')) AS on_air
+      FROM sites s LEFT JOIN clusters c ON c.id = s.cluster_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' ${siteWhere}
+      GROUP BY 1`);
+    const summary = phaseScope(
+      rows.map((r) => ({
+        phase: r.phase, sites: Number(r.sites), completed: Number(r.completed), in_progress: Number(r.in_progress),
+        not_started: Number(r.not_started), on_hold: Number(r.on_hold), on_air: Number(r.on_air),
+      })),
+    );
+    const monthly = await monthlyOnAirTarget(this.db, siteWhere);
+    return {
+      ...summary,
+      monthly_on_air_auto: monthly,
+    };
+  }
+
   private async materialsSection(
     scope: number[] | null,
     region: number | null,

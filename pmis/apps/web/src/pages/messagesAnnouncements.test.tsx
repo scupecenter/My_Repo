@@ -323,6 +323,7 @@ describe('departments and manager', () => {
     await u.click(screen.getByTestId('dept-dialog-submit'));
     expect(await screen.findByTestId('dept-dialog-error')).toBeInTheDocument();
     await u.click(within(screen.getByTestId('dept-dialog')).getByText('Cancel'));
+    await u.click(await screen.findByTestId('unsaved-discard')); // Decision 11: typed input asks before the dialog closes
 
     await u.click(screen.getByTestId('dept-toggle-QA'));
     await u.type(screen.getByTestId('dept-dialog-reason'), 'Merged elsewhere');

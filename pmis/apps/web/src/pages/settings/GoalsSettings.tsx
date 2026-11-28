@@ -1,4 +1,6 @@
+import { MissingArabicHint } from '@/components/MissingArabicHint';
 import { Plus, Trash2 } from "lucide-react";
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -101,6 +103,7 @@ export function GoalsSettings() {
                 </td>
                 <td className="px-2">
                   <input className="input w-full" dir="rtl" aria-label={t("goals.name_ar")} data-testid={`goal-name-ar-${g.id}`} value={g.name_ar ?? ""} maxLength={120} onChange={(e) => change(i, { name_ar: e.target.value || null })} />
+                  <MissingArabicHint en={g.name_en} ar={g.name_ar} testid={`goal-name-ar-warn-${g.id}`} />
                 </td>
                 <td className="px-2">
                   <select className="input" aria-label={t("goals.metric")} data-testid={`goal-metric-${g.id}`} value={g.metric} onChange={(e) => change(i, { metric: e.target.value })}>
@@ -147,6 +150,7 @@ export function GoalsSettings() {
         <button className="btn" data-testid="goal-add" disabled={rows.length >= 50} onClick={add}>
           <Plus size={16} aria-hidden="true" /> {t("goals.add")}
         </button>
+        <UnsavedGuard scope="settings" dirty={!!draft && !invalid} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: s.version, body: { goals: rows.map((g) => ({ ...g, name_en: g.name_en.trim(), name_ar: g.name_ar?.trim() || null })), reason } }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }))} />
         <button className="btn btn-accent" data-testid="goals-save" disabled={!draft || invalid} onClick={() => setOpen(true)}>
           {t("common.save")}
         </button>
