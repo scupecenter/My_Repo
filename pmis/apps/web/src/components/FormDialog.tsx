@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { RequiredMark } from './RequiredMark';
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
@@ -45,7 +46,7 @@ export function FormDialog({ open, onClose, title, testid, children, onSubmit, s
           {children}
           {withReason && (
             <div>
-              <label htmlFor={`${testid}-reason`} className="text-sm font-semibold">{t('common.reason')}</label>
+              <label htmlFor={`${testid}-reason`} className="text-sm font-semibold">{t('common.reason')}<RequiredMark /></label>
               <textarea id={`${testid}-reason`} data-testid={`${testid}-reason`} className="input mt-1 min-h-16" value={reason} onChange={(e) => setReason(e.target.value)} onBlur={() => setTouched(true)} />
               {touched && short && <p role="alert" data-testid={`${testid}-reason-error`} className="mt-1 text-sm text-lateInk">{t('common.reason_required')}</p>}
             </div>

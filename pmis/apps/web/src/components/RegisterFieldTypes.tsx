@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { RequiredMark } from './RequiredMark';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -156,7 +157,7 @@ export function ChildListInput({ field, value, onChange, ctx, disabled }: { fiel
   return (
     <div className="overflow-x-auto" data-testid={id}>
       <table className="w-full text-sm">
-        <thead className="text-mute"><tr>{cols.map((c) => <th key={c.code} className="p-1 text-start">{label(i18n.language, c)}{c.required ? ' *' : ''}</th>)}<th /></tr></thead>
+        <thead className="text-mute"><tr>{cols.map((c) => <th key={c.code} className="p-1 text-start">{label(i18n.language, c)}{c.required && <RequiredMark />}</th>)}<th /></tr></thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={(r.id as string) ?? `new-${i}`} className="border-t border-line" data-testid={`${id}-row-${i}`}>

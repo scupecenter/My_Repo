@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { RequiredMark } from './RequiredMark';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,7 +18,7 @@ export function AdminApproveDialog({ open, count, busy, onClose, onSend }: { ope
         <Dialog.Content data-testid="admin-approve-dialog" className="card fixed inset-x-0 top-1/4 z-[70] mx-auto w-[min(500px,92vw)] space-y-3 p-5">
           <Dialog.Title className="font-bold">{t('batch.admin_title')}</Dialog.Title>
           <Dialog.Description className="text-sm text-mute">{t('batch.admin_body', { count })}</Dialog.Description>
-          <label htmlFor="admin-approve-reason" className="text-sm font-semibold">{t('batch.admin_reason')}</label>
+          <label htmlFor="admin-approve-reason" className="text-sm font-semibold">{t('batch.admin_reason')}<RequiredMark /></label>
           <textarea id="admin-approve-reason" data-testid="admin-approve-reason" className="input min-h-24" value={reason} onChange={(e) => { setReason(e.target.value); setErr(false); }} />
           {err && <p role="alert" data-testid="admin-approve-error" className="text-lateInk">{t('batch.admin_reason_required')}</p>}
           <div className="flex justify-end gap-2">

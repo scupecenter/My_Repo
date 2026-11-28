@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { RequiredMark } from './RequiredMark';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,7 +15,7 @@ export function RejectDialog({ open, title, onClose, onSend }: { open: boolean; 
         <Dialog.Content data-testid="reject-dialog" className="card fixed inset-x-0 top-1/4 z-[70] mx-auto w-[min(460px,92vw)] space-y-3 p-5">
           <Dialog.Title className="font-bold">{title}</Dialog.Title>
           <Dialog.Description className="sr-only">{t('approvals.note_required')}</Dialog.Description>
-          <label htmlFor="reject-note" className="text-sm font-semibold">{t('approvals.note')}</label>
+          <label htmlFor="reject-note" className="text-sm font-semibold">{t('approvals.note')}<RequiredMark /></label>
           <textarea id="reject-note" data-testid="reject-note" className="input min-h-24" value={note} onChange={(e) => { setNote(e.target.value); setErr(false); }} />
           {err && <p role="alert" data-testid="reject-error" className="text-lateInk">{t('approvals.note_required')}</p>}
           <div className="flex justify-end gap-2">
