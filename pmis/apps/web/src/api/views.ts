@@ -35,6 +35,22 @@ export function useSavedViewOps(screen: string) {
   };
 }
 
+// ---------------------------------------------------------------------------------------------------------------- default view per screen (0.15.582)
+export type DefaultView = { screen_key: string; view_id: string; name: string };
+const DEF_KEY = ['default-views'] as const;
+/** The caller's default saved view of each screen (one per screen). */
+export const useDefaultViews = () =>
+  useQuery({ queryKey: DEF_KEY, staleTime: 60_000, queryFn: async () => (await api.get<{ items: DefaultView[] }>('/me/default-views')).items });
+
+export function useDefaultViewOps() {
+  const qc = useQueryClient();
+  const settle = () => void qc.invalidateQueries({ queryKey: DEF_KEY });
+  return {
+    set: useMutation<{ view_id: string; screen_key: string; is_default: boolean }, ApiError, string>({ mutationFn: (id) => api.post(`/saved-views/${id}/set-default`, { body: {} }), onSuccess: settle }),
+    clear: useMutation<{ view_id: string; screen_key: string | null; is_default: boolean }, ApiError, string>({ mutationFn: (id) => api.post(`/saved-views/${id}/clear-default`, { body: {} }), onSuccess: settle }),
+  };
+}
+
 // ---------------------------------------------------------------------------------------------------------------- home pins (0.15.245, item 16)
 export type HomeViewPin = S['HomeViewPin'];
 
