@@ -49,6 +49,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Dismantle part (outsourced) | Procurement order | register link | `procurement_order_id`, contractor | contractor derived from the order |
 | Register records, task instances, task delay periods, contractor teams and contracts | Contractor company (`external_parties`) | foreign key | `external_party_id`, `party_id` | chosen |
 | Procurement, snags, quality inspections, issues | Contractor company | foreign key (0182, `_idfk`) | `party_id`, `responsible_party_id` | chosen |
+| Company onboarding statuses | Contractor company (`external_parties`) and onboarding items (`company_onboarding_items`, Settings) | foreign key (0746) | `party_id`, `item_code` | chosen; approver and date recorded; "applies to" company types seeded empty |
+| Company templates (contacts, documents, checklist) | Contractor company, contacts, documents, statuses | template import and export | TPL-COMPANY-CONTACTS, -DOCUMENTS, -ONBOARDING | filled by the template; a refused row refuses the file |
 | Company contacts, company documents | Contractor company (`external_parties`) | foreign key (0745) | `party_id` | chosen; hidden with `is_active`, never deleted |
 | Company documents | Company document types (`company_document_types`, Settings) | foreign key (0745) | `type_code` | chosen; "required for" company types seeded empty |
 | Company compliance (expired, expiring, missing) | Company documents and types | computed on read (`company_compliance`) | none stored | derived; feeds the red chip and the daily alert |
