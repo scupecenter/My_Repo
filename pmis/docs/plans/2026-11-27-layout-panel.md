@@ -38,7 +38,7 @@
 
 ## خارج النطاق
 
-V2–V10 قرارات لاحقة بـ PRs مستقلة: التقويم، الرسم كنمط، توحيد My Work (V7)، خيار فتح السجل (V5)، تعميم الجدول الزمني (V3)، حجم البطاقة (V6)، تتبع تلوين القيم (V8). Gallery وFeed مرفوضان موثَّقًا في التحليل (V9/V10).
+V2–V10 قرارات لاحقة بـ PRs مستقلة: التقويم، الرسم كنمط، توحيد My Work (V7)، خيار فتح السجل (V5)، تعميم الجدول الزمني (V3)، حجم البطاقة (V6)، تتبع تلوين القيم (V8). Gallery أُقرّ 2026-11-28 (V9، القسم الأخير)؛ Feed مرفوض موثَّق في التحليل (V10).
 
 ## V2: التقويم نمط عرض (PR3، نفس اليوم)
 
@@ -57,3 +57,7 @@ Inside the list card: row 1 holds the tabs, the quick filters (colours, stale) a
 
 ## P4: one place for density
 `ColumnMenu` takes `density` (default true). Screens that carry the Layout panel (Sites, Register vertical, My Work, Daily Plan, Archive, TaskGrid) pass `density={false}`: Display > Density in the panel is the only control. Screens without the panel (StandardTable users, Audit log, System log, Field changes) keep the Columns-menu density until they get the panel (item d).
+
+## V9: المعرض (Gallery) نمط عرض على كل سجل (2026-11-28)
+
+رُفض في التحليل الأول ثم أُقرّ بعده: المعرض شبكة بطاقات مسطّحة على كل سجل (خيار «المعرض» في قائمة العرض بعد اللوحة، `register-layout-gallery`)، بلا تجميع: سجلات المرشّحات الحالية بترتيب القائمة حتى ALL_CAP كاللوحة والخريطة. البطاقة: رمز الموقع، العنوان (أول حقل ظاهر في القائمة له قيمة)، حتى ثلاثة حقول قائمة أخرى «التسمية: القيمة» (خلاياها تتبع مفتاح تلوين القيم V8)، الحالة، المنطقة، نوع السجل، وشارة القفل. للقراءة فقط: نقر البطاقة يفتح السجل (درجًا أو صفحة بحسب V5)، والاختيار يدخل في العروض المحفوظة وعنوان الصفحة (`layout=gallery`) كبقية الأنماط. حجم البطاقة (V6) يمتد إلى هنا عند التقاء الفرعين (PR مستقل).

@@ -7671,7 +7671,9 @@
     "map": "Map",
     "map_hint": "Items on the map",
     "chart_hint": "The rows as bars or a ring, by a field you choose",
-    "calendar_hint": "On a month grid, by a date you choose"
+    "calendar_hint": "On a month grid, by a date you choose",
+    "gallery": "Gallery",
+    "gallery_hint": "A grid of record cards to skim"
   },
   "batchedit": {
     "title": "Batch edit",
