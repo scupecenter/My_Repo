@@ -34,3 +34,29 @@ describe('buildGantt dependencies and today', () => {
     expect(buildGantt([n('A', 'done', undefined, undefined, '2026-02-10')])!.today).toBeNull();
   });
 });
+
+describe('critical path', () => {
+  const rows = [
+    n('A', 'done', '2026-01-01', undefined, '2026-01-05'),
+    n('B', 'late', '2026-01-10', '2026-01-25'),
+    n('C', 'planned', '2026-01-20', '2026-02-01'),
+    n('D', 'planned', '2026-02-10', '2026-02-12'),
+  ];
+  it('is every open dated stage, the finish and its variance against the last baseline', () => {
+    const c = buildGantt(rows)!.critical;
+    expect(c.codes).toEqual(['B', 'C', 'D']);
+    expect(c.finish).toBe(buildGantt(rows)!.max);
+    expect(c.varianceDays).toBe(2);
+  });
+  it('names the stage that added the most delay', () => {
+    const c = buildGantt(rows)!.critical;
+    expect(c.added).toEqual({ B: 11, C: -3, D: -10 });
+    expect(c.driver).toBe('B');
+  });
+  it('has no driver and no stages when everything is done, and no variance without baselines', () => {
+    const c = buildGantt([n('A', 'done', undefined, undefined, '2026-01-05')])!.critical;
+    expect(c.codes).toEqual([]);
+    expect(c.driver).toBeNull();
+    expect(c.varianceDays).toBeNull();
+  });
+});

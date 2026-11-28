@@ -7931,7 +7931,14 @@
     "today": "Today",
     "conflicts": "{{count}} order conflict(s)",
     "dep_ok": "Waits for the stage before it",
-    "dep_conflict": "Dated before the stage it waits for"
+    "dep_conflict": "Dated before the stage it waits for",
+    "critical": "Critical path:",
+    "critical_tip": "The stages that can still move the finish date. A stage already done cannot. Shown for information; nothing is saved.",
+    "critical_row": "On the critical path: a delay here moves the finish date",
+    "critical_finish": "{{count}} open stage(s) set the finish date, {{date}}.",
+    "critical_late": "{{days}} day(s) after the baseline finish.",
+    "critical_ontime": "{{days}} day(s) ahead of or on the baseline finish.",
+    "critical_driver": "Most delay added by {{name}} ({{days}} day(s))."
   },
   "siteActivity": {
     "c_entity": "Entity",
