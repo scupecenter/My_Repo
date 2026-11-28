@@ -257,7 +257,7 @@
     "group_site_register": "Site Master",
     "sites_all": "Site 360°",
     "site_submenus": "Site Master sub-menus",
-    "contractors": "Contractors",
+    "contractors": "Companies",
     "car_dispatcher": "Car Dispatcher",
     "financial_advances": "Financial Advances",
     "warehouse": "Warehouse",
@@ -5405,6 +5405,7 @@
     "internal_types": "Team types of an internal team (In-House), separated by commas",
     "closed": "Order statuses that end an order, separated by commas"
   },
+  "companies": {"title": "Companies", "tabs": "Company views", "tab_list": "List", "tab_ranking": "Ranking", "tab_complete": "Data to complete", "tab_match": "Team and scope match", "tab_list_hint": "The register of companies: add, edit, import and export", "tab_ranking_hint": "How each company performs on delays, snags, quality, orders and contract", "tab_complete_hint": "Companies, teams and contracts that miss data", "tab_match_hint": "Running orders whose team no longer matches the scope"},
   "contractorReports": {
     "title": "Contractor reports",
     "mismatch": "Running orders that no longer match",

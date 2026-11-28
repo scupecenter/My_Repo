@@ -38,7 +38,7 @@ export function ContractorPerformance() {
             <tbody>
               {q.data.items.map((r) => (
                 <tr key={r.party_id} className="border-t border-line align-top" data-testid={`perf-${r.name}`}>
-                  <td className="p-2 font-semibold"><Link className="underline" to="/registers/contractors">{r.name}</Link></td>
+                  <td className="p-2 font-semibold"><Link className="underline" to="/companies">{r.name}</Link></td>
                   <td className="p-2"><Chip level={r.level} label={t(`contractorPerf.level_${r.level}`)} testid={`perf-level-${r.name}`} /></td>
                   <td className="p-2">{r.delay_days}<span className="block text-xs text-mute">{t('contractorPerf.open_note', { open: r.issues_open, total: r.issues_total })}</span></td>
                   <td className="p-2"><Chip level={r.snags.overdue_level} label={pctText(r.snags.overdue_pct)} /><span className="block text-xs text-mute">{t('contractorPerf.open_note', { open: r.snags.open, total: r.snags.total })}</span></td>

@@ -1296,9 +1296,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   );
 }
 
-export function RegisterPage() {
+/** The register of `key` in the URL (`/registers/:key`), or of `registerKey` when another page embeds it (the Companies list). */
+export function RegisterPage({ registerKey }: { registerKey?: string } = {}) {
   const { t } = useTranslation();
-  const { key = "" } = useParams();
+  const params = useParams();
+  const key = registerKey ?? params.key ?? "";
   const defs = useRegisterDefs();
   if (!isLive(key) && !isCustomKey(key)) return <RegisterSoon name={key} />;
   if (defs.isLoading) return <p className="text-mute">{t("common.loading")}</p>;
