@@ -4,16 +4,39 @@ test.skip(!process.env.WALK, 'real-stack run only');
 
 /** V10 (0.15.577): the Feed, the records of a register latest-first, read only, EN and AR. */
 
-/** The first register with at least two records. */
+type RegDef = { register_key: string; fields: { code: string; type: string; in_list?: boolean; options?: { value: string }[] }[] };
+
+/** The session's current CSRF token (every answer rotates it, so read it right before each write). */
+async function freshCsrf(request: APIRequestContext): Promise<string> {
+  const s = await (await request.get('/api/v1/auth/session')).json();
+  return s.csrf_token;
+}
+
+/** The first register with at least two records, and one record that shows a title (seeded when none does). */
 async function pickRegister(request: APIRequestContext): Promise<{ key: string; recordId: string }> {
-  const regs: { items: { register_key: string }[] } = await (await request.get('/api/v1/registers')).json();
+  const regs: { items: RegDef[] } = await (await request.get('/api/v1/registers')).json();
   for (const r of regs.items) {
     const recs = await (await request.get(`/api/v1/registers/${r.register_key}/records?limit=100`)).json();
-    const items: { id: string }[] = recs.items ?? [];
-    if (items.length >= 2) return { key: r.register_key, recordId: items[0].id };
+    const items: { id: string; data: Record<string, unknown> }[] = recs.items ?? [];
+    if (items.length < 2) continue;
+    const listed = (r.fields ?? []).filter((x) => x.in_list);
+    const titled = items.find((x) => listed.some((f) => x.data[f.code] !== undefined && x.data[f.code] !== null && x.data[f.code] !== ''));
+    if (titled) return { key: r.register_key, recordId: titled.id };
+    // none shows a title yet: give the first editable record a value of its first listed list field
+    const f = listed.find((x) => x.type === 'list' && (x.options ?? []).length > 0);
+    if (!f) continue;
+    for (const rec of items) {
+      const detail = await (await request.get(`/api/v1/registers/${r.register_key}/records/${rec.id}`)).json();
+      const patch = await request.patch(`/api/v1/registers/${r.register_key}/records/${rec.id}`, {
+        headers: { 'X-CSRF-Token': await freshCsrf(request), 'If-Match': `"${detail.version}"` },
+        data: { data: { [f.code]: f.options![0].value } },
+      });
+      if (patch.ok()) return { key: r.register_key, recordId: rec.id };
+    }
   }
   throw new Error('no register with two records found');
 }
+
 
 test('walk: the feed on a register, EN and AR', async ({ page, request }) => {
   test.setTimeout(240000);
