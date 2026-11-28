@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import type { Client as PgClient } from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { penaltyOf } from '../src/contractors/contractor-performance.service';
+import { superDb } from './helpers';
 
 /** Contract 0.15.591: the SLA penalty is days late x the contractor's rate (else the default), never above the cap, two decimals. */
 const P = { rate_per_day: 10, currency: 'USD', cap: 400 as number | null, overrides: { 'a-id': 2.5 } as Record<string, number> };
@@ -17,10 +19,6 @@ describe('penaltyOf', () => {
     expect(penaltyOf(-4, 'x', P)?.amount).toBe(0);
   });
 });
-
-import type { Client as PgClient } from 'pg';
-import { afterAll, beforeAll } from 'vitest';
-import { superDb } from './helpers';
 
 /** Migration 0671: the setting function is changed in place and takes the optional penalty object. */
 describe('admin_set_contractor_perf_thresholds (0671)', () => {
