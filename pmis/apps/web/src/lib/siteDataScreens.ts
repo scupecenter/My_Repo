@@ -69,5 +69,6 @@ export const SITE_DATA_SCREENS: SiteDataScreen[] = [
   { id: 'dashboard-drilldowns', route: '/sites?dashboard_status=...', state: 'done', kind: 'grid', note: 'Dashboard drill-downs open Site Master with their filter (dashboard_status, milestone_reached, cluster): the Site Master toolbar and counts.' },
   { id: 'daily-plan', route: '/my-work/daily-plan', state: 'not_applicable', note: 'Not built yet (W7). It must use TableToolbar from the start.' },
   { id: 'library-archive', route: '/library/archive/:docCode', state: 'done', kind: 'grid', note: 'Library > Archive, the list of one document type (W5): saved views, search with the pasted list, + Filter (screen library-archive), server counts (GET /library/archive/rows), columns, density, Display, Export current view (every page, CSV), bulk zip, the # column.' },
+  { id: 'library-media', route: '/library/media', state: 'not_applicable', note: 'Library > Media (GAL-1): a card gallery, not a table. Saved views (screen library-media), search, filters (source, type, snag type, status, dates), server count; no column chooser.' },
   { id: 'site-master-grid', route: '/sites?section=cw&layout=grid', state: 'not_applicable', note: 'The hidden Excel-like grid (no button since 2026-11-22, kept for its source panel): its own header, totals row and counts.' },
 ];

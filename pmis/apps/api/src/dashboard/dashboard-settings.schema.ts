@@ -25,3 +25,12 @@ export const dashboardSettingsPutSchema = z
     stale_idle_days: z.number().int().min(1).max(30).optional(),
   })
   .strict();
+
+/** PUT /settings/dashboard/health-bands body (contract 0.15.435). The database checks the same rules again (green above amber, whole numbers). */
+export const healthBandsPutSchema = z
+  .object({
+    reason: z.string().trim().min(3).max(1000),
+    green: z.number().int().min(1).max(100),
+    amber: z.number().int().min(0).max(99),
+  })
+  .strict();

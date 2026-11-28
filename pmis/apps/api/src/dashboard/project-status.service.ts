@@ -114,7 +114,7 @@ export class ProjectStatusService {
       sites_in_scope: Number(ps.sites_in_scope ?? 0),
       activities: card.activities ?? [],
       ...(group !== 'none'
-        ? { rows: ((ps.rows ?? []) as Json[]).map((x) => ({ key: x.key, label: x.label, progress_pct: x.progress_pct, planned_pct: x.planned_pct ?? null, activities: x.activities ?? {} })) }
+        ? { rows: ((ps.rows ?? []) as Json[]).map((x) => ({ key: x.key, label: x.label, progress_pct: x.progress_pct, planned_pct: x.planned_pct ?? null, forecast_date: x.forecast_date ?? null, activities: x.activities ?? {} })) }
         : {}),
     };
   }

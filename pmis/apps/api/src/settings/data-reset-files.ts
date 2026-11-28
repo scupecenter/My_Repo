@@ -149,3 +149,27 @@ export async function quarantineFiles(store: string, qdir: string, keys: string[
   if (lines.length > 0) await fs.appendFile(`${q}.manifest`, `${lines.join('\n')}\n`, { mode: 0o600 });
   return out;
 }
+
+/**
+ * The generated thumbnails of the given source keys: `thumbs/<same middle path>/<last part>-s<px>-<format>` (and -m). Found by reading the directory, so a
+ * thumbnail made under an older size setting is found too. Derived data: the reset moves them to the quarantine with the originals.
+ */
+export async function thumbKeysFor(store: string, keys: string[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const key of keys) {
+    const parts = key.split('/');
+    if (parts.length < 2 || !STORAGE_KEY_RE.test(key) || parts[0] === 'thumbs') continue;
+    const last = parts[parts.length - 1]!;
+    const dir = join(store, 'thumbs', ...parts.slice(1, -1));
+    let names: string[] = [];
+    try {
+      names = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const n of names) {
+      if (n.startsWith(`${last}-s`) || n.startsWith(`${last}-m`)) out.push(['thumbs', ...parts.slice(1, -1), n].join('/'));
+    }
+  }
+  return out;
+}
