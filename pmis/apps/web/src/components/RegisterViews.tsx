@@ -11,7 +11,6 @@ import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { STATE_TONE } from '@/components/RegisterDrawer';
 import { SiteMap } from '@/components/SiteMap';
 import { ChartView, type ChartKind } from '@/components/ChartView';
-import { EmptyState } from '@/components/States';
 import { buildTimeline, posPct } from '@/lib/timeline';
 import { fmtDate } from '@/lib/time';
 import { StatusChip } from '@/components/TableKit';
