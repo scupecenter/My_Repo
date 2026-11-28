@@ -80,12 +80,14 @@ describe('Warehouse item master', () => {
     await waitFor(() => expect(screen.queryByTestId('wh-item-CBL-FEED')).not.toBeInTheDocument());
   }, 15_000);
 
-  it('0565: hide replaces delete: every item can be hidden (reason, audit), nothing is removed', async () => {
+  it('0565: every item can be hidden (reason, audit); only an item with no data can be deleted for real (0160)', async () => {
     await signIn('pm');
     show('/warehouse');
     const u = userEvent.setup();
     await screen.findByTestId('wh-item-ANT-900');
-    expect(screen.getByTestId('wh-del-ANT-900')).toBeInTheDocument();
+    // an item with data cannot be deleted (0160) but can always be hidden, with a reason (0565)
+    expect(screen.queryByTestId('wh-del-ANT-900')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wh-off-ANT-900')).toBeInTheDocument();
     await u.click(screen.getByTestId('wh-new'));
     await u.type(screen.getByTestId('wh-f-code'), 'SPL-DEL');
     await u.type(screen.getByTestId('wh-f-name_en'), 'Spare');

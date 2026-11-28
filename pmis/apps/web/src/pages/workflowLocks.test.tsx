@@ -12,6 +12,7 @@ import en from '@/i18n/en.json';
 import { siteIdOf, siteMeta } from '@/mocks/sites';
 import { pickFilterField, renderApp, signIn } from '@/test/utils';
 import { NewSite } from './NewSite';
+import { setLiveLockModeMock } from '@/mocks/handlers.workflowEditor';
 import { Site } from './Site';
 import { Sites } from './Sites';
 
@@ -105,6 +106,17 @@ describe('Site Master: the column, the filter and the bulk action', () => {
 });
 
 describe('New site: the Workflow locks field', () => {
+  it('is preselected Open when the live version mode is Open, and the person can switch back', async () => {
+    await signIn('engineer');
+    setLiveLockModeMock('open');
+    const u = userEvent.setup();
+    renderApp(<Routed />, { route: '/sites/new' });
+    const sel = await screen.findByTestId('ns-workflow_locks');
+    await waitFor(() => expect(sel).toHaveValue('Open'));
+    await u.selectOptions(sel, '');
+    expect(sel).toHaveValue('');
+  });
+
   it('is Locked by default; Open shows the hint and goes with the draft', async () => {
     await signIn('engineer');
     const u = userEvent.setup();
