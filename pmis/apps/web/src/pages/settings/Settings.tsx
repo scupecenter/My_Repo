@@ -111,7 +111,7 @@ export const LEGACY_SETTINGS_PATHS: Readonly<Record<string, string>> = {
   'my-work/daily-plan': 'screens/daily-plan',
   'sla/dlp': 'security/dlp',
   'contractor-rules': 'registers/contractors',
-  'gecol-order': 'registers/gecol',
+  'gecol-order': 'registers/order',
   'register-columns': 'registers/columns',
   'mail-kinds': 'alerts/mail',
   'documents/mail': 'alerts/mail',

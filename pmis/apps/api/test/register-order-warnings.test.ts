@@ -38,7 +38,7 @@ describe('order warnings of any register', () => {
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ enabled: true, version: 1 });
     expect((await admin.call('put', '/settings/registers/permits_hse/order-warnings', body, { 'If-Match': etag })).status).toBe(412);
-    const w = await db.query(`SELECT reg_order_warnings('permits_hse', $1::jsonb) AS w`, [JSON.stringify({ [dates[0]]: '2026-02-01', [dates[1]]: '2026-01-01' })]);
+    const w = await db.query(`SELECT reg_order_warnings('permits_hse', $1::jsonb) AS w`, [JSON.stringify({ [dates[0]!]: '2026-02-01', [dates[1]!]: '2026-01-01' })]);
     expect(w.rows[0].w).toEqual([expect.objectContaining({ code: 'order', path: `/data/${dates[1]}`, related_path: `/data/${dates[0]}` })]);
     const aud = await db.query(`SELECT count(*)::int AS n FROM audit_log WHERE action = 'register_order_warnings_update' AND entity_id = 'register.order_warnings:permits_hse'`);
     expect(aud.rows[0].n).toBeGreaterThanOrEqual(1);
