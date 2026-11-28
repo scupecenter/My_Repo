@@ -3154,6 +3154,8 @@
     "t_a_new_site_waits_for_approval": "موقع جديد بانتظار الاعتماد",
     "t_a_new_site_was_returned_to_you": "أُعيد إليك موقع جديد",
     "t_a_project_data_reset_waits_for_your_approval": "إعادة ضبط بيانات المشروع بانتظار اعتمادك",
+    "t_the_project_data_reset_can_run_soon": "إعادة ضبط بيانات المشروع ستكون جاهزة للتنفيذ قريباً",
+    "t_the_project_data_reset_is_waiting_before_it_can_run": "إعادة ضبط بيانات المشروع تنتظر قبل أن تُنفَّذ",
     "t_a_running_order_no_longer_matches_its_team_or_contract": "أمر جارٍ لم يعد يطابق فريقه أو عقده",
     "t_an_email_could_not_be_delivered": "تعذّر تسليم رسالة بريد",
     "t_assignment_requested": "طُلب إسناد",
