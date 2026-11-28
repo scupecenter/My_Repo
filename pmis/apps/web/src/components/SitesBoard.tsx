@@ -27,7 +27,7 @@ function Card({ c, region, column, onOpenAction }: { c: SiteBoardCard; region: s
   const { t, i18n } = useTranslation();
   const name = (i18n.language === 'ar' && c.name_ar) || c.name;
   return (
-    <div draggable data-ctx data-ctx-link={`/sites/${c.id}`} onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: c.id, column })); e.dataTransfer.effectAllowed = 'move'; }}>
+    <div draggable data-ctx data-swipe data-ctx-link={`/sites/${c.id}`} onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: c.id, column })); e.dataTransfer.effectAllowed = 'move'; }}>
     <Link to={`/sites/${c.id}`} data-ctx-open data-testid={`board-site-${c.site_code}`} data-ageing={c.ageing_wd}
         className="block rounded-md border border-line bg-card p-2 text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         aria-label={t('board.site_card', { code: c.site_code, name, days: c.ageing_wd })}>
@@ -45,7 +45,7 @@ function Card({ c, region, column, onOpenAction }: { c: SiteBoardCard; region: s
           {(c.at_l1 > 0 || c.at_l2 > 0) && <span className="chip border border-line" title={t('board.ball_title')}>{t('board.ball', { l1: c.at_l1, l2: c.at_l2 })}</span>}
         </div>
     </Link>
-    {column !== 'closed' && <button type="button" className="mt-1 text-xs text-accentText underline" data-testid={`board-site-action-${c.site_code}`} onClick={() => onOpenAction(c, column)}>{t('board.open_action')}</button>}
+    {column !== 'closed' && <button type="button" data-swipe-action className="mt-1 text-xs text-accentText underline" data-testid={`board-site-action-${c.site_code}`} onClick={() => onOpenAction(c, column)}>{t('board.open_action')}</button>}
     </div>
   );
 }

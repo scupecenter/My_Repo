@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { setSwipe, swipeOn } from "@/lib/swipe";
 import { applyMotion, currentMotion, type MotionPref } from "@/lib/motion";
 
 const CHOICES: MotionPref[] = ["auto", "reduced"];
@@ -13,6 +14,7 @@ export function MotionSettings() {
   const { t } = useTranslation();
   const [pref, setPref] = useState<MotionPref>(currentMotion);
   const [replay, setReplay] = useState(0);
+  const [swipe, setSw] = useState(swipeOn);
   const choose = (p: MotionPref) => {
     applyMotion(p);
     setPref(p);
@@ -41,6 +43,10 @@ export function MotionSettings() {
           </label>
         ))}
       </fieldset>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-1" checked={swipe} data-testid="motion-swipe" onChange={(e) => { setSwipe(e.target.checked); setSw(e.target.checked); }} />
+        <span><b>{t("motion.swipe_label")}</b><span className="block text-mute">{t("motion.swipe_note")}</span></span>
+      </label>
       <div className="flex flex-wrap items-center gap-3">
         <div
           key={replay}

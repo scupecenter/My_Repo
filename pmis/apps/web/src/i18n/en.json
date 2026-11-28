@@ -310,6 +310,7 @@
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
     "deliverables": "Deliverables",
+    "tools_equipment": "Tools & Equipment",
     "incidents": "Incidents & Security"
   },
   "toast": {
@@ -2214,6 +2215,9 @@
     "execution": "Execution",
     "lesson": "Lesson",
     "follow_up": "Follow-up",
+    "equipment": "Equipment",
+    "custody": "Custody",
+    "calibration_inspection": "Calibration and inspection",
     "invoice": "Invoice",
     "payment": "Payment",
     "deliverable": "Deliverable",
@@ -4239,7 +4243,9 @@
         "list": "List (default)",
         "grid": "Icon grid with search"
       }
-    }
+    },
+    "swipe_label": "Swipe on cards (phones and tablets)",
+    "swipe_note": "Swipe a board card toward the end of the line to run its main action, toward the start to open its menu. Touch screens only; saved in this browser."
   },
   "nav_side": {
     "mode": "Menu mode",

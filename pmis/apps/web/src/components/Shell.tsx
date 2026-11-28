@@ -22,6 +22,7 @@ import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
+import { CardSwipe } from './CardSwipe';
 import { RowActions } from './RowActions';
 import { NotificationBell } from './NotificationPanel';
 import { ShortcutsHelp } from './ShortcutsHelp';
@@ -283,6 +284,7 @@ function ShellFrame() {
       <ExportDialog open={exp} onClose={() => setExp(false)} />
       <ShortcutsHelp />
       <RowActions />
+      <CardSwipe />
       {me.data?.user.id && <QuickTour userId={me.data.user.id} />}
       <CommandPalette open={palette} onOpenChange={setPalette} items={paletteItems.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
