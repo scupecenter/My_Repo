@@ -35,3 +35,12 @@ A column keeps its code, but people name it in different ways in their own copie
 - What they do: the data upload checks the header row of a file against the issued template. A header that equals the label of the column, or one of its aliases (case and surrounding spaces ignored), is that column. The order of the columns, the typed values and the version rules (D112) are unchanged: a header that is neither a label nor an alias is still refused as before.
 - Aliases apply to register columns only (not to the Site ID or other fixed columns) and are never used to guess a column that is missing.
 - They travel in the proposal differences, in the undo of an applied proposal and in the audit record of the column.
+
+## Link cells in the data upload (migration 0642, contract 0.15.571)
+
+A cell of a link column (the id of a record of another register) is checked while the row is staged, so a wrong id is a clear row error in the error report (P4) and not a record
+that is created with a dead link. `imp_link_errors(register, data)` covers the links that have no rule of their own in entry: `procurement_record_id` of HLC, Car Dispatcher and
+Financial Advances (an entity id, or for HLC a version row id, of a Procurement record the person may read), `vehicle_id` and `parent_booking_id` of Car Dispatcher, and `parent_advance_id`
+of Financial Advances. Codes: `invalid` (not an id) and `link_not_found`. The links of invoices, issues, quality, change control, dismantle and risks already have a rule in entry; it
+runs on the probe record of the staging and its error now keeps its own column and message. A blank cell is not an error. A row of the same file cannot be the target of another row of
+that file (a record that does not exist yet has no id): send the parent first, or the second row after the first is approved.
