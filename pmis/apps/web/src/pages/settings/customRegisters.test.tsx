@@ -14,6 +14,7 @@ describe('Settings, Custom registers', () => {
 
   it('creates a register from its name, enables it once it has a required column, renames, hides and shows it', async () => {
     await signIn('pm');
+    setCustomRegisterColumns('custom_ready_one', 3, 1);
     const u = userEvent.setup();
     page();
     expect(await screen.findByTestId('custreg-empty')).toBeInTheDocument();
@@ -27,16 +28,18 @@ describe('Settings, Custom registers', () => {
     expect(screen.getByTestId('custreg-status-custom_tower_audit')).toHaveTextContent('Not enabled yet');
     expect(screen.getByTestId('custreg-enable-custom_tower_audit')).toBeDisabled();
     expect(screen.getByTestId('custreg-limit')).toHaveTextContent('1 of 20');
-    setCustomRegisterColumns('custom_tower_audit', 3, 1);
-    page();
-    await u.click(await screen.findByTestId('custreg-enable-custom_tower_audit'));
+    await u.click(screen.getByTestId('custreg-new'));
+    await u.type(await screen.findByTestId('custreg-name-en'), 'Ready One');
+    await u.type(screen.getByTestId('custreg-dialog-create-reason'), 'Second register');
+    await u.click(screen.getByTestId('custreg-dialog-create-submit'));
+    await u.click(await screen.findByTestId('custreg-enable-custom_ready_one'));
     await u.type(await screen.findByTestId('custreg-dialog-enable-reason'), 'Ready');
     await u.click(screen.getByTestId('custreg-dialog-enable-submit'));
-    await waitFor(() => expect(screen.getAllByTestId('custreg-status-custom_tower_audit').some((e) => /Enabled/.test(e.textContent ?? ''))).toBe(true));
-    await u.click(screen.getAllByTestId('custreg-hide-custom_tower_audit')[0]!);
+    await waitFor(() => expect(screen.getAllByTestId('custreg-status-custom_ready_one').some((e) => /Enabled/.test(e.textContent ?? ''))).toBe(true));
+    await u.click(screen.getByTestId('custreg-hide-custom_ready_one'));
     await u.type(await screen.findByTestId('custreg-dialog-hide-reason'), 'Not used now');
     await u.click(screen.getByTestId('custreg-dialog-hide-submit'));
-    await waitFor(() => expect(screen.getAllByTestId('custreg-status-custom_tower_audit').some((e) => /Hidden/.test(e.textContent ?? ''))).toBe(true));
+    await waitFor(() => expect(screen.getAllByTestId('custreg-status-custom_ready_one').some((e) => /Hidden/.test(e.textContent ?? ''))).toBe(true));
   });
 
   it('shows the limit row with the other operational limits', async () => {

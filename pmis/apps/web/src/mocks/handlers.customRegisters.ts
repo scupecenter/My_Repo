@@ -10,6 +10,7 @@ import { guard, problem } from './handlers';
  * (the mock counts the columns the test sets with `setCustomRegisterColumns`).
  */
 const R: CustomRegister[] = [];
+const PLAN: Record<string, [number, number]> = {};
 const MAX = 20;
 const isAdmin = () => viewer()?.key === 'pm';
 const reasonOk = (b: { reason?: string }) => (b.reason ?? '').trim().length >= 3;
@@ -37,6 +38,7 @@ export const customRegisterHandlers = [
       register_key: key, module_key: key, name_en: b.name_en.trim(), name_ar: b.name_ar ?? null, site_scoped: !!b.site_scoped, multiple_per_site: b.multiple_per_site ?? true,
       enabled: false, is_active: true, version: 1, created_at: '2026-11-28T08:00:00Z', field_count: 0, required_count: 0, record_count: 0, template_id: null,
     };
+    const plan = PLAN[key]; if (plan) { r.field_count = plan[0]; r.required_count = plan[1]; }
     R.push(r);
     return out(r, 201);
   }),
@@ -71,5 +73,5 @@ export const customRegisterHandlers = [
   }),
 ];
 /** Test helpers. */
-export const resetCustomRegisters = () => { R.length = 0; };
-export const setCustomRegisterColumns = (key: string, fields: number, required: number) => { const r = find(key); if (r) { r.field_count = fields; r.required_count = required; } };
+export const resetCustomRegisters = () => { R.length = 0; for (const k of Object.keys(PLAN)) delete PLAN[k]; };
+export const setCustomRegisterColumns = (key: string, fields: number, required: number) => { PLAN[key] = [fields, required]; const r = find(key); if (r) { r.field_count = fields; r.required_count = required; } };
