@@ -282,6 +282,62 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
     }
   });
 
+  it("progress figure colours (contract 0.15.432): nothing on by default, admin-only write, order and range rules, audit, the 10-KPI catalogue untouched", async () => {
+    const admin = await plainAdmin(app, db);
+    const g: Team = await team(app, db, "gecol", "gecol", 7);
+    const cur = await admin.api.call("get", "/settings/dashboard/progress-rag");
+    expect(cur.status).toBe(200);
+    const items = cur.body.items as { code: string; enabled: boolean; green: number; amber: number; default_green: number }[];
+    expect(items.map((i) => i.code)).toEqual(["spi", "progress_gap", "velocity"]);
+    expect(items.every((i) => i.enabled === false)).toBe(true);
+    expect(items[0]!.green).toBe(0.95);
+    const etag = cur.headers.etag as string;
+    const body = (over: Record<string, unknown> = {}) => ({
+      reason: "Owner wants the SPI and the velocity coloured",
+      items: {
+        spi: { enabled: true, green: 0.95, amber: 0.85 },
+        progress_gap: { enabled: false, green: -2, amber: -5 },
+        velocity: { enabled: true, green: 1.5, amber: 0.75 },
+      },
+      ...over,
+    });
+    const put = (b: object, h: Record<string, string> = { "If-Match": etag }) =>
+      admin.api.call("put", "/settings/dashboard/progress-rag", b, h);
+
+    expect((await g.entry.api.call("put", "/settings/dashboard/progress-rag", body(), { "If-Match": etag })).status).toBe(403);
+    expect((await admin.api.call("put", "/settings/dashboard/progress-rag", body())).status).toBe(428);
+    expect((await put(body(), { "If-Match": '"999"' })).status).toBe(412);
+    expect((await put(body({ items: { spi: { enabled: true, green: 0.95, amber: 0.85 } } }))).status).toBe(422);
+    const order = await put(body({ items: { ...body().items, velocity: { enabled: true, green: 0.5, amber: 0.75 } } }));
+    expect(order.status).toBe(422);
+    expect(codesOf(order.body)).toContain("/items/velocity:invalid_order");
+    const range = await put(body({ items: { ...body().items, spi: { enabled: true, green: 9, amber: 0.85 } } }));
+    expect(range.status).toBe(422);
+    expect(codesOf(range.body)).toContain("/items/spi:invalid");
+    expect((await put(body({ items: { ...body().items, other: { enabled: true, green: 1, amber: 0 } } }))).status).toBe(422);
+    expect((await put(body({ reason: "" }))).status).toBe(422);
+
+    const before = await admin.api.call("get", "/settings/dashboard");
+    try {
+      const saved = await put(body());
+      expect(saved.status).toBe(200);
+      const si = saved.body.items as { code: string; enabled: boolean }[];
+      expect(si.find((i) => i.code === "spi")!.enabled).toBe(true);
+      expect(si.find((i) => i.code === "progress_gap")!.enabled).toBe(false);
+      expect(saved.body.version).toBeGreaterThan(0);
+      const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'progress_rag_update' AND entity_id = 'dashboard.progress_rag'`);
+      expect(au.length).toBeGreaterThan(0);
+      // the 10-KPI catalogue and the counters thresholds are not touched
+      const after = await admin.api.call("get", "/settings/dashboard");
+      expect(Object.keys(after.body.thresholds)).toEqual(Object.keys(before.body.thresholds));
+      expect(after.body.catalogue.kpis.length).toBe(before.body.catalogue.kpis.length);
+    } finally {
+      const now = await admin.api.call("get", "/settings/dashboard/progress-rag");
+      await admin.api.call("put", "/settings/dashboard/progress-rag", body({ reason: "test reset to the default", items: {
+        spi: { enabled: false, green: 0.95, amber: 0.85 }, progress_gap: { enabled: false, green: -2, amber: -5 }, velocity: { enabled: false, green: 1.5, amber: 0.75 } } }), { "If-Match": now.headers.etag as string });
+    }
+  });
+
   it("forecast window (contract 0.15.431): reads the default 4, admin-only write, range rule, audit, stored snapshots untouched", async () => {
     const admin = await plainAdmin(app, db);
     const g: Team = await team(app, db, "gecol", "gecol", 7);

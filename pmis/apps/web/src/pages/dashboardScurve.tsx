@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { ProjectStatusSnapshot } from "@/api/dashboard";
 import { EChart, type Palette } from "@/components/EChart";
-import { useForecastWindow } from "@/api/dashboardSettings";
+import { useForecastWindow, useProgressRag } from "@/api/dashboardSettings";
+import { RAG_CLASS, ragTone } from "@/lib/progressRag";
 import { forecastFull, scurveSeries, VELOCITY_WINDOW, weeklyVelocity } from "@/lib/scurve";
 import { Card, pct, signed } from "./dashboardBits";
 
@@ -30,6 +31,8 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
   // contract 0.15.431: the number of weeks is the setting dashboard.forecast_window_weeks (default 4); until it is read the old fixed value is used
   const windowWeeks = useForecastWindow().data?.weeks ?? VELOCITY_WINDOW;
   const velocity = useMemo(() => weeklyVelocity(points, windowWeeks), [points, windowWeeks]);
+  // contract 0.15.432: the velocity is coloured only when an admin turned it on in Settings > Dashboard
+  const velTone = ragTone(useProgressRag().data?.items, "velocity", velocity);
   const forecast = useMemo(() => forecastFull(points, velocity), [points, velocity]);
   const last = series[series.length - 1];
   const lastSnap = (snaps?.items ?? []).filter((s) => s.scope !== "region").sort((a, b) => (a.taken_on < b.taken_on ? 1 : -1))[0];
@@ -112,7 +115,7 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
             <span className="card px-3 py-1.5 text-sm" data-testid="dash-scurve-spi">
               {t("dash.scurve.spi")} <b className="tnum">{lastSnap?.spi === null || lastSnap?.spi === undefined ? "–" : lastSnap.spi.toFixed(3)}</b>
             </span>
-            <span className="card px-3 py-1.5 text-sm" data-testid="dash-scurve-velocity">
+            <span className={`card px-3 py-1.5 text-sm ${velTone ? RAG_CLASS[velTone] : ""}`} data-testid="dash-scurve-velocity" data-rag={velTone ?? undefined}>
               {t("dash.scurve.velocity")}{" "}
               <b className="tnum">
                 {velocity === null ? "–" : `${signed(Number(velocity.toFixed(1)))}${t("dash.scurve.per_week")}`}

@@ -80,6 +80,29 @@ export function useSetHealthBands() {
   });
 }
 
+/** 0.15.432 (settings review gap 5): green and amber thresholds of the SPI, the progress against plan and the weekly velocity. Kept in the setting dashboard.progress_rag. */
+export type ProgressRag = S["ProgressRag"];
+export type ProgressRagInput = S["ProgressRagInput"];
+
+export const useProgressRag = () =>
+  useQuery({
+    queryKey: ["progressRag"],
+    queryFn: () => api.get<ProgressRag>("/settings/dashboard/progress-rag"),
+  });
+
+export function useSetProgressRag() {
+  const qc = useQueryClient();
+  return useMutation<
+    ProgressRag,
+    ApiError,
+    { version: number; body: ProgressRagInput & { reason: string } }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/progress-rag", { version, body }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["progressRag"] }),
+  });
+}
+
 /** 0.15.431 (settings review gap 3): the number of weeks the dashboard forecast averages. Kept in the setting dashboard.forecast_window_weeks. */
 export type ForecastWindow = S["ForecastWindow"];
 
