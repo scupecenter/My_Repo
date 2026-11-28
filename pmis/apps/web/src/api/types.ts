@@ -218,6 +218,7 @@ export type RolePatch = S['RolePatch'];
 export type RegisterKey = S['RegisterKey'];
 export type RegisterField = S['RegisterField'];
 export type RegisterDefinition = S['RegisterDefinition'];
+export type DuplicateRowsSettings = S['DuplicateRowsSettings'];
 export type PermitEntryType = S['PermitEntryType'];
 export type RegisterRecord = S['RegisterRecord'];
 export type RegisterRecordState = S['RegisterRecordState'];
@@ -276,3 +277,5 @@ export type AlertRule = S['AlertRule'];
 export type AlertRuleInput = S['AlertRuleInput'];
 export type AlertRuleSaved = S['AlertRuleSaved'];
 export type AlertRulesResponse = S['AlertRulesResponse'];
+
+export type DashboardTargetPolicy = S['DashboardTargetPolicy'];

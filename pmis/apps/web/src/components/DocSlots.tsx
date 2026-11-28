@@ -48,7 +48,7 @@ const camera = (s: DocumentSlot): boolean => s.kind === 'photo' || (s.formats ??
 const size = (n: number): string => (n >= MB ? `${(n / MB).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandidate, busy }: {
-  slot: DocumentSlot; canUpload: boolean; onFile: (f: File) => void; onWithdraw: (fileId: string) => void; onDeclare: () => void; onAddCandidate: (label: string) => void; busy: boolean;
+  slot: DocumentSlot; canUpload: boolean; onFile: (f: File, marks?: { signed: boolean; stamped: boolean }) => void; onWithdraw: (fileId: string) => void; onDeclare: () => void; onAddCandidate: (label: string) => void; busy: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [over, setOver] = useState(false);
@@ -57,7 +57,12 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
   const camRef = useRef<HTMLInputElement>(null);
   const annRef = useRef<HTMLInputElement>(null);
   const [annotate, setAnnotate] = useState<File | null>(null);
-  const drop = (e: DragEvent) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f && canUpload) onFile(f); };
+  // 0555: a document type that needs a signed and / or stamped copy: the uploader says whether this file is that copy (ticked by default)
+  const needsMarks = slot.needs_signature === true || slot.needs_stamp === true;
+  const [signed, setSigned] = useState(true);
+  const [stamped, setStamped] = useState(true);
+  const give = (f: File) => onFile(f, needsMarks ? { signed: slot.needs_signature === true && signed, stamped: slot.needs_stamp === true && stamped } : undefined);
+  const drop = (e: DragEvent) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f && canUpload) give(f); };
   // Item 14 widened to every document slot (tasks and register records): the slot's format list - set in Settings on the document
   // definitions - is the gate. Annotate where a PNG can land, a short field video where the slot allows a video format (or lists no
   // formats, meaning unrestricted); never on a read-only slot. The snag surface keeps its own buttons in SiteSnags.
@@ -72,6 +77,8 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
       <button type="button" className="mono truncate text-link hover:underline" data-testid={`file-dl-${f.id}`} title={f.download_name} onClick={() => void downloadDocument(f.id)}><Download size={12} className="me-1 inline" />{f.original_name}</button>
       <span className="chip bg-card2" data-testid={`file-v-${f.id}`}>v{f.version}</span>
       <span className="text-xs">{size(f.size_bytes)}</span>
+      {f.signed && <span className="chip bg-doneBg text-doneInk" data-testid={`file-signed-${f.id}`}>{t('docs.signed')}</span>}
+      {f.stamped && <span className="chip bg-doneBg text-doneInk" data-testid={`file-stamped-${f.id}`}>{t('docs.stamped')}</span>}
       {f.unknown_capture_date && <span className="chip bg-waitBg text-waitInk" data-testid={`file-unknown-date-${f.id}`}>{t('docs.unknown_capture')}</span>}
       {f.capture_date && <span className="text-xs" data-testid={`file-capture-${f.id}`}>{t('docs.captured', { date: f.capture_date.slice(0, 10) })}</span>}
       {canUpload && !old && <button type="button" className="btn ms-auto px-1 py-0.5 text-xs" aria-label={t('docs.withdraw')} data-testid={`file-withdraw-${f.id}`} disabled={busy} onClick={() => onWithdraw(f.id)}><Trash2 size={12} /></button>}
@@ -86,6 +93,7 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
         <span className={`chip ms-auto ${SLOT_TONE[slot.status]}`} data-testid={`slot-status-${slot.id}`}>{t(`slotStatus.${slot.status}`)}</span>
       </div>
       <p className="text-xs text-mute" data-testid={`slot-limits-${slot.id}`}>{t('docs.limits', { formats: (slot.formats ?? []).join(', '), mb: slot.max_size_mb ?? 20 })}{slot.max_files ? ` · ${t('docs.max_files', { n: slot.max_files })}` : ''}</p>
+      {slot.awaiting_signed_copy && <p className="mt-1 rounded-md bg-waitBg p-2 text-xs text-waitInk" data-testid={`slot-awaiting-signed-${slot.id}`}>{t('docs.awaiting_signed')}</p>}
       {slot.determination_pending && <p className="mt-1 rounded-md bg-waitBg p-2 text-xs text-waitInk" data-testid={`slot-pending-${slot.id}`}>{t('docs.determination_pending')}</p>}
       {slot.inherited_approval && <p className="mt-1 text-xs text-mute" data-testid={`slot-inherited-${slot.id}`}>{t('docs.inherited_approval')}</p>}
       {slot.shared_with && (
@@ -103,18 +111,24 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
           {history && <ul className="mt-1 space-y-1 border-s border-line ps-2 text-sm text-mute" data-testid={`slot-history-list-${slot.id}`}>{older.map((f) => fileLine(f, true))}</ul>}
         </div>
       )}
+      {canUpload && needsMarks && (
+        <div className="mt-2 flex flex-wrap gap-3 text-xs" data-testid={`slot-marks-${slot.id}`}>
+          {slot.needs_signature && <label className="flex items-center gap-1"><input type="checkbox" data-testid={`slot-mark-signed-${slot.id}`} checked={signed} onChange={(e) => setSigned(e.target.checked)} />{t('docs.mark_signed')}</label>}
+          {slot.needs_stamp && <label className="flex items-center gap-1"><input type="checkbox" data-testid={`slot-mark-stamped-${slot.id}`} checked={stamped} onChange={(e) => setStamped(e.target.checked)} />{t('docs.mark_stamped')}</label>}
+        </div>
+      )}
       {canUpload && (
         <div className="mt-2 flex flex-wrap gap-2">
           <label data-testid={`slot-drop-${slot.id}`} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={drop}
             className={`flex min-w-48 flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed p-2 text-sm ${over ? 'border-accent bg-accentSoft' : 'border-line text-mute hover:bg-hover'}`}>
             <FileUp size={14} />{t('drawer.drop')}
-            <input type="file" className="sr-only" accept={acceptOf(slot) || undefined} data-testid={`slot-input-${slot.id}`} onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
+            <input type="file" className="sr-only" accept={acceptOf(slot) || undefined} data-testid={`slot-input-${slot.id}`} onChange={(e) => { const f = e.target.files?.[0]; if (f) give(f); e.target.value = ''; }} />
           </label>
           {camera(slot) && (
             <>
               <button type="button" className="btn text-sm" data-testid={`slot-camera-btn-${slot.id}`} onClick={() => camRef.current?.click()}><Camera size={14} />{t('docs.camera')}</button>
               <input ref={camRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={`slot-camera-${slot.id}`}
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) give(f); e.target.value = ''; }} />
             </>
           )}
           {annotateOk && (
@@ -124,10 +138,10 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
                 onChange={(e) => { const f = e.target.files?.[0]; if (f && f.type.startsWith('image/')) setAnnotate(f); e.target.value = ''; }} />
             </>
           )}
-          {videoOk && <RecordVideo formats={fmts.length ? (slot.formats ?? []) : ['webm']} testid={`slot-video-${slot.id}`} onFile={onFile} />}
+          {videoOk && <RecordVideo formats={fmts.length ? (slot.formats ?? []) : ['webm']} testid={`slot-video-${slot.id}`} onFile={give} />}
           {annotate && (
             <AnnotatePhoto file={annotate} testid={`slot-annotate-${slot.id}`}
-              onUse={(f) => { setAnnotate(null); onFile(f); }} onCancel={() => setAnnotate(null)} />
+              onUse={(f) => { setAnnotate(null); give(f); }} onCancel={() => setAnnotate(null)} />
           )}
         </div>
       )}
@@ -214,10 +228,10 @@ export function SlotList({ slots, target, edit, suggestFor }: { slots: DocumentS
   const active = slots.filter((s) => s.status !== 'not_required' || s.determination_pending);
   const optional = slots.filter((s) => s.status === 'not_required' && !s.determination_pending);
   const uploadable = active.filter((s) => slotUploadable(s, edit));
-  const send = (slot: DocumentSlot, file: File): Promise<boolean> => {
+  const send = (slot: DocumentSlot, file: File, marks?: { signed: boolean; stamped: boolean }): Promise<boolean> => {
     const pre = precheck(t, slot, file);
     if (pre) { toast(`${file.name}: ${pre}`, 'err'); return Promise.resolve(false); }
-    return up.mutateAsync({ slot, file }).then(() => true, (e) => { toast(`${file.name}: ${uploadMessage(t, e, slot)}`, 'err'); return false; });
+    return up.mutateAsync({ slot, file, marks }).then(() => true, (e) => { toast(`${file.name}: ${uploadMessage(t, e, slot)}`, 'err'); return false; });
   };
   const sendMany = async (rows: Pending[]) => {
     setMulti(null);
@@ -240,7 +254,7 @@ export function SlotList({ slots, target, edit, suggestFor }: { slots: DocumentS
       <ul className="space-y-2" data-testid="slot-list">
         {active.map((s) => (
           <SlotCard key={s.id} slot={s} canUpload={slotUploadable(s, edit)} busy={busy}
-            onFile={(f) => void send(s, f)}
+            onFile={(f, m) => void send(s, f, m)}
             onWithdraw={(fileId) => act(del.mutateAsync({ slotId: s.id, fileId }))}
             onDeclare={() => act(add.mutateAsync({ doc_code: s.doc_code, candidate_label: s.candidate_label ?? null }))}
             onAddCandidate={(label) => act(add.mutateAsync({ doc_code: s.doc_code, candidate_label: label }))} />

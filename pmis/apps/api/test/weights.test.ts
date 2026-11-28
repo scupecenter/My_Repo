@@ -25,6 +25,8 @@ const sum = (xs: number[]): number => Math.round(xs.reduce((a, b) => a + b, 0) *
 beforeAll(async () => {
   app = await startApp();
   db = await superDb();
+  // 0541 seeds a draft calibrated Project Status set; this suite drafts and publishes its own sets, so it starts from no draft.
+  await db.query(`DELETE FROM weight_sets WHERE status = 'draft'`);
   admin = await plainAdmin(app, db, true);
   noStepUp = await plainAdmin(app, db, false);
   viewer = await actor(app, db, { grants: [['admin.settings', 'view']] });
@@ -146,6 +148,9 @@ describe('draft, 100% rule and publish', () => {
     expect((await admin.api.call('put', `${SETS}/${draftId}`, dup, ifm(etag))).status).toBe(422);
     const dupItem = { reason: 'a good reason', activities: [{ code: 'X', name_en: 'X', weight: 100, items: [{ code: '1', name_en: 'a', weight: 50 }, { code: '1', name_en: 'b', weight: 50 }] }] };
     expect((await admin.api.call('put', `${SETS}/${draftId}`, dupItem, ifm(etag))).status).toBe(422);
+    // 0552: a measure rule that looks like JSON but is not is a field error (422), not a 500
+    const badRule = { reason: 'a good reason', activities: [{ code: 'X', name_en: 'X', weight: 100, items: [{ code: '1', name_en: 'a', weight: 100, measure_rule: '{"method": ' }] }] };
+    expect((await admin.api.call('put', `${SETS}/${draftId}`, badRule, ifm(etag))).status).toBe(422);
   });
 
   it('accepts weights that total 100 at every level, shows the effect in the preview, and publishes only with step-up, a date from today and a reason', async () => {

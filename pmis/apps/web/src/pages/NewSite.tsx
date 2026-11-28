@@ -1,8 +1,9 @@
 import { Check, FilePlus2, Pencil, Send, Trash2, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
+import { useWorkflowVersions } from '@/api/workflowEditor';
 import { useCreateSiteDraft, useDecideSiteDraft, useDiscardSiteDraft, useRegions, useSiteDrafts, useSubmitSiteDraft, useUpdateSiteDraft } from '@/api/sites';
 import type { SiteDraft, SiteDraftInput } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
@@ -46,6 +47,15 @@ export function NewSite() {
   const drafts = useSiteDrafts({});
   const create = useCreateSiteDraft(), update = useUpdateSiteDraft(), submit = useSubmitSiteDraft(), discard = useDiscardSiteDraft(), decide = useDecideSiteDraft();
   const [f, setF] = useState<Form>(EMPTY);
+  // D49: the live workflow version's lock mode preselects the Workflow Locks column of a NEW site (Strict stays the default; the person can change it on the form).
+  const versions = useWorkflowVersions();
+  const modeDefault = ((versions.data?.items ?? []).find((v) => v.is_current) as { lock_mode?: string } | undefined)?.lock_mode === 'open' ? 'Open' : '';
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !versions.data) return;
+    seeded.current = true;
+    if (modeDefault) setF((p) => (p.workflow_locks === '' && !p.site_code ? { ...p, workflow_locks: modeDefault } : p));
+  }, [versions.data, modeDefault]);
   const [editing, setEditing] = useState<SiteDraft | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -70,7 +80,7 @@ export function NewSite() {
     setFormError(text);
     toast(text, 'err');
   };
-  const reset = () => { setF(EMPTY); setEditing(null); setErrors({}); setFormError(null); };
+  const reset = () => { setF({ ...EMPTY, workflow_locks: modeDefault }); setEditing(null); setErrors({}); setFormError(null); };
   const save = () => {
     setErrors({}); setFormError(null);
     if (editing) update.mutate({ draft: editing, body: toInput(f) }, { onSuccess: (d) => { toast(t('newSite.saved')); setSaved(d.warnings?.length ? { code: d.site_code, warnings: d.warnings } : null); reset(); }, onError: fail });
