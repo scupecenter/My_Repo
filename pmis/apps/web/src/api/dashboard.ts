@@ -170,3 +170,15 @@ export function useDecideDelayPeriod(taskId: string) {
     },
   });
 }
+
+// ---------------------------------------------------------------- 0.15.593: warehouse stock card
+export type DashboardWarehouseStock = S['DashboardWarehouseStock'];
+/** Read only. Flows (received, issued, returned) are for the period; on hand and available are today's figures. */
+export const useDashboardWarehouseStock = (from: string, to: string, enabled = true) =>
+  useQuery({
+    queryKey: ['dashboard-warehouse-stock', from, to],
+    staleTime: 60_000,
+    enabled,
+    retry: false,
+    queryFn: () => api.get<DashboardWarehouseStock>('/dashboard/warehouse-stock', { query: { from, to } }),
+  });

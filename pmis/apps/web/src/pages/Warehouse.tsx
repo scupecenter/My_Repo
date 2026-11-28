@@ -2,7 +2,7 @@ import { Lock, Pencil, Plus } from 'lucide-react';
 import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useMe } from '@/api/hooks';
 import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
@@ -460,7 +460,9 @@ function Gaps() {
 
 export function Warehouse() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>('items');
+  const [sp] = useSearchParams();
+  const wanted = sp.get('tab');
+  const [tab, setTab] = useState<Tab>((['items', 'movements', 'stock', 'reorder', 'rma', 'dispatch', 'gaps'] as const).find((x) => x === wanted) ?? 'items');
   return (
     <div data-testid="page-warehouse">
       <div className="mb-3 flex items-center gap-3">

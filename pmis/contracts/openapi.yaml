@@ -135,6 +135,7 @@ info:
     - 0.15.370 (2026-11-27): the personal sidebar mode (migration 0527, mirror `db/sql/526_sidebar_mode.sql`; Ahmed's decision 2026-11-25). Additive. `UiNav` gains `mode` (`pinned` default, `autohide`); `ui_nav_check` is patched in place; a stored sidebar without it is unchanged. Audited like the other sidebar keys.
     - 0.15.371 (2026-11-27): weight item measure rule checked (migration 0552, mirror `db/sql/551_weight_rule_check.sql`; Settings review gap 1). Additive, no new path. `PUT /settings/weight-sets/{id}`: a measure rule that looks like JSON but does not parse is 422 `validation_failed` (it was 500). Publish and preview: `weight_set_errors` adds `measure_rule_invalid` (path `/activities/{n}/items`) for a rule that is not an object, has an unknown method (none, tasks, register), names no task, names a task code that is in no workflow, has a plan outside MS1 to MS10, or has a `central` that is not true/false.
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
+    - 0.15.593 (2026-11-28): the warehouse stock card of the dashboard (migration 0716, mirror `db/sql/715_dash_stock_card.sql`). Additive. `GET /dashboard/warehouse-stock` (`getDashboardWarehouseStock`, `dashboard.view` and `warehouse.view`): per item group the quantities received, issued and returned in a period (`from`, `to`, default the last 30 days) and the stock on hand, reserved and available today, with issued and returned split by region. The card code `warehouse_stock` joins the dashboard settings catalogue. No table or setting.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.431 (2026-11-28): the number of weeks the dashboard forecast averages is editable (Settings review gap 4, approved by the owner 2026-11-27; migration 0572, mirror `db/sql/571_forecast_window.sql`). Additive. `GET /settings/dashboard/forecast-window` (`getForecastWindow`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-window` (`setForecastWindow`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_window_update` with before and after): the new setting `dashboard.forecast_window_weeks` (a whole number 2 to 12, default 4, the value that was fixed in the web code). The progress curve card reads it when it is drawn: the forecast date uses the mean weekly gain over that many last weeks of the saved snapshots. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
@@ -18645,6 +18646,30 @@ paths:
                       items: {$ref: '#/components/schemas/SystemLogEntry'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/warehouse-stock:
+    get:
+      tags: [dashboard]
+      operationId: getDashboardWarehouseStock
+      summary: Warehouse stock per item group, received, issued, returned, on hand (0.15.593)
+      description: |
+        0.15.593. Per item group: `received` (posted receipts, packing lists and opening balances), `issued` (posted delivery notes) and `returned` (posted return notes) with a posting date
+        (Africa/Tripoli) in the period, and `on_hand`, `reserved`, `available` today, the same figures as `GET /warehouse/stock` (the period never changes them). Issues and returns of sites are
+        limited to the caller's `warehouse` regions; receipts and the central stock are shown to every reader of the module. There is one central stock, so `by_region` splits only issued and returned.
+        `mixed_units` is true when a group holds items of more than one unit: its quantities are then sums of numbers in different units. Needs `dashboard.view` and `warehouse.view` (403 `module_forbidden`).
+        422 `invalid_range` when `from` is after `to`.
+      x-db-path: wh_stock_summary
+      parameters:
+      - {name: from, in: query, description: 'First day of the period (Africa/Tripoli date). Default 29 days before `to`.', schema: {type: string, format: date}}
+      - {name: to, in: query, description: 'Last day of the period. Default today.', schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardWarehouseStock'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /dashboard/ops:
     get:
       tags: [dashboard]
@@ -28127,6 +28152,43 @@ components:
           version: { type: integer, minimum: 0 }
           updated_at: { type: [string, 'null'], format: date-time }
           updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    DashboardWarehouseStockTotals:
+      type: object
+      required: [received, issued, returned, on_hand, reserved, available]
+      properties:
+        received: { type: number }
+        issued: { type: number }
+        returned: { type: number }
+        on_hand: { type: number }
+        reserved: { type: number }
+        available: { type: number }
+    DashboardWarehouseStock:
+      type: object
+      required: [from, to, totals, groups]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        totals: { $ref: '#/components/schemas/DashboardWarehouseStockTotals' }
+        groups:
+          type: array
+          items:
+            allOf:
+            - {$ref: '#/components/schemas/DashboardWarehouseStockTotals'}
+            - type: object
+              required: [group, items, mixed_units, by_region]
+              properties:
+                group: { type: string, description: 'The item group of the item master.' }
+                items: { type: integer, description: 'Items of the group.' }
+                mixed_units: { type: boolean }
+                by_region:
+                  type: array
+                  items:
+                    type: object
+                    required: [region_id, issued, returned]
+                    properties:
+                      region_id: { type: integer }
+                      issued: { type: number }
+                      returned: { type: number }
     SnapshotScheduleInput:
       type: object
       required: [weekday]
