@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CW Snag List - {{doc.ref_no}}</title>
+<style>
+@page {
+  size: A4;
+  margin: 18mm 14mm 20mm 14mm;
+  @bottom-center { content: "Page " counter(page) " of " counter(pages); font: 8pt Arial, sans-serif; color: #444; }
+}
+body { font: 10pt Arial, sans-serif; color: #111; }
+h1 { font-size: 15pt; text-align: center; margin: 0 0 2mm; letter-spacing: .5px; }
+.sub { text-align: center; font-size: 9pt; color: #444; margin-bottom: 5mm; }
+table.meta { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
+table.meta td { border: 1px solid #888; padding: 1.6mm 2mm; font-size: 9.5pt; }
+table.meta td.k { background: #eee; font-weight: bold; width: 22%; }
+table.snags { width: 100%; border-collapse: collapse; }
+table.snags th, table.snags td { border: 1px solid #666; padding: 1.6mm 2mm; font-size: 9pt; vertical-align: top; }
+table.snags th { background: #ddd; }
+td.c, th.c { text-align: center; }
+table.sig { width: 100%; border-collapse: collapse; margin-top: 10mm; }
+table.sig th, table.sig td { border: 1px solid #666; padding: 2mm; font-size: 9.5pt; height: 14mm; vertical-align: bottom; }
+table.sig th { background: #eee; vertical-align: middle; }
+.footer-code { font-size: 7.5pt; color: #666; margin-top: 4mm; }
+</style>
+</head>
+<body>
+<h1>CIVIL WORKS SNAG LIST</h1>
+<div class="sub">Ref: <b>{{doc.ref_no}}</b> &mdash; Date: {{doc.date}}</div>
+<table class="meta">
+  <tr><td class="k">Site ID</td><td>{{site.id}}</td><td class="k">Site Name</td><td>{{site.name}}</td></tr>
+  <tr><td class="k">Region</td><td>{{site.region_name}}</td><td class="k">PO / WO</td><td>{{site.po_wo}}</td></tr>
+  <tr><td class="k">Contractor</td><td colspan="3">{{contractor.name}}</td></tr>
+</table>
+<table class="snags">
+  <thead>
+    <tr><th class="c" style="width:8%">No.</th><th style="width:44%">Description</th><th class="c" style="width:12%">Raised</th><th class="c" style="width:12%">Closed</th><th style="width:12%">Verified by</th><th class="c" style="width:12%">Status</th></tr>
+  </thead>
+  <tbody>
+    {{#each snags}}
+    <tr><td class="c">{{no}}</td><td>{{description}}</td><td class="c">{{raised_date}}</td><td class="c">{{closed_date}}</td><td>{{verified_by}}</td><td class="c">{{status}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+<table class="sig">
+  <tr><th style="width:34%">Site Engineer</th><th style="width:33%">CW Team Lead</th><th style="width:33%">Project Manager</th></tr>
+  <tr>
+    <td>{{signatories.site_engineer.name}}<br>{{signatories.site_engineer.date}}</td>
+    <td>{{signatories.cw_team_lead.name}}<br>{{signatories.cw_team_lead.date}}</td>
+    <td>{{signatories.project_manager.name}}<br>{{signatories.project_manager.date}}</td>
+  </tr>
+</table>
+<div class="footer-code">{{{template.code_css}}} v{{{template.version_css}}}</div>
+</body>
+</html>
