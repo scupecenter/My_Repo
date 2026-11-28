@@ -152,7 +152,7 @@
     "settings_hint": "Data hub settings (widgets and default views)", "all_hidden": "All widgets are hidden. Turn them on in Settings > Screens > Data hub.",
     "quick_title": "Quick template download", "pick_template": "Template", "pick_template_ph": "Type to find a template", "pick_action": "Action", "pick_action_ph": "Choose an action", "pick_template_first": "Choose a template first", "none_found": "No template matches", "quick_go": "Go",
     "act_blank": "Download blank copy", "act_blank_hint": "The approved empty template", "act_prefill": "Download pre-filled copy", "act_prefill_hint": "With the records in force in your regions", "act_upload": "Upload a filled file", "act_upload_hint": "Starts an import batch", "act_open": "Open Templates page", "act_open_hint": "All templates and batches",
-    "kind_master": "Master", "kind_stream": "Section", "kind_register": "Register", "kind_sites": "New sites", "kind_list_values": "List values", "kind_holidays": "Holidays",
+    "kind_master": "Master", "kind_stream": "Section", "kind_register": "Register", "kind_sites": "New sites", "kind_list_values": "List values", "kind_daily_plan": "Daily Plan", "kind_holidays": "Holidays",
     "my_downloads": "Your last downloads", "prefilled": "pre-filled",
     "w_batches": "Batches needing action", "batches_none": "Nothing waits for you.", "open_all": "Open", "open_templates": "Templates",
     "act_send": "Send", "act_review_l2": "Review", "act_returned": "Returned", "act_checking": "Checking",
@@ -3026,6 +3026,7 @@
     "mode_draft": "Save Draft / Planning",
     "mode_draft_hint": "The planned dates and values are saved without submitting. Nothing goes to L2 and no milestone moves.",
     "kind_sites": "New sites",
+    "kind_daily_plan": "Daily Plan (download here, upload on the Daily Plan page)",
     "kind_holidays": "Holidays (upload in Settings > Calendar)",
     "kind_list_values": "List values (upload in the list)",
     "rule_sites": "One row per new site. Each valid row becomes a site draft when you send the batch; no site exists until L2 approves it.",
@@ -6982,6 +6983,11 @@
     "result_no_backup": "This reset ran without a backup: no backup restores the database to the moment before it. Only the files in the quarantine can be put back."
   },
   "dailyPlan": {
+    "template": "Download template (this day)",
+    "import": "Import from template",
+    "import_apply": "Apply file",
+    "import_note": "Only the editable columns are read: the manual values, Reason, Remark, sites added by hand and Remove from plan = yes. Site name and Region are ignored. A locked day or a refused row refuses the whole file.",
+    "imported": "Imported: {{updated}} updated, {{added}} added, {{removed}} removed, {{unchanged}} unchanged.",
     "title": "Daily Plan",
     "subtitle": "Daily progress of the day and the plan of the next working day, filled from system data.",
     "tab_progress": "Progress",

@@ -377,7 +377,7 @@ describe('hybrid mode list', () => {
       'GET /settings/dlp', 'POST /settings/dlp/versions', 'GET /settings/table-display', 'PUT /settings/table-display', 'GET /settings/ui-features', 'PUT /settings/ui-features', 'GET /settings/idle-task-alert', 'PUT /settings/idle-task-alert', 'GET /settings/notification-policy/catalogue', 'GET /settings/notification-policy', 'PUT /settings/notification-policy', 'POST /settings/holidays/import',
       // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
       // 0.15.67 (migration 0149): My Work > Daily Plan
-      'GET /daily-plans', 'GET /daily-plans/export', 'POST /daily-plans/:date/regions/:regionId/sites', 'PATCH /daily-plans/:date/regions/:regionId/sites/:siteId',
+      'GET /daily-plans', 'GET /daily-plans/export', 'POST /daily-plans/import', 'POST /daily-plans/:date/regions/:regionId/sites', 'PATCH /daily-plans/:date/regions/:regionId/sites/:siteId',
       'DELETE /daily-plans/:date/regions/:regionId/sites/:siteId', 'POST /daily-plans/:date/regions/:regionId/lock', 'POST /daily-plans/:date/regions/:regionId/unlock',
       'GET /settings/daily-plan', 'PUT /settings/daily-plan',
       'GET /absences', 'POST /absences', 'GET /absences/:id', 'PATCH /absences/:id', 'DELETE /absences/:id', 'GET /reassignments/alerts', 'GET /reassignments/eligible-users',
