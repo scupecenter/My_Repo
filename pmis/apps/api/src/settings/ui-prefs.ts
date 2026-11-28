@@ -13,6 +13,9 @@ export const UI_PREF_OPTIONS = {
   menu_style: ['default', 'rail', 'autohide'],
   accent: ['default', 'teal', 'blue', 'violet', 'green', 'orange', 'red', 'amber'],
   contrast: ['standard', 'high'], // 0347 (item 19): the high-contrast mode
+  inbox_panel: ['overlay', 'floating', 'docked'], // 0526: the notification panel as an overlay, a floating window or docked
+  more_menu: ['list', 'grid'], // 0581: the More menu of the table screens as a list or an icon grid with search
+  inbox_anchor: ['end-top', 'end-bottom', 'start-top', 'start-bottom'], // 0526: the corner of the floating panel
 } as const;
 
 export type UiPrefKey = keyof typeof UI_PREF_OPTIONS;
@@ -20,7 +23,7 @@ export type UiPrefs = Partial<{ [K in UiPrefKey]: (typeof UI_PREF_OPTIONS)[K][nu
 
 /** The built-in standard of every dimension (ui_pref_defaults() in the database). */
 export const UI_PREF_DEFAULTS: Required<UiPrefs> = {
-  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard',
+  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top', more_menu: 'list',
 };
 
 /** A subset of the dimensions, each with one of its allowed values (PATCH /me/profile ui_prefs, PUT /settings/identity defaults). */
@@ -33,6 +36,9 @@ export const uiPrefsSchema = z.object({
   menu_style: z.enum(UI_PREF_OPTIONS.menu_style).optional(),
   accent: z.enum(UI_PREF_OPTIONS.accent).optional(),
   contrast: z.enum(UI_PREF_OPTIONS.contrast).optional(),
+  inbox_panel: z.enum(UI_PREF_OPTIONS.inbox_panel).optional(),
+  inbox_anchor: z.enum(UI_PREF_OPTIONS.inbox_anchor).optional(),
+  more_menu: z.enum(UI_PREF_OPTIONS.more_menu).optional(),
 }).strict();
 
 /**
@@ -42,6 +48,7 @@ export const uiPrefsSchema = z.object({
  * (at most 20). A menu key is a short lowercase id; the web knows the real list and ignores a key it does not have.
  */
 export const UI_NAV_BADGE_STYLES = ['full', 'dot', 'none'] as const;
+export const UI_NAV_MODES = ['pinned', 'autohide'] as const;
 export type UiNavBadgeStyle = (typeof UI_NAV_BADGE_STYLES)[number];
 const NAV_KEY = /^[a-z0-9_.]{1,60}$/;
 const navKeyList = (max: number) => z.array(z.string().regex(NAV_KEY)).max(max);
@@ -50,6 +57,8 @@ export const uiNavSchema = z.object({
   order: navKeyList(200).optional(),
   badge_style: z.enum(UI_NAV_BADGE_STYLES).optional(),
   pins: navKeyList(20).optional(),
+  /** 0527: pinned (the menu stays open, default) or autohide (a rail that opens on hover, focus or the shortcut). */
+  mode: z.enum(UI_NAV_MODES).optional(),
 }).strict();
 export type UiNav = z.infer<typeof uiNavSchema>;
 
