@@ -102,3 +102,33 @@ export function useSetProgressRag() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["progressRag"] }),
   });
 }
+
+/** 0.15.470 (F4 follow-up 1): which Project Status items read the Deliverables register. Kept in the setting dashboard.ps_deliverables. */
+export type PsDeliverables = S["PsDeliverables"];
+export type PsDeliverablesItemInput = S["PsDeliverablesItemInput"];
+
+export const usePsDeliverables = () =>
+  useQuery({
+    queryKey: ["psDeliverables"],
+    queryFn: () =>
+      api.get<PsDeliverables>("/settings/dashboard/ps-deliverables"),
+  });
+
+export function useSetPsDeliverables() {
+  const qc = useQueryClient();
+  return useMutation<
+    PsDeliverables,
+    ApiError,
+    {
+      version: number;
+      body: { items: PsDeliverablesItemInput[]; reason: string };
+    }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/ps-deliverables", { version, body }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["psDeliverables"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}

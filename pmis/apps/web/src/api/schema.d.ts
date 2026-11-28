@@ -8242,6 +8242,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard/ps-deliverables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which Project Status items read the Deliverables register (0.15.470)
+         * @description 0.15.470. The setting `dashboard.ps_deliverables`: for every central Project Status item in force, the deliverable `kind` it reads and the `mode` (`auto` or `manual`),
+         *     with the live counts (`accepted`, `total`: current approved deliverables of the kind, cancelled ones left out) and the `source` the dashboard shows now (`deliverables` only
+         *     in mode `auto` with at least one deliverable). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getPsDeliverables"];
+        /**
+         * Save the Project Status to Deliverables mapping (reason, If-Match, audited)
+         * @description 0.15.470. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). All items are sent. Field errors (422 `validation_failed`):
+         *     `invalid` (`item_code` is not a central Project Status item in force, `mode` is not auto or manual, `kind` is not an active DeliverableKind), `duplicate` (an item listed twice),
+         *     `required` (`kind` in mode `auto`). One audit row with before and after values and the reason. Manual values are never touched.
+         */
+        put: operations["setPsDeliverables"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/dashboard/progress-rag": {
         parameters: {
             query?: never;
@@ -20439,6 +20467,42 @@ export interface components {
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
         };
+        PsDeliverablesItemInput: {
+            /** @description A central Project Status item in force (for example 1.3). */
+            item_code: string;
+            /** @description A DeliverableKind code. Required in mode auto. */
+            kind?: string | null;
+            /**
+             * @description auto: the register figure while deliverables of the kind exist. manual: the manual value only.
+             * @enum {string}
+             */
+            mode: "auto" | "manual";
+        };
+        PsDeliverablesInput: {
+            items: components["schemas"]["PsDeliverablesItemInput"][];
+        };
+        PsDeliverablesItem: components["schemas"]["PsDeliverablesItemInput"] & {
+            name_en: string;
+            name_ar?: string | null;
+            weight: number;
+            /** @description Accepted deliverables of the kind now (null without a kind). */
+            accepted: number | null;
+            /** @description Non-cancelled deliverables of the kind now (null without a kind). */
+            total: number | null;
+            /**
+             * @description Where the dashboard figure comes from now.
+             * @enum {string}
+             */
+            source: "manual" | "deliverables";
+        };
+        /** @description 0.15.470. The setting dashboard.ps_deliverables with the live counts. */
+        PsDeliverables: {
+            items: components["schemas"]["PsDeliverablesItem"][];
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
         ProgressRagItemInput: {
             /** @description True: the figure is coloured by green and amber. False: no colour (the stored numbers are kept). */
             enabled: boolean;
@@ -23485,6 +23549,16 @@ export interface components {
                 /** Format: date */
                 effective_date: string;
                 version: number;
+                /**
+                 * @description 0.15.470: where the figure comes from. deliverables: accepted / non-cancelled deliverables of the mapped kind (Settings > Dashboard).
+                 * @enum {string}
+                 */
+                source?: "manual" | "deliverables";
+                /** @description 0.15.470: the counts behind a figure taken from the Deliverables register; null for a manual figure. */
+                deliverables?: {
+                    accepted?: number;
+                    total?: number;
+                } | null;
             } | null;
         };
         DashboardProjectStatusActivity: {
@@ -38434,6 +38508,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnapshotSchedule"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getPsDeliverables: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The mapping. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PsDeliverables"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setPsDeliverables: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["PsDeliverablesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PsDeliverables"];
                 };
             };
             401: components["responses"]["Unauthorized"];

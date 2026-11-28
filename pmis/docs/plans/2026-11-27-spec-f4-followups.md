@@ -1,5 +1,5 @@
 # Spec: F4 Deliverables register follow-ups
-Status: not built. F4 itself is merged (#360, 975b83a5).
+Status: follow-up (1) built (migration 0610, contract 0.15.470); follow-up (2) waits for the L5 date alert. F4 itself is merged (#360, 975b83a5).
 ## (1) Project Status items read from the Deliverables register
 Main 10:23:32 (from Ahmed), quoted: "Build (1) as stated (accepted share of non-cancelled deliverables, BILL weight 0, manual value kept with history), with these safeguards: the mapping and the formula mode are in Settings, per item a switch auto / manual-only (so Ahmed can turn any item back to manual), and the dashboard shows which source the number comes from (tooltip). Patch stored function text in place as you planned."
 - Uses dash_build_manual, patched in place and idempotently.

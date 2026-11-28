@@ -5398,6 +5398,23 @@
     "range": "Numbers from {{min}} to {{max}}.",
     "order": "Green must not be below amber."
   },
+  "psDeliv": {
+    "title": "Project Status from the Deliverables register",
+    "note": "Per Project Status item: the deliverable kind it reads and a switch. Auto: the figure is accepted divided by non-cancelled deliverables of the kind, while at least one exists; with none, the manual value shows. Manual only: the manual value always shows. Manual values and their history are never changed. Own save, reason and audit row.",
+    "item": "Item",
+    "kind": "Deliverable kind",
+    "mode": "Source",
+    "count": "Deliverables now",
+    "none": "No kind",
+    "auto": "Auto (register)",
+    "manual": "Manual only",
+    "counts": "{{accepted}} accepted of {{total}}",
+    "src_deliverables": "from the register",
+    "src_manual": "manual value",
+    "kind_required": "Auto needs a deliverable kind.",
+    "tip_deliverables": "Source: Deliverables register, {{accepted}} accepted of {{total}} non-cancelled",
+    "tip_manual": "Source: manual value"
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",

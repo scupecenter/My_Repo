@@ -466,6 +466,21 @@ let dashState = {
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
 /** The weekday of the weekly dashboard snapshot (contract 0.15.430): the setting dashboard.snapshot_weekday, default 4 (Thursday), version 0 until the first save. */
+// ------------------------------------------------------------------ Project Status from the Deliverables register (contract 0.15.470)
+const PSD_ITEMS = [
+  { item_code: '1.3', name_en: 'HLD', name_ar: 'HLD', weight: 15, kind: 'HLD', accepted: 2, total: 4 },
+  { item_code: '1.5', name_en: 'Technical document templates', name_ar: 'قوالب الوثائق الفنية', weight: 10, kind: 'DOC', accepted: 0, total: 0 },
+  { item_code: '3.10', name_en: 'Billing', name_ar: 'الفوترة', weight: 0, kind: 'BILL', accepted: 0, total: 0 },
+];
+let psdState = { version: 0, updated_at: null as string | null, updated_by: null as null, modes: {} as Record<string, { kind: string | null; mode: 'auto' | 'manual' }> };
+const psdView = () => ({
+  version: psdState.version, updated_at: psdState.updated_at, updated_by: psdState.updated_by,
+  items: PSD_ITEMS.map((i) => {
+    const m = psdState.modes[i.item_code] ?? { kind: i.kind, mode: 'auto' as const };
+    const total = m.kind ? (m.kind === i.kind ? i.total : 0) : null;
+    return { ...i, kind: m.kind, mode: m.mode, total, accepted: m.kind ? (m.kind === i.kind ? i.accepted : 0) : null, source: m.mode === 'auto' && m.kind && (total ?? 0) > 0 ? 'deliverables' : 'manual' };
+  }),
+});
 let snapState = { version: 0, weekday: 4, updated_at: null as string | null, updated_by: null as null };
 const snapView = () => ({ ...snapState });
 /** The colours of the progress figures (contract 0.15.432): nothing enabled until saved, the suggested numbers shown. */
@@ -652,6 +667,29 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     bandsState = { ...bandsState, version: bandsState.version + 1, green: b.green!, amber: b.amber!, updated_at: new Date().toISOString() };
     return HttpResponse.json(bandsView(), tag(bandsState.version));
+  }),
+  // ------------------------------------------------------------------ Project Status from the Deliverables register (contract 0.15.470)
+  http.get(`${B}/settings/dashboard/ps-deliverables`, () => { const g = guard(); if (g) return g; return HttpResponse.json(psdView(), tag(psdState.version)); }),
+  http.put(`${B}/settings/dashboard/ps-deliverables`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, psdState.version); if (p) return p;
+    const b = (await request.json()) as { items?: { item_code?: string; kind?: string | null; mode?: string }[]; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    const seen = new Set<string>();
+    (b.items ?? []).forEach((it, n) => {
+      if (!PSD_ITEMS.some((x) => x.item_code === it.item_code)) errs.push({ path: `/items/${n}/item_code`, code: 'invalid' });
+      else if (seen.has(it.item_code!)) errs.push({ path: `/items/${n}/item_code`, code: 'duplicate' });
+      else seen.add(it.item_code!);
+      if (it.mode !== 'auto' && it.mode !== 'manual') errs.push({ path: `/items/${n}/mode`, code: 'invalid' });
+      if (it.mode === 'auto' && !it.kind) errs.push({ path: `/items/${n}/kind`, code: 'required' });
+    });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    const modes: typeof psdState.modes = {};
+    for (const it of b.items ?? []) modes[it.item_code!] = { kind: it.kind ?? null, mode: it.mode as 'auto' | 'manual' };
+    psdState = { ...psdState, version: psdState.version + 1, modes, updated_at: new Date().toISOString() };
+    return HttpResponse.json(psdView(), tag(psdState.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),

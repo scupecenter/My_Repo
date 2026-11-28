@@ -88,6 +88,8 @@ import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardCacheInvalidator, DashboardCacheService } from './dashboard/dashboard-cache.service';
 import { DashboardSettingsController } from './dashboard/dashboard-settings.controller';
 import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
+import { PsDeliverablesController } from './dashboard/ps-deliverables.controller';
+import { PsDeliverablesService } from './dashboard/ps-deliverables.service';
 import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controller';
 import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
 import { ProgressRagController } from './dashboard/progress-rag.controller';
@@ -255,6 +257,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       PartialCreditController, // 0.15.269 progress standards
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       SnapshotWeekdayController, // 0.15.430 (own line)
+      PsDeliverablesController, // 0.15.470 (own line)
       ProgressRagController, // 0.15.432 (own line)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
@@ -290,6 +293,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       PartialCreditService, // 0.15.269 progress standards
       MediaService, // 0.15.292
       SnapshotWeekdayService, // 0.15.430 (own line)
+      PsDeliverablesService, // 0.15.470 (own line)
       ProgressRagService, // 0.15.432 (own line)
       PasskeyService, // S4
       DuplicateRowsSettingsService,
