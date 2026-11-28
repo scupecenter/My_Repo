@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login, stepUp } from './helpers';
+import { login, stepUp, signOutViaMenu } from './helpers';
 
 // These specs drive the list grid; the site page opens on the Excel-like row by default (2026-11-08).
 test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!localStorage.getItem('pmis.site.layout')) localStorage.setItem('pmis.site.layout', '"list"'); }); });
@@ -33,7 +33,7 @@ for (const locale of ['en', 'ar'] as const) {
     await page.keyboard.press('Escape');
 
     // switch account: the Project Manager approves with step-up
-    await page.getByTestId('topbar-signout').click();
+    await signOutViaMenu(page);
     await login(page, 'pm');
     await page.getByTestId('nav-approvals').click();
     const item = page.locator('[data-site="TR101"]');

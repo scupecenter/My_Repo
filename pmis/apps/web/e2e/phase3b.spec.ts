@@ -32,7 +32,9 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('np-save')).toBeEnabled();
       await expect(page.getByTestId('np-lock-audit_integrity_failure')).toBeVisible();
 
-      await page.getByTestId('settings-tab-security').click(); await page.getByTestId('settings-section-security-retention').click();
+      await page.getByTestId('settings-tab-security').click();
+      await page.getByTestId('unsaved-discard').click(); // Decision 11: the unsaved threshold edit asks before the tab changes
+      await page.getByTestId('settings-section-security-retention').click();
       await page.getByTestId('ret-security').fill('400');
       await expect(page.getByTestId('ret-warning')).toBeVisible();
       await page.getByTestId('ret-save').click();
@@ -158,7 +160,7 @@ for (const locale of ['en', 'ar'] as const) {
       await page.getByTestId('user-act-dialog-reason').fill('Duplicate account');
       await withStepUp(page, () => page.getByTestId('user-act-dialog-submit').click());
       await expect(page.getByTestId('user-row-1305')).toHaveCount(0);
-      await page.getByTestId('users-tab-deleted').click();
+      await page.getByTestId('users-filter-status').selectOption('deleted');
       await expect(page.getByTestId('user-restore-9001')).toBeDisabled();
       await expect(page.getByTestId('restore-blocked-9001')).toBeVisible();
       await page.getByTestId('user-restore-1305').click();

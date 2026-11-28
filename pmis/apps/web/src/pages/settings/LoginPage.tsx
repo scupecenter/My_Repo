@@ -1,4 +1,5 @@
 import { Info, Lock, Plus, Trash2, Wrench } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoginPage, useSetLoginPage } from '@/api/settings';
@@ -131,6 +132,7 @@ export function LoginPageSettings() {
       {ro
         ? <p className="text-sm text-mute" data-testid="lp-readonly">{t('loginPage.readonly')}</p>
         : <button className="btn btn-accent" data-testid="lp-save" disabled={!dirty || !linksOk} onClick={() => setOpen(true)}>{t('common.save')}</button>}
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, ...clean(v), reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="lp-dialog" title={t('loginPage.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: cur.version, ...clean(v), reason },

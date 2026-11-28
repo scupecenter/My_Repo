@@ -12,13 +12,13 @@ export class StepUpService {
 
   constructor(private readonly db: DbService) {}
 
-  /** Setting `stepup_max_age_seconds` (default 300), read from the settings table, cached for a minute. */
+  /** Limit `stepup.seconds` (Settings > Security > Limits, default 300; the earlier setting stepup_max_age_seconds is still honoured until an admin saves this one), cached for a minute. */
   async maxAgeSeconds(): Promise<number> {
     if (this.cached && Date.now() - this.cached.at < 60_000) return this.cached.seconds;
     let seconds = DEFAULT_MAX_AGE_S;
     try {
-      const rows = await this.db.client.$queryRaw<{ value: unknown }[]>`SELECT value FROM settings WHERE key = 'stepup_max_age_seconds'`;
-      const v = rows[0]?.value;
+      const rows = await this.db.client.$queryRaw<{ s: number }[]>`SELECT ops_limit('stepup.seconds') AS s`;
+      const v = rows[0]?.s;
       if (typeof v === 'number' && Number.isFinite(v) && v >= 30 && v <= 3600) seconds = v;
     } catch {
       /* keep the default */

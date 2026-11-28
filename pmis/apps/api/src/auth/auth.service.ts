@@ -13,7 +13,7 @@ import { SessionService } from './session.service';
 import { StepUpService } from './step-up.service';
 import { SyslogService } from './syslog.service';
 import { UserStateService } from './user-state.service';
-import { IDLE_HOURS } from './session.service';
+import { limit } from '../ops/ops-limits';
 import { CodeInput, TwoFactorService, TWO_FACTOR_PARAMS } from './two-factor.service';
 import { SecurityLogService } from '../logs/security-log.service';
 import { applyContext, RequestContext, UA_MAX } from '../logs/context';
@@ -121,7 +121,7 @@ export class AuthService {
   ) {}
 
   async sessionBody(auth: AuthContext, csrf = auth.session.csrfToken): Promise<SessionBody> {
-    const idleEnd = auth.session.lastActivityAt.getTime() + IDLE_HOURS * 3600_000;
+    const idleEnd = auth.session.lastActivityAt.getTime() + limit('session.idle_hours') * 3600_000;
     const tf = await this.twoFactor.state(auth.user.id);
     return {
       authenticated: true,

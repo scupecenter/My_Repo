@@ -57,3 +57,13 @@ Every upload must be a template the system issued, with its ID and version embed
 - Older template versions are rejected outright, which is strict. Users must re-download after any field change, so the message has to be clear and carry the download link.
 - The stamp action removes the long-term need for the legacy path. The legacy path is time-boxed and loud.
 - The header checksum makes "adding a column to the file does not break the upload" (TI-03) true only for the legacy Master fingerprint, which ignores unknown trailing columns. Issued templates are strict on purpose. Inconsistency I-10 in the gate report.
+
+## Addendum 2026-11-27 (P3, migration 0367): what changed in a template
+- `GET /templates/{id}/changes` compares two versions of a register template by column code (added, removed, renamed). Read only; same visibility as the template list. The Templates page shows it as "What changed" and the upload dialog shows a version badge with the same list.
+- When a new version is issued, the daily job notifies the level-1 entry holders of that register (in-app kind `template_changed`). The setting `templates.change_notice` (enabled, days) in Settings > Imports controls it; changes are saved with a reason and an audit row.
+- Nothing is deleted or hidden: older versions stay as they are (additive migration). Register templates only; master, sites, stream, list-values and holiday templates are excluded.
+
+## Addendum 2026-11-27 (migration 0432): last row wins for a record that is in a file twice
+- Setting `imports.duplicate_rows` (Settings > Data > Imports, `GET/PUT /settings/duplicate-rows`): `first` is the default and the behaviour of 0365 (the first row wins, later rows are refused as `duplicate_in_file`). `last` lets the later row win. A default for all registers plus an override per register. Saved with a reason, If-Match and an audit row.
+- In `last` mode the earlier row is kept as an error row with the code `overridden_by_later_row`, so it stays in the batch review (own count `overridden`, own tab), in the error report and in the audit. Nothing is deleted. Register templates only; master, sites, stream, list-values and holiday templates are excluded and keep first-row-wins.
+- Additive migration: a new setting, `imp_duplicate_mode`, the settings door, and `imp_batch_counts` and `imp_stage_register_batch` replaced with the same behaviour while the setting is `first`.

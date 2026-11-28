@@ -4,10 +4,10 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { api, API_BASE, ApiError } from '@/api/client';
-import type { Page, SiteTasks } from '@/api/types';
+import type { Comment, Page, SiteTasks } from '@/api/types';
 import type { UiFeaturesSetting } from '@/api/uiFeatures';
 import { FollowButton } from '@/components/FollowButton';
-import { MentionBox } from '@/components/Comments';
+import { CommentsPanel, MentionBox } from '@/components/Comments';
 import { Shell } from '@/components/Shell';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { uid } from '@/mocks/ids';
@@ -54,22 +54,31 @@ describe('X1 inbox', () => {
     expect(screen.queryByTestId(`inbox-item-${N(5)}`)).toBeNull();
   });
 
+  it('P6: a kind from the address or a saved view shows as a removable chip', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    inbox('/inbox?kind=mention');
+    await waitFor(() => expect(ids()).toEqual([N(3)]));
+    expect(screen.getByTestId('inbox-kind-chip')).toBeInTheDocument();
+    await u.click(screen.getByTestId('inbox-kind-clear'));
+    await waitFor(() => expect(ids().length).toBeGreaterThan(1));
+    expect(screen.queryByTestId('inbox-kind-chip')).toBeNull();
+  });
+
   it('filters by unread, by kind and by the snoozed choice, and keeps the filter in the address', async () => {
     await signIn('pm');
     const u = userEvent.setup();
     inbox();
     await screen.findByTestId('inbox-list');
-    await u.click(screen.getByTestId('inbox-show-unread'));
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'unread');
     await waitFor(() => expect(ids()).toHaveLength(3));
     expect(screen.queryByTestId(`inbox-item-${N(4)}`)).toBeNull();
-    await u.selectOptions(screen.getByTestId('inbox-kind'), 'mention');
-    await waitFor(() => expect(ids()).toEqual([N(3)]));
-    await u.selectOptions(screen.getByTestId('inbox-kind'), '');
-    await u.click(screen.getByTestId('inbox-show-all'));
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'only');
+    expect(screen.queryByTestId('inbox-kind')).toBeNull(); // P6: the kind select duplicated the tabs
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'snoozed');
     await waitFor(() => expect(ids()).toEqual([N(5)]));
     expect(screen.getByTestId(`inbox-snoozed-chip-${N(5)}`)).toBeInTheDocument();
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'include');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all_incl');
     await waitFor(() => expect(ids()).toHaveLength(5));
   });
 
@@ -98,12 +107,12 @@ describe('X1 inbox', () => {
     await u.click(await screen.findByTestId(`inbox-snooze-in_a_week-${N(2)}`));
     await waitFor(() => expect(screen.queryByTestId(`inbox-item-${N(2)}`)).toBeNull());
     expect(screen.getByTestId('inbox-unread')).toHaveTextContent('2 unread'); // a snoozed item does not count
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'only');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'snoozed');
     await waitFor(() => expect(ids().sort()).toEqual([N(2), N(5)].sort()));
     await u.click(screen.getByTestId(`inbox-snooze-${N(2)}`));
     await u.click(await screen.findByTestId(`inbox-unsnooze-${N(2)}`));
     await waitFor(() => expect(ids()).toEqual([N(5)]));
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'hide');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all');
     await waitFor(() => expect(screen.getByTestId(`inbox-item-${N(2)}`)).toBeInTheDocument());
   });
 
@@ -141,7 +150,7 @@ describe('X1 inbox', () => {
     inbox('/inbox?unread=1');
     expect(await screen.findByTestId('inbox-empty')).toHaveTextContent('No unread items');
     server.use(http.get(`${API_BASE}/notifications`, () => HttpResponse.json({ type: 'x', title: 'Boom', status: 500, code: 'unknown' }, { status: 500 })));
-    await u.click(screen.getByTestId('inbox-show-all'));
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all');
     expect(await screen.findByTestId('inbox-error')).toBeInTheDocument();
     server.resetHandlers();
     await u.click(screen.getByTestId('inbox-error-retry'));
@@ -221,6 +230,37 @@ describe('Item 8 side panel', () => {
     await u.click(await screen.findByTestId('bell-tab-all'));
     await u.click(await screen.findByTestId(`bell-item-${N(3)}`));
     expect(await screen.findByTestId('page-inbox')).toBeInTheDocument();
+  });
+});
+
+describe('Floating inbox panel (appearance: inbox_panel, inbox_anchor)', () => {
+  const shell = () => renderApp(<Routes><Route element={<Shell />}><Route path="/inbox" element={<Inbox />} /><Route path="*" element={<div data-testid="elsewhere" />} /></Route></Routes>, { route: '/my-work' });
+
+  it('floats from the side panel, moves by keyboard, pins at the edge, and Escape closes it; the choice is saved in the profile', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    await api.put<UiFeaturesSetting>('/settings/ui-features', { version: 0, body: { sections: { panel: { mode: 'side_panel', width: 'medium', show_tabs: true } }, reason: 'Side panel' } });
+    shell();
+    await screen.findByTestId('topbar-bell');
+    await new Promise((r) => setTimeout(r, 300));
+    await u.click(screen.getByTestId('topbar-bell'));
+    await u.click(await screen.findByTestId('bell-float'));
+    await waitFor(() => expect(screen.queryByTestId('bell-panel')?.getAttribute('data-mode')).toBe('floating'));
+    // closing the overlay on switch is fine; reopen with the bell: no backdrop, the page stays usable
+    if (!screen.queryByTestId('bell-panel')) await u.click(screen.getByTestId('topbar-bell'));
+    const panel = await screen.findByTestId('bell-panel');
+    expect(panel).toHaveAttribute('data-anchor', 'end-top');
+    expect(screen.queryByRole('dialog', { hidden: false })?.getAttribute('aria-modal')).not.toBe('true');
+    const grip = within(panel).getByTestId('bell-drag');
+    grip.focus();
+    await u.keyboard('{ArrowLeft}{ArrowDown}');
+    await waitFor(() => expect(screen.getByTestId('bell-panel')).toHaveAttribute('data-anchor', 'start-bottom'));
+    await u.click(within(screen.getByTestId('bell-panel')).getByTestId('bell-pin'));
+    await waitFor(() => expect(screen.getByTestId('bell-panel')).toHaveAttribute('data-mode', 'docked'));
+    expect(document.documentElement.hasAttribute('data-inbox-docked')).toBe(true);
+    await u.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('bell-panel')).toBeNull());
+    expect(document.documentElement.hasAttribute('data-inbox-docked')).toBe(false);
   });
 });
 
@@ -544,5 +584,34 @@ describe('navigation (X1, X5, X7)', () => {
     expect(await screen.findByTestId('nav-inbox')).toBeInTheDocument();
     expect(screen.queryByTestId('nav-status_updates')).toBeNull();
     expect(screen.queryByTestId('nav-workload')).toBeNull();
+  });
+});
+
+describe('PM18 comment reactions and resolved (0.15.247)', () => {
+  const base: Comment = { id: 'c-1', author: { id: 'u-1', display_name: 'Demo User 01' }, body: 'please confirm', is_rejection_note: false, mentions: [], reactions: [{ emoji: '👍', count: 1, mine: false }], created_at: '2026-11-27T08:00:00Z' };
+
+  it('toggles the acknowledged reaction and the resolved flag through the parent handlers', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const onReact = vi.fn(), onToggleResolved = vi.fn();
+    renderApp(<CommentsPanel items={[base]} loaded pending={false} onSend={vi.fn()} onReact={onReact} onToggleResolved={onToggleResolved} />);
+    const react = screen.getByTestId('comment-react-c-1');
+    expect(react).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('comment-react-count-c-1')).toHaveTextContent('1');
+    await u.click(react);
+    expect(onReact).toHaveBeenCalledWith('c-1', '👍', true);
+    await u.click(screen.getByTestId('comment-resolve-c-1'));
+    expect(onToggleResolved).toHaveBeenCalledWith('c-1', true);
+  });
+
+  it('names who resolved a comment and offers to reopen it', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const onToggleResolved = vi.fn();
+    const resolved: Comment = { ...base, id: 'c-2', resolved: { at: '2026-11-27T09:00:00Z', by: { id: 'u-2', display_name: 'Demo User 02' } } };
+    renderApp(<CommentsPanel items={[resolved]} loaded pending={false} onSend={vi.fn()} onToggleResolved={onToggleResolved} />);
+    expect(screen.getByTestId('comment-resolved-c-2')).toHaveTextContent('Demo User 02');
+    await u.click(screen.getByTestId('comment-reopen-c-2'));
+    expect(onToggleResolved).toHaveBeenCalledWith('c-2', false);
   });
 });
