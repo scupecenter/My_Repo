@@ -3465,6 +3465,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/version-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The archived (deleted) workflow versions (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions. No snapshot body: id, version, effective date, who archived it and why, counts, and when it was restored.
+         */
+        get: operations["listWorkflowVersionArchive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/version-archive/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived workflow version as it was (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions, a reason and a step-up. One transaction: the version comes back published with its version number, ids, dates, milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views. 409 `invalid_transition` (nothing changes) when the version number or an id exists again, it was already restored, or a row it points to is gone. Audited as `workflow_version_restore`.
+         */
+        post: operations["restoreWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete an old published version after archiving a full snapshot (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions, a reason, `If-Match`, a step-up and `confirm_text` = `v<version>` (422 `confirmation_mismatch`). 409 `invalid_transition` when the version is a draft, is in force, has not started, has sites, site tasks or site migrations (`reasons`). The snapshot is archived before the delete, in the same transaction.
+         */
+        post: operations["deleteWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/discard": {
         parameters: {
             query?: never;
@@ -5568,6 +5630,71 @@ export interface paths {
          * @description L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day (409 `plan_locked`). `overrides` sets the manual value of an auto-filled column (`null` goes back to the auto value; Site ID, Site Name and Region cannot be changed: `read_only`). On a day up to today a row whose Actual Work has fewer lines than its Planned Work needs a Reason (422, `/reason` `required`). Audited with before and after.
          */
         patch: operations["saveDailyPlanRow"];
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * History of one plan day (0.15.410)
+         * @description The audit trail of the plan day (rows changed, added, removed, locked, unlocked, claimed, triaged), newest first, with the field changes. Needs view on the Daily Plan in the region.
+         */
+        get: operations["getDailyPlanHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Claim and triage state of a plan day (0.15.410) */
+        get: operations["getDailyPlanTriage"];
+        put?: never;
+        /**
+         * Accept or defer a plan day, with a note (0.15.410)
+         * @description The L2 holder of the Daily Plan in the region or a System Admin. States `accepted` and `deferred`; reject and merge do not apply to a plan day. Never blocks editing or the lock of the day. Audited.
+         */
+        post: operations["triageDailyPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim the review of a plan day (0.15.410)
+         * @description The L2 holder of the Daily Plan in the region or a System Admin. A day claimed by someone else is taken over only by a System Admin.
+         */
+        post: operations["claimDailyPlan"];
+        /**
+         * Release a claimed plan day (0.15.410)
+         * @description The person who claimed it, or a System Admin.
+         */
+        delete: operations["releaseDailyPlan"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/daily-plans/{date}/regions/{region_id}/lock": {
@@ -10852,6 +10979,26 @@ export interface paths {
         put?: never;
         /** Add an item (System Admin, or the Inventory Supervisor by delegation `warehouse.items.edit`) */
         post: operations["createWarehouseItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/items/{item_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * History of one item (0.15.410)
+         * @description The audit trail of the item, newest first, with the field changes. System Admin or a warehouse_items delegate. Restore is a PATCH of the old values through `PATCH /warehouse/items/{item_id}` (rights, locks, reason and audit as for any edit).
+         */
+        get: operations["getWarehouseItemHistory"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -16348,6 +16495,40 @@ export interface components {
             missing_documents: string[];
             reason?: string | null;
         };
+        HistoryEntries: {
+            id: string;
+            at: string;
+            action: string;
+            actor?: {
+                [key: string]: unknown;
+            } | null;
+            reason?: string | null;
+            site_id?: string | null;
+            before?: unknown;
+            after?: unknown;
+            changes: {
+                field: string;
+                from?: unknown;
+                to?: unknown;
+            }[];
+        }[];
+        DailyPlanTriage: {
+            region_id: number;
+            /** Format: date */
+            plan_date: string;
+            /** @enum {string|null} */
+            triage_state: "pending" | "accepted" | "deferred" | null;
+            triage_note?: string | null;
+            triage_by?: {
+                [key: string]: unknown;
+            } | null;
+            triage_at?: string | null;
+            claimed_by?: {
+                [key: string]: unknown;
+            } | null;
+            claimed_at?: string | null;
+            can_triage: boolean;
+        };
         WithReason: {
             reason: components["schemas"]["Reason"];
         };
@@ -17757,6 +17938,8 @@ export interface components {
             density: "compact" | "normal" | "comfortable";
             wrap: boolean;
             zebra: boolean;
+            /** @description 0.15.561 (0652). The count and status distribution bar on the header of each group of a grouped table (My Work). Optional in a PUT (an older client that does not send it keeps working); the GET always returns it (default true). */
+            groupbar?: boolean;
         };
         TableDisplaySetting: {
             defaults: components["schemas"]["TableDisplay"];
@@ -22601,6 +22784,7 @@ export interface components {
                 align?: "start" | "center";
                 wrap?: boolean;
                 zebra?: boolean;
+                groupbar?: boolean;
             };
         };
         SavedViewSort: {
@@ -30060,6 +30244,126 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listWorkflowVersionArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            version: number;
+                            /** Format: date-time */
+                            archived_at: string;
+                            reason?: string;
+                            effective_from?: string | null;
+                            stages?: number;
+                            tasks?: number;
+                            archived_by?: components["schemas"]["UserRef"] | null;
+                            /** Format: date-time */
+                            restored_at?: string | null;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    restoreWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        restored: boolean;
+                        /** Format: uuid */
+                        archive_id: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                    /** @description The text v<version>. */
+                    confirm_text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Deleted; the snapshot is archived. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        deleted: boolean;
+                        /** Format: uuid */
+                        archive_id: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     discardWorkflowDraft: {
         parameters: {
             query?: never;
@@ -33961,6 +34265,150 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDailyPlanHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The trail. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryEntries"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDailyPlanTriage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanTriage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    triageDailyPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    state: "accepted" | "deferred";
+                    note: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The state after the decision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanTriage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    claimDailyPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state after the claim. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanTriage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    releaseDailyPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state after the release. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanTriage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     lockDailyPlan: {
@@ -43490,6 +43938,31 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getWarehouseItemHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The trail. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryEntries"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getWarehouseItem: {

@@ -21,7 +21,7 @@ const B = API_BASE;
 const TODAY = '2026-10-25';
 const C = () => db().cfg;
 /** W8 (0.15.64): the defaults of the Display menu, the seed look until an admin saves them. */
-const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true }, version: 0 } as TableDisplaySetting);
+const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true }, version: 0 } as TableDisplaySetting);
 /** 0.15.102: the interface features, the seed until an admin saves them. */
 const UF = () => (C().uiFeatures ??= { sections: structuredClone(UI_FEATURES_SEED), version: 0 } as UiFeaturesSetting);
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
@@ -1489,12 +1489,13 @@ export const settingsHandlers = [
     const errs: { path: string; code: string }[] = [];
     for (const k of Object.keys(b)) if (k !== 'defaults' && k !== 'reason') errs.push({ path: `/${k}`, code: 'unknown_key' });
     const d = b.defaults ?? {};
-    for (const k of Object.keys(d)) if (!['size', 'align', 'density', 'wrap', 'zebra'].includes(k)) errs.push({ path: `/defaults/${k}`, code: 'unknown_key' });
+    for (const k of Object.keys(d)) if (!['size', 'align', 'density', 'wrap', 'zebra', 'groupbar'].includes(k)) errs.push({ path: `/defaults/${k}`, code: 'unknown_key' });
     if (!['sm', 'md', 'lg'].includes(String(d.size))) errs.push({ path: '/defaults/size', code: 'invalid' });
     if (!['start', 'center'].includes(String(d.align))) errs.push({ path: '/defaults/align', code: 'invalid' });
     if (!['compact', 'normal', 'comfortable'].includes(String(d.density))) errs.push({ path: '/defaults/density', code: 'invalid' });
     if (typeof d.wrap !== 'boolean') errs.push({ path: '/defaults/wrap', code: 'invalid' });
     if (typeof d.zebra !== 'boolean') errs.push({ path: '/defaults/zebra', code: 'invalid' });
+    if (d.groupbar !== undefined && typeof d.groupbar !== 'boolean') errs.push({ path: '/defaults/groupbar', code: 'invalid' });
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
     if (errs.length) return fields(...errs);
     C().tableDisplay = { defaults: d as TableDisplaySetting['defaults'], version: TD().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();

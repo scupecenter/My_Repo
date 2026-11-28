@@ -135,6 +135,7 @@ info:
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
     - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
+    - 0.15.436 (2026-11-28): an old published workflow version can be deleted after a full snapshot is archived (owner request relayed 2026-11-27; migration 0575, mirror `db/sql/574_workflow_version_delete.sql`). Additive. `POST /workflow/versions/{version}/delete` (`deleteWorkflowVersion`): `workflow_versions` administer for all regions (the publish right), a reason, `If-Match`, a password step-up and the typed confirmation `v<version>`; audited as `workflow_version_delete`. Allowed only for a published version that is not the one in force, has started, has no site, no site task and no site migration (409 `invalid_transition` with `reasons`: `current`, `not_started`, `sites`, `site_tasks`, `migrations`). The version and all its milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views are written first as one snapshot (`workflow_version_archive`, kept on a data reset); the delete runs in the same transaction. `GET /workflow/version-archive` (`listWorkflowVersionArchive`, `administer`) lists the archived versions (no snapshot body); `POST /workflow/version-archive/{id}/restore` (`restoreWorkflowVersion`, `administer`, reason, step-up) puts one back as it was (published, same version number, same ids) in one transaction and answers 409 `invalid_transition` without changing anything when the version number or an id exists again, it was already restored, or a row it points to is gone. Drafts are still discarded with `/discard`; a published version stays immutable and tasks are still deactivated, not deleted.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.376 (2026-11-27): the daily delay log (migration 0554). Additive, data only. The Issues register gets the type value `Daily Delay` (list IssueCategory), the optional date field `delay_date`, and four more values of the list BlockerReason (Weather, Permit Pending, Delivery Delay, Safety Stop); no endpoint or schema changes. The delay reasons are edited in Settings > Registers > Lists and show in the dashboard issue breakdown (`by_category`, `by_reason`) and in the register export.
@@ -151,6 +152,7 @@ info:
     - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
     - 0.15.69 (2026-11-24): W2 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 204; 0.15.62 to 0.15.68 are used by the work merged before it). Documentation only, no path, schema or rule changes. A saved view of a register screen (`register-<register key>`) keeps the layout of the screen's view switcher as quick parameters of `filters`, as `site360-<menu>` does since 0.15.49: `layout` = empty (the list), `wide`, `board` or `map`; `board_by` = the code of the register field the board's columns follow, or `state` (the approval state); `lane` = empty, `region` or `type`. They are stored as given, like any other quick parameter; the filter tree in `filters.advanced` keeps its validation. `RegisterDefinition.site_scoped` also decides whether the screen offers the map. Inline edits of the wide table use `PATCH /registers/{register_key}/records/{record_id}` with `If-Match`, the same route, rights, field rules and locks as the record form.
     - 0.15.68 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; renumbered from 0.15.64 at the merge with main, which holds 0.15.62 to 0.15.67). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site-master/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site-master/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
+    - 0.15.561 (2026-11-28): item 9, the group summary row of grouped tables. Additive. `TableDisplay` (GET/PUT `/settings/table-display`, the `display` of a saved view) gains the optional boolean `groupbar` (default true): the count and a status distribution bar on every group header of a grouped table, on the same framework as text size, wrap and zebra rows (organization default in Settings > Screens > Tables, personal choice per screen in the Layout panel). Migration 0652 (mirror `db/sql/651_group_summary_display.sql`) changes `table_display_seed()` and `admin_set_table_display` in place; no table, no new route, no permission change.
     - 0.15.67 (2026-11-24): My Work > Daily Plan, the daily progress and the plan of the next working day (plan W7, owner decisions 2026-11-23; migration 0149, mirror `db/sql/148_daily_plan.sql`; CHANGELOG 203; 0.15.62 to 0.15.66 are used by other branches). Additive. New tag `daily-plan`: (1) `GET /daily-plans?date=&region_id=` returns one plan per region per day for the regions the caller sees (the Project Manager and the System Admins see all), with the auto-filled rows (Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW; the Procurement assignment of the day: Vendor / Contractor and AAT SE; a CW permit or B3: Access Valid; tasks and field work of the day: Planned Work and Actual Work), the manual values over them, Reason and Remark, the counts and the flags `below_target` and `reason_missing`, plus `next_working_day` (weekend Friday and Saturday, holidays of the calendar). (2) `PATCH`, `POST` and `DELETE` under `/daily-plans/{date}/regions/{region_id}/sites` change a row, add a site or remove one: `view` on `daily_plan` or `sites` for the region and L1 of the new Matrix row `daily_plan` (or a System Admin), `If-Match` = the plan version (`0` before the first change), a row below target without a reason is 422 (`/reason` `required`), a locked day is 409 `plan_locked`, every change audited with before and after. (3) `POST .../lock` (L2 of the row or a System Admin; 422 with the sites that lack a reason) freezes the day; `POST .../unlock` is an admin override (System Admin or a delegate of `overrides.unlock` for the region, reason, step-up, flagged). (4) `GET /daily-plans/export` downloads both tables as one Excel sheet in the exact column order of the owner's sheet (`export` on `daily_plan` or `sites` per region, audited). Reading needs `view` on `daily_plan` or `sites` for the region, as the menu does. (5) `GET`/`PUT /settings/daily-plan`: visible columns and their order per tab, default region scope, automatic lock time, reminder hour (System Admin or an all-regions `admin.settings` delegate, reason, `If-Match`, closed body). The automatic lock and the reminder (notification kind `daily_plan_reminder`) run in the background job.
     - 0.15.62 (2026-11-24): the project data reset in Settings, with two System Admins (owner decisions 2026-11-24; migration 0146, mirror `db/sql/145_settings_data_reset.sql`; CHANGELOG 198). Additive. New paths `GET /settings/data-reset`, `PUT /settings/data-reset/settings`, `POST /settings/data-reset/requests`, `GET /settings/data-reset/requests/{request_id}`, `POST .../approve`, `POST .../cancel`, `POST .../run` (202) and `POST .../retry-files`; schemas `DataResetState`, `DataResetRequest`, `DataResetSettings`, `DataResetBackup`, `DataResetPlanTable`, `DataResetFiles`. Every route is for a System Admin acting without delegation (403 `delegate_forbidden` for a delegate). A request needs a reason, a step-up and the typed phrase `RESET <database>`; a different System Admin approves (403 `self_approval_forbidden` for the requester), with their own step-up and reason; the requester or the approver starts the run (step-up, the phrase again, If-Match). A request expires after `data_reset.settings.request_expiry_minutes` (default 30; 409 `request_expired`); either admin cancels. With fewer than two active System Admins a request is 409 `single_admin` (the operator script on the server is the way). A run is refused unless the System Log records a successful database backup within `backup_max_age_hours` (default 24; 409 `backup_missing`), with documents in S3/MinIO (409 `storage_not_supported`), or while the operator script runs (409 `reset_running`). While a run's database transaction is open every route but the two reads answers 503 `maintenance` (`components/responses/ServiceUnavailable`). New `ErrorCode` values `single_admin`, `backup_missing`, `request_expired`, `reset_running`, `plan_incomplete`, `storage_not_supported`, `quarantine_unavailable`, `maintenance`; `NotificationKind` `data_reset_request`; `SecurityEvent` `project_data_reset`.
     - 0.15.61 (2026-11-23): the system-settings routes the web called that no controller served are served by the API (migration 0145, mirror `db/sql/144_settings_screens_api.sql`; CHANGELOG 197). Additive. (1) `GET /settings/dlp`, `POST /settings/dlp/versions`: the versions of `dlp.months.cw` and `dlp.months.te` (seed version 1: CW 3, TE 12); a version takes effect today or later and never before the latest version (field errors `in_the_past`, `before_latest_version`, `out_of_range`, `unknown_key`), so a PAC keeps the version in force on its date (the SLA start event `DLP:<task>:<key>` adds the months in force on the PAC date). (2) `GET`/`PUT /settings/idle-task-alert`: `working_days` is the existing dashboard idle limit `stale_idle_days` (one setting, Q523); `enabled` is new; the ETag moves when either screen changes it. (3) `GET`/`PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`: closed schema validated in the database (`unknown_key` at the path of the key, the cross-field rule on both paths, `invalid_timezone`, `mandatory_locked`, `not_eligible_recipient`, `unknown_type`, `unknown_column`, `duplicate`); the security and system rows and `rate_cap_per_hour` need a System Admin (403 `delegate_forbidden`) and a step-up. (4) `POST /settings/holidays/import`: the approved template `TPL-HOLIDAYS` only (`template_kind` `holidays`, ADR 0011), applied at once: 202 with `status` `applied`, `counts.create` and `counts.unchanged`, and `affected_open_tasks`; one bad row refuses the file (`errors[]` with `path` `/rows/<line>/<field>`); any other file is 422 `template_rejected`. `Template.template_kind` lists `list_values` (0.15.23) and `holidays`. Numbered 0.15.61 because 0.15.53 to 0.15.58 are used by other branches.
@@ -273,6 +275,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.410 (2026-11-27): hardening layer 1c, History and Restore for the Warehouse item master and the Daily Plan, and Claim and Triage of a Daily Plan day (migration 0567). Additive. `GET /warehouse/items/{id}/history` and `GET /daily-plans/{date}/regions/{region_id}/history` return the audit trail with the field changes; Restore of an item is a PATCH of the old values through the normal item writer. A plan day (region and date) can be claimed and released (`POST` and `DELETE` on `/daily-plans/{date}/regions/{region_id}/claim`) and accepted or deferred with a note (`POST /daily-plans/{date}/regions/{region_id}/triage`, `GET` for the state), by the L2 holder of the Daily Plan in the region or a System Admin, as for the registers (0340). New plan days start `pending`; existing days stay untriaged. Reject and merge do not apply to a plan day. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
 
@@ -5476,6 +5479,118 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/version-archive:
+    get:
+      tags: [workflow]
+      operationId: listWorkflowVersionArchive
+      summary: The archived (deleted) workflow versions (0.15.436)
+      description: 'Migration 0575. Needs `workflow_versions.administer` for all regions. No snapshot body: id, version, effective date, who archived it and why, counts, and when it was restored.'
+      x-db-path: workflow_archive_json
+      responses:
+        '200':
+          description: The archive, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, version, archived_at]
+                      properties:
+                        id: { type: string, format: uuid }
+                        version: { type: integer }
+                        archived_at: { type: string, format: date-time }
+                        reason: { type: string }
+                        effective_from: { type: [string, 'null'] }
+                        stages: { type: integer }
+                        tasks: { type: integer }
+                        archived_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+                        restored_at: { type: [string, 'null'], format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /workflow/version-archive/{id}/restore:
+    post:
+      tags: [workflow]
+      operationId: restoreWorkflowVersion
+      summary: Restore an archived workflow version as it was (0.15.436)
+      description: 'Migration 0575. Needs `workflow_versions.administer` for all regions, a reason and a step-up. One transaction: the version comes back published with its version number, ids, dates, milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views. 409 `invalid_transition` (nothing changes) when the version number or an id exists again, it was already restored, or a row it points to is gone. Audited as `workflow_version_restore`.'
+      x-step-up: true
+      x-db-path: admin_wf_restore_version (app_actor_is_admin('workflow_versions', 'administer'))
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              additionalProperties: false
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Restored.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, restored, archive_id]
+                properties:
+                  version: { type: integer }
+                  restored: { type: boolean }
+                  archive_id: { type: string, format: uuid }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /workflow/versions/{version}/delete:
+    parameters:
+      - $ref: '#/components/parameters/WorkflowVersionNo'
+    post:
+      tags: [workflow]
+      operationId: deleteWorkflowVersion
+      summary: Delete an old published version after archiving a full snapshot (0.15.436)
+      description: 'Migration 0575. Needs `workflow_versions.administer` for all regions, a reason, `If-Match`, a step-up and `confirm_text` = `v<version>` (422 `confirmation_mismatch`). 409 `invalid_transition` when the version is a draft, is in force, has not started, has sites, site tasks or site migrations (`reasons`). The snapshot is archived before the delete, in the same transaction.'
+      x-step-up: true
+      x-db-path: admin_wf_delete_version (app_actor_is_admin('workflow_versions', 'administer'))
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, confirm_text]
+              additionalProperties: false
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_text: { type: string, maxLength: 200, description: 'The text v<version>.' }
+      responses:
+        '200':
+          description: Deleted; the snapshot is archived.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, deleted, archive_id]
+                properties:
+                  version: { type: integer }
+                  deleted: { type: boolean }
+                  archive_id: { type: string, format: uuid }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/discard:
     parameters:
       - $ref: '#/components/parameters/WorkflowVersionNo'
@@ -8736,6 +8851,115 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/history:
+    get:
+      tags: [daily-plan]
+      operationId: getDailyPlanHistory
+      summary: History of one plan day (0.15.410)
+      description: The audit trail of the plan day (rows changed, added, removed, locked, unlocked, claimed, triaged), newest first, with the field changes. Needs view on the Daily Plan in the region.
+      x-db-path: dp_plan_history
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The trail.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoryEntries'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /daily-plans/{date}/regions/{region_id}/triage:
+    get:
+      tags: [daily-plan]
+      operationId: getDailyPlanTriage
+      summary: Claim and triage state of a plan day (0.15.410)
+      x-db-path: dp_plan_triage_get
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [daily-plan]
+      operationId: triageDailyPlan
+      summary: Accept or defer a plan day, with a note (0.15.410)
+      description: The L2 holder of the Daily Plan in the region or a System Admin. States `accepted` and `deferred`; reject and merge do not apply to a plan day. Never blocks editing or the lock of the day. Audited.
+      x-db-path: dp_plan_triage
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [state, note]
+              properties:
+                state: {type: string, enum: [accepted, deferred]}
+                note: {type: string, minLength: 3}
+      responses:
+        '200':
+          description: The state after the decision.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /daily-plans/{date}/regions/{region_id}/claim:
+    post:
+      tags: [daily-plan]
+      operationId: claimDailyPlan
+      summary: Claim the review of a plan day (0.15.410)
+      description: The L2 holder of the Daily Plan in the region or a System Admin. A day claimed by someone else is taken over only by a System Admin.
+      x-db-path: dp_plan_claim
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The state after the claim.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [daily-plan]
+      operationId: releaseDailyPlan
+      summary: Release a claimed plan day (0.15.410)
+      description: The person who claimed it, or a System Admin.
+      x-db-path: dp_plan_claim
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: The state after the release.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanTriage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /daily-plans/{date}/regions/{region_id}/lock:
     post:
       tags: [daily-plan]
@@ -16816,6 +17040,24 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/items/{item_id}/history:
+    get:
+      tags: [warehouse]
+      operationId: getWarehouseItemHistory
+      summary: History of one item (0.15.410)
+      description: The audit trail of the item, newest first, with the field changes. System Admin or a warehouse_items delegate. Restore is a PATCH of the old values through `PATCH /warehouse/items/{item_id}` (rights, locks, reason and audit as for any edit).
+      x-db-path: wh_item_history
+      parameters:
+      - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The trail.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoryEntries'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /warehouse/items/{item_id}:
     parameters:
     - {$ref: '#/components/parameters/WarehouseItemId'}
@@ -23388,6 +23630,42 @@ components:
         flagged_at: { type: string, format: date-time }
         missing_documents: { type: array, items: { type: string }, description: The document codes that were missing when the check was skipped. }
         reason: { type: [string, 'null'] }
+    HistoryEntries:
+      type: array
+      items:
+        type: object
+        required: [id, at, action, changes]
+        properties:
+          id: {type: string}
+          at: {type: string}
+          action: {type: string}
+          actor: {type: [object, 'null'], additionalProperties: true}
+          reason: {type: [string, 'null']}
+          site_id: {type: [string, 'null']}
+          before: {}
+          after: {}
+          changes:
+            type: array
+            items:
+              type: object
+              required: [field]
+              properties:
+                field: {type: string}
+                from: {}
+                to: {}
+    DailyPlanTriage:
+      type: object
+      required: [region_id, plan_date, triage_state, can_triage]
+      properties:
+        region_id: {type: integer}
+        plan_date: {type: string, format: date}
+        triage_state: {type: [string, 'null'], enum: [pending, accepted, deferred, null]}
+        triage_note: {type: [string, 'null']}
+        triage_by: {type: [object, 'null'], additionalProperties: true}
+        triage_at: {type: [string, 'null']}
+        claimed_by: {type: [object, 'null'], additionalProperties: true}
+        claimed_at: {type: [string, 'null']}
+        can_triage: {type: boolean}
     WithReason:
       type: object
       required: [reason]
@@ -24637,6 +24915,7 @@ components:
         density: { type: string, enum: [compact, normal, comfortable] }
         wrap: { type: boolean }
         zebra: { type: boolean }
+        groupbar: { type: boolean, description: '0.15.561 (0652). The count and status distribution bar on the header of each group of a grouped table (My Work). Optional in a PUT (an older client that does not send it keeps working); the GET always returns it (default true).' }
     TableDisplaySetting:
       type: object
       required: [defaults, version]
@@ -29344,6 +29623,7 @@ components:
             align: { type: string, enum: [start, center] }
             wrap: { type: boolean }
             zebra: { type: boolean }
+            groupbar: { type: boolean }
     SavedViewSort:
       type: object
       additionalProperties: false

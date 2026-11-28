@@ -234,7 +234,7 @@ export const canEditDisplayDefaults = (me: Me | undefined) => !!me && (!!me.is_s
 
 /** The data attributes that draw the Display options on a table container (styles in index.css, `[data-tsize]` and the others). */
 export function displayAttrs(d: Display): Record<string, string> {
-  return { 'data-tsize': d.size, 'data-talign': d.align, 'data-twrap': d.wrap ? '1' : '0', 'data-tzebra': d.zebra ? '1' : '0', 'data-density': d.density };
+  return { 'data-tsize': d.size, 'data-talign': d.align, 'data-twrap': d.wrap ? '1' : '0', 'data-tzebra': d.zebra ? '1' : '0', 'data-tgroupbar': d.groupbar ? '1' : '0', 'data-density': d.density };
 }
 
 /** Extra pixels of a virtualised row when long text wraps on two lines. */
