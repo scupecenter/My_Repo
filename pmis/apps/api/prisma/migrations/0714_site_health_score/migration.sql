@@ -79,17 +79,17 @@ BEGIN
       AND (p_site IS NULL OR x.id = p_site)
   ), tk AS (
     SELECT t.site_id,
-      count(*) FILTER (WHERE t.state = 'approved' AND t.sla_elapsed_wd IS NOT NULL AND r.max_working_days IS NOT NULL) AS closed_n,
-      count(*) FILTER (WHERE t.state = 'approved' AND t.sla_elapsed_wd IS NOT NULL AND r.max_working_days IS NOT NULL AND t.sla_elapsed_wd <= r.max_working_days) AS closed_ok,
-      count(*) FILTER (WHERE t.state <> 'approved' AND t.due_date IS NOT NULL AND t.sla_start_date IS NOT NULL AND t.sla_start_date <= today) AS open_n,
-      count(*) FILTER (WHERE t.state <> 'approved' AND t.due_date IS NOT NULL AND t.sla_start_date IS NOT NULL AND t.sla_start_date <= today AND t.due_date >= today) AS open_ok
+      count(*) FILTER (WHERE t.state::text = 'approved' AND t.sla_elapsed_wd IS NOT NULL AND r.max_working_days IS NOT NULL) AS closed_n,
+      count(*) FILTER (WHERE t.state::text = 'approved' AND t.sla_elapsed_wd IS NOT NULL AND r.max_working_days IS NOT NULL AND t.sla_elapsed_wd <= r.max_working_days) AS closed_ok,
+      count(*) FILTER (WHERE t.state::text <> 'approved' AND t.due_date IS NOT NULL AND t.sla_start_date IS NOT NULL AND t.sla_start_date <= today) AS open_n,
+      count(*) FILTER (WHERE t.state::text <> 'approved' AND t.due_date IS NOT NULL AND t.sla_start_date IS NOT NULL AND t.sla_start_date <= today AND t.due_date >= today) AS open_ok
     FROM public.task_instances t JOIN s ON s.id = t.site_id LEFT JOIN public.sla_rules r ON r.id = t.sla_rule_id
-    WHERE t.state NOT IN ('locked', 'na', 'skipped') AND NOT t.is_na AND NOT t.admin_override GROUP BY t.site_id
+    WHERE t.state::text NOT IN ('locked', 'na', 'skipped') AND NOT t.is_na AND NOT t.admin_override GROUP BY t.site_id
   ), dc AS (
     SELECT t.site_id, count(*) AS n, count(*) FILTER (WHERE ds.status = 'approved') AS ok
     FROM public.task_instances t JOIN s ON s.id = t.site_id
     JOIN public.document_slots ds ON ds.task_id = t.id JOIN public.document_types dt ON dt.id = ds.doc_type_id AND dt.is_mandatory
-    WHERE t.state = 'approved' AND NOT t.admin_override GROUP BY t.site_id
+    WHERE t.state::text = 'approved' AND NOT t.admin_override GROUP BY t.site_id
   ), sg AS (
     SELECT n.site_id, count(*) AS n,
       sum(CASE lower(coalesce(n.severity, '')) WHEN 'critical' THEN 30 WHEN 'major' THEN 15 ELSE 5 END) AS pen
