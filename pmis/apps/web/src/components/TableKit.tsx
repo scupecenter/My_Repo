@@ -42,6 +42,7 @@ import {
   isDensity,
 } from "@/lib/tablePrefs";
 import { Tip } from "./Tip";
+import { DragGrip } from "./TextSelection";
 
 export const SEL_W = 36;
 export const HEADER_H = 37;
@@ -403,6 +404,7 @@ export function HeaderRow({
             className={`relative truncate py-2 ps-2 ${colMenu ? "pe-7" : "pe-2"} ${over === c.id ? "bg-accentSoft" : "bg-inherit"} ${p.className}`}
             style={p.style}
           >
+            {!c.pinned && <DragGrip className="me-1 align-middle" />}
             <Trunc text={label(c.id)} />
             {colMenu && (
               <HeaderMenu col={c.id} name={label(c.id)} items={colMenu(c.id)} />

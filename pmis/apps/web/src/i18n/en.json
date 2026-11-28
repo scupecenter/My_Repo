@@ -2889,6 +2889,7 @@
     "more_none": "No tool matches",
     "resize": "Resize column {{col}}",
     "fit_hint": "Double-click the edge to fit the column to its content",
+    "drag_grip": "Drag from here",
     "move_earlier": "Move {{col}} earlier",
     "move_later": "Move {{col}} later",
     "narrower": "Narrower: {{col}}",
