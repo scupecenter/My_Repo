@@ -1,3 +1,4 @@
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RULES_WITH_SEVERITY, SEVERITIES, useAlertSettings, useSetAlertSettings, type AlertSettings, type Severity } from '@/api/logs';
@@ -18,7 +19,7 @@ export function weakens(cur: AlertSettings, sev: Record<string, Severity>, floor
  * Alert rules (owner answers Q167 and Q168, contract 0.12.3): the severity of each rule, the lowest severity that is mailed to the System Admins, and
  * the trusted networks that soften a new-address alert by one level. The thresholds of 0.10.0 are sent back unchanged.
  */
-export function AlertRules() {
+export function AlertSettingsPanel() {
   const { t } = useTranslation();
   const toast = useToast();
   const q = useAlertSettings(), set = useSetAlertSettings();
@@ -53,6 +54,11 @@ export function AlertRules() {
         <span className="text-xs font-normal text-mute">{t('rules.networks_hint')}</span></label>
       {badNets.length > 0 && <p role="alert" className="text-sm text-lateInk" data-testid="rules-bad-net" dir="ltr">{t('rules.bad_net')} {badNets.join(', ')}</p>}
       {weaker && <p role="alert" className="rounded-md bg-waitBg p-2 text-sm text-waitInk" data-testid="rules-weaker">{t('rules.weaker')}</p>}
+      <UnsavedGuard scope="settings" dirty={!!edit && badNets.length === 0} needsReason label={t('ui.guard_settings')}
+        onSave={(reason) => new Promise<boolean>((res) => set.mutate({
+          version: cur.version,
+          body: { reason, failed_sign_ins: cur.failed_sign_ins, failed_by_ip: cur.failed_by_ip, large_export_rows: cur.large_export_rows, new_ip: cur.new_ip, severity: v.sev, email_min_severity: v.floor, trusted_networks: nets },
+        }, { onSuccess: () => { setEdit(null); res(true); }, onError: () => res(false) }))} />
       <button className="btn btn-accent" data-testid="rules-save" disabled={!edit || badNets.length > 0} onClick={() => setOpen(true)}>{t('common.save')}</button>
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="rules-dialog" title={t('rules.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}

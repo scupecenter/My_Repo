@@ -11,6 +11,7 @@ import {
   useResendEmailCode, useSelfDisableTwoFactor, useSelfEnrolConfirm, useSelfEnrolStart, useUpdateMyProfile, useVerifyEmailChange,
 } from '@/api/profile';
 import { errText } from '@/components/FormDialog';
+import { NotificationPrefsSection } from '@/components/NotificationPrefsSection';
 import { PushSection } from '@/components/PushSection';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
@@ -59,7 +60,7 @@ export function Profile() {
   const p = q.data;
   return (
     <div className="space-y-4" data-testid="page-profile">
-      <PageHeader title={t('profile.title')} subtitle={t('profile.subtitle')} />
+      <PageHeader title={t('profile.title')} subtitle={t('profile.subtitle')} settings="profile" />
       <div className="grid gap-4 lg:grid-cols-2">
         <Details key={p.version} p={p} />
         <AppearanceSection key={`ap-${p.version}`} p={p} />
@@ -69,6 +70,7 @@ export function Profile() {
         <PasswordSection p={p} />
         <TwoFactorSection p={p} />
         <MySessionsSection />
+        <NotificationPrefsSection />
         <PushSection />
       </div>
     </div>
@@ -228,7 +230,7 @@ function AppearanceSection({ p }: { p: MyProfile }) {
   const preset = (name: keyof typeof APPEARANCE_PRESETS) => {
     const pr = APPEARANCE_PRESETS[name];
     // a look does not move the notification panel: the personal inbox_* choices stay
-    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}) });
+    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}), ...(draft.more_menu ? { more_menu: draft.more_menu } : {}) });
     setTheme(pr.theme);
   };
   const dimLabel = (k: AppearanceKey) => t(`appearance.dim.${k}`);
