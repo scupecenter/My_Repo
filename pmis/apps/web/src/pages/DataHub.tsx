@@ -70,6 +70,7 @@ export function DataHubPage() {
   return (
     <div data-testid="page-data-hub">
       <PageHeader title={t('dhub.title')} subtitle={t('dhub.subtitle')} settings="data_hub" />
+      <p className="mb-3 text-sm"><Link to="/reports" className="text-link" data-testid="hub-reports-link">{t('reports.title')}</Link> <span className="text-mute">{t('reports.hub_hint')}</span></p>
       {!anyWidget && <EmptyState title={t('dhub.all_hidden')} />}
       {w.quick_bar && (
         <section className="card mb-4 p-4" data-testid="hub-widget-quick_bar" aria-label={t('dhub.quick_title')}>

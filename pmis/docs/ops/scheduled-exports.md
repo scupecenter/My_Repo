@@ -20,3 +20,7 @@ Schedules (Settings > Data > Scheduled export, migration 0251) start when their 
 - Time of the run: the first hourly tick after the due instant (the due instant is the start of the schedule's day in the project time zone).
 - Look at the System Log and the Audit log (`export_schedule_save`, `master_export.start`) to follow a schedule. A failure shows as the schedule's `last_error` and, when `mail` is on, as a mail to the owner.
 - To stop all unattended runs at once: switch it OFF, or use the lock `disable_export`.
+
+## Report builder (`/reports`)
+
+A report is a saved view of the screen `register-<key>`: the filters as the AND/OR tree (`filters.advanced`) and the export columns in order (`columns.order`). It reuses saved views, so it is private by default, versioned, shared with the views.share right, and hidden fields are stripped per reader. Run is `POST /exports/master` with a `view` block. Schedule is `PUT /exports/schedules` with `spec.view` and the mail option. Register exports have no sort, so none is offered. No new table, no migration, no permission change; the export grant, regions and field rules are re-checked on every run. The page is linked from the Data hub.
