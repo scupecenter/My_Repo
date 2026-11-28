@@ -1,11 +1,11 @@
-import { Bookmark, Pin, PinOff, Save, Share2, Trash2, UserCheck } from 'lucide-react';
+import { Bookmark, Pin, PinOff, Save, Star, Share2, Trash2, UserCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGroups, useRoles } from '@/api/admin';
 import { useRegions } from '@/api/sites';
 import type { UserPickerItem } from '@/api/types';
-import { importLocalViews, useHomePinOps, useHomePins, useSavedViewOps, useSavedViews, type LocalView, type SavedView, type SavedViewAudience, type SavedViewColumns, type SavedViewSort } from '@/api/views';
+import { importLocalViews, useDefaultViewOps, useDefaultViews, useHomePinOps, useHomePins, useSavedViewOps, useSavedViews, type LocalView, type SavedView, type SavedViewAudience, type SavedViewColumns, type SavedViewSort } from '@/api/views';
 import { loadPref } from '@/lib/localPref';
 import type { Prefs } from '@/lib/tablePrefs';
 import { errText, FormDialog } from './FormDialog';
@@ -50,6 +50,10 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
   const ops = useSavedViewOps(screen);
   const pinsQ = useHomePins();
   const pinOps = useHomePinOps();
+  const defQ = useDefaultViews();
+  const defOps = useDefaultViewOps();
+  const defApplied = useRef(false);
+  const myDefault = (defQ.data ?? []).find((d) => d.screen_key === screen);
   const [cur, setCur] = useState('');
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
@@ -94,6 +98,14 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
     if (v) { setCur(v.id); apply(v); }
     const next = new URLSearchParams(sp); next.delete('view_id'); setSp(next, { replace: true });
   }, [wantView, q.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 0.15.582: the person's default view of this screen opens by itself, once, when the link names no filter or view of its own.
+  useEffect(() => {
+    if (defApplied.current || !q.isSuccess || !defQ.isSuccess) return;
+    defApplied.current = true;
+    if (wantView || sp.toString() !== '') return;
+    const v = (q.data?.items ?? []).find((x) => x.id === myDefault?.view_id);
+    if (v) { setCur(v.id); apply(v); }
+  }, [q.isSuccess, defQ.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
   const save = () => {
     const n = name.trim();
@@ -118,6 +130,10 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
       {view && <button type="button" className="btn px-2" data-testid="views-pin-home" aria-label={(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? t('savedViews.unpin_home') : t('savedViews.pin_home')} title={(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? t('savedViews.unpin_home') : t('savedViews.pin_home')} aria-pressed={(pinsQ.data ?? []).some((p) => p.view_id === view.id)} disabled={pinOps.pin.isPending || pinOps.unpin.isPending}
         onClick={() => { const pinned = (pinsQ.data ?? []).some((p) => p.view_id === view.id); (pinned ? pinOps.unpin : pinOps.pin).mutate(view.id, { onSuccess: () => toast(t(pinned ? 'savedViews.unpinned_home' : 'savedViews.pinned_home')), onError: fail }); }}>
         {(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? <PinOff size={14} aria-hidden /> : <Pin size={14} aria-hidden />}</button>}
+      {view && (() => { const isDef = myDefault?.view_id === view.id; const label = t(isDef ? 'savedViews.clear_default' : 'savedViews.set_default');
+        return <button type="button" className="btn px-2" data-testid="views-default" aria-pressed={isDef} aria-label={label} title={label} disabled={defOps.set.isPending || defOps.clear.isPending}
+          onClick={() => (isDef ? defOps.clear : defOps.set).mutate(view.id, { onSuccess: () => toast(t(isDef ? 'savedViews.default_cleared' : 'savedViews.default_set')), onError: fail })}>
+          <Star size={14} aria-hidden fill={isDef ? 'currentColor' : 'none'} /></button>; })()}
       {view?.can_share && <button type="button" className="btn px-2" data-testid="views-share" aria-label={t('savedViews.share')} title={t('savedViews.share')} onClick={() => setSharing(view)}><Share2 size={14} aria-hidden /></button>}
       {view?.can_edit && view.shared && <button type="button" className="btn px-2" data-testid="views-transfer" aria-label={t('savedViews.transfer')} title={t('savedViews.transfer')} onClick={() => setHanding(view)}><UserCheck size={14} aria-hidden /></button>}
       {view?.can_edit && <button type="button" className="btn px-2" data-testid="views-delete" aria-label={t('savedViews.deactivate')} title={t('savedViews.deactivate')}
