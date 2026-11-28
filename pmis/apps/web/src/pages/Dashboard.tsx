@@ -4,6 +4,7 @@ import { useDownloadGate } from '@/lib/downloadGate';
 import { useEffect, useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { fmtDate } from "@/lib/time";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "@/api/hooks";
 import {
@@ -2619,6 +2620,9 @@ export function Dashboard() {
                               {t("dash.regions.progress")}
                             </th>
                             <th className="px-2 text-end">
+                              {t("dash.regions.forecast")}
+                            </th>
+                            <th className="px-2 text-end">
                               {t("dash.regions.health")}
                             </th>
                           </tr>
@@ -2660,6 +2664,9 @@ export function Dashboard() {
                                     {pct(r.progress_pct)}
                                   </span>
                                 </div>
+                              </td>
+                              <td className="px-2 text-end tnum" data-testid={`dash-region-forecast-${r.region_id}`}>
+                                {fmtDate(r.forecast_date, i18n.language) || "–"}
                               </td>
                               <td className="px-2 text-end tnum">
                                 {r.health_score == null

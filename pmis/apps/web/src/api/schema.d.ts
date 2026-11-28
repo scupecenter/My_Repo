@@ -3775,6 +3775,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/tasks/{task_code}/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Estimated man-days and planned duration of a task (draft)
+         * @description 0.15.269 (migration 0542, admin_wf_task_estimate): the estimated man-days and an optional planned duration (days) of a task, editable on a draft only. They feed the suggested weight shown in the editor; the suggestion is advice and is never auto-applied. Null clears the value. Needs weights.edit, a step-up and If-Match.
+         */
+        put: operations["putTaskEstimate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/tasks/{task_code}/closing": {
         parameters: {
             query?: never;
@@ -5328,6 +5348,30 @@ export interface paths {
          * @description 0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
          */
         post: operations["createAlertRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/partial-credit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Partial credit for in-progress tasks
+         * @description 0.15.269 (migration 0543): the setting `progress.partial_credit`. When on, an applicable task that is not yet approved earns current_level/levels_required of its item fraction in the project-status calculation. System Admin only.
+         */
+        get: operations["getPartialCredit"];
+        /**
+         * Set partial credit for in-progress tasks
+         * @description 0.15.269 (migration 0543, `admin_save_progress_partial_credit`): System Admin only, a reason and If-Match (the setting version). Audited.
+         */
+        put: operations["putPartialCredit"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -14689,6 +14733,10 @@ export interface components {
             name_ar?: string | null;
             stage_code: string;
             stream_code?: string | null;
+            /** @description 0.15.269: the workflow version the site runs on. The milestone/gate date rule (automatic milestone dates; gates take the milestone date only) applies from version 2. */
+            workflow_version?: number;
+            /** @description 0.15.269: the task is the milestone task of its stage (its code is the stage code). On workflow version 2+ its actual date is the date of its last linked task, set automatically and never typed. */
+            is_milestone_task?: boolean;
             state: components["schemas"]["TaskState"];
             current_level?: number;
             levels_required?: number;
@@ -22954,6 +23002,11 @@ export interface components {
                 label: string;
                 progress_pct: number;
                 planned_pct?: number | null;
+                /**
+                 * Format: date
+                 * @description 0.15.269 (migration 0545): the forecast completion date of the row; null when it cannot be forecast.
+                 */
+                forecast_date?: string | null;
                 /** @description Activity code to progress %. */
                 activities?: {
                     [key: string]: number;
@@ -22991,6 +23044,14 @@ export interface components {
          * @enum {string}
          */
         PipelineVariant: "A" | "B";
+        PartialCreditSettings: {
+            /** @description Off by default. */
+            enabled: boolean;
+            version: number;
+            /** Format: date-time */
+            updated_at: string | null;
+            updated_by: components["schemas"]["UserRef"] | null;
+        };
         /** @description 0.12.7 (Q177): Actual / Planned over the items that have a plan, with the share of the weight they cover. */
         PartialPlanIndex: {
             value: number | null;
@@ -23644,6 +23705,11 @@ export interface components {
                 cancelled?: number;
             };
             progress_pct: number;
+            /**
+             * Format: date
+             * @description 0.15.269 (migration 0545): the forecast completion date of the region from its remaining work and recent rate; null when it cannot be forecast.
+             */
+            forecast_date?: string | null;
             health_score?: number | null;
             /** @description Sites that reached each milestone, by code. */
             by_milestone?: {
@@ -30445,6 +30511,44 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    putTaskEstimate: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    est_man_days: number | null;
+                    planned_duration_days?: number | null;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated task of the draft version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     setTaskClosing: {
         parameters: {
             query?: never;
@@ -33233,6 +33337,66 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getPartialCredit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartialCreditSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putPartialCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartialCreditSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     updateAlertRule: {
