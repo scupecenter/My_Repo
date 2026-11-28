@@ -7696,6 +7696,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/links/orphans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Orphan counts of the declared links (0.15.512)
+         * @description 0.15.512 (D60 follow-up). For each active link of `register_links`: how many current rows hold an id (`rows_with_value`) and how many of those are not a current record of the target register (`orphan_rows`). Read only. System Admin only (the database refuses anyone else with 403). The Settings links editor shows it as a badge beside each link, so an admin sees whether the check (`enforce`) can be switched on.
+         */
+        get: operations["listRegisterLinkOrphans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{key}/links": {
         parameters: {
             query?: never;
@@ -37848,6 +37868,36 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listRegisterLinkOrphans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One item per active link. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            register_key: string;
+                            field_code: string;
+                            target_register: string;
+                            rows_with_value: number;
+                            orphan_rows: number;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listRegisterLinks: {

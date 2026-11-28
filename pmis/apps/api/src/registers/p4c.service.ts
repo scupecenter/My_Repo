@@ -88,6 +88,12 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/links/orphans (D60 follow-up, 0655): per declared link, the rows that hold an id that is not a current record of the target. System Admin only (the database checks). */
+  async registerLinkOrphans(auth: AuthContext): Promise<{ items: unknown[] }> {
+    const r = await this.registers.call<{ items: unknown[] }>(auth, Prisma.sql`SELECT register_link_orphans_report() AS r`);
+    return { items: r.items ?? [] };
+  }
+
   /** GET /registers/{key}/link-options/{field}?site_id=&q= (D60): the one generic picker of a declared link; needs the view of the target register. */
   async registerLinkOptions(auth: AuthContext, key: string, field: string, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
     if (!/^[a-z][a-z0-9_]{0,40}$/.test(key)) throw problems.validation([{ path: '/key', code: 'invalid', message: 'A register key.' }]);

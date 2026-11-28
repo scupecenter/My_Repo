@@ -57,6 +57,10 @@ export const p4cHandlers = [
   }),
 
   // D60: the declared links of a register and the generic picker (the demo declares none; a test overrides them)
+  http.get(`${B}/registers/links/orphans`, () => {
+    const g = guard(); if (g) return g;
+    return HttpResponse.json({ items: [] });
+  }),
   http.get(`${B}/registers/:key/links`, ({ params }) => {
     const g = guard(); if (g) return g;
     const key = String(params.key);

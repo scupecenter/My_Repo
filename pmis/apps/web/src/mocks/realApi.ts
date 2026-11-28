@@ -508,6 +508,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/change_control/order-options'],
   ['get', '/registers/quality/order-options'],
   ['get', '/registers/financial_advances/advance-options'],
+  ['get', '/registers/links/orphans'],
   ['get', '/registers/:key/links'],
   ['get', '/registers/:key/link-options/:field'],
   ['get', '/registers/invoices/order-options'],

@@ -80,6 +80,12 @@ export class P4cController {
     return this.p4c.invoiceSupplierOptions(auth);
   }
 
+  /** D60 follow-up: the orphan counts of every declared link, for the Settings links editor (System Admin). */
+  @Get('links/orphans')
+  registerLinkOrphans(@Auth() auth: AuthContext) {
+    return this.p4c.registerLinkOrphans(auth);
+  }
+
   /** D60: the declared links of a register (the generic link declaration, table register_links). */
   @Get(':key/links')
   registerLinks(@Auth() auth: AuthContext, @Param('key') key: string) {

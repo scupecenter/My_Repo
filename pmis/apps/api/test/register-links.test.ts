@@ -89,3 +89,20 @@ describe('register links (migration 0409)', () => {
     await db.query('ROLLBACK');
   });
 });
+
+describe('orphan report of the links (migration 0655)', () => {
+  it('lists every active link with its counts for a System Admin, and refuses a call without an actor', async () => {
+    await db.query('BEGIN');
+    let none: unknown = null;
+    await db.query('SAVEPOINT s');
+    try { await db.query(`SELECT register_link_orphans_report() AS j`); none = 'ran'; } catch (e) { none = (e as { code?: string }).code; }
+    await db.query('ROLLBACK TO SAVEPOINT s');
+    expect(none).toBe('42501');
+    await beginAs(db, adminId);
+    const r = await db.query(`SELECT register_link_orphans_report() AS j`);
+    const items = (r.rows[0].j as { items: { register_key: string; field_code: string; rows_with_value: number; orphan_rows: number }[] }).items;
+    expect(items.some((x) => x.register_key === 'issues' && x.field_code === 'risk_entity_id')).toBe(true);
+    expect(items.every((x) => Number(x.orphan_rows) <= Number(x.rows_with_value))).toBe(true);
+    await db.query('ROLLBACK');
+  });
+});

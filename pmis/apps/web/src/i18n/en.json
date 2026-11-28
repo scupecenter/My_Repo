@@ -8607,5 +8607,11 @@
     "note": "Note",
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
+  },
+  "linkOrphans": {
+    "badge_clean": "No orphans",
+    "badge_orphans": "{{n}} orphan(s)",
+    "badge_title": "{{n}} of {{total}} rows hold an id that is not a current record of {{target}}. Switch the check on only when this is 0.",
+    "badge_none": "No rows use this link yet"
   }
 }
