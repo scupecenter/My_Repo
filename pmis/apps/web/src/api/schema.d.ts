@@ -12346,7 +12346,7 @@ export interface paths {
         };
         /**
          * Project Status (ends at HOTO) with the weight-set version used
-         * @description Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then).
+         * @description Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then). Since 0.15.368 `project_phase` narrows them further, and `group_by=phase` returns one row per project phase (the same engine run once per phase site set; sites without a phase are in no row).
          */
         get: operations["getProjectStatus"];
         put?: never;
@@ -23756,7 +23756,7 @@ export interface components {
             /** @description 0.7.2. Active sites behind the figure. */
             sites_in_scope?: number;
             activities: components["schemas"]["ProjectStatusActivity"][];
-            /** @description Present when `group_by` is region or site. */
+            /** @description Present when `group_by` is region, site or (0.15.368) phase; a phase row's key and label are the phase value. */
             rows?: {
                 key: string;
                 label: string;
@@ -24062,6 +24062,8 @@ export interface components {
             }[];
             clusters: string[];
             scenarios: components["schemas"]["DeliveryScenario"][];
+            /** @description 0.15.368: the distinct values of `project_phase` of the sites the caller can see, for the phase quick filter. */
+            phases?: string[];
             streams: {
                 code: string;
                 name_en: string;
@@ -24847,6 +24849,8 @@ export interface components {
         FilterTree: string;
         /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
         DashboardFilterTree: string;
+        /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+        DashboardProjectPhase: string;
         Limit: number;
         /** @description Opaque cursor from `page.next_cursor`. */
         Cursor: string;
@@ -46442,6 +46446,8 @@ export interface operations {
                 /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
                 filter?: components["parameters"]["DashboardFilterTree"];
                 region_id?: components["schemas"]["RegionId"];
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
             };
             header?: never;
             path?: never;
@@ -46617,6 +46623,8 @@ export interface operations {
                 stream?: string;
                 /** @description A view code from `filters.views` (CW, TE, OM; 0.11.0, Q126). Keeps the sites that have a task of the view that applies, the milestones of the view (its whole stages, or for a view of single tasks such as O&M the stages of those tasks) and the tasks of the view in the SLA and the delay attribution. Combines with `stream`. An unknown one is 422 `unknown_view`. */
                 view?: string;
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
                 /** @description Leave out tasks closed by an admin override. Default is the setting `dashboard.exclude_overrides` (true). The number left out is `meta.override_flagged_count`. */
                 exclude_overrides?: boolean;
             };
@@ -46675,6 +46683,8 @@ export interface operations {
                 scenario?: components["schemas"]["DeliveryScenario"];
                 /** @description Accepted as in `GET /dashboard`; the sections do not depend on it. */
                 stream?: string;
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
             };
             header?: never;
             path?: never;
@@ -46771,9 +46781,11 @@ export interface operations {
             query?: {
                 /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
                 filter?: components["parameters"]["DashboardFilterTree"];
+                /** @description 0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller's regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given. */
+                project_phase?: components["parameters"]["DashboardProjectPhase"];
                 region_id?: components["schemas"]["RegionId"];
                 site_id?: string;
-                group_by?: "none" | "region" | "site";
+                group_by?: "none" | "region" | "site" | "phase";
                 weight_set_version?: number;
                 /** @description Re-run with this weight set (any published or older set of code `project_status`) instead of the one in force, for comparison (0.2.6). Not together with `weight_set_version` (422). The response `weight_set.is_active` is false. Nothing is saved and snapshots are not touched. */
                 weight_set_id?: string;

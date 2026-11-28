@@ -3488,6 +3488,9 @@
       "region": "Region",
       "cluster": "Cluster",
       "scenario": "Scenario",
+      "phase": "Phase",
+      "all_phases": "All phases",
+      "phase_hint": "Keep only the sites of one phase; every figure and card narrows to them.",
       "stream": "Stream",
       "all_clusters": "All clusters",
       "all_streams": "All streams",
@@ -3570,7 +3573,10 @@
       "no_data": "no data yet",
       "central_line": "Central project-wide items, outside this figure: {{m}} of {{t}} have a value",
       "central_pct": "their weighted progress {{pct}}%",
-      "central_hint": "They count in the project-wide figure only."
+      "central_hint": "They count in the project-wide figure only.",
+      "by_phase": "By phase",
+      "by_phase_hint": "The same Project Status computed once per project phase.",
+      "phase_planned": "plan {{n}}%"
     },
     "streams": {
       "title": "Streams",
