@@ -45,7 +45,7 @@
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "@types/web-push": "3.6.4",
-    "eslint": "^9.39.5",
+    "eslint": "^10.15.0",
     "pg": "^8.23.1",
     "prisma": "^6.19.3",
     "supertest": "^7.3.2",
