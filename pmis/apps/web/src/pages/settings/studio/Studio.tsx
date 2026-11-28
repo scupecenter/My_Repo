@@ -15,6 +15,7 @@ import { StudioAdd, type AddTab } from './StudioAdd';
 import { GateForm, MilestoneForm, TaskForm } from './StudioForms';
 import { StudioPending } from './StudioPending';
 import { StudioReview } from './StudioReview';
+import { StudioLists, type ListKind } from './StudioLists';
 import { StudioTree } from './StudioTree';
 import { useAsk, useWrites, type Ctx } from './studioCtx';
 import { OldVersions } from './OldVersions';
@@ -67,6 +68,9 @@ function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: numbe
   const [addMs, setAddMs] = useState<string | undefined>();
   const [addTask, setAddTask] = useState<string | undefined>();
   const [query, setQuery] = useState('');
+  const [listKind, setListKind] = useState<ListKind>('tasks');
+  const [unsaved, setUnsaved] = useState(0);
+  const [asList, setAsList] = useState(true);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<'tree' | 'detail'>('tree');
   const [menu, setMenu] = useState(false);
@@ -122,7 +126,7 @@ function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: numbe
           {isDraft && <>
             <button type="button" className="chip min-h-11 bg-hover text-ink hover:bg-line" data-testid="studio-pending" aria-expanded={panel} aria-haspopup="dialog" title={t('studioPanel.open')} onClick={() => setPanel((o) => !o)}><ListChecks size={14} aria-hidden />{t('studio.pending', { count: changes.length })}</button>
             <button type="button" className="btn min-h-11" data-testid="studio-preview" onClick={() => setDlg('preview')}><Eye size={14} aria-hidden />{t('studio.preview_impact')}</button>
-            <button type="button" className="btn btn-accent min-h-11" data-testid="studio-review-btn" disabled={!v.can_publish} title={!v.can_publish ? t('wfe.readonly') : undefined} onClick={() => { setView('review'); setStep('detail'); }}><Upload size={14} aria-hidden />{t('studio.review_publish')}</button>
+            <button type="button" className="btn btn-accent min-h-11" data-testid="studio-review-btn" disabled={!v.can_publish || unsaved > 0} title={!v.can_publish ? t('wfe.readonly') : unsaved > 0 ? t('studioLists.save_first') : undefined} onClick={() => { setView('review'); setStep('detail'); }}><Upload size={14} aria-hidden />{t('studio.review_publish')}</button>
           </>}
         </div>
       </header>
@@ -131,9 +135,13 @@ function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: numbe
       {!canEdit && <p className="text-sm text-mute" data-testid="studio-readonly">{t('wfe.readonly')}</p>}
       {!isDraft && canEdit && <p className="text-sm text-mute" data-testid="studio-live-note">{t('studio.live_note')}</p>}
 
-      <div className="grid gap-4 md:grid-cols-[minmax(340px,380px)_minmax(0,1fr)]">
-        <div className={`${step === 'tree' ? '' : 'hidden'} md:block`}>
-          <StudioTree s={struc} version={v.version} isDraft={isDraft} query={query} expanded={open} onToggle={toggle} sel={sel} edited={edited} nm={nm} onSelect={select} onAddTask={(m) => startAdd('task', m)} canAdd={struct} why={why} />
+      <div className={asList && step === 'tree' ? 'space-y-4' : 'grid gap-4 md:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]'}>
+        <div className={asList && step === 'tree' ? '' : 'hidden'} data-testid="studio-lists-wrap">
+          <StudioLists c={c} kind={listKind} onKind={setListKind} version={v.version} query={query} onPending={setUnsaved} onOpen={(k, code) => { select({ kind: k, code }); setAsList(false); }} />
+        </div>
+        <div className={asList && step === 'tree' ? 'hidden' : step === 'tree' ? '' : 'hidden md:block'}>
+          <button type="button" className="btn mb-2 min-h-11 w-full" data-testid="studio-show-lists" onClick={() => { setAsList(true); setStep('tree'); setView('form'); }}>{t('studioLists.back_to_lists')}</button>
+          <StudioTree s={struc} version={v.version} isDraft={isDraft} query={query} expanded={open} onToggle={toggle} sel={sel} edited={edited} nm={nm} onSelect={(x) => { select(x); setAsList(false); }} onAddTask={(m) => startAdd('task', m)} canAdd={struct} why={why} />
         </div>
         <main className={`${step === 'detail' ? '' : 'hidden'} min-w-0 space-y-3 md:block`} aria-label={t('studio.title')} data-testid="studio-centre">
           <button type="button" className="btn min-h-11 md:hidden" data-testid="studio-back" onClick={() => setStep('tree')}><ArrowLeft size={14} aria-hidden className="rtl:rotate-180" />{t('wfe.back')}</button>
