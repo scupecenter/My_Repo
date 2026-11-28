@@ -43,7 +43,17 @@ const ALERT_RULES: AlertRuleRow[] = [
     link: '/project-status', enabled: true, locked: false, version: 1, created_at: '2026-11-27T00:00:00.000Z', updated_at: '2026-11-27T00:00:00.000Z',
   },
 ];
-let perf = { thresholds: structuredClone(PERF_DEFAULT), version: 1 };
+type PerfPenalty = { rate_per_day: number; currency: string; cap: number | null; overrides: Record<string, number> };
+let perf: { thresholds: typeof PERF_DEFAULT & { penalty?: PerfPenalty }; version: number } = { thresholds: structuredClone(PERF_DEFAULT), version: 1 };
+/** Late days of the snags per mock contractor (the API sums the days past the target date); the issue delay days are the row's own. */
+const SNAG_LATE: Record<string, number> = { 'Delta Build': 12, 'Omega Works': 0 };
+/** The penalty of a row as the API computes it: days late x the rate (the contractor's own, else the default), never above the cap. */
+const perfItems = (amounts: boolean) => PERF_ROWS.map((r) => {
+  const p = perf.thresholds.penalty, snags = SNAG_LATE[r.name] ?? 0, total = snags + r.delay_days;
+  const rate = p ? (p.overrides[r.party_id] ?? p.rate_per_day) : 0;
+  const raw = Math.round(total * rate * 100) / 100, capped = !!p && p.cap !== null && raw > p.cap;
+  return { ...r, penalty: { late_days: { snags, issues: r.delay_days, total }, has_rate: rate > 0, ...(amounts && p && rate > 0 ? { rate, amount: capped ? p.cap! : raw, capped, currency: p.currency } : {}) } };
+});
 const PERF_ROWS = [
   { party_id: '11111111-1111-4111-8111-111111111101', name: 'Delta Build', type: 'cw_contractor', delay_days: 42, issues_total: 5, issues_open: 2,
     snags: { total: 10, open: 4, overdue: 3, overdue_pct: 30, overdue_level: 'red' as const, returned: 2, returned_pct: 20, returned_level: 'amber' as const },
@@ -1695,13 +1705,13 @@ export const settingsHandlers = [
     return HttpResponse.json({ task_code: row.task_code, is_none: !!b.no_sla });
   }),
   http.get(`${B}/reports/gecol-hlc-counts`, () => { const g = guard(); if (g) return g; return HttpResponse.json(GECOL_HLC_COUNTS); }),
-  http.get(`${B}/reports/contractor-performance`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ as_of: '2026-11-26T12:00:00.000Z', thresholds: perf.thresholds, items: PERF_ROWS }); }),
+  http.get(`${B}/reports/contractor-performance`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ as_of: '2026-11-26T12:00:00.000Z', thresholds: perf.thresholds, items: perfItems(true) }); }),
   http.get(`${B}/settings/contractor-performance`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ thresholds: perf.thresholds, version: perf.version, can_edit: true, updated_at: null, updated_by: null }, tag(perf.version)); }),
   http.put(`${B}/settings/contractor-performance`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match.');
     const p = ver(request, perf.version); if (p) return p;
-    const b = await body<{ reason?: string; thresholds: typeof PERF_DEFAULT }>(request);
+    const b = await body<{ reason?: string; thresholds: typeof PERF_DEFAULT & { penalty?: PerfPenalty } }>(request);
     const r = reasonErr(b.reason); if (r) return r;
     perf = { thresholds: b.thresholds, version: perf.version + 1 };
     return HttpResponse.json({ thresholds: perf.thresholds, version: perf.version, can_edit: true, updated_at: new Date().toISOString(), updated_by: null }, tag(perf.version));

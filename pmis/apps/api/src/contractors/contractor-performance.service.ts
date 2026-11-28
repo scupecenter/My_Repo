@@ -9,11 +9,18 @@ import { DbService } from '../db/db.service';
 
 const pct = z.object({ amber: z.number().int().min(0).max(100), red: z.number().int().min(0).max(100) }).strict();
 const days = z.object({ amber: z.number().int().min(0).max(365), red: z.number().int().min(0).max(365) }).strict();
+const money = (max: number) => z.number().min(0).max(max).refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, 'At most 2 decimals');
+/** The daily rate of the SLA penalty (0.15.591): a default, an optional cap per contractor, and a rate per contractor (the contractor id is the key). */
+const penaltySchema = z.object({
+  rate_per_day: money(10_000_000), currency: z.string().regex(/^[A-Z]{3}$/), cap: money(1_000_000_000).nullable().optional(),
+  overrides: z.record(z.string().uuid(), money(10_000_000)).refine((o) => Object.keys(o).length <= 200, 'At most 200 contractors').optional(),
+}).strict();
 const thresholdsSchema = z.object({
   reason: z.string().trim().min(3).max(1000),
   thresholds: z.object({
     min_sample: z.number().int().min(1).max(100),
     snag_overdue_pct: pct, snag_return_pct: pct, quality_fail_pct: pct, contract_expiry_days: days,
+    penalty: penaltySchema.optional(),
   }).strict(),
 }).strict();
 
@@ -21,12 +28,14 @@ export type Level = 'ok' | 'amber' | 'red' | 'insufficient';
 interface Pair { amber: number; red: number }
 export interface Thresholds {
   min_sample: number; snag_overdue_pct: Pair; snag_return_pct: Pair; quality_fail_pct: Pair; contract_expiry_days: Pair;
+  penalty?: Penalty;
 }
+export interface Penalty { rate_per_day: number; currency: string; cap: number | null; overrides: Record<string, number> }
 interface ThresholdsJson { thresholds: Thresholds; updated_at: string | null; updated_by: string | null; version: number; can_edit: boolean }
 
 interface Row {
   party_id: string; name: string; type: string; is_active: boolean;
-  issues_total: number; issues_open: number; delay_days: number;
+  issues_total: number; issues_open: number; delay_days: number; snag_late_days: number;
   snags_total: number; snags_open: number; snags_overdue: number; snags_returned: number;
   quality_total: number; quality_failed: number;
   orders_total: number; orders_open: number;
@@ -47,6 +56,19 @@ export function pctLevel(part: number, total: number, t: Pair, minSample: number
 export function expiryLevel(daysLeft: number | null, t: Pair): Level {
   if (daysLeft === null) return 'insufficient';
   return daysLeft <= t.red ? 'red' : daysLeft <= t.amber ? 'amber' : 'ok';
+}
+
+/**
+ * SLA penalty (0.15.591): the days late times the daily rate of the contractor (its own rate when the setting has one, else the default), never more
+ * than the cap. No rate, or a rate of 0, is no penalty (null). Amounts have two decimals.
+ */
+export function penaltyOf(daysLate: number, partyId: string, p: Penalty | undefined): { rate: number; amount: number; capped: boolean; currency: string } | null {
+  if (!p) return null;
+  const rate = p.overrides?.[partyId] ?? p.rate_per_day;
+  if (!(rate > 0)) return null;
+  const raw = Math.round(Math.max(0, daysLate) * rate * 100) / 100;
+  const capped = p.cap !== null && p.cap !== undefined && raw > p.cap;
+  return { rate, amount: capped ? p.cap! : raw, capped, currency: p.currency };
 }
 
 export function overall(levels: Level[]): Level {
@@ -82,7 +104,10 @@ export class ContractorPerformanceService {
 
   async getThresholds(auth: AuthContext) {
     await this.access.requireModuleView(auth, 'contractors');
-    return this.dto(await this.thresholdsJson());
+    const j = await this.thresholdsJson();
+    // the daily rates are money: only an editor of the setting and a reader of the money registers see them
+    if (!j.can_edit && !(await this.access.hasGrant(auth, 'financial_advances', 'view'))) { const { penalty: _p, ...rest } = j.thresholds; j.thresholds = rest; }
+    return this.dto(j);
   }
 
   async putThresholds(ifMatch: string | undefined, raw: unknown) {
@@ -96,7 +121,8 @@ export class ContractorPerformanceService {
 
   async report(auth: AuthContext) {
     await this.access.requireModuleView(auth, 'contractors');
-    return this.reportData();
+    // the penalty amount is money: it follows the right to see the money registers (financial advances); the late days are always shown
+    return this.reportData(await this.access.hasGrant(auth, 'financial_advances', 'view'));
   }
 
   /**
@@ -104,7 +130,7 @@ export class ContractorPerformanceService {
    * GET /dashboard/ops (0.15.202, item 5) answers available false when the caller lacks contractors view. Same rows,
    * same rules, so the dashboard card and this screen never disagree.
    */
-  async reportData() {
+  async reportData(showAmounts = false) {
     const th = await this.thresholdsJson();
     const t = th.thresholds;
     const rows = await this.db.tx.$queryRaw<Row[]>(Prisma.sql`
@@ -115,7 +141,10 @@ export class ContractorPerformanceService {
                     (count(*) FILTER (WHERE status::text NOT IN ('closed', 'cancelled')))::int AS open,
                     (count(*) FILTER (WHERE target_date IS NOT NULL AND ((status::text NOT IN ('closed', 'cancelled') AND target_date < CURRENT_DATE)
                                                                         OR (status::text = 'closed' AND closed_at::date > target_date))))::int AS overdue,
-                    (count(*) FILTER (WHERE return_count > 0))::int AS returned
+                    (count(*) FILTER (WHERE return_count > 0))::int AS returned,
+                    coalesce(sum(CASE WHEN target_date IS NULL THEN 0
+                                      WHEN status::text NOT IN ('closed', 'cancelled') AND target_date < CURRENT_DATE THEN CURRENT_DATE - target_date
+                                      WHEN status::text = 'closed' AND closed_at::date > target_date THEN closed_at::date - target_date ELSE 0 END), 0)::int AS late_days
              FROM snags WHERE responsible_party_id IS NOT NULL AND status::text <> 'cancelled' GROUP BY responsible_party_id),
       q AS (SELECT party_id, count(*)::int AS total, (count(*) FILTER (WHERE lower(btrim(result)) = 'fail'))::int AS failed
             FROM quality_inspections WHERE party_id IS NOT NULL AND lower(btrim(result)) IN ('pass', 'fail') GROUP BY party_id),
@@ -126,7 +155,7 @@ export class ContractorPerformanceService {
             FROM external_party_contracts WHERE status = 'active' GROUP BY party_id)
       SELECT p.id::text AS party_id, p.name, p.type::text AS type, p.is_active,
         coalesce(iss.total, 0) AS issues_total, coalesce(iss.open, 0) AS issues_open, coalesce(iss.delay, 0) AS delay_days,
-        coalesce(sn.total, 0) AS snags_total, coalesce(sn.open, 0) AS snags_open, coalesce(sn.overdue, 0) AS snags_overdue, coalesce(sn.returned, 0) AS snags_returned,
+        coalesce(sn.total, 0) AS snags_total, coalesce(sn.open, 0) AS snags_open, coalesce(sn.overdue, 0) AS snags_overdue, coalesce(sn.returned, 0) AS snags_returned, coalesce(sn.late_days, 0) AS snag_late_days,
         coalesce(q.total, 0) AS quality_total, coalesce(q.failed, 0) AS quality_failed,
         coalesce(o.total, 0) AS orders_total, coalesce(o.open, 0) AS orders_open,
         coalesce(c.active, 0) AS contracts_active,
@@ -141,8 +170,13 @@ export class ContractorPerformanceService {
       const returned = pctLevel(r.snags_returned, r.snags_total, t.snag_return_pct, t.min_sample);
       const fail = pctLevel(r.quality_failed, r.quality_total, t.quality_fail_pct, t.min_sample);
       const expiry = expiryLevel(r.days_left, t.contract_expiry_days);
+      const lateDays = r.snag_late_days + r.delay_days;
+      const pen = penaltyOf(lateDays, r.party_id, t.penalty);
       return {
         party_id: r.party_id, name: r.name, type: r.type,
+        penalty: { late_days: { snags: r.snag_late_days, issues: r.delay_days, total: lateDays },
+          ...(showAmounts && pen ? { rate: pen.rate, amount: pen.amount, capped: pen.capped, currency: pen.currency } : {}),
+          has_rate: !!pen },
         delay_days: r.delay_days, issues_total: r.issues_total, issues_open: r.issues_open,
         snags: { total: r.snags_total, open: r.snags_open, overdue: r.snags_overdue, overdue_pct: overdue.pct, overdue_level: overdue.level,
                  returned: r.snags_returned, returned_pct: returned.pct, returned_level: returned.level },
@@ -154,6 +188,7 @@ export class ContractorPerformanceService {
     });
     const worst = (a: { level: Level }, b: { level: Level }) => RANK[b.level] - RANK[a.level];
     items.sort((a, b) => worst(a, b) || b.delay_days - a.delay_days || a.name.localeCompare(b.name));
-    return { as_of: new Date().toISOString(), thresholds: t, items };
+    const { penalty: _hidden, ...open } = t;
+    return { as_of: new Date().toISOString(), thresholds: showAmounts ? t : open, items };
   }
 }

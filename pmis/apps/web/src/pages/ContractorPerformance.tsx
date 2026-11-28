@@ -31,7 +31,7 @@ export function ContractorPerformance() {
           <table className="w-full text-sm">
             <thead className="text-mute"><tr>
               <th className="p-2 text-start">{t('contractorPerf.contractor')}</th><th className="p-2 text-start">{t('contractorPerf.overall')}</th>
-              <th className="p-2 text-start">{t('contractorPerf.delay_days')}</th><th className="p-2 text-start">{t('contractorPerf.overdue')}</th>
+              <th className="p-2 text-start">{t('contractorPerf.delay_days')}</th><th className="p-2 text-start">{t('contractorPerf.pen_col')}</th><th className="p-2 text-start">{t('contractorPerf.overdue')}</th>
               <th className="p-2 text-start">{t('contractorPerf.returned')}</th><th className="p-2 text-start">{t('contractorPerf.quality')}</th>
               <th className="p-2 text-start">{t('contractorPerf.orders')}</th><th className="p-2 text-start">{t('contractorPerf.contract')}</th>
             </tr></thead>
@@ -40,6 +40,11 @@ export function ContractorPerformance() {
                 <tr key={r.party_id} className="border-t border-line align-top" data-testid={`perf-${r.name}`}>
                   <td className="p-2 font-semibold"><Link className="underline" to="/registers/contractors">{r.name}</Link></td>
                   <td className="p-2"><Chip level={r.level} label={t(`contractorPerf.level_${r.level}`)} testid={`perf-level-${r.name}`} /></td>
+                  <td className="p-2" data-testid={`perf-penalty-${r.name}`} data-late-days={r.penalty.late_days.total}>
+                    {r.penalty.late_days.total} <span className="text-xs text-mute">{t('contractorPerf.pen_days')}</span>
+                    <span className="block text-xs text-mute" title={t('contractorPerf.pen_basis')}>{t('contractorPerf.pen_split', { snags: r.penalty.late_days.snags, issues: r.penalty.late_days.issues })}</span>
+                    {r.penalty.amount !== undefined && <span className="block font-semibold" data-testid={`perf-amount-${r.name}`}>{r.penalty.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {r.penalty.currency}{r.penalty.capped ? ` · ${t('contractorPerf.pen_capped')}` : ''}<span className="block text-xs font-normal text-mute">{t('contractorPerf.pen_at', { rate: r.penalty.rate })}</span></span>}
+                  </td>
                   <td className="p-2">{r.delay_days}<span className="block text-xs text-mute">{t('contractorPerf.open_note', { open: r.issues_open, total: r.issues_total })}</span></td>
                   <td className="p-2"><Chip level={r.snags.overdue_level} label={pctText(r.snags.overdue_pct)} /><span className="block text-xs text-mute">{t('contractorPerf.open_note', { open: r.snags.open, total: r.snags.total })}</span></td>
                   <td className="p-2"><Chip level={r.snags.returned_level} label={pctText(r.snags.returned_pct)} /></td>

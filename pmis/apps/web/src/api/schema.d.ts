@@ -17923,6 +17923,18 @@ export interface components {
             snag_return_pct: components["schemas"]["PerfPair"];
             quality_fail_pct: components["schemas"]["PerfPair"];
             contract_expiry_days: components["schemas"]["PerfPair"];
+            /** @description 0.15.591: the SLA penalty rates. Returned only to a caller who can edit the setting or may read the financial advances; absent means no penalty is computed. */
+            penalty?: {
+                /** @description The default rate for each day late, at most 2 decimals. 0 means no penalty. */
+                rate_per_day: number;
+                currency: string;
+                /** @description The most a contractor can owe; null for no cap. */
+                cap?: number | null;
+                /** @description A rate per contractor (`party_id` is the key) in place of the default. */
+                overrides?: {
+                    [key: string]: number;
+                };
+            };
         };
         ContractorPerformanceThresholds: {
             thresholds: components["schemas"]["ContractorPerformanceSettings"];
@@ -17942,6 +17954,19 @@ export interface components {
             delay_days: number;
             issues_total: number;
             issues_open: number;
+            /** @description 0.15.591: the SLA penalty. `late_days` is the days the contractor is late: snags past their target date (open) or closed after it, plus the delay days of its issues. `amount` is the days late times the rate, never more than the cap; present only for a caller who may read the financial advances and when a rate is set. */
+            penalty: {
+                late_days: {
+                    snags: number;
+                    issues: number;
+                    total: number;
+                };
+                has_rate: boolean;
+                rate?: number;
+                amount?: number;
+                capped?: boolean;
+                currency?: string;
+            };
             snags: {
                 total: number;
                 open: number;
