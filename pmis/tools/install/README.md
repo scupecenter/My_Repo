@@ -159,3 +159,7 @@ sudo -u postgres psql pmis -c "UPDATE settings SET value = '[\"task_assigned\", 
 
 The mails need SMTP (above); with `SMTP_HOST` empty they are only logged. The recipient limit per hour (`mail.cap_per_recipient_per_hour`, 30) still applies
 to these kinds, so a person with many waiting items gets the first 30 mails in an hour and the rest stay in-app.
+
+## Map tiles (optional)
+
+`install-map-tiles.sh` builds the road map tiles of the site map on this server from free OpenStreetMap data (zoom 5 to 11, about 100 MB, run once). See `docs/ops/map-tiles.md`.
