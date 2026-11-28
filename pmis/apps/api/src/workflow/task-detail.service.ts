@@ -100,6 +100,7 @@ export class TaskDetailService {
       is_na: row.is_na,
       na_reason: row.na_reason,
       workflow_version: row.workflow_version,
+      is_milestone_task: row.is_milestone_task,
       historical_load: await this.historicalLoad(row),
       overrides: await this.overrides(row.id),
       can_override: !['na', 'skipped'].includes(row.state) && (await this.isAdmin(auth)),
