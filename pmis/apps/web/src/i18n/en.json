@@ -7203,6 +7203,7 @@
     "display_wrap": "Wrap long text",
     "display_zebra": "Zebra rows",
     "display_groupbar": "Group summary: count and status bar on each group header",
+    "display_colors": "Value colours",
     "display_reset": "Back to the defaults",
     "display_settings": "Defaults in Settings",
     "size_sm": "Small",
@@ -7909,10 +7910,14 @@
   },
   "gantt": {
     "title": "Timeline (read only)",
-    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. Dates change only through the normal change flow.",
+    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. A thin line joins each stage to the one it waits for (red when it is dated earlier). The vertical line is today. Dates change only through the normal change flow.",
     "baseline": "Baseline",
     "planned": "Planned",
-    "actual": "Actual"
+    "actual": "Actual",
+    "today": "Today",
+    "conflicts": "{{count}} order conflict(s)",
+    "dep_ok": "Waits for the stage before it",
+    "dep_conflict": "Dated before the stage it waits for"
   },
   "siteActivity": {
     "c_entity": "Entity",
