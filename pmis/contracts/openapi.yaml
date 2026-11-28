@@ -136,6 +136,7 @@ info:
     - 0.15.371 (2026-11-27): weight item measure rule checked (migration 0552, mirror `db/sql/551_weight_rule_check.sql`; Settings review gap 1). Additive, no new path. `PUT /settings/weight-sets/{id}`: a measure rule that looks like JSON but does not parse is 422 `validation_failed` (it was 500). Publish and preview: `weight_set_errors` adds `measure_rule_invalid` (path `/activities/{n}/items`) for a rule that is not an object, has an unknown method (none, tasks, register), names no task, names a task code that is in no workflow, has a plan outside MS1 to MS10, or has a `central` that is not true/false.
     - 0.15.456 (2026-11-28): five extra register links declared in `register_links` (L10; migration 0596, mirror `db/sql/595_extra_register_links.sql`). Additive, no endpoint change. Optional fields `lessons_learned.incident_id`, `lessons_learned.issue_id` and `incidents.permit_id` (same site, declared with the check off); the generic picker, the Related records panel on both sides, the orphan report and the filters pick them up through the declaration.
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
+    - 0.15.470 (2026-11-28): Project Status items read the Deliverables register (F4 follow-up 1; migration 0610, mirror `db/sql/609_ps_deliverables_source.sql`). Additive. `GET /settings/dashboard/ps-deliverables` (`getPsDeliverables`, needs `dashboard.view`) and `PUT /settings/dashboard/ps-deliverables` (`setPsDeliverables`, `admin.settings` edit for all regions, reason, If-Match, audited as `ps_deliverables_update` with before and after): per central Project Status item the deliverable `kind` (a DeliverableKind code) and the `mode` (`auto` or `manual`). An item in mode `auto` shows accepted / non-cancelled deliverables of its kind (current approved records) while at least one exists, otherwise its manual value; mode `manual` never reads the register. Defaults without a saved row: items 1.3 HLD, 1.5 DOC, 3.8 NMS-S, 3.10 BILL, 6.1 PILOT, 6.6 NMS-I, 7.7 NMS-A, 8.1 TRN, all `auto`. Manual values and their history are never changed. The dashboard card item `manual` object gains `source` (`manual` or `deliverables`) and `deliverables` (`accepted`, `total`; present only for the register source). No new table, no permission change.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.431 (2026-11-28): the number of weeks the dashboard forecast averages is editable (Settings review gap 4, approved by the owner 2026-11-27; migration 0572, mirror `db/sql/571_forecast_window.sql`). Additive. `GET /settings/dashboard/forecast-window` (`getForecastWindow`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-window` (`setForecastWindow`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_window_update` with before and after): the new setting `dashboard.forecast_window_weeks` (a whole number 2 to 12, default 4, the value that was fixed in the web code). The progress curve card reads it when it is drawn: the forecast date uses the mean weekly gain over that many last weeks of the saved snapshots. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
@@ -13079,6 +13080,57 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SnapshotSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard/ps-deliverables:
+    get:
+      tags: [settings]
+      operationId: getPsDeliverables
+      summary: Which Project Status items read the Deliverables register (0.15.470)
+      description: |
+        0.15.470. The setting `dashboard.ps_deliverables`: for every central Project Status item in force, the deliverable `kind` it reads and the `mode` (`auto` or `manual`),
+        with the live counts (`accepted`, `total`: current approved deliverables of the kind, cancelled ones left out) and the `source` the dashboard shows now (`deliverables` only
+        in mode `auto` with at least one deliverable). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+      responses:
+        '200':
+          description: The mapping.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PsDeliverables'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setPsDeliverables
+      summary: Save the Project Status to Deliverables mapping (reason, If-Match, audited)
+      description: |
+        0.15.470. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). All items are sent. Field errors (422 `validation_failed`):
+        `invalid` (`item_code` is not a central Project Status item in force, `mode` is not auto or manual, `kind` is not an active DeliverableKind), `duplicate` (an item listed twice),
+        `required` (`kind` in mode `auto`). One audit row with before and after values and the reason. Manual values are never touched.
+      x-db-path: admin_save_ps_deliverables
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/PsDeliverablesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PsDeliverables'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
@@ -28279,6 +28331,46 @@ components:
           version: { type: integer, minimum: 0 }
           updated_at: { type: [string, 'null'], format: date-time }
           updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    PsDeliverablesItemInput:
+      type: object
+      required: [item_code, mode]
+      additionalProperties: false
+      properties:
+        item_code: { type: string, maxLength: 20, description: 'A central Project Status item in force (for example 1.3).' }
+        kind: { type: [string, 'null'], description: 'A DeliverableKind code. Required in mode auto.' }
+        mode: { type: string, enum: [auto, manual], description: 'auto: the register figure while deliverables of the kind exist. manual: the manual value only.' }
+    PsDeliverablesInput:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/PsDeliverablesItemInput' }
+    PsDeliverablesItem:
+      allOf:
+      - $ref: '#/components/schemas/PsDeliverablesItemInput'
+      - type: object
+        required: [name_en, weight, accepted, total, source]
+        properties:
+          name_en: { type: string }
+          name_ar: { type: [string, 'null'] }
+          weight: { type: number }
+          accepted: { type: [integer, 'null'], description: 'Accepted deliverables of the kind now (null without a kind).' }
+          total: { type: [integer, 'null'], description: 'Non-cancelled deliverables of the kind now (null without a kind).' }
+          source: { type: string, enum: [manual, deliverables], description: 'Where the dashboard figure comes from now.' }
+    PsDeliverables:
+      description: '0.15.470. The setting dashboard.ps_deliverables with the live counts.'
+      type: object
+      required: [items, version]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PsDeliverablesItem' }
+        version: { type: integer, minimum: 0 }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     ProgressRagItemInput:
       type: object
       required: [enabled, green, amber]
@@ -31129,6 +31221,13 @@ components:
             value_pct: {type: number}
             effective_date: {type: string, format: date}
             version: {type: integer}
+            source: {type: string, enum: [manual, deliverables], description: '0.15.470: where the figure comes from. deliverables: accepted / non-cancelled deliverables of the mapped kind (Settings > Dashboard).'}
+            deliverables:
+              description: '0.15.470: the counts behind a figure taken from the Deliverables register; null for a manual figure.'
+              type: [object, 'null']
+              properties:
+                accepted: {type: integer}
+                total: {type: integer}
     DashboardProjectStatusActivity:
       type: object
       required: [code, name_en, weight, progress_pct, measured, items]

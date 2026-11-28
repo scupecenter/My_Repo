@@ -2045,6 +2045,23 @@ export function Dashboard() {
                               value={a.measured ? a.progress_pct : 0}
                               tone="bg-open"
                             />
+                            {(a.items ?? []).some(
+                              (i) => i.manual?.source === "deliverables",
+                            ) && (
+                              <span
+                                className="chip mt-1 border border-line text-xs text-mute"
+                                data-testid={`dash-ps-src-${a.code}`}
+                                title={(a.items ?? [])
+                                  .filter((i) => i.manual?.source === "deliverables")
+                                  .map(
+                                    (i) =>
+                                      `${i.code} ${name(i)}: ${t("psDeliv.tip_deliverables", { accepted: i.manual?.deliverables?.accepted ?? 0, total: i.manual?.deliverables?.total ?? 0 })}`,
+                                  )
+                                  .join("\n")}
+                              >
+                                {t("psDeliv.src_deliverables")}
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>

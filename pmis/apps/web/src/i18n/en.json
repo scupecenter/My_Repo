@@ -5520,6 +5520,23 @@
     "mean": "Mean weekly gain",
     "linear": "Fitted straight line"
   },
+  "psDeliv": {
+    "title": "Project Status from the Deliverables register",
+    "note": "Per Project Status item: the deliverable kind it reads and a switch. Auto: the figure is accepted divided by non-cancelled deliverables of the kind, while at least one exists; with none, the manual value shows. Manual only: the manual value always shows. Manual values and their history are never changed. Own save, reason and audit row.",
+    "item": "Item",
+    "kind": "Deliverable kind",
+    "mode": "Source",
+    "count": "Deliverables now",
+    "none": "No kind",
+    "auto": "Auto (register)",
+    "manual": "Manual only",
+    "counts": "{{accepted}} accepted of {{total}}",
+    "src_deliverables": "from the register",
+    "src_manual": "manual value",
+    "kind_required": "Auto needs a deliverable kind.",
+    "tip_deliverables": "Source: Deliverables register, {{accepted}} accepted of {{total}} non-cancelled",
+    "tip_manual": "Source: manual value"
+  },
   "forecastWindow": {
     "title": "Forecast window",
     "note": "How many of the last real weeks the progress curve forecast averages the weekly gain over (2 to 12, default 4). A longer window smooths the forecast, a shorter one follows the recent pace. The forecast is drawn from the saved snapshots when the card opens, so nothing stored is recomputed. Own save, reason and audit row.",
