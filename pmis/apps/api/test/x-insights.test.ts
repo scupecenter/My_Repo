@@ -208,6 +208,25 @@ describe('X5 workload', () => {
     expect(lates).toEqual([...lates].sort((x: number, y: number) => y - x));
   });
 
+  it('weights the open tasks by the effort entries of the capacity plan (0.15.731)', async () => {
+    const { h1, h2 } = await fixture();
+    const plan = { skills: [{ code: 'civil', name_en: 'Civil', name_ar: 'مدني' }], crews: [], efforts: [{ task_code: 'B9', skill: 'civil', person_days: 2 }], days_per_week: 5, utilization_pct: 80, horizon_weeks: 8 };
+    await db.query(`UPDATE settings SET value = $1::jsonb, updated_by = NULL, updated_at = now() WHERE key = 'capacity.plan'`, [JSON.stringify(plan)]);
+    try {
+      const lead = await reports();
+      const res = await lead.api.call('get', `/reports/workload?region_id=${R7}`);
+      expect(res.status).toBe(200);
+      // h1 holds two B9 tasks of two person-days each; the claimed one counts for h2 alone
+      expect(row(res, h1.user.id)).toMatchObject({ open: 2, days: 4, unestimated: 0 });
+      expect(row(res, h2.user.id)).toMatchObject({ open: 1, days: 2, unestimated: 0 });
+      // the A2 task has no effort entry: it lands in unestimated under no_holder and adds no days
+      expect(res.body.no_holder.unestimated).toBeGreaterThanOrEqual(1);
+      expect(res.body.no_holder.days).toBe(0);
+    } finally {
+      await db.query(`UPDATE settings SET value = $1::jsonb, updated_by = NULL, updated_at = now() WHERE key = 'capacity.plan'`, [JSON.stringify({ skills: [], crews: [], efforts: [], days_per_week: 5, utilization_pct: 80, horizon_weeks: 8 })]);
+    }
+  });
+
   it('never shows the holders of a region the reader does not hold, whatever is asked for', async () => {
     const { h1, h6 } = await fixture();
     const only7 = await reports([R7]);

@@ -82,19 +82,21 @@ function timeInState(t: MockTask) {
 }
 
 const OPEN = new Set(['open', 'entry', 'in_review', 'in_approval']);
+// 0.15.731: the mock weights every open task at two person-days, as a capacity.plan effort entry would.
+const MOCK_TASK_DAYS = 2;
 function workload(region: number | null) {
-  const rows = new Map<string, { holder: UserRef; team: 'cw' | 'te' | 'both' | 'none'; open: number; late: number; by_level: { entry: number; review: number; approve: number } }>();
-  const none = { open: 0, late: 0 };
+  const rows = new Map<string, { holder: UserRef; team: 'cw' | 'te' | 'both' | 'none'; open: number; late: number; days: number; unestimated: number; by_level: { entry: number; review: number; approve: number } }>();
+  const none = { open: 0, late: 0, days: 0, unestimated: 0 };
   const tasks = [...db().tasks, ...db().extra, ...Object.values(db().ov)].filter((t) => OPEN.has(t.state) && (region === null || t.region_id === region));
   for (const t of tasks) {
     const b = ballFor(t);
     const late = t.sla?.colour === 'red';
     const users = b.holders.filter((h) => h.employee_id);
-    if (!users.length) { none.open += 1; none.late += late ? 1 : 0; continue; }
+    if (!users.length) { none.open += 1; none.late += late ? 1 : 0; none.days += MOCK_TASK_DAYS; continue; }
     for (const h of users) {
       const s = STAFF.find((x) => x.employee_id === h.employee_id);
-      const r = rows.get(h.employee_id as string) ?? { holder: staffRef(s ?? STAFF[0]!), team: ((s?.team as 'cw') ?? 'none'), open: 0, late: 0, by_level: { entry: 0, review: 0, approve: 0 } };
-      r.open += 1; r.late += late ? 1 : 0; r.by_level[(b.level_kind ?? 'entry') as 'entry'] += 1;
+      const r = rows.get(h.employee_id as string) ?? { holder: staffRef(s ?? STAFF[0]!), team: ((s?.team as 'cw') ?? 'none'), open: 0, late: 0, days: 0, unestimated: 0, by_level: { entry: 0, review: 0, approve: 0 } };
+      r.open += 1; r.late += late ? 1 : 0; r.days += MOCK_TASK_DAYS; r.by_level[(b.level_kind ?? 'entry') as 'entry'] += 1;
       rows.set(h.employee_id as string, r);
     }
   }

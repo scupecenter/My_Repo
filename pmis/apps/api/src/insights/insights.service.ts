@@ -393,10 +393,16 @@ export class InsightsService {
         kind: Kind;
         open: bigint;
         late: bigint;
+        days: number;
+        unestimated: bigint;
       }[]
     >(Prisma.sql`
-      WITH act AS (
-        SELECT t.id, t.ball_in_court_user_id AS pinned,
+      WITH eff AS (
+        -- 0.15.731: the effort entries of the capacity.plan setting (0666), one row per task definition code
+        SELECT e ->> 'task_code' AS task_code, sum((e ->> 'person_days')::numeric) AS days
+        FROM jsonb_array_elements(public.capacity_plan_cfg() -> 'efforts') e GROUP BY 1
+      ), act AS (
+        SELECT t.id, t.ball_in_court_user_id AS pinned, td.code AS task_code,
           wf_kind(CASE WHEN t.path_frozen_at IS NULL THEN wf_levels_live(t.id) ELSE t.levels_required END, greatest(t.current_level, 1)) AS kind,
           coalesce(sla_colour(CASE WHEN t.sla_start_date IS NULL OR r.id IS NULL THEN NULL ELSE cal_workdays_between(t.sla_start_date, cal_today(), r.calendar_id) END,
                               r.min_working_days, r.max_working_days) = 'red', false) AS late
@@ -405,11 +411,12 @@ export class InsightsService {
         LEFT JOIN sla_rules r ON r.id = t.sla_rule_id
         WHERE t.state IN ('open', 'entry', 'in_review', 'in_approval') AND ${this.scope(regions, q)}
       ), h AS (
-        SELECT act.kind, act.late, coalesce(act.pinned, e.user_id) AS holder
+        SELECT act.kind, act.late, act.task_code, coalesce(act.pinned, e.user_id) AS holder
         FROM act LEFT JOIN LATERAL (SELECT x.user_id FROM wf_eligible(act.id, act.kind) x WHERE act.pinned IS NULL) e ON true
       )
-      SELECT h.holder::text AS holder, ${TEAM_OF(Prisma.sql`h.holder`)} AS team, h.kind, count(*) AS open, count(*) FILTER (WHERE h.late) AS late
-      FROM h GROUP BY h.holder, h.kind`);
+      SELECT h.holder::text AS holder, ${TEAM_OF(Prisma.sql`h.holder`)} AS team, h.kind, count(*) AS open, count(*) FILTER (WHERE h.late) AS late,
+        coalesce(sum(eff.days), 0)::float8 AS days, count(*) FILTER (WHERE eff.task_code IS NULL) AS unestimated
+      FROM h LEFT JOIN eff ON eff.task_code = h.task_code GROUP BY h.holder, h.kind`);
     const refs = await this.view.userRefs([
       ...new Set(rows.map((r) => r.holder).filter((x): x is string => !!x)),
     ]);
@@ -420,14 +427,18 @@ export class InsightsService {
         team: string;
         open: number;
         late: number;
+        days: number;
+        unestimated: number;
         by_level: Record<Kind, number>;
       }
     >();
-    const none = { open: 0, late: 0 };
+    const none = { open: 0, late: 0, days: 0, unestimated: 0 };
     for (const r of rows) {
       if (!r.holder) {
         none.open += Number(r.open);
         none.late += Number(r.late);
+        none.days += Number(r.days);
+        none.unestimated += Number(r.unestimated);
         continue;
       }
       const g = byHolder.get(r.holder) ?? {
@@ -439,13 +450,19 @@ export class InsightsService {
         team: r.team ?? "none",
         open: 0,
         late: 0,
+        days: 0,
+        unestimated: 0,
         by_level: { entry: 0, review: 0, approve: 0 },
       };
       g.open += Number(r.open);
       g.late += Number(r.late);
+      g.days += Number(r.days);
+      g.unestimated += Number(r.unestimated);
       g.by_level[r.kind] += Number(r.open);
       byHolder.set(r.holder, g);
     }
+    for (const g of byHolder.values()) g.days = Math.round(g.days * 10) / 10;
+    none.days = Math.round(none.days * 10) / 10;
     const items = [...byHolder.values()].sort(
       (a, b) =>
         b.late - a.late ||

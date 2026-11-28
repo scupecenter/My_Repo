@@ -11953,8 +11953,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Open and late tasks per holder (0.4.10, X5)
-         * @description A claimed task counts for its claimant, an unclaimed one for everyone who could act on its level. Late = the SLA is past its maximum. A level nobody can hold is counted under `no_holder`. Needs `view` on `reports` and `sites`, limited to the regions both cover. Reassign with `POST /tasks/reassign` (B12b).
+         * Open and late tasks per holder (0.4.10, X5; effort weight 0.15.731)
+         * @description A claimed task counts for its claimant, an unclaimed one for everyone who could act on its level. Late = the SLA is past its maximum. A level nobody can hold is counted under `no_holder`. Needs `view` on `reports` and `sites`, limited to the regions both cover. Reassign with `POST /tasks/reassign` (B12b). 0.15.731 adds `days` and `unestimated`, the open tasks weighted by the effort entries of the `capacity.plan` setting (0666), read through its door, with no permission change.
          */
         get: operations["getWorkload"];
         put?: never;
@@ -23537,10 +23537,18 @@ export interface components {
                     review?: number;
                     approve?: number;
                 };
+                /** @description 0.15.731. Sum of the person-days of the holder’s open tasks that have an effort entry in the capacity.plan setting (0666), one decimal; a task with several effort entries sums them. Zero when no task has an entry. */
+                days: number;
+                /** @description 0.15.731. Open tasks of the holder with no effort entry in capacity.plan: they carry no days until one is added. */
+                unestimated: number;
             }[];
             no_holder: {
                 open: number;
                 late: number;
+                /** @description 0.15.731. As items.days, for the tasks no one can hold. */
+                days: number;
+                /** @description 0.15.731. As items.unestimated, for the tasks no one can hold. */
+                unestimated: number;
             };
         };
         BlockedBy: {

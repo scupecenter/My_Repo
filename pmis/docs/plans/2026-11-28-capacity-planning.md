@@ -15,3 +15,7 @@ Crews and skills per region against the planned tasks, week by week. Settings > 
 
 ## Checked connections
 Region scope (`reportRegions` pattern), settings guard triggers, nav catalogue (`nav_item_catalogue` row, `NAV_KEYS`, derived like the workload), screen-settings gear, mock API, real API list, Arabic RTL and English.
+
+## Workload link (view-mode item 2, 2026-11-28, 0.15.731)
+
+The Workload screen (X5) weights its rows with the efforts of this plan: `GET /reports/workload` items and `no_holder` gain `days` (the open tasks summed by the person-days of their effort entries, one decimal) and `unestimated` (open tasks with no effort entry). Read through `capacity_plan_cfg()`: no new write path, no permission change, no migration. The web table gains a Load column with the heat-bar language and an unestimated chip, EN/AR. The weekly region/skill grid stays on the Capacity screen; per-person capacity and effort from history stay out.

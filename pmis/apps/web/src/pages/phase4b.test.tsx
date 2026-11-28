@@ -459,6 +459,11 @@ describe('X5 workload and the time report', () => {
     expect(rows.length).toBeGreaterThan(0);
     const lates = rows.map((r) => Number(within(r).getByTestId('workload-late').textContent));
     expect(lates).toEqual([...lates].sort((a, b) => b - a));
+    // 0.15.731: every row carries the effort-weighted load (the mock weighs each open task at two person-days)
+    for (const r of rows) {
+      const open = Number(within(r).getByTestId('workload-open').textContent);
+      expect(Number(within(r).getByTestId('workload-days').textContent)).toBe(open * 2);
+    }
     const first = rows[0]!;
     const emp = first.getAttribute('data-testid')!.replace('workload-row-', '');
     // the table can render before useMe resolves; the reassign button only shows once the viewer's right is known
