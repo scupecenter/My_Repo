@@ -1,6 +1,7 @@
 import {
   ArrowRightLeft,
   BarChart3,
+  Sigma,
   CalendarDays,
   Columns3,
   Download,
@@ -41,6 +42,7 @@ import {
   type RecordFilters,
 } from "@/api/registers";
 import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
+import { PIVOT_NONE } from "@/lib/pivot";
 import { useRegions } from "@/api/sites";
 import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
@@ -72,6 +74,10 @@ import {
   layoutsOf,
   numericFields,
   RegisterChart,
+  RegisterPivot,
+  pivotAxes,
+  pivotDrillTree,
+  BY_REGION,
   RegisterBoard,
   RegisterFeed,
   RegisterCalendar,
@@ -116,7 +122,7 @@ import { isCustomKey, isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
-const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf", "chx", "chm", "chk"] as const;
+const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf", "chx", "chm", "chk", "pvr", "pvc", "pvm"] as const;
 type RegisterView = RecordFilters & {
   advanced?: FilterTree;
   layout?: string;
@@ -126,6 +132,9 @@ type RegisterView = RecordFilters & {
   chx?: string;
   chm?: string;
   chk?: string;
+  pvr?: string;
+  pvc?: string;
+  pvm?: string;
 };
 const VIEW_EMPTY: RegisterView = {
   q: "",
@@ -139,6 +148,9 @@ const VIEW_EMPTY: RegisterView = {
   chx: "",
   chm: "",
   chk: "",
+  pvr: "",
+  pvc: "",
+  pvm: "",
 };
 // P10: the saved-views control (and its share dialog, people picker and role/group queries) loads on its own, after the records, so it never
 // delays the first paint of the list.
@@ -215,6 +227,12 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       : "none";
   // V4: the chart's axis (`chx`: empty = the approval state, else a list or yes/no field), measure (`chm`: empty = a count, else a number
   // field to sum) and kind (`chk`: bar by default, or pie), in the URL and the saved views
+  const pvAxes = pivotAxes(def);
+  const pvRow = pvAxes.includes(sp.get("pvr") ?? "") ? (sp.get("pvr") as string) : BY_STATE;
+  // the default column field is the first list field (the status of the register), "none" is the plain one-column summary
+  const pvColDefault = pvAxes.find((a) => a !== pvRow && a !== BY_STATE) ?? PIVOT_NONE;
+  const pvCol = sp.get("pvc") === "none" ? PIVOT_NONE : pvAxes.includes(sp.get("pvc") ?? "") && sp.get("pvc") !== pvRow ? (sp.get("pvc") as string) : pvColDefault;
+  const pvMeasure = numericFields(def).some((x) => x.code === sp.get("pvm")) ? (sp.get("pvm") as string) : "";
   const chAxis = sp.get("chx") ?? "";
   const chMeasure = sp.get("chm") ?? "";
   const chKind: ChartKind = sp.get("chk") === "pie" ? "pie" : "bar";
@@ -338,6 +356,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     { id: "feed", label: t("view.feed"), hint: t("view.feed_hint"), icon: <Rss size={14} />, testid: "register-layout-feed" },
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
     { id: "chart", label: t("chartv.title"), hint: t("view.chart_hint"), icon: <BarChart3 size={14} />, testid: "register-layout-chart" },
+    { id: "pivot", label: t("regviews.pivot_title"), hint: t("view.pivot_hint"), icon: <Sigma size={14} />, testid: "register-layout-pivot" },
     ...(layouts.includes("calendar") ? [{ id: "calendar", label: t("calview.title"), hint: t("view.calendar_hint"), icon: <CalendarDays size={14} />, testid: "register-layout-calendar" }] : []),
   ];
   const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
@@ -347,6 +366,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     (l) => viewOptions.some((o) => o.id === l),
     applyView,
   );
+  const pivotAxisLabel = (a: string) => a === BY_STATE ? t("analytics.by_state") : a === BY_REGION ? t("regviews.pivot_region") : fieldLabel(def.fields.find((x) => x.code === a)!, i18n.language);
   const pickView = (id: string) => { applyView(id); remember(id); };
   const rname = (id?: number | null) => {
     const r = regions.data?.find((x) => x.id === id);
@@ -679,6 +699,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 chx: layout === "chart" ? (sp.get("chx") ?? "") : "",
                 chm: layout === "chart" ? (sp.get("chm") ?? "") : "",
                 chk: layout === "chart" ? (sp.get("chk") ?? "") : "",
+                pvr: layout === "pivot" ? (sp.get("pvr") ?? "") : "",
+                pvc: layout === "pivot" ? (sp.get("pvc") ?? "") : "",
+                pvm: layout === "pivot" ? (sp.get("pvm") ?? "") : "",
                 calf: layout === "calendar" ? (sp.get("calf") ?? "") : "",
                 ...(advTree ? { advanced: advTree } : {}),
               }}
@@ -741,6 +764,26 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                   <select className="input w-auto py-1" data-testid="register-chart-kind" value={chKind} onChange={(e) => setParams({ chk: e.target.value === "bar" ? "" : e.target.value })}>
                     <option value="bar">{t("chartv.bar")}</option>
                     <option value="pie">{t("chartv.pie")}</option>
+                  </select>
+                </label>
+              </>
+            ) : view === "vertical" && layout === "pivot" ? (
+              <>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("regviews.pivot_rows")}</span>
+                  <select className="input w-auto py-1" data-testid="register-pivot-rows" value={pvRow} onChange={(e) => setParams({ pvr: e.target.value === BY_STATE ? "" : e.target.value, ...(e.target.value === pvCol ? { pvc: "none" } : {}) })}>
+                    {pvAxes.map((a) => <option key={a} value={a}>{pivotAxisLabel(a)}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("regviews.pivot_cols")}</span>
+                  <select className="input w-auto py-1" data-testid="register-pivot-cols" value={pvCol || "none"} onChange={(e) => setParams({ pvc: e.target.value === pvColDefault || (e.target.value === "none" && !pvColDefault) ? "" : e.target.value })}>
+                    <option value="none">{t("regviews.pivot_no_cols")}</option>
+                    {pvAxes.filter((a) => a !== pvRow).map((a) => <option key={a} value={a}>{pivotAxisLabel(a)}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("chartv.measure")}</span>
+                  <select className="input w-auto py-1" data-testid="register-pivot-measure" value={pvMeasure} onChange={(e) => setParams({ pvm: e.target.value })}>
+                    <option value="">{t("chartv.count")}</option>
+                    {numericFields(def).map((x) => <option key={x.code} value={x.code}>{t("chartv.sum_of", { field: fieldLabel(x, i18n.language) })}</option>)}
                   </select>
                 </label>
               </>
@@ -1090,6 +1133,10 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           )}
           {layout === "chart" && (
             <RegisterChart def={def} records={real} axis={chAxis} measure={chMeasure} kind={chKind} partial={partial} />
+          )}
+          {layout === "pivot" && (
+            <RegisterPivot def={def} records={real} rowAxis={pvRow} colAxis={pvCol} measure={pvMeasure} regionName={rname} partial={partial}
+              onDrill={(conds) => setParams({ adv: encodeFilter(pivotDrillTree(conds, advTree)), layout: "", view: "" })} />
           )}
           {layout === "calendar" && (
             <RegisterCalendar def={def} records={real} field={calField} onOpen={setRecord} partial={partial} />

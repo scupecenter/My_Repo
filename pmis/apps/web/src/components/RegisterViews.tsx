@@ -15,6 +15,9 @@ import { EmptyState } from '@/components/States';
 import { WideTable, type WideCell, type WideColumn, type WideInput, type WideTableRow } from '@/components/WideTable';
 import { isHidden, sectionIdOf, typeHides } from '@/lib/registerForms';
 import { measureBreakdown } from '@/lib/viewAnalytics';
+import { buildPivot, cellKey, PIVOT_NONE, type PivotAxisValue } from '@/lib/pivot';
+import { GroupSummary, type SummarySegment } from '@/components/GroupSummary';
+import type { FilterTree } from '@/api/views';
 import type { Display } from '@/lib/tablePrefs';
 
 /**
@@ -22,8 +25,8 @@ import type { Display } from '@/lib/tablePrefs';
  * the board and the map are the same shared components as Site Master (WideTable, BoardGrid, SiteMap), fed by the register's own list
  * (GET /registers/{key}/records with the same filters, so every layout shows the same records, with the caller's rights and field rules).
  */
-export type RegisterLayout = 'list' | 'wide' | 'board' | 'feed' | 'map' | 'calendar' | 'chart';
-export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'feed', 'map', 'calendar', 'chart'];
+export type RegisterLayout = 'list' | 'wide' | 'board' | 'feed' | 'map' | 'calendar' | 'chart' | 'pivot';
+export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'feed', 'map', 'calendar', 'chart', 'pivot'];
 
 /** The board's grouping on the approval state of the records (entry, in review, in approval, approved, voided), which every register has. */
 export const BY_STATE = 'state';
@@ -61,7 +64,7 @@ export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => [
   'list', 'wide', 'board', 'feed',
   ...(def.site_scoped ? (['map'] as const) : []),
   ...(dateFields(def).length ? (['calendar'] as const) : []),
-  'chart',
+  'chart', 'pivot',
 ];
 
 /** A key that is safe in a test id and an id attribute, unique among the keys already given. */
@@ -374,4 +377,124 @@ export function RegisterFeed({ def, records, regionName, onOpen, partial }: {
       )}
     </section>
   );
+}
+
+/** The axes a pivot table can use: the approval state, the region (where records carry a site) and every list or yes/no field. */
+export const BY_REGION = 'region';
+export const pivotAxes = (def: RegisterDefinition): string[] => [BY_STATE, ...(def.site_scoped ? [BY_REGION] : []), ...axisFields(def).map((f) => f.code)];
+const SEG_TONES = ['bg-accent', 'bg-doneInk', 'bg-waitInk', 'bg-lateInk', 'bg-openInk', 'bg-lockInk'];
+
+/**
+ * Pivot table of a register (decision 2026-11-28): the rows the view already shows, summarised by a row field and a column field (the approval
+ * state, the region or any list or yes/no field), counted or summed by a number field. Like the chart it reads the records the screen has loaded,
+ * so it adds no request and shows nothing the caller cannot already see; a note says how many it counted when the view has more. A cell is a button
+ * that filters the list to its rows (the filter builder's own tree, so it can be saved in a view); the last column reuses the group summary bar
+ * to show how a row splits across the columns.
+ */
+export function RegisterPivot({ def, records, rowAxis, colAxis, measure, regionName, onDrill, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; rowAxis: string; colAxis: string; measure: string;
+  regionName: (id: number | null | undefined) => string;
+  /** the conditions of the clicked cell, in the filter builder's keys; the page applies them and shows the list */
+  onDrill: (conds: { field: string; value: unknown }[]) => void;
+  partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const none = t('analytics.none');
+  const mf = numericFields(def).find((f) => f.code === measure);
+  const axisOf = (axis: string) => {
+    if (axis === BY_STATE) return { field: 'state', label: t('analytics.by_state'), of: (r: RegisterRecord): PivotAxisValue => ({ key: r.state, label: t(`regState.${r.state}`), raw: r.state }) };
+    if (axis === BY_REGION) return { field: 'region_id', label: t('regviews.pivot_region'), of: (r: RegisterRecord): PivotAxisValue => r.region_id ? ({ key: String(r.region_id), label: regionName(r.region_id as number), raw: r.region_id }) : ({ key: '', label: none, raw: null }) };
+    const f = axisFields(def).find((x) => x.code === axis);
+    if (!f) return null;
+    return { field: `f:${f.code}`, label: fieldLabel(f, lang), of: (r: RegisterRecord): PivotAxisValue => {
+      const v = r.data[f.code];
+      return v === undefined || v === null || v === '' ? { key: '', label: none, raw: null } : { key: String(v), label: showValue(f, v, lang, t), raw: v };
+    } };
+  };
+  const rA = axisOf(rowAxis) ?? axisOf(BY_STATE)!;
+  const cA = colAxis === PIVOT_NONE ? null : axisOf(colAxis);
+  const p = buildPivot(records, rA.of, cA ? cA.of : null, (r) => (mf ? (Number(r.data[mf.code]) || 0) : 1), t('analytics.other'));
+  const measureLabel = mf ? t('chartv.sum_of', { field: fieldLabel(mf, lang) }) : t('chartv.count');
+  const fmt = (n: number) => n.toLocaleString(lang);
+  const max = Math.max(1, ...[...p.cells.values()].map(Math.abs));
+  const drill = (rk: string | null, ck: string | null) => {
+    const conds: { field: string; value: unknown }[] = [];
+    const rh = rk === null ? null : p.rows.find((h) => h.key === rk), ch = ck === null || !cA ? null : p.cols.find((h) => h.key === ck);
+    if (rh && rh.raw !== undefined) conds.push({ field: rA.field, value: rh.raw });
+    if (ch && ch.raw !== undefined && cA) conds.push({ field: cA.field, value: ch.raw });
+    if (conds.length) onDrill(conds);
+  };
+  const folded = (k: string) => k === '_other';
+  if (!records.length) return <div className="card p-3 text-sm text-mute" data-testid="register-pivot-empty">{t('analytics.empty')}</div>;
+  return (
+    <section className="card overflow-x-auto p-3" data-testid="register-pivot-card" aria-label={t('regviews.pivot_title')}>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-mute">
+        <span data-testid="register-pivot-note">{t('regviews.pivot_note', { measure: measureLabel, rows: rA.label, cols: cA ? cA.label : t('regviews.pivot_no_cols') })}</span>
+        {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-pivot-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
+      </div>
+      <table className="w-full min-w-max border-collapse text-sm" data-testid="register-pivot" data-total={p.total}>
+        <caption className="sr-only">{t('regviews.pivot_label', { measure: measureLabel, rows: rA.label, cols: cA ? cA.label : t('regviews.pivot_no_cols') })}</caption>
+        <thead>
+          <tr className="border-b border-line text-start text-xs text-mute">
+            <th scope="col" className="px-2 py-1.5 text-start font-semibold">{rA.label}{cA ? ` / ${cA.label}` : ''}</th>
+            {cA && p.cols.map((c) => <th key={c.key} scope="col" className="px-2 py-1.5 text-end font-semibold" data-testid={`register-pivot-col-${c.key}`}>{c.label}</th>)}
+            <th scope="col" className="px-2 py-1.5 text-end font-semibold">{t('regviews.pivot_total')}</th>
+            {cA && <th scope="col" className="px-2 py-1.5 text-start font-semibold"><span className="sr-only">{t('regviews.pivot_split')}</span></th>}
+          </tr>
+        </thead>
+        <tbody>
+          {p.rows.map((r) => {
+            const segs: SummarySegment[] = cA ? p.cols.map((c, i) => ({ key: c.key, label: c.label, count: Math.abs(p.cells.get(cellKey(r.key, c.key)) ?? 0), tone: SEG_TONES[i % SEG_TONES.length]! })) : [];
+            return (
+              <tr key={r.key} className="border-b border-line" data-testid={`register-pivot-row-${r.key}`}>
+                <th scope="row" className="px-2 py-1.5 text-start font-medium">{r.label}</th>
+                {cA && p.cols.map((c) => {
+                  const v = p.cells.get(cellKey(r.key, c.key));
+                  if (!v) return <td key={c.key} className="px-2 py-1.5 text-end text-faint" data-testid={`register-pivot-cell-${r.key}-${c.key}`}>·</td>;
+                  const off = folded(r.key) || folded(c.key);
+                  return (
+                    <td key={c.key} className="p-0 text-end" style={{ background: `color-mix(in srgb, var(--accent) ${Math.round((Math.abs(v) / max) * 40)}%, transparent)` }}>
+                      <button type="button" disabled={off} data-testid={`register-pivot-cell-${r.key}-${c.key}`} data-value={v}
+                        title={off ? t('regviews.pivot_other_hint') : t('regviews.pivot_cell_hint', { rows: r.label, cols: c.label, value: fmt(v) })}
+                        aria-label={t('regviews.pivot_cell', { rows: r.label, cols: c.label, value: fmt(v) })}
+                        className="block w-full px-2 py-1.5 text-end tabular-nums hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default disabled:no-underline"
+                        onClick={() => drill(r.key, c.key)}>{fmt(v)}</button>
+                    </td>
+                  );
+                })}
+                <td className="p-0 text-end font-semibold">
+                  <button type="button" disabled={folded(r.key)} data-testid={`register-pivot-rowtotal-${r.key}`} data-value={p.rowTotals.get(r.key) ?? 0}
+                    title={folded(r.key) ? t('regviews.pivot_other_hint') : t('regviews.pivot_row_hint', { rows: r.label })}
+                    className="block w-full px-2 py-1.5 text-end tabular-nums hover:underline disabled:cursor-default disabled:no-underline" onClick={() => drill(r.key, null)}>{fmt(p.rowTotals.get(r.key) ?? 0)}</button>
+                </td>
+                {cA && (
+                  <td className="px-2 py-1.5">
+                    <GroupSummary testid={`register-pivot-split-${r.key}`} group={r.label} segments={segs} active={null} show
+                      label={t('regviews.pivot_split_label', { rows: r.label, total: fmt(p.rowTotals.get(r.key) ?? 0) })}
+                      onPick={(k) => { if (k && !folded(r.key) && !folded(k)) drill(r.key, k); }} />
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr className="font-semibold">
+            <th scope="row" className="px-2 py-1.5 text-start">{t('regviews.pivot_total')}</th>
+            {cA && p.cols.map((c) => <td key={c.key} className="px-2 py-1.5 text-end tabular-nums" data-testid={`register-pivot-coltotal-${c.key}`}>{fmt(p.colTotals.get(c.key) ?? 0)}</td>)}
+            <td className="px-2 py-1.5 text-end tabular-nums" data-testid="register-pivot-grand">{fmt(p.total)}</td>
+            {cA && <td />}
+          </tr>
+        </tfoot>
+      </table>
+    </section>
+  );
+}
+
+/** The filter tree of a clicked pivot cell: every condition must hold (an existing top-level AND of conditions is kept, anything else is replaced). */
+export function pivotDrillTree(conds: { field: string; value: unknown }[], current: FilterTree | null | undefined): FilterTree {
+  const mine = conds.map((c) => ({ field: c.field, operator: 'is' as const, value: c.value as never }));
+  const keep = current && current.op === 'and' ? current.items.filter((i) => 'field' in i && !conds.some((c) => c.field === (i as { field: string }).field)) : [];
+  return { op: 'and', items: [...keep, ...mine] };
 }

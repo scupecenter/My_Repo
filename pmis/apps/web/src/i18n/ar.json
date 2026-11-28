@@ -7255,6 +7255,20 @@
     "display_pin": "تثبيت الأعمدة الأولى"
   },
   "regviews": {
+    "pivot_title": "جدول محوري",
+    "pivot_rows": "الصفوف",
+    "pivot_cols": "الأعمدة",
+    "pivot_no_cols": "بلا (الإجماليات فقط)",
+    "pivot_region": "المنطقة",
+    "pivot_total": "الإجمالي",
+    "pivot_split": "التوزيع على الأعمدة",
+    "pivot_note": "{{measure}}، الصفوف حسب {{rows}}، والأعمدة حسب {{cols}}.",
+    "pivot_label": "جدول محوري لـ {{measure}}: الصفوف حسب {{rows}}، والأعمدة حسب {{cols}}",
+    "pivot_cell": "{{rows}}، {{cols}}: {{value}}",
+    "pivot_cell_hint": "{{rows}} / {{cols}}: {{value}}. انقر لعرض هذه الصفوف.",
+    "pivot_row_hint": "انقر لعرض كل صفوف {{rows}}.",
+    "pivot_other_hint": "عدة قيم مطوية هنا فلا يمكن عرضها معاً.",
+    "pivot_split_label": "كيف يتوزع {{total}} من {{rows}} على الأعمدة",
     "group_record": "السجل",
     "group_workflow": "سير الاعتماد",
     "record": "السجل",
@@ -7829,6 +7843,7 @@
     "feed_hint": "الأحدث أولاً، سطر لكل قيد",
     "map": "خريطة",
     "map_hint": "العناصر على الخريطة",
+    "pivot_hint": "لخّص الصفوف بحقلين، مثلاً عدد المواقع لكل منطقة وحالة.",
     "chart_hint": "الصفوف أعمدة أو دائرة بحسب حقل تختاره",
     "calendar_hint": "على شبكة شهر بحقل تاريخ تختاره"
   },
