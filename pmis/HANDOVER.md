@@ -16,6 +16,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 7. `docs/handover/db-gaps.md`: schema and SQL work that contract 0.2.5 and 0.2.6 need and the database does not have yet, as a checklist for database-engineer.
 
 ## 2. What exists
+- **Guest access** (migration 0731, contract 0.15.730, off by default): a System Admin makes a view-only account with an end date for a person outside the staff (Settings > Security > Guest access). Spec and limits: `docs/spec/guest-access.md`.
 
 | Area | Path | State |
 |---|---|---|

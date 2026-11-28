@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { OpsLimits, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList, ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, DashboardFinanceReaders, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting, DashboardTargetPolicy,
+import type { OpsLimits, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList, ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, DashboardFinanceReaders, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, GuestAccessSetting, Guest, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting, DashboardTargetPolicy,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -127,6 +127,34 @@ export const useSetDownloadLocks = () => {
     mutationFn: ({ version, ...body }) => api.put('/settings/download-locks', { version, body }), onSettled: () => refresh(qc, 'download-locks'),
   });
 };
+/** Guest access (migration 0731, setting security.guest_access): view-only accounts with an end date. System Admin only; every action asks a reason and a fresh step-up. */
+export const useGuestAccess = () => useQuery({ queryKey: ['guest-access-setting'], queryFn: () => api.get<GuestAccessSetting>('/settings/guest-access') });
+export const useSetGuestAccess = () => {
+  const qc = useQueryClient();
+  return useMutation<GuestAccessSetting, ApiError, { version: number; enabled: boolean; max_days: number; default_days: number; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/guest-access', { version, body }), onSettled: () => refresh(qc, 'guest-access-setting'),
+  });
+};
+export const useGuests = (enabled = true) => useQuery({ queryKey: ['guests'], enabled, queryFn: () => api.get<{ items: Guest[] }>('/guests').then((r) => r.items) });
+export const useCreateGuest = () => {
+  const qc = useQueryClient();
+  return useMutation<{ guest: Guest; temporary_password: string }, ApiError, { email: string; display_name: string; regions: number[]; modules: string[]; days: number; note?: string; reason: string }>({
+    mutationFn: (body) => api.post('/guests', { body }), onSettled: () => refresh(qc, 'guests'),
+  });
+};
+export const useExtendGuest = () => {
+  const qc = useQueryClient();
+  return useMutation<Guest, ApiError, { user_id: string; expires_at: string; reason: string }>({
+    mutationFn: ({ user_id, ...body }) => api.post(`/guests/${user_id}/expiry`, { body }), onSettled: () => refresh(qc, 'guests'),
+  });
+};
+export const useEndGuest = () => {
+  const qc = useQueryClient();
+  return useMutation<Guest, ApiError, { user_id: string; reason: string }>({
+    mutationFn: ({ user_id, reason }) => api.post(`/guests/${user_id}/end`, { body: { reason } }), onSettled: () => refresh(qc, 'guests'),
+  });
+};
+
 /** 0.15.191 (migration 0291): support access (setting security.support_access) and the support grants. System Admin only; a grant is a time-limited delegation. */
 export const useSupportAccess = () => useQuery({ queryKey: ['support-access-setting'], queryFn: () => api.get<SupportAccessSetting>('/settings/support-access') });
 export const useSetSupportAccess = () => {

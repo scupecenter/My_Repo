@@ -307,6 +307,14 @@ const support: { enabled: boolean; max_hours: number; default_hours: number; ver
 type SupportGrant = { id: string; to: { id: string; display_name: string; employee_id: string | null }; from: { id: string; display_name: string; employee_id: string | null }; rights: string[]; valid_from: string; valid_to: string; revoked: boolean; revoked_at: string | null; reason: string };
 const supportGrants: SupportGrant[] = [];
 const SUPPORT_RIGHTS = ['templates.edit', 'fields.edit', 'documents.edit', 'warehouse.items.edit'];
+/** 0.15.730: guest access (off by default) and the guests, kept in memory. A guest is a view-only account with an end date. */
+const guestCfg: { enabled: boolean; max_days: number; default_days: number; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { enabled: false, max_days: 30, default_days: 7, version: 1, updated_at: null, updated_by: null };
+type GuestRow = { user_id: string; display_name: string; email: string; note: string | null; expires_at: string; created_at: string; ended_at: string | null; end_reason: string | null; regions: number[]; modules: string[] };
+const guestRows: GuestRow[] = [];
+const GUEST_MODULES = ['sites', 'dashboard', 'reports', 'procurement', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings'];
+const guestView = () => ({ ...guestCfg, modules: GUEST_MODULES, can_edit: true });
+const guestDto = (g: GuestRow) => ({ ...g, created_by: null, state: g.ended_at ? 'ended' : new Date(g.expires_at) <= new Date() ? 'expired' : 'active' });
 const newDeviceView = () => ({ enabled: newDeviceState.enabled, code_minutes: newDeviceState.code_minutes, include_admins: newDeviceState.include_admins, mail_ready: true, updated_at: newDeviceState.updated_at, updated_by: newDeviceState.updated_by, version: newDeviceState.version, can_edit: true });
 const passkeyView = () => ({ enabled: passkeyState.enabled, ready: passkeyState.ready, updated_at: passkeyState.updated_at, updated_by: passkeyState.updated_by, version: passkeyState.version, can_edit: true });
 const supportView = () => ({ ...support, modules: ['templates', 'fields', 'lists', 'document_types', 'warehouse_items'], can_edit: true });
@@ -1165,6 +1173,73 @@ export const settingsHandlers = [
     if (r.revoked) return problem(409, 'invalid_transition', 'The support grant is already revoked.');
     r.revoked = true; r.revoked_at = new Date().toISOString();
     return HttpResponse.json(supportDto(r));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.730: guest access (System Admin only)
+  http.get(`${B}/settings/guest-access`, () => { const g = needAdmin(); if (g) return g; const j = guestView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/guest-access`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; max_days?: unknown; default_days?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'max_days', 'default_days', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    const okD = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 365;
+    if (!okD(b.max_days)) errs.push({ path: '/max_days', code: 'invalid' });
+    if (!okD(b.default_days) || (okD(b.max_days) && b.default_days > b.max_days)) errs.push({ path: '/default_days', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 900) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, guestCfg.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const v = viewer()!;
+    Object.assign(guestCfg, { enabled: b.enabled, max_days: b.max_days, default_days: b.default_days, version: guestCfg.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = guestView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.get(`${B}/guests`, () => { const g = needAdmin(); if (g) return g; return HttpResponse.json({ items: [...guestRows].reverse().map(guestDto) }); }),
+  http.post(`${B}/guests`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ email?: unknown; display_name?: unknown; regions?: unknown; modules?: unknown; days?: unknown; note?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['email', 'display_name', 'regions', 'modules', 'days', 'note', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.email !== 'string' || !/^\S+@\S+\.\S+$/.test(b.email)) errs.push({ path: '/email', code: 'invalid' });
+    if (typeof b.display_name !== 'string' || !b.display_name.trim()) errs.push({ path: '/display_name', code: 'required' });
+    if (!Array.isArray(b.regions) || b.regions.length === 0) errs.push({ path: '/regions', code: 'invalid' });
+    if (!Array.isArray(b.modules) || b.modules.length === 0 || !b.modules.every((m) => GUEST_MODULES.includes(m as string))) errs.push({ path: '/modules', code: 'not_allowed' });
+    const days = b.days === undefined ? guestCfg.default_days : b.days;
+    if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > guestCfg.max_days) errs.push({ path: '/days', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 900) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!stepUpValid()) return stepUp();
+    if (!guestCfg.enabled) return problem(409, 'invalid_transition', 'Guest access is switched off.');
+    const now = new Date();
+    const row: GuestRow = { user_id: `gu-${guestRows.length + 1}-${now.getTime()}`, display_name: (b.display_name as string).trim(), email: (b.email as string).toLowerCase(), note: typeof b.note === 'string' ? b.note : null,
+      expires_at: new Date(now.getTime() + (days as number) * 86_400_000).toISOString(), created_at: now.toISOString(), ended_at: null, end_reason: null, regions: b.regions as number[], modules: b.modules as string[] };
+    guestRows.push(row);
+    return HttpResponse.json({ guest: guestDto(row), temporary_password: 'Tmp-guest-4821-xQ' }, { status: 201 });
+  }),
+  http.post(`${B}/guests/:user_id/expiry`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ expires_at?: string; reason?: string } & Record<string, unknown>>(request);
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (!stepUpValid()) return stepUp();
+    const r = guestRows.find((x) => x.user_id === params.user_id);
+    if (!r) return problem(404, 'not_found', 'No such guest');
+    if (r.ended_at) return problem(409, 'invalid_transition', 'The guest is already ended.');
+    const t = new Date(b.expires_at ?? '');
+    if (Number.isNaN(t.getTime()) || t.getTime() > Date.now() + guestCfg.max_days * 86_400_000) return fields({ path: '/expires_at', code: 'invalid' });
+    r.expires_at = t.toISOString();
+    return HttpResponse.json(guestDto(r));
+  }),
+  http.post(`${B}/guests/:user_id/end`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ reason?: string } & Record<string, unknown>>(request);
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (!stepUpValid()) return stepUp();
+    const r = guestRows.find((x) => x.user_id === params.user_id);
+    if (!r) return problem(404, 'not_found', 'No such guest');
+    if (r.ended_at) return problem(409, 'invalid_transition', 'The guest is already ended.');
+    r.ended_at = new Date().toISOString(); r.end_reason = (b.reason ?? '').trim();
+    return HttpResponse.json(guestDto(r));
   }),
 
   // ------------------------------------------------------------------ 0.15.232 (0243): the workspace logo of the identity

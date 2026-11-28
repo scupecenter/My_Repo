@@ -159,6 +159,7 @@ info:
     - 0.15.71 (2026-11-24): the project data reset becomes selectable (owner decision 2026-11-24; migration 0152, mirror `db/sql/151_data_reset_scope.sql`; CHANGELOG 207). Additive and backward compatible: a request without `parts` is everything as before. New path `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`): the counts of a chosen scope per part and per table, the closure and its hash. `POST /settings/data-reset/requests` takes optional `parts` (codes of the catalogue `DataResetPart`); the database adds every dependent part (`depends_on`) and stores the normalised closure and its SHA-256 on the request (`DataResetRequest.scope`, `scope_hash`). `POST .../approve` takes optional `scope_hash` (the scope the approver saw): a different hash, or a request whose closure would be different today, is 409 `scope_changed`; the approval stores `approved_scope_hash`, and start and execute check it again. `DataResetState.plan` is a `DataResetPlan` (now with `parts`, the catalogue with labels EN/AR, `depends_on`, `dependents` and rows, `scope`, `accounts_to_deactivate`) and `everything` (the parts of "everything"). Three optional identity parts, never in everything: `users` (deactivate every account but the System Admins, the break-glass account, the requester, the approver and the runner), `roles` (assignments, groups but the System Admins group, delegations), `staff` (staff registry, absences). `DataResetPlanTable` gains `part` and the action `optional`. New `ErrorCode` `scope_changed`.
     - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
     - 0.15.69 (2026-11-24): W2 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 204; 0.15.62 to 0.15.68 are used by the work merged before it). Documentation only, no path, schema or rule changes. A saved view of a register screen (`register-<register key>`) keeps the layout of the screen's view switcher as quick parameters of `filters`, as `site360-<menu>` does since 0.15.49: `layout` = empty (the list), `wide`, `board` or `map`; `board_by` = the code of the register field the board's columns follow, or `state` (the approval state); `lane` = empty, `region` or `type`. They are stored as given, like any other quick parameter; the filter tree in `filters.advanced` keeps its validation. `RegisterDefinition.site_scoped` also decides whether the screen offers the map. Inline edits of the wide table use `PATCH /registers/{register_key}/records/{record_id}` with `If-Match`, the same route, rights, field rules and locks as the record form.
+    - 0.15.730 (2026-11-28): guest access, part of the security section (migration 0731, mirror `db/sql/730_guest_access.sql`). Additive and off by default: nothing changes until a System Admin turns it on. A guest is a local account that only views the regions and modules chosen for it, until an end date; it is an ordinary user with the role GUEST and the profile guest_view, kept that way by database guards. New paths `GET`/`PUT /settings/guest-access`, `GET`/`POST /guests`, `POST /guests/{user_id}/expiry`, `POST /guests/{user_id}/end`; new error code `guest_read_only` (403: a guest session called a route outside its read-only list). No existing permission, role or default changes.
     - 0.15.582 (2026-11-28): a default saved view per screen, chosen by each person (migration 0655, table `user_default_views`). Additive. `POST /saved-views/{view_id}/set-default` makes the view the caller's default for its screen (one per screen; a view the caller may not read answers 404, like `GET /saved-views/{view_id}`), `POST /saved-views/{view_id}/clear-default` clears it (a missing default is a no-op) and `GET /me/default-views` lists the caller's defaults (a deactivated or unreadable view drops out, and the screen then opens on its built-in view). Personal display preference: no grant, role, permission, visibility or audit change.
     - 0.15.68 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; renumbered from 0.15.64 at the merge with main, which holds 0.15.62 to 0.15.67). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site-master/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site-master/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
     - 0.15.561 (2026-11-28): item 9, the group summary row of grouped tables. Additive. `TableDisplay` (GET/PUT `/settings/table-display`, the `display` of a saved view) gains the optional boolean `groupbar` (default true): the count and a status distribution bar on every group header of a grouped table, on the same framework as text size, wrap and zebra rows (organization default in Settings > Screens > Tables, personal choice per screen in the Layout panel). Migration 0652 (mirror `db/sql/651_group_summary_display.sql`) changes `table_display_seed()` and `admin_set_table_display` in place; no table, no new route, no permission change.
@@ -11395,6 +11396,167 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/guest-access:
+    get:
+      tags: [settings]
+      operationId: getGuestAccess
+      summary: The guest access setting (System Admin only) (0.15.730)
+      description: System Admin only (403 `action_forbidden` otherwise). `enabled` is `false` until a System Admin turns it on. `modules` lists the modules a guest may ever view.
+      x-db-path: guest_access_state
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GuestAccessSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setGuestAccess
+      summary: Turn guest access on or off and set its limits (System Admin, reason, step-up, If-Match, audited) (0.15.730)
+      description: |
+        System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. `max_days` is 1 to 365, `default_days` is 1 to `max_days`.
+        Saving the values already in force is 409 `invalid_transition`. Audited `guest_access_update` with before and after. Turning it off does not end guests already made.
+      x-step-up: true
+      x-db-path: admin_set_guest_access
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GuestAccessSettingInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GuestAccessSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /guests:
+    get:
+      tags: [users]
+      operationId: listGuests
+      summary: The guest accounts, newest first, with their state (System Admin only) (0.15.730)
+      description: '`state` is active, expired (by itself at `expires_at`) or ended (an admin ended it). At most 200.'
+      x-db-path: guest_access_list
+      responses:
+        '200':
+          description: Guests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Guest' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [users]
+      operationId: createGuest
+      summary: Create a view-only guest account with an end date (System Admin, step-up, reason, rate limited) (0.15.730)
+      description: |
+        Creates a local account (like `POST /users`) and makes it a guest in the same transaction; a refused request creates no account. The temporary password is returned once and the guest must change it at the first sign-in.
+        Needs the switch on (409 `invalid_transition` while it is off), at least one region and one module from the setting's list (422), an end date that is at least one hour away and at most `max_days` from now (`expires_at`, or `days`; omitted = `default_days`), and a new email. At most 10 a minute (429 `rate_limited`).
+        The guest holds the role GUEST at level view with the profile guest_view, for the chosen regions and modules, ending at `expires_at`. Audited `guest_created`.
+      x-step-up: true
+      x-db-path: admin_create_guest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GuestInput'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [guest, temporary_password]
+                properties:
+                  guest: { $ref: '#/components/schemas/Guest' }
+                  temporary_password: { type: string, description: Shown once. }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /guests/{user_id}/expiry:
+    post:
+      tags: [users]
+      operationId: extendGuest
+      summary: Change the end date of a guest (System Admin, step-up, reason) (0.15.730)
+      description: The new date is at least one hour away and at most `max_days` from now (422). An ended guest is not reopened (409 `invalid_transition`). Audited `guest_extended`.
+      x-step-up: true
+      x-db-path: admin_extend_guest
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WithReason'
+                - type: object
+                  required: [expires_at]
+                  properties:
+                    expires_at: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Changed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Guest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /guests/{user_id}/end:
+    post:
+      tags: [users]
+      operationId: endGuest
+      summary: End a guest account now (System Admin, step-up, reason) (0.15.730)
+      description: The guest is signed out at once and cannot sign in again. The account and its history stay. 409 `invalid_transition` when it is already ended. Audited `guest_ended`.
+      x-step-up: true
+      x-db-path: admin_end_guest
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Ended.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Guest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /support-access:
     get:
       tags: [delegations]
@@ -21487,6 +21649,7 @@ components:
         - not_eligible_holder
         - self_beneficiary
         - delegate_forbidden
+        - guest_read_only
         - last_admin
         - not_found
         - already_claimed
@@ -27596,6 +27759,59 @@ components:
             enabled: { type: boolean }
             max_hours: { type: integer, minimum: 1, maximum: 168 }
             default_hours: { type: integer, minimum: 1, maximum: 168 }
+    GuestAccessSetting:
+      type: object
+      description: '0.15.730. The guest access setting (`security.guest_access`, migration 0731).'
+      required: [enabled, max_days, default_days, modules, version, can_edit]
+      properties:
+        enabled: { type: boolean, description: 'false until a System Admin turns it on.' }
+        max_days: { type: integer, minimum: 1, maximum: 365 }
+        default_days: { type: integer, minimum: 1, maximum: 365 }
+        modules: { type: array, items: { type: string }, description: The modules a guest may view. }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    GuestAccessSettingInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [enabled, max_days, default_days]
+          properties:
+            enabled: { type: boolean }
+            max_days: { type: integer, minimum: 1, maximum: 365 }
+            default_days: { type: integer, minimum: 1, maximum: 365 }
+    GuestInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [email, display_name, regions, modules]
+          properties:
+            email: { type: string, format: email }
+            display_name: { type: string, minLength: 1, maxLength: 200 }
+            note: { type: string, maxLength: 500 }
+            regions: { type: array, minItems: 1, items: { type: integer } }
+            modules: { type: array, minItems: 1, items: { type: string } }
+            expires_at: { type: string, format: date-time, description: 'Or days. Omitted both = default_days from now.' }
+            days: { type: integer, minimum: 1, maximum: 365 }
+            temporary_password: { type: string }
+    Guest:
+      type: object
+      description: '0.15.730. A guest account.'
+      required: [user_id, display_name, email, expires_at, created_at, state, regions, modules]
+      properties:
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+        email: { type: string }
+        note: { type: [string, 'null'] }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        created_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        ended_at: { type: [string, 'null'], format: date-time }
+        end_reason: { type: [string, 'null'] }
+        state: { type: string, enum: [active, expired, ended] }
+        regions: { type: array, items: { type: integer } }
+        modules: { type: array, items: { type: string } }
     SupportAccessGrantInput:
       allOf:
         - $ref: '#/components/schemas/WithReason'

@@ -9,6 +9,7 @@ interface StateRow {
   is_admin: boolean;
   has_assignment: boolean;
   must_change: boolean | null;
+  guest: { expires_at: string; ended: boolean } | null;
 }
 
 /**
@@ -29,9 +30,11 @@ export class UserStateService {
         SELECT app_user_is_system_admin(${userId}::uuid) AS is_admin,
                EXISTS (SELECT 1 FROM user_role_assignments a WHERE a.user_id = ${userId}::uuid AND a.valid_from <= now()
                        AND (a.valid_to IS NULL OR a.valid_to > now())) AS has_assignment,
-               (SELECT l.must_change FROM auth_local_lookup(${email}) l) AS must_change`);
+               (SELECT l.must_change FROM auth_local_lookup(${email}) l) AS must_change,
+               guest_session_state(${userId}::uuid) AS guest`);
       const r = rows[0];
-      base = { isAdmin: r?.is_admin ?? false, hasAssignment: r?.has_assignment ?? false, mustChange: r?.must_change ?? false };
+      base = { isAdmin: r?.is_admin ?? false, hasAssignment: r?.has_assignment ?? false, mustChange: r?.must_change ?? false,
+        guest: r?.guest ? { expiresAt: new Date(r.guest.expires_at), ended: r.guest.ended } : null };
       this.cache.set(userId, { at: Date.now(), state: base });
     }
     const pending = status === 'pending_assignment' || (status === 'active' && !base.hasAssignment && !base.isAdmin);

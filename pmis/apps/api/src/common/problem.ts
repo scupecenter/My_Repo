@@ -4,7 +4,7 @@ import { HttpException } from '@nestjs/common';
 export type ErrorCode =
   | 'validation_failed' | 'unauthenticated' | 'mfa_required' | 'step_up_required' | 'pending_assignment'
   | 'module_forbidden' | 'action_forbidden' | 'field_read_only' | 'not_eligible_holder' | 'self_beneficiary'
-  | 'delegate_forbidden' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
+  | 'delegate_forbidden' | 'guest_read_only' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
   | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'invalid_enrol_code' | 'enrol_code_expired' | 'password_change_required' | 'weak_password' | 'internal_error'
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected'
@@ -41,6 +41,7 @@ const TITLES: Record<string, string> = {
   action_forbidden: 'Action not allowed',
   self_beneficiary: 'You cannot do this to your own account',
   delegate_forbidden: 'Not allowed for a delegate',
+  guest_read_only: 'A guest account can only view',
   last_admin: 'At least one active System Admin must remain',
   not_found: 'Not found',
   already_assigned: 'Already assigned',
