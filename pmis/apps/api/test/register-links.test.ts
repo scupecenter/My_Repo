@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { beginAs, makeAdmin, superDb } from './helpers';
@@ -103,6 +105,28 @@ describe('orphan report of the links (migration 0660)', () => {
     const items = (r.rows[0].j as { items: { register_key: string; field_code: string; rows_with_value: number; orphan_rows: number }[] }).items;
     expect(items.some((x) => x.register_key === 'issues' && x.field_code === 'risk_entity_id')).toBe(true);
     expect(items.every((x) => Number(x.orphan_rows) <= Number(x.rows_with_value))).toBe(true);
+  });
+});
+
+describe('extra register links (migration 0596, L10)', () => {
+  it('declares the lesson and permit links with their optional fields, no check yet, and the migration runs again without error', async () => {
+    const sql = readFileSync(join(__dirname, '..', '..', '..', 'db', 'sql', '595_extra_register_links.sql'), 'utf8');
+    await db.query('BEGIN');
+    await db.query(sql);
+    await db.query(sql);
+    const links = await db.query(
+      `SELECT register_key || '.' || field_code AS k, target_register, same_site, enforce FROM register_links
+        WHERE (register_key, field_code) IN (('lessons_learned', 'incident_id'), ('lessons_learned', 'issue_id'), ('incidents', 'permit_id'), ('car_dispatcher', 'parent_booking_id'), ('financial_advances', 'parent_advance_id')) ORDER BY 1`);
+    expect(links.rows).toEqual([
+      { k: 'car_dispatcher.parent_booking_id', target_register: 'car_dispatcher', same_site: true, enforce: false },
+      { k: 'financial_advances.parent_advance_id', target_register: 'financial_advances', same_site: true, enforce: false },
+      { k: 'incidents.permit_id', target_register: 'permits_hse', same_site: true, enforce: false },
+      { k: 'lessons_learned.incident_id', target_register: 'incidents', same_site: true, enforce: false },
+      { k: 'lessons_learned.issue_id', target_register: 'issues', same_site: true, enforce: false },
+    ]);
+    const fields = await db.query(
+      `SELECT count(*)::int AS c FROM register_fields WHERE (register_key, code) IN (('lessons_learned', 'incident_id'), ('lessons_learned', 'issue_id'), ('incidents', 'permit_id')) AND required = false`);
+    expect(fields.rows[0].c).toBe(3);
     await db.query('ROLLBACK');
   });
 });
