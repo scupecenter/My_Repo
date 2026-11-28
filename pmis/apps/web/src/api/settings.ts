@@ -606,6 +606,31 @@ export const useUpdateAlertRule = () => {
   });
 };
 
+// ---------------------------------------------------------------- link triggers (0.15.488, migration 0629): proposals only
+export type LinkTriggersData = import('./schema').components['schemas']['LinkTriggersResponse'];
+export type LinkTriggerInput = import('./schema').components['schemas']['LinkTriggerInput'];
+export type LinkTriggerPreview = import('./schema').components['schemas']['LinkTriggerPreview'];
+export type LinkProposal = import('./schema').components['schemas']['LinkProposal'];
+export const useLinkTriggers = () => useQuery({ queryKey: ['linkTriggers'], queryFn: () => api.get<LinkTriggersData>('/settings/link-triggers') });
+export const useSaveLinkTrigger = () => {
+  const qc = useQueryClient();
+  return useMutation<{ id: string }, ApiError, { id: string | null; body: LinkTriggerInput }>({
+    mutationFn: ({ id, body }) => (id ? api.put(`/settings/link-triggers/${id}`, { body }) : api.post('/settings/link-triggers', { body })),
+    onSettled: () => refresh(qc, 'linkTriggers'),
+  });
+};
+export const usePreviewLinkTrigger = () => useMutation<LinkTriggerPreview, ApiError, string>({ mutationFn: (id) => api.post(`/settings/link-triggers/${id}/preview`, { body: {} }) });
+export const useLinkProposals = (status: 'open' | 'applied' | 'dismissed' | 'all' = 'open') =>
+  useQuery({ queryKey: ['linkProposals', status], queryFn: async () => (await api.get<{ items: LinkProposal[] }>('/me/link-proposals', { query: { status } })).items });
+export const useLinkProposalOps = () => {
+  const qc = useQueryClient();
+  const settle = () => { refresh(qc, 'linkProposals', 'linkTriggers'); };
+  return {
+    apply: useMutation<{ id: string; status: string; new_record: string }, ApiError, string>({ mutationFn: (id) => api.post(`/link-proposals/${id}/apply`, { body: {} }), onSettled: settle }),
+    dismiss: useMutation<{ id: string; status: string }, ApiError, string>({ mutationFn: (id) => api.post(`/link-proposals/${id}/dismiss`, { body: {} }), onSettled: settle }),
+  };
+};
+
 /** 0.15.367 (migration 0524): whether the typed dashboard targets may override the derived ones (off by default). */
 export const useDashboardTargetPolicy = () => useQuery({ queryKey: ['dash-target-policy'], queryFn: () => api.get<DashboardTargetPolicy>('/settings/dashboard-target-policy') });
 export const useSetDashboardTargetPolicy = () => {

@@ -239,6 +239,14 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/alert-rules/link-orphans'],
   ['post', '/settings/alert-rules'],
   ['put', '/settings/alert-rules/:id'],
+  // Contract 0.15.488 (0629): link triggers propose, never write.
+  ['get', '/settings/link-triggers'],
+  ['post', '/settings/link-triggers'],
+  ['put', '/settings/link-triggers/:id'],
+  ['post', '/settings/link-triggers/:id/preview'],
+  ['get', '/me/link-proposals'],
+  ['post', '/link-proposals/:id/apply'],
+  ['post', '/link-proposals/:id/dismiss'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
   ['get', '/me/sessions'],

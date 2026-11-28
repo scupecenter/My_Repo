@@ -296,6 +296,8 @@ describe('hybrid mode list', () => {
       // contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342)
       'GET /settings/partial-credit', 'PUT /settings/partial-credit',
       'GET /settings/alert-rules', 'GET /settings/alert-rules/link-orphans', 'POST /settings/alert-rules', 'PUT /settings/alert-rules/:id',
+      // contract 0.15.488 (0629): link triggers propose, never write
+      'GET /settings/link-triggers', 'POST /settings/link-triggers', 'PUT /settings/link-triggers/:id', 'POST /settings/link-triggers/:id/preview', 'GET /me/link-proposals', 'POST /link-proposals/:id/apply', 'POST /link-proposals/:id/dismiss',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
       'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'GET /admin/document-search-index', 'GET /me/push', 'POST /me/push/subscribe', 'POST /me/push/unsubscribe', 'GET /me/notification-prefs', 'PUT /me/notification-prefs', 'POST /me/notification-prefs/snooze', 'POST /me/notification-prefs/test', 'GET /me/notification-prefs/decisions', 'GET /admin/notification-personal', 'PUT /admin/notification-personal', 'GET /admin/web-push', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
