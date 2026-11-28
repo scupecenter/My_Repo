@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useIssueRisks, useRiskIssues, useDismantleOrders, useDismantleRns, useOrderReceipts, useWarehouseOrders, useAdvanceOptions, useInvoiceSuppliers, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
+import { useIssueRisks, useRiskIssues, useDismantleOrders, useDismantleRns, useOrderReceipts, useWarehouseOrders, useAdvanceOptions, useInvoiceSuppliers, useRegisterLinkOptions, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
 import type { RegisterRecord } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { errText, FormDialog } from './FormDialog';
@@ -302,5 +302,31 @@ export function HlcLegacyDialog({ open, onClose }: { open: boolean; onClose: () 
         </div>
       )}
     </FormDialog>
+  );
+}
+
+/** D60: the generic picker of a declared link (table register_links): any field that names a record of another register, without a hand-coded picker. */
+export function RecordLinkSelect({ registerKey, field, siteId, value, onChange, editable, invalid, targetLabel }: {
+  registerKey: string; field: string; siteId: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean; targetLabel?: string;
+}) {
+  const { t } = useTranslation();
+  const hint = t(`p4c.link_hint_${field}`, { defaultValue: '' });
+  const q = useRegisterLinkOptions(registerKey, field, siteId, editable);
+  const items = q.data ?? [];
+  const cur = typeof value === 'string' ? value : '';
+  const chosen = items.find((i) => i.entity_id === cur);
+  return (
+    <div data-testid={`reg-link-select-${field}`}>
+      {editable
+        ? (
+          <select id={`reg-field-${field}`} data-testid={`reg-field-${field}`} className="input" aria-invalid={invalid || undefined} value={cur} onChange={(e) => onChange(e.target.value || null)}>
+            <option value="">{t('p4c.link_none', { target: targetLabel ?? '' })}</option>
+            {items.map((i) => <option key={i.entity_id} value={i.entity_id}>{i.label}</option>)}
+            {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
+          </select>
+        )
+        : <div className="font-semibold" data-testid={`reg-view-${field}`}>{chosen ? chosen.label : cur ? cur.slice(0, 8) : '—'}</div>}
+      {hint !== '' && <p className="text-sm text-mute">{hint}</p>}
+    </div>
   );
 }
