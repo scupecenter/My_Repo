@@ -18,16 +18,16 @@ export const useReadiness = (id: string | null) =>
 
 export const useExtendBooking = (id: string) => {
   const qc = useQueryClient();
-  return useMutation<RegisterRecord, ApiError, { to_date: string }>({
-    mutationFn: (body) => api.post(`/registers/car_dispatcher/records/${id}/extend`, { body }),
+  return useMutation<RegisterRecord, ApiError, { to_date: string; version: number }>({
+    mutationFn: ({ version, ...body }) => api.post(`/registers/car_dispatcher/records/${id}/extend`, { body, version }),
     onSettled: () => void qc.invalidateQueries({ queryKey: ['register-records', 'car_dispatcher'] }),
   });
 };
 
 export const useTopUp = (id: string) => {
   const qc = useQueryClient();
-  return useMutation<RegisterRecord, ApiError, { requested_amount?: number; period_to?: string }>({
-    mutationFn: (body) => api.post(`/registers/financial_advances/records/${id}/top-up`, { body }),
+  return useMutation<RegisterRecord, ApiError, { requested_amount?: number; period_to?: string; version: number }>({
+    mutationFn: ({ version, ...body }) => api.post(`/registers/financial_advances/records/${id}/top-up`, { body, version }),
     onSettled: () => void qc.invalidateQueries({ queryKey: ['register-records', 'financial_advances'] }),
   });
 };
