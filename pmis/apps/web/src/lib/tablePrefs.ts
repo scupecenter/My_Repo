@@ -1,3 +1,4 @@
+import { cleanRules, type FormatRule } from './condFormat';
 import { loadPref, savePref } from './localPref';
 
 /** A column of a list screen. `forbidden` = hidden by permission: never shown, never offered, never stored as visible (plan G1/G11). */
@@ -22,7 +23,7 @@ export function cleanDisplay(d: unknown): Partial<DisplayOpts> | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 /** `density` and `display` are the user's own choices; unset = the defaults of Settings > Display. */
-export type Prefs = { order: string[]; hidden: string[]; width: Record<string, number>; density?: Density; display?: Partial<DisplayOpts>; /** the person turned the frozen first columns off (Display menu): they scroll, move and hide like the others */ unpinned?: boolean };
+export type Prefs = { order: string[]; hidden: string[]; width: Record<string, number>; density?: Density; display?: Partial<DisplayOpts>; /** the person turned the frozen first columns off (Display menu): they scroll, move and hide like the others */ unpinned?: boolean; /** the person's own conditional formatting rules (decision 2026-11-28) */ rules?: FormatRule[] };
 
 export const EMPTY_PREFS: Prefs = { order: [], hidden: [], width: {} };
 export const prefsKey = (screen: string, user: string) => `pmis.table.${screen}.${user}`;
@@ -31,7 +32,7 @@ export const prefsKey = (screen: string, user: string) => `pmis.table.${screen}.
 export function reconcile(p: Prefs, defs: ColDef[]): Prefs {
   const ok = new Set(defs.filter((d) => !d.forbidden).map((d) => d.id));
   const order = [...p.order.filter((id) => ok.has(id)), ...defs.filter((d) => ok.has(d.id) && !p.order.includes(d.id)).map((d) => d.id)];
-  return { order, hidden: p.hidden.filter((id) => ok.has(id)), width: Object.fromEntries(Object.entries(p.width).filter(([id]) => ok.has(id))), ...(isDensity(p.density) ? { density: p.density } : {}), ...(cleanDisplay(p.display) ? { display: cleanDisplay(p.display) } : {}), ...(p.unpinned === true ? { unpinned: true } : {}) };
+  return { order, hidden: p.hidden.filter((id) => ok.has(id)), width: Object.fromEntries(Object.entries(p.width).filter(([id]) => ok.has(id))), ...(isDensity(p.density) ? { density: p.density } : {}), ...(cleanDisplay(p.display) ? { display: cleanDisplay(p.display) } : {}), ...(p.unpinned === true ? { unpinned: true } : {}), ...(cleanRules(p.rules) ? { rules: cleanRules(p.rules) } : {}) };
 }
 
 /** Visible columns in order; pinned (identity) columns always come first and cannot be hidden. */

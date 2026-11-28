@@ -7,6 +7,7 @@ import { useMe } from '@/api/hooks';
 import { DENSITIES } from '@/lib/tablePrefs';
 import type { TableApi } from './TableKit';
 import { canEditDisplayDefaults } from './TableStandard';
+import { FormatRulesEditor, type FormatCol } from './FormatRulesEditor';
 import { Tip } from './Tip';
 
 export type ViewOption = { id: string; label: string; hint?: string; icon: ReactNode; testid: string };
@@ -24,7 +25,7 @@ export type ViewOption = { id: string; label: string; hint?: string; icon: React
  * The keyboard model is the one the view menu had: Enter or Space opens, the arrows, Home and End move over the view items, Enter picks, Escape
  * closes and the focus returns to the button. Every view item keeps the test id its layout button had.
  */
-export function LayoutPanel({ testid, views, options, table, grouped }: {
+export function LayoutPanel({ testid, views, options, table, grouped, formatCols }: {
   testid: string;
   /** the layouts of the screen (list, wide table, grid, board, timeline, map) */
   views?: { value: string; options: ViewOption[]; onChange: (id: string) => void };
@@ -34,6 +35,8 @@ export function LayoutPanel({ testid, views, options, table, grouped }: {
   table?: TableApi;
   /** the table has group header rows: the Display section then offers the group summary (count and status bar) */
   grouped?: boolean;
+  /** the columns a conditional formatting rule can look at; the Formatting section shows only when it is passed */
+  formatCols?: FormatCol[];
 }) {
   const { t } = useTranslation();
   const me = useMe(true).data;
@@ -114,6 +117,7 @@ export function LayoutPanel({ testid, views, options, table, grouped }: {
               </div>
             </div>
           )}
+          {table && formatCols && formatCols.length > 0 && <FormatRulesEditor testid={`${testid}-format`} rules={table.rules ?? []} cols={formatCols} onChange={table.setRules} />}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

@@ -34,6 +34,15 @@ const columnsSchema = z.object({
     zebra: z.boolean().optional(),
     groupbar: z.boolean().optional(),
   }).strict().optional(),
+  // 0.15.590: the person's conditional formatting rules of the view (display only)
+  rules: z.array(z.object({
+    id: z.string().min(1).max(40),
+    col: colId.min(1),
+    op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq', 'ne', 'contains', 'empty', 'notempty', 'days_past', 'days_ahead']),
+    value: z.union([z.string().max(120), z.number().finite()]).optional(),
+    tone: z.enum(['red', 'amber', 'green', 'blue', 'grey']),
+    scope: z.enum(['cell', 'row']),
+  }).strict()).max(20).optional(),
 }).strict();
 const sortSchema = z.array(z.object({ id: colId, dir: z.enum(['asc', 'desc']) }).strict()).max(5);
 const filtersSchema = z.record(z.string().max(100), z.unknown()).refine((f) => Object.keys(f).length <= 50, { message: 'At most 50 filters.' });

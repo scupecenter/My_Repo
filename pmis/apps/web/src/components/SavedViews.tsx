@@ -79,7 +79,7 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
 
   const content = () => ({
     filters: { ...(value as unknown as Record<string, unknown>), ...(table?.screen ? { [COLUMNS_FOR]: table.screen } : {}) },
-    ...(table ? { columns: { order: table.prefs.order, hidden: table.prefs.hidden, width: table.prefs.width, density: table.prefs.density, ...(table.prefs.display ? { display: table.prefs.display } : {}) } } : {}),
+    ...(table ? { columns: { order: table.prefs.order, hidden: table.prefs.hidden, width: table.prefs.width, density: table.prefs.density, ...(table.prefs.display ? { display: table.prefs.display } : {}), ...(table.prefs.rules ? { rules: table.prefs.rules } : {}) } } : {}),
     ...(sort ? { sort } : {}),
   });
   const apply = (v: SavedView | undefined) => {

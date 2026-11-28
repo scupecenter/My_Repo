@@ -43,6 +43,8 @@ import {
 } from "@/api/registers";
 import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
 import { PIVOT_NONE } from "@/lib/pivot";
+import { cellRule, rowRule, TONE_STYLE, type RuleKind } from "@/lib/condFormat";
+import { ruleText, type FormatCol } from "@/components/FormatRulesEditor";
 import { useRegions } from "@/api/sites";
 import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
@@ -535,6 +537,24 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     }
   };
   useAutoFit(tbl, label, items, fitText, i18n.language);
+  // Conditional formatting rules (decision 2026-11-28): the listed fields a rule can look at, and the rule a cell or a row meets
+  const fmtKind = (ty: string): RuleKind => (ty === "number" || (ty as string) === "percentage" ? "number" : ty === "date" ? "date" : ty === "list" || ty === "yes_no" ? "list" : "text");
+  const formatCols: FormatCol[] = fieldCols.map((c) => ({
+    id: `f:${c.code}`, label: fieldLabel(c, i18n.language), kind: fmtKind(c.type),
+    ...(c.type === "list" && c.options?.length ? { options: c.options.map((o) => ({ value: o.value, label: (i18n.language === "ar" && o.label_ar) || o.label_en })) } : {}),
+  }));
+  const fmtNow = new Date();
+  // a rule on a column the screen does not offer (hidden from this reader, or gone from the register) never applies
+  const liveRules = tbl.rules?.filter((r) => formatCols.some((c) => c.id === r.col));
+  const fmtOf = (r: (typeof items)[number], id: string) => {
+    const c = fieldCols.find((x) => `f:${x.code}` === id);
+    return c ? { v: r.data[c.code] as unknown, shown: showValue(c, r.data[c.code], i18n.language, t) } : { v: undefined, shown: undefined };
+  };
+  const cellFmt = (id: string, r: (typeof items)[number]) => {
+    const x = fmtOf(r, id);
+    return cellRule(liveRules, id, x.v, fmtNow, x.shown);
+  };
+  const rowFmt = (r: (typeof items)[number]) => rowRule(liveRules, (col) => fmtOf(r, col), fmtNow);
   const cell = (id: string, r: (typeof items)[number]) => {
     if (id.startsWith("f:")) {
       const c = fieldCols.find((x) => `f:${x.code}` === id);
@@ -809,6 +829,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               </>
             ) : undefined}
             table={view === "vertical" && (layout === "list" || layout === "wide") ? tbl : undefined}
+            formatCols={layout === "list" ? formatCols : undefined}
           />
         }
         primary={
@@ -1194,7 +1215,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                       data-zebra={g["data-zebra"]}
                       data-picked={g["data-picked"]}
                       onClick={() => !tmp && setRecord(r.id)}
-                      style={{ gridTemplateColumns: tracks(tbl.cols, true) }}
+                      data-fmt-row={rowFmt(r)?.tone}
+                      title={rowFmt(r) ? t("fmt.rule_hint", { rule: ruleText(rowFmt(r)!, formatCols, t) }) : undefined}
+                      style={{ gridTemplateColumns: tracks(tbl.cols, true), ...(rowFmt(r) ? TONE_STYLE[rowFmt(r)!.tone] : {}) }}
                       className={`grid w-full cursor-pointer items-center border-b border-line text-start text-sm ${rowPad(tbl.density)} ${g.className}`}
                     >
                       <div className="sticky start-0 z-10 flex items-center justify-center gap-1 bg-inherit">
@@ -1216,7 +1239,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                             key={c.id}
                             data-col={c.id}
                             className={`min-w-0 px-2 ${p.className}`}
-                            style={p.style}
+                            data-fmt={c.id.startsWith("f:") ? cellFmt(c.id, r)?.tone : undefined}
+                            title={c.id.startsWith("f:") && cellFmt(c.id, r) ? t("fmt.rule_hint", { rule: ruleText(cellFmt(c.id, r)!, formatCols, t) }) : undefined}
+                            style={{ ...p.style, ...(c.id.startsWith("f:") && cellFmt(c.id, r) ? { ...TONE_STYLE[cellFmt(c.id, r)!.tone], borderInlineStart: "3px solid currentColor" } : {}) }}
                           >
                             {c.id === "rowno" ? <span data-testid="reg-row-no"><RowNo n={i + 1} /></span> : cell(c.id, r)}
                           </div>
