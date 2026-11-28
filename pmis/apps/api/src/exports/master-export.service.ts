@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { createReadStream, promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { zipSync } from 'fflate';
 import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -36,6 +37,8 @@ const bodySchema = z.object({
   view: viewSchema.optional(),
   regions: z.array(z.number().int().min(1).max(99)).min(1).max(7).optional(),
   as_of: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** D5 (0.15.461): the site pack of one site: one workbook per part in a zip, only what the caller may export and read. */
+  site_pack: z.object({ site_id: uuidSchema, parts: z.array(z.enum(PART_KEYS)).min(1).max(PART_KEYS.length).optional() }).strict().optional(),
 }).strict();
 type Body = z.infer<typeof bodySchema>;
 type View = z.infer<typeof viewSchema>;
@@ -61,16 +64,21 @@ interface JobRow {
 /** What the job does, as stored in document_export_jobs.scope. */
 interface Scope {
   kind: 'master_export';
-  export_kind: 'full' | 'partial' | 'view';
+  export_kind: 'full' | 'partial' | 'view' | 'site_pack';
   parts: PartKey[];
   view: View | null;
   regions: number[] | null;
   as_of: string;
+  /** site_pack: the site and its code (for the file name). */
+  site_id?: string;
+  site_code?: string;
 }
 
 interface PartInfo { key: PartKey; label_en: string; label_ar: string; module: string; register: string | null; site_scoped: boolean; map: RegisterMap | undefined }
 interface SheetCount { sheet: string; part: string; rows: number }
 
+/** Parts a site pack leaves out: project-wide, or part of the Master sheet (a site pack has the site's Master row, its tasks and its registers). */
+const SITE_PACK_SKIP: PartKey[] = ['project_status', 'dismantle'];
 const MASTER_ROW_BATCH = 200;
 const LIST_PAGE = '200';
 const SITE_FIXED: Record<string, { ord: number | null; en: string; ar: string }> = {
@@ -254,6 +262,10 @@ export class MasterExportService {
   // ------------------------------------------------------------------ start
   async start(auth: AuthContext, raw: unknown, idemKey: string | undefined, onStarted: (go: () => void) => void): Promise<Record<string, unknown>> {
     const body: Body = parse(bodySchema, raw ?? {});
+    if (body.site_pack && (body.parts?.length || body.view || body.regions)) {
+      throw problems.validation([{ path: '/site_pack', code: 'site_pack_exclusive', message: 'Send the site pack alone: not with parts, view or regions.' }]);
+    }
+    if (body.site_pack?.parts && new Set(body.site_pack.parts).size !== body.site_pack.parts.length) throw problems.validation([{ path: '/site_pack/parts', code: 'duplicate', message: 'A part is listed twice.' }]);
     if (body.parts?.length && body.view) {
       throw problems.validation([{ path: '/view', code: 'parts_and_view_exclusive', message: 'Send parts or view, not both.' }]);
     }
@@ -274,7 +286,19 @@ export class MasterExportService {
 
     let exportKind: Scope['export_kind'];
     let parts: PartKey[];
-    if (body.view) {
+    let pack: { id: string; site_code: string; region_id: number } | null = null;
+    if (body.site_pack) {
+      const found = await this.db.tx.$queryRaw<{ id: string; site_code: string; region_id: number }[]>(Prisma.sql`SELECT id::text AS id, site_code, region_id FROM sites WHERE id = ${body.site_pack.site_id}::uuid`);
+      if (!found[0]) throw problems.notFound('The site does not exist or is not visible to you.');
+      pack = found[0];
+      exportKind = 'site_pack';
+      parts = body.site_pack.parts ?? cat.filter((p) => allowed(p.key) && p.site_scoped && !SITE_PACK_SKIP.includes(p.key)).map((p) => p.key);
+      if (parts.length === 0) throw problems.forbidden('action_forbidden', 'You hold the export grant on no part of this site.');
+      const outside = parts.filter((k) => { const r = regionsOf.get(k) ?? null; return r !== null && !r.includes((pack as { region_id: number }).region_id); });
+      if (outside.length) {
+        throw new ProblemException(403, 'action_forbidden', { detail: 'You may not export these parts for this site.', errors: outside.map((k) => ({ path: `/site_pack/parts/${k}`, code: 'export_denied', message: 'You need the export grant on this part in the region of the site.' })) });
+      }
+    } else if (body.view) {
       exportKind = 'view';
       parts = [body.view.source];
     } else if (body.parts?.length) {
@@ -309,12 +333,12 @@ export class MasterExportService {
       }
       view = body.view;
     }
-    const scope: Scope = { kind: 'master_export', export_kind: exportKind, parts: exportKind === 'view' ? [] : parts, view, regions: body.regions ?? null, as_of: body.as_of ?? today };
+    const scope: Scope = { kind: 'master_export', export_kind: exportKind, parts: exportKind === 'view' ? [] : parts, view, regions: body.regions ?? null, as_of: body.as_of ?? today, ...(pack ? { site_id: pack.id, site_code: pack.site_code } : {}) };
     return this.idem.run(auth.user.id, 'startMasterExport', idemKey, body, async () => {
       const r = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT doc_job_create(${JSON.stringify(scope)}::jsonb)::text AS id`);
       const id = (r[0] as { id: string }).id;
       await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('master_export.start', 'master_export', ${id}::text, NULL,
-        ${JSON.stringify({ kind: exportKind, parts, view, regions: scope.regions, as_of: scope.as_of })}::jsonb, NULL)`);
+        ${JSON.stringify({ kind: exportKind, parts, view, regions: scope.regions, as_of: scope.as_of, site_id: scope.site_id ?? null })}::jsonb, NULL)`);
       onStarted(() => this.schedule(id, auth, scope));
       return { id, kind: 'master_export', status: 'queued', progress: 0, result_file_id: null, created_at: new Date(), finished_at: null };
     });
@@ -333,6 +357,7 @@ export class MasterExportService {
       status: expired ? 'expired' : j.status,
       regions: j.scope.regions ?? [],
       as_of: j.scope.as_of,
+      ...(j.scope.site_id ? { site_id: j.scope.site_id } : {}),
       row_count: j.status === 'done' ? j.file_count : null,
       expires_at: j.status === 'done' ? j.expires_at : null,
       progress: Number(j.progress),
@@ -357,6 +382,7 @@ export class MasterExportService {
 
   /** The file name: the full Master, one part, or several parts. */
   private fileName(s: Scope, at: Date): string {
+    if (s.export_kind === 'site_pack') return `GSDN_SitePack_${(s.site_code ?? 'site').replace(/[^A-Za-z0-9_-]/g, '_')}_${ymd(at)}.zip`;
     if (s.export_kind === 'full') return `GSDN_Site_Master_${ymd(at)}.xlsx`;
     const parts = s.export_kind === 'view' && s.view ? [s.view.source] : s.parts;
     const tag = parts.length === 1 ? (parts[0] as string).split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('') : 'Parts';
@@ -375,11 +401,11 @@ export class MasterExportService {
     }
     const name = this.fileName(j.scope, j.created_at);
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('master_export.download', 'master_export', ${j.id}::text, NULL,
-      ${JSON.stringify({ export_id: j.id, download_name: name, kind: j.scope.export_kind, parts: j.scope.parts, view: j.scope.view, regions: j.scope.regions,
+      ${JSON.stringify({ export_id: j.id, download_name: name, site_id: j.scope.site_id ?? null, kind: j.scope.export_kind, parts: j.scope.parts, view: j.scope.view, regions: j.scope.regions,
         row_count: j.file_count, size_bytes: j.size_bytes === null ? null : Number(j.size_bytes) })}::jsonb, NULL)`);
     return {
       file: new StreamableFile(await this.storage.store.get(j.storage_key), {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', disposition: attachmentHeader(name), length: Number(j.size_bytes),
+        type: j.scope.export_kind === 'site_pack' ? 'application/zip' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', disposition: attachmentHeader(name), length: Number(j.size_bytes),
       }),
       headers: { 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' },
     };
@@ -409,23 +435,28 @@ export class MasterExportService {
 
   private async work(id: string, auth: AuthContext, scope: Scope): Promise<void> {
     await new Promise((r) => setTimeout(r, 25)); // the request transaction that created the job commits first
-    const tmp = join(tmpdir(), `pmis-master-${id}.xlsx`);
+    const pack = scope.export_kind === 'site_pack';
+    const tmp = join(tmpdir(), `pmis-master-${id}.${pack ? 'zip' : 'xlsx'}`);
     let key: string | null = null;
     try {
       await this.inContext(auth, () => this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${id}::uuid, 'running', 0, NULL, NULL, NULL, NULL)`));
       await this.inContext(auth, async () => {
-        const wb = workbookWriter(tmp);
-        const counts = await this.writeBook(wb, id, auth, scope);
-        await wb.commit();
+        let counts: SheetCount[];
+        if (pack) counts = await this.writePack(tmp, id, auth, scope);
+        else {
+          const wb = workbookWriter(tmp);
+          counts = await this.writeBook(wb, id, auth, scope);
+          await wb.commit();
+        }
         const size = (await fs.stat(tmp)).size;
         key = newObjectKey('exports');
         // generated by GSDN Workspace from database values only: stored encrypted, not sent to the virus scanner (Q195, as the log exports)
         await this.storage.store.putStream(key, createReadStream(tmp), size);
-        const master = counts.find((c) => c.sheet === MASTER_SHEET);
+        const master = pack ? undefined : counts.find((c) => c.sheet === MASTER_SHEET);
         const rowCount = master ? master.rows : counts.reduce((n, c) => n + c.rows, 0);
         await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${id}::uuid, 'done', 1, ${rowCount}::int, ${size}::bigint, ${key}::text, NULL)`);
         await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('master_export.done', 'master_export', ${id}::text, NULL,
-          ${JSON.stringify({ kind: scope.export_kind, parts: scope.parts, view: scope.view, regions: scope.regions, row_count: rowCount, sheets: counts, size_bytes: size })}::jsonb, NULL)`);
+          ${JSON.stringify({ kind: scope.export_kind, parts: scope.parts, view: scope.view, regions: scope.regions, site_id: scope.site_id ?? null, row_count: rowCount, sheets: counts, size_bytes: size })}::jsonb, NULL)`);
       }, 600_000);
     } catch (e) {
       const msg = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
@@ -435,6 +466,58 @@ export class MasterExportService {
     } finally {
       await fs.rm(tmp, { force: true }).catch(() => undefined);
     }
+  }
+
+  /**
+   * D5 (0.15.461): the site pack of one site, a zip with one workbook per part and a README. It runs as the requester (row-level security, the export
+   * grant per part and region), offers only the columns the caller may export (a Master column of another part needs that part's grant; a hidden site
+   * custom field is left out), and skips voided records. Project-wide figures and the dismantle part are not in a site pack.
+   */
+  private async writePack(file: string, id: string, auth: AuthContext, scope: Scope): Promise<SheetCount[]> {
+    const siteId = scope.site_id as string;
+    const cat = await this.catalogue();
+    const info = new Map(cat.map((p) => [p.key, p]));
+    const regionsOf = new Map<PartKey, number[] | null>();
+    for (const p of cat) regionsOf.set(p.key, await this.exportRegions(p));
+    const regionNames = new Map((await this.db.tx.$queryRaw<{ id: number; name_en: string }[]>(Prisma.sql`SELECT id, name_en FROM regions`)).map((r) => [r.id, r.name_en]));
+    const parts = scope.parts.filter((k) => info.has(k) && !SITE_PACK_SKIP.includes(k));
+    const files: Record<string, Uint8Array> = {};
+    const counts: SheetCount[] = [];
+    let done = 0;
+    for (const k of parts) {
+      const p = info.get(k) as PartInfo;
+      const regs = regionsOf.get(k) ?? null;
+      const columns = (await this.columnsOf(auth, p)).map((c) => c.code);
+      const tmp = join(tmpdir(), `pmis-pack-${id}-${k}.xlsx`);
+      try {
+        const wb = workbookWriter(tmp);
+        const view: View = { source: k, filters: { site_id: siteId }, columns };
+        let c: SheetCount;
+        if (k === 'sites' || k === 'milestones') c = await this.masterViewSheet(wb, auth, view, regs, regionsOf, siteId);
+        else if (k === 'tasks') c = await this.tasksViewSheet(wb, auth, view, regs);
+        else c = await this.registerSheet(wb, auth, p, regs, regionNames, { filters: { site_id: siteId }, columns, skipVoided: true });
+        await wb.commit();
+        files[`${k}.xlsx`] = new Uint8Array(await fs.readFile(tmp));
+        counts.push(c);
+      } finally {
+        await fs.rm(tmp, { force: true }).catch(() => undefined);
+      }
+      done++;
+      await this.progress(id, auth, done / Math.max(1, parts.length));
+    }
+    const me = await this.db.tx.$queryRaw<{ display_name: string; employee_id: string | null }[]>(Prisma.sql`SELECT display_name, employee_id FROM users WHERE id = ${auth.user.id}::uuid`);
+    const readme = [
+      `Site pack: ${scope.site_code ?? siteId}`,
+      `Generated at: ${new Date().toISOString()}`,
+      `Generated by: ${`${me[0]?.display_name ?? ''} ${me[0]?.employee_id?.trim() ?? ''}`.trim()}`,
+      'Content: only the parts you may export for this site, and only the columns you may read. Voided records are left out.',
+      'Not included: project-wide figures and the dismantle part.',
+      'Personal columns: Landlord and contact columns are left empty (decision Q469).',
+      ...counts.map((c) => `Rows in ${c.part}.xlsx (${c.sheet}): ${c.rows}`),
+    ].join('\r\n') + '\r\n';
+    files['README.txt'] = new TextEncoder().encode(readme);
+    await fs.writeFile(file, zipSync(files, { level: 6 }));
+    return counts;
   }
 
   /** Writes every sheet of the export; returns the data rows per sheet. */
@@ -582,7 +665,7 @@ export class MasterExportService {
 
   /** "Export current view" of the Sites list or Site Master: the rows of GET /sites with the same query, the chosen columns in screen order, Master header rows. */
   private async masterViewSheet(
-    wb: ReturnType<typeof workbookWriter>, auth: AuthContext, v: View, regs: number[] | null, regionsOf: Map<PartKey, number[] | null>,
+    wb: ReturnType<typeof workbookWriter>, auth: AuthContext, v: View, regs: number[] | null, regionsOf: Map<PartKey, number[] | null>, onlySite?: string,
   ): Promise<SheetCount> {
     const cols = await this.masterColumns();
     const ms = await this.milestoneLetters();
@@ -608,7 +691,7 @@ export class MasterExportService {
     const ords = spec.map((s) => s.ord).filter((o): o is number => o !== null);
     let rowNo = MASTER_FIRST_DATA_ROW;
     for await (const items of this.pages((q) => this.sites.list(auth, q) as Promise<{ items: unknown[]; page: { next_cursor: string | null } }>, { ...v.filters, ...(v.sort ? { sort: v.sort } : {}) })) {
-      const page = items.filter((it) => regs === null || regs.includes(Number(it.region_id)));
+      const page = items.filter((it) => (regs === null || regs.includes(Number(it.region_id))) && (!onlySite || String(it.id) === onlySite));
       if (!page.length) continue;
       const ids = page.map((it) => String(it.id));
       const region = new Map(page.map((it) => [String(it.id), Number(it.region_id)]));
@@ -716,7 +799,7 @@ export class MasterExportService {
 
   private async registerSheet(
     wb: ReturnType<typeof workbookWriter>, auth: AuthContext, p: PartInfo, regs: number[] | null, regionNames: Map<number, string>,
-    view: { filters: Record<string, unknown>; columns: string[] } | null, only?: Set<string>,
+    view: { filters: Record<string, unknown>; columns: string[]; skipVoided?: boolean } | null, only?: Set<string>,
   ): Promise<SheetCount> {
     const layout = await this.exportLayout(p);
     let columns: RegisterSheetColumn[] = layout.columns;
@@ -738,7 +821,7 @@ export class MasterExportService {
     for await (const items of this.pages((q) => this.registers.listRecords(auth, p.register as string, q), filters)) {
       for (const it of items) {
         if (only && !only.has(String(it.entity_id))) continue;   // the archive of a reset: only the records it deletes, every state
-        if (!view && !only && it.state === 'voided') continue;
+        if ((!view || view.skipVoided) && !only && it.state === 'voided') continue;
         const region = it.region_id === null || it.region_id === undefined ? null : Number(it.region_id);
         if (!only && regs !== null && region !== null && !regs.includes(region)) continue;
         const data = (it.data ?? {}) as Record<string, unknown>;

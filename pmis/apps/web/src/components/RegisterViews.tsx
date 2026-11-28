@@ -1,5 +1,5 @@
 import { Lock, PanelRightOpen } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RegisterDefinition, RegisterField, RegisterRecord } from '@/api/types';
 import { BoardGrid, type BoardColumn } from '@/components/Board';
@@ -11,6 +11,7 @@ import { STATE_TONE } from '@/components/RegisterDrawer';
 import { SiteMap } from '@/components/SiteMap';
 import { ChartView, type ChartKind } from '@/components/ChartView';
 import { StatusChip } from '@/components/TableKit';
+import { EmptyState } from '@/components/States';
 import { WideTable, type WideCell, type WideColumn, type WideInput, type WideTableRow } from '@/components/WideTable';
 import { isHidden, sectionIdOf, typeHides } from '@/lib/registerForms';
 import { measureBreakdown } from '@/lib/viewAnalytics';
@@ -21,8 +22,8 @@ import type { Display } from '@/lib/tablePrefs';
  * the board and the map are the same shared components as Site Master (WideTable, BoardGrid, SiteMap), fed by the register's own list
  * (GET /registers/{key}/records with the same filters, so every layout shows the same records, with the caller's rights and field rules).
  */
-export type RegisterLayout = 'list' | 'wide' | 'board' | 'map' | 'calendar' | 'chart';
-export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'map', 'calendar', 'chart'];
+export type RegisterLayout = 'list' | 'wide' | 'board' | 'feed' | 'map' | 'calendar' | 'chart';
+export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'feed', 'map', 'calendar', 'chart'];
 
 /** The board's grouping on the approval state of the records (entry, in review, in approval, approved, voided), which every register has. */
 export const BY_STATE = 'state';
@@ -57,7 +58,7 @@ export const dateFields = (def: RegisterDefinition): RegisterField[] => def.fiel
 /** The layouts a register offers: list, wide table, board and chart on every register; the map only where the records carry a site (and its coordinates);
     the calendar (decision V2) where the definition has at least one date field. */
 export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => [
-  'list', 'wide', 'board',
+  'list', 'wide', 'board', 'feed',
   ...(def.site_scoped ? (['map'] as const) : []),
   ...(dateFields(def).length ? (['calendar'] as const) : []),
   'chart',
@@ -169,15 +170,23 @@ export type RegisterLane = 'none' | 'region' | 'type';
  * the order of its list (values outside the list and "Not set" after them), or one per approval state. Swimlanes by region or by record type.
  * Read only, as the Site Master board: a card opens the record, and a record moves only through its own form and actions.
  */
-export function RegisterBoard({ def, records, by, lane, regionName, onOpen, partial }: {
+export function RegisterBoard({ def, records, by, lane, regionName, onOpen, partial, admin, onMove, onRefused, onPreview }: {
   def: RegisterDefinition; records: RegisterRecord[]; by: string; lane: RegisterLane;
   regionName: (id: number | null | undefined) => string; onOpen: (id: string) => void;
   /** the board holds only the first records of a larger filtered set */
   partial: { shown: number; total: number } | null;
+  /** a System Admin may edit a locked field or row (the database exempts admins too) */
+  admin?: boolean;
+  /** drag a card to another column: the page saves the status field through the normal edit path (If-Match). Without it the board stays read only. */
+  onMove?: (r: RegisterRecord, code: string, value: string | null) => void;
+  onRefused?: (reason: string) => void;
+  /** Space on a focused card */
+  onPreview?: (id: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [dragId, setDragId] = useState<string | null>(null);
   const choices = statusFields(def);
   const field = by === BY_STATE ? undefined : choices.find((f) => f.code === by);
   const groupBy = field ? field.code : BY_STATE;
@@ -200,6 +209,20 @@ export function RegisterBoard({ def, records, by, lane, regionName, onOpen, part
   const cells = new Map<string, RegisterRecord[]>();
   for (const r of records) { const k = `${keys.get(raw(r)) ?? ''}|${laneKey.get(laneOf(r))}`; const a = cells.get(k); if (a) a.push(r); else cells.set(k, [r]); }
   const columns: BoardColumn[] = values.map((x) => ({ key: keys.get(x.v)!, name: x.name, count: records.filter((r) => raw(r) === x.v).length }));
+  const valueOfKey = (k: string): string | undefined => values.find((x) => keys.get(x.v) === k)?.v;
+  /** why a card may not go to this column (null = it may); the server still has the last word */
+  const refusal = (r: RegisterRecord, k: string): string | null => {
+    if (!field) return t('regviews.drag_state');
+    const to = valueOfKey(k);
+    if (to === undefined) return t('regviews.drag_state');
+    if (raw(r) === to) return t('regviews.drag_same');
+    if (r.locked && !admin) return t('regviews.drag_locked');
+    if (field.read_only || (field.locked && !admin)) return t('regviews.drag_field_locked');
+    if (!r.allowed_actions?.includes('edit')) return t('regviews.drag_no_edit');
+    if (to === '' && field.required) return t('regviews.drag_required');
+    return null;
+  };
+  const dragging = dragId ? records.find((x) => x.id === dragId) : undefined;
   const title = (r: RegisterRecord) => {
     const f = def.fields.find((y) => y.in_list && y.code !== groupBy && r.data[y.code] !== undefined && r.data[y.code] !== null && r.data[y.code] !== '');
     return f ? valueText(f, r.data[f.code], lang, t) : '';
@@ -208,11 +231,23 @@ export function RegisterBoard({ def, records, by, lane, regionName, onOpen, part
     <section className="space-y-2" data-testid="register-board" data-by={groupBy} aria-label={t('regviews.board_label', { name: (lang === 'ar' && def.name_ar) || def.name_en })}>
       <div className="flex flex-wrap items-center gap-2">
         {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-board-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
-        <span className="ms-auto text-xs text-mute">{t('regviews.board_read_only')}</span>
+        <span className="ms-auto text-xs text-mute" data-testid="register-board-note">{onMove && field ? t('regviews.board_drag_note') : t('regviews.board_read_only')}</span>
       </div>
       <BoardGrid<RegisterRecord> testid="register-board-scroll" emptyTestid="register-board-empty" empty={t('registers.empty')} total={records.length} showLanes={lane !== 'none'}
         columns={columns} lanes={laneIds.map((l) => ({ key: laneKey.get(l)!, name: laneName(l), count: records.filter((r) => laneOf(r) === l).length }))}
         label={(c, l) => `${c.name} · ${l.name}`}
+        {...(onMove ? {
+          dropHint: (col: string) => { if (!dragging) return null; const why = refusal(dragging, col); return why ? { ok: false, reason: why } : { ok: true }; },
+          onDropTo: (col: string, _ln: string, e: DragEvent) => {
+            const r = records.find((x) => x.id === (e.dataTransfer.getData('text/plain') || dragId));
+            setDragId(null);
+            if (!r) return;
+            const why = refusal(r, col);
+            if (why) { if (raw(r) !== valueOfKey(col)) onRefused?.(why); return; }
+            const to = valueOfKey(col);
+            if (field && to !== undefined) onMove(r, field.code, to === '' ? null : to);
+          },
+        } : {})}
         cell={(col, ln) => {
           const all = cells.get(`${col}|${ln}`) ?? [];
           const k = `${col}|${ln}`;
@@ -224,6 +259,8 @@ export function RegisterBoard({ def, records, by, lane, regionName, onOpen, part
           const tt = title(r);
           return (
             <button type="button" onClick={() => onOpen(r.id)} data-testid={`board-record-${r.id}`} data-state={r.state}
+              {...(onMove && field ? { draggable: true, onDragStart: (e: DragEvent) => { e.dataTransfer.setData('text/plain', r.id); e.dataTransfer.effectAllowed = 'move'; setDragId(r.id); }, onDragEnd: () => setDragId(null) } : {})}
+              {...(onPreview ? { onKeyDown: (e: KeyboardEvent) => { if (e.key === ' ') { e.preventDefault(); onPreview(r.id); } }, onKeyUp: (e: KeyboardEvent) => { if (e.key === ' ') e.preventDefault(); } } : {})}
               className="block w-full rounded-md border border-line bg-card p-2 text-start text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               aria-label={t('regviews.card', { code: r.site_code ?? '', title: tt })}>
               <div className="flex items-baseline gap-2">{r.site_code && <b className="mono" dir="ltr">{r.site_code}</b>}<span className="truncate">{tt}</span></div>
@@ -305,6 +342,72 @@ export function RegisterCalendar({ def, records, field, onOpen, partial }: {
     <section className="card p-3" data-testid="register-calendar-card" aria-label={t('calview.title')}>
       <CalendarGrid testid="register-calendar" items={items} onOpen={onOpen}
         head={partial ? <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-calendar-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span> : undefined} />
+    </section>
+  );
+}
+
+/** The moment a feed entry carries: the last update, else the creation. */
+function feedTime(r: RegisterRecord): string {
+  return r.updated_at ?? r.created_at ?? '';
+}
+
+/** "3 hours ago" in the caller's language; empty when the record carries no time. */
+function relTime(iso: string, lang: string): string {
+  if (!iso) return '';
+  const sec = Math.round((Date.parse(iso) - Date.now()) / 1000);
+  if (Number.isNaN(sec)) return '';
+  const abs = Math.abs(sec);
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+  if (abs < 60) return rtf.format(sec, 'second');
+  if (abs < 3600) return rtf.format(Math.round(sec / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(sec / 3600), 'hour');
+  if (abs < 86400 * 30) return rtf.format(Math.round(sec / 86400), 'day');
+  if (abs < 86400 * 365) return rtf.format(Math.round(sec / (86400 * 30)), 'month');
+  return rtf.format(Math.round(sec / (86400 * 365)), 'year');
+}
+
+/**
+ * Decision V10 (2026-11-28, 0.15.577): the feed, the records of the current filters latest-first (by the last update, else the creation),
+ * one line each, on every register, up to ALL_CAP like the board and the map. A line shows the title (the first listed field with a value),
+ * the site code, the state, the region, the record type and the time in the caller's language. Read only: a line opens its record (drawer or
+ * page, per V5).
+ */
+export function RegisterFeed({ def, records, regionName, onOpen, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; regionName: (id: number | null | undefined) => string;
+  onOpen: (id: string) => void; partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const sorted = [...records].sort((a, b) => feedTime(b).localeCompare(feedTime(a)));
+  const titleOf = (r: RegisterRecord) => {
+    const f = def.fields.find((y) => y.in_list && r.data[y.code] !== undefined && r.data[y.code] !== null && r.data[y.code] !== '');
+    return f ? valueText(f, r.data[f.code], lang, t) : '';
+  };
+  return (
+    <section className="space-y-2" data-testid="register-feed" aria-label={t('view.feed')}>
+      <div className="flex flex-wrap items-center gap-2">
+        {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-feed-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
+        <span className="ms-auto text-xs text-mute">{t('regviews.board_read_only')}</span>
+      </div>
+      {!sorted.length ? <EmptyState testid="register-feed-empty" title={t('registers.empty')} /> : (
+        <ol className="divide-y divide-line rounded-md border border-line bg-card" data-testid="register-feed-list">
+          {sorted.map((r) => (
+            <li key={r.id}>
+              <button type="button" onClick={() => onOpen(r.id)} data-testid={`register-feed-item-${r.id}`} data-state={r.state}
+                className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3 py-2 text-start text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label={t('regviews.card', { code: r.site_code ?? '', title: titleOf(r) })}>
+                {r.site_code && <b className="mono" dir="ltr">{r.site_code}</b>}
+                <span className="font-medium" data-testid={`register-feed-title-${r.id}`}>{titleOf(r)}</span>
+                <span className={`chip ${STATE_TONE[r.state] ?? ''}`} data-testid={`register-feed-value-${r.id}-state`}>{t(`regState.${r.state}`)}</span>
+                {r.region_id ? <span className="text-xs text-mute" data-testid={`register-feed-value-${r.id}-site`}>{regionName(r.region_id as number)}</span> : null}
+                {r.record_type && <span className="chip border border-line">{r.record_type.toUpperCase()}</span>}
+                {r.locked && <span className="chip bg-hover" data-testid={`register-feed-locked-${r.id}`}>{t('registers.locked_badge')}</span>}
+                <span className="ms-auto text-xs text-mute" data-testid={`register-feed-time-${r.id}`}>{relTime(feedTime(r), lang)}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

@@ -28,7 +28,7 @@ import { SitePhaseTabs } from '@/components/SitePhaseTabs';
 import { DataGapsChip, LocksChip } from '@/components/WorkflowLocks';
 import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
-import { ExportViewButton } from '@/components/ExportDialog';
+import { ExportViewButton, SitePackButton } from '@/components/ExportDialog';
 import { TaskGrid, taskMatches } from '@/components/TaskGrid';
 import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
@@ -108,7 +108,7 @@ export function Site() {
     ],
     onChange: (id: string) => { const l = id === 'timeline' ? 'row' : 'list'; setLayout(l); savePref(LAYOUT_KEY, id); },
   };
-  const exporter = <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(pq.stream ? { stream: pq.stream } : {}), ...(pq.view ? { view: pq.view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} />;
+  const exporter = <><ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(pq.stream ? { stream: pq.stream } : {}), ...(pq.view ? { view: pq.view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} /><SitePackButton testid="site-pack" siteId={siteId} /></>;
 
   return (
     <div data-testid="page-site">

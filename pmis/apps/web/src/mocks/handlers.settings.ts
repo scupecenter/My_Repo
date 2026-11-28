@@ -452,6 +452,7 @@ const DASH_CATALOGUE = {
     { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
     { code: 'goals', label_en: 'Goals', label_ar: 'الأهداف' },
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
+    { code: 'ps_detail', label_en: 'Project Status detail: activities A1..A8 with their items', label_ar: 'تفصيل حالة المشروع: الأنشطة A1..A8 وبنودها' },
     { code: 'region_health', label_en: 'Region health', label_ar: 'صحة المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
     { code: 'pinned_views', label_en: 'Pinned views', label_ar: 'العروض المثبتة' },
@@ -490,7 +491,13 @@ const ragView = () => ({
   items: RAG_CAT.map((c) => ({ ...c, enabled: ragState.saved[c.code]?.enabled ?? false, green: ragState.saved[c.code]?.green ?? c.default_green, amber: ragState.saved[c.code]?.amber ?? c.default_amber })),
   version: ragState.version, updated_at: ragState.updated_at, updated_by: null,
 });
+/** The number of weeks the dashboard forecast averages (contract 0.15.431): the setting dashboard.forecast_window_weeks, default 4, version 0 until the first save. */
+let fcState = { version: 0, weeks: 4, updated_at: null as string | null, updated_by: null as null };
+const fcView = () => ({ ...fcState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
+/** The method of the dashboard forecast (contract 0.15.474): the setting dashboard.forecast_method, default mean, version 0 until the first save. */
+let fmState = { version: 0, method: 'mean', updated_at: null as string | null, updated_by: null as null };
+const fmView = () => ({ ...fmState });
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
 
@@ -628,6 +635,20 @@ export const settingsHandlers = [
     return HttpResponse.json(snapView(), tag(snapState.version));
   }),
   // ------------------------------------------------------------------ progress figure colours (contract 0.15.432, settings review gap 5)
+  // ------------------------------------------------------------------ forecast method (contract 0.15.474, phase 5)
+  http.get(`${B}/settings/dashboard/forecast-method`, () => { const g = guard(); if (g) return g; return HttpResponse.json(fmView(), tag(fmState.version)); }),
+  http.put(`${B}/settings/dashboard/forecast-method`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, fmState.version); if (p) return p;
+    const b = (await request.json()) as { method?: string; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (b.method !== 'mean' && b.method !== 'linear') errs.push({ path: '/method', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    fmState = { ...fmState, version: fmState.version + 1, method: b.method!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(fmView(), tag(fmState.version));
+  }),
   http.get(`${B}/settings/dashboard/progress-rag`, () => { const g = guard(); if (g) return g; return HttpResponse.json(ragView(), tag(ragState.version)); }),
   http.put(`${B}/settings/dashboard/progress-rag`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
@@ -647,6 +668,20 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     ragState = { version: ragState.version + 1, saved, updated_at: new Date().toISOString() };
     return HttpResponse.json(ragView(), tag(ragState.version));
+  }),
+  // ------------------------------------------------------------------ forecast window (contract 0.15.431, settings review gap 4)
+  http.get(`${B}/settings/dashboard/forecast-window`, () => { const g = guard(); if (g) return g; return HttpResponse.json(fcView(), tag(fcState.version)); }),
+  http.put(`${B}/settings/dashboard/forecast-window`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, fcState.version); if (p) return p;
+    const b = (await request.json()) as { weeks?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weeks) || b.weeks! < 2 || b.weeks! > 12) errs.push({ path: '/weeks', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    fcState = { ...fcState, version: fcState.version + 1, weeks: b.weeks!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(fcView(), tag(fcState.version));
   }),
   // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
   http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
