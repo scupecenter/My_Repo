@@ -14161,6 +14161,10 @@ export interface components {
             capture_date?: string | null;
             /** @description A photo without an EXIF date: accepted and flagged for the reviewer. */
             unknown_capture_date?: boolean;
+            /** @description 0.15.377: this version is the signed copy (set by the person who uploaded it with the form field `signed`); absent when never marked. */
+            signed?: boolean;
+            /** @description 0.15.377: this version is the stamped copy (form field `stamped`); absent when never marked. */
+            stamped?: boolean;
             /**
              * Format: uuid
              * @description The file that replaced this version; null for the current version (and for a withdrawn file).
@@ -14190,6 +14194,12 @@ export interface components {
             doc_code: string;
             name_en: string;
             name_ar?: string | null;
+            /** @description 0.15.377: the document type needs a signed copy (setting documents.marks). */
+            needs_signature?: boolean;
+            /** @description 0.15.377: the document type needs a stamped copy. */
+            needs_stamp?: boolean;
+            /** @description 0.15.377: the type needs a copy and no current version carries the markers yet. Informs only; nothing is blocked. */
+            awaiting_signed_copy?: boolean;
             /** @enum {string} */
             kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
