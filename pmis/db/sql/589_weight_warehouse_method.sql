@@ -1,4 +1,4 @@
--- 0565: keep the publish validation whole after 0552. 0552 replaced weight_set_errors in place with the measure-rule
+-- 0590: keep the publish validation whole after 0552. 0552 replaced weight_set_errors in place with the measure-rule
 -- check; in migration-number order that replace runs AFTER 0540/0544 and drops their register and warehouse blocks,
 -- and its method whitelist does not know the warehouse method (0544), so a warehouse item could never publish. This
 -- migration extends the whitelist and re-applies the 0540/0544 blocks. Every block below is idempotent: a database
