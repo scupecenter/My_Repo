@@ -14,6 +14,7 @@ import { boolParam, oneParam, Query } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { TOP_LEVEL_KEYS } from '../permissions/catalogue';
+import { customModuleKeys } from '../permissions/custom-modules';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { ASSIGNMENT_INCLUDE, assignmentVersion, AssignmentDto, AssignmentRow, toAssignmentDto, UsersRepo } from '../users/users.repo';
 import { limit } from '../ops/ops-limits';
@@ -476,7 +477,8 @@ export class AssignmentsService {
   private async checkScope(p: Patch, base: string): Promise<void> {
     const errors: FieldError[] = [];
     if (Array.isArray(p.module_keys)) {
-      p.module_keys.forEach((m, i) => { if (!TOP_LEVEL_KEYS.has(m)) errors.push({ path: `${base}/module_keys/${i}`, code: 'unknown_module', message: `Unknown module ${m}.` }); });
+      const custom = await customModuleKeys(this.db);
+      p.module_keys.forEach((m, i) => { if (!TOP_LEVEL_KEYS.has(m) && !custom.has(m)) errors.push({ path: `${base}/module_keys/${i}`, code: 'unknown_module', message: `Unknown module ${m}.` }); });
     }
     if (p.profile_ids) {
       const ids = [...new Set(p.profile_ids)];
