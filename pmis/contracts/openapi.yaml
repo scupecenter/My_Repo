@@ -282,6 +282,8 @@ info:
     - 0.15.410 (2026-11-27): hardening layer 1c, History and Restore for the Warehouse item master and the Daily Plan, and Claim and Triage of a Daily Plan day (migration 0567). Additive. `GET /warehouse/items/{id}/history` and `GET /daily-plans/{date}/regions/{region_id}/history` return the audit trail with the field changes; Restore of an item is a PATCH of the old values through the normal item writer. A plan day (region and date) can be claimed and released (`POST` and `DELETE` on `/daily-plans/{date}/regions/{region_id}/claim`) and accepted or deferred with a note (`POST /daily-plans/{date}/regions/{region_id}/triage`, `GET` for the state), by the L2 holder of the Daily Plan in the region or a System Admin, as for the registers (0340). New plan days start `pending`; existing days stay untriaged. Reject and merge do not apply to a plan day. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
     - 0.15.206 (2026-11-27): the dashboard follow-up sections, restricted financial summary (owner approval 2026-11-26, dashboard proposals item 9; migration 0307). Additive. `GET /dashboard/ops` gains the section `finance` (`DashboardOpsFinance`): the advances (counts, amounts of the records whose amounts are not hidden, age of the open ones since disbursement) and the disbursed amount against the completion of the assignments the advances belong to. It is OFF by default and only a holder of a role listed by the new setting `dashboard.finance_readers` (default Project Manager and Finance Officer) who also has the financial advances view receives figures; everyone else gets `available: false` with null figures, and the card stays hidden. It is never part of a share link or an export. New `GET/PUT /settings/dashboard-finance-readers` (`getDashboardFinanceReaders`, `setDashboardFinanceReaders`) to switch it on and choose the roles (System Admin or an all-regions delegate of settings edit, reason, step-up, If-Match, audited). Invoice ages are not part of the summary: the system holds no invoice data yet.
+    - 0.15.207 (2026-11-27): the dashboard follow-up sections, comparison of regions and contractors (owner approval 2026-11-26, dashboard proposals item 10; migration 0308). Additive. `GET /dashboard/ops` gains the section `compare` (`DashboardOpsCompare`): the parties of the contractor performance report side by side (level, delay days, open and overdue snags, quality failures), worst first, at most 10, no amounts; `available: false` with null figures without the contractors view right. The regions are compared by the page from the existing `regions` of `GET /dashboard`. The A4 landscape print and the filters by project phase, delivery batch, site type and tower owner already exist (F6/F13, 0.15.45); this version adds only the card code `ops_compare` and, in the page, quick dropdowns that write the same filter tree.
+
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -27371,7 +27373,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings, finance, phase_scope]
+      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings, finance, compare, phase_scope]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -27386,6 +27388,7 @@ components:
         approvals: {$ref: '#/components/schemas/DashboardOpsApprovals'}
         changes_meetings: {$ref: '#/components/schemas/DashboardOpsChangesMeetings'}
         finance: {$ref: '#/components/schemas/DashboardOpsFinance'}
+        compare: {$ref: '#/components/schemas/DashboardOpsCompare'}
         phase_scope: {$ref: '#/components/schemas/DashboardOpsPhaseScope'}
     DashboardOpsProcurement:
       type: object
@@ -27630,6 +27633,29 @@ components:
               anyOf:
                 - $ref: '#/components/schemas/DashboardOpsAging'
                 - type: 'null'
+    DashboardOpsCompare:
+      type: object
+      description: "0.15.207 (item 10): the contractors side by side. No amounts."
+      required: [available, contractors]
+      properties:
+        available: {type: boolean, description: "False without the contractors view right; contractors is then null."}
+        contractors:
+          type: [array, 'null']
+          maxItems: 10
+          items:
+            type: object
+            required: [party_id, name, type, level, delay_days, snags_open, snags_overdue, quality_total, quality_failed, quality_fail_pct]
+            properties:
+              party_id: {type: string}
+              name: {type: string}
+              type: {type: string}
+              level: {type: string, enum: [ok, amber, red, insufficient]}
+              delay_days: {type: integer}
+              snags_open: {type: integer}
+              snags_overdue: {type: integer}
+              quality_total: {type: integer}
+              quality_failed: {type: integer}
+              quality_fail_pct: {type: [number, 'null']}
     DashboardOpsFinance:
       type: object
       description: "0.15.206 (item 9): the restricted financial summary. Only for a configured reader (setting dashboard.finance_readers); never in an export or a share link. Invoice ages are not included: no invoice data exists."

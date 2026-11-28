@@ -10,6 +10,7 @@ import {
   bucketAges,
   receivePct,
   scorecardSummary,
+  compareContractors,
   approvalsByRole,
   changesSummary,
   actionsSummary,
@@ -327,5 +328,25 @@ describe('target in force (0.15.367)', () => {
     expect(targetInForce(true, null, 8)).toEqual({ value: 8, source: 'derived' });
     expect(targetInForce(true, 0, 8)).toEqual({ value: 8, source: 'derived' });
     expect(targetInForce(false, null, null)).toEqual({ value: null, source: 'derived' });
+  });
+});
+
+describe('compareContractors (0.15.207, item 10)', () => {
+  const it1 = (n: string, over: Record<string, unknown> = {}) => ({
+    party_id: n, name: n, type: 'contractor', delay_days: 3, issues_open: 0,
+    snags: { total: 10, open: 4, overdue: 2, returned: 1 }, quality: { total: 20, failed: 1 }, level: 'amber' as const, ...over,
+  });
+  it('keeps the report order, shows the figures and no amounts', () => {
+    const r = compareContractors([it1('A'), it1('B', { quality: { total: 0, failed: 0 } })]);
+    expect(r.map((x) => x.name)).toEqual(['A', 'B']);
+    expect(r[0]).toMatchObject({ snags_open: 4, snags_overdue: 2, quality_failed: 1, quality_fail_pct: 5 });
+    expect(r[1]?.quality_fail_pct).toBeNull();
+    expect(Object.keys(r[0] ?? {}).some((k) => /amount|value|cost/.test(k))).toBe(false);
+  });
+  it('is capped at the limit', () => {
+    const many = Array.from({ length: 15 }, (_, i) => it1(`P${i}`));
+    expect(compareContractors(many)).toHaveLength(10);
+    expect(compareContractors(many, 3)).toHaveLength(3);
+    expect(compareContractors([])).toEqual([]);
   });
 });

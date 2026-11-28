@@ -227,6 +227,16 @@ export const dashboardHandlers = [
         ncrs: { open: 6, closed: 41, avg_close_days: 14.2 },
         first_pass_pct: 92.4,
       },
+      // 0.15.207: contractors side by side, synthetic figures
+      compare: {
+        available: true,
+        contractors: [
+          { party_id: '00000000-0000-4000-8000-000000000201', name: 'A&T Global', type: 'contractor', level: 'red', delay_days: 21, snags_open: 14, snags_overdue: 12, quality_total: 30, quality_failed: 3, quality_fail_pct: 10 },
+          { party_id: '00000000-0000-4000-8000-000000000202', name: 'Delta Towers', type: 'contractor', level: 'amber', delay_days: 9, snags_open: 9, snags_overdue: 7, quality_total: 25, quality_failed: 1, quality_fail_pct: 4 },
+          { party_id: '00000000-0000-4000-8000-000000000203', name: 'Sahara Power', type: 'supplier', level: 'amber', delay_days: 5, snags_open: 6, snags_overdue: 4, quality_total: 20, quality_failed: 2, quality_fail_pct: 10 },
+          { party_id: '00000000-0000-4000-8000-000000000204', name: 'Nile Works', type: 'contractor', level: 'ok', delay_days: 2, snags_open: 4, snags_overdue: 3, quality_total: 40, quality_failed: 0, quality_fail_pct: 0 },
+        ],
+      },
       // 0.15.206: restricted financial summary, synthetic figures (the mock viewer is a configured reader)
       finance: {
         available: true,

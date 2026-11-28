@@ -20370,6 +20370,7 @@ export interface components {
             approvals: components["schemas"]["DashboardOpsApprovals"];
             changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
             finance: components["schemas"]["DashboardOpsFinance"];
+            compare: components["schemas"]["DashboardOpsCompare"];
             phase_scope: components["schemas"]["DashboardOpsPhaseScope"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
@@ -20594,6 +20595,24 @@ export interface components {
                 no_due_date: number | null;
                 overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
             };
+        };
+        /** @description 0.15.207 (item 10): the contractors side by side. No amounts. */
+        DashboardOpsCompare: {
+            /** @description False without the contractors view right; contractors is then null. */
+            available: boolean;
+            contractors: {
+                party_id: string;
+                name: string;
+                type: string;
+                /** @enum {string} */
+                level: "ok" | "amber" | "red" | "insufficient";
+                delay_days: number;
+                snags_open: number;
+                snags_overdue: number;
+                quality_total: number;
+                quality_failed: number;
+                quality_fail_pct: number | null;
+            }[] | null;
         };
         /** @description 0.15.206 (item 9): the restricted financial summary. Only for a configured reader (setting dashboard.finance_readers); never in an export or a share link. Invoice ages are not included: no invoice data exists. */
         DashboardOpsFinance: {
