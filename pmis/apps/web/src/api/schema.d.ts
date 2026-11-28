@@ -4309,6 +4309,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/finance-hub/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Finance hub landing page, in one call (0.15.361)
+         * @description 0.15.361. Read-only summary cards over the two separate registers `financial_advances` and `invoices` - open advances (count, overdue count, and the open balance total where `fin_amounts_visible` shows the caller amounts - null otherwise), and open invoices (count by state, aging buckets over the received date, count past due). Each card is null when the caller cannot view that register's module, and every row counted is a row the register screen would show the caller (same module and region visibility, latest version only). The thresholds come from the `finance_hub` section of ui.features.
+         */
+        get: operations["getFinanceHubSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules": {
         parameters: {
             query?: never;
@@ -6246,6 +6266,30 @@ export interface paths {
          * @description 0.15.62. Any System Admin acting without delegation, a reason and a step-up, while the request is `files_pending` (409 `invalid_transition` otherwise). Moves the keys still `pending` into the same quarantine directory with the same rules; a key already moved, missing or refused is never tried again. Audited (`data_reset_files_retry`).
          */
         post: operations["retryDataResetFiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/duplicate-rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How a record that is in an upload file twice is treated (imports.duplicate_rows)
+         * @description 0.15.345 (migration 0432). Every signed-in user may read it. `default` is `first` (the first row of the record wins and the later rows are refused as `duplicate_in_file`, as before) or `last` (the later row wins and the earlier row is set aside as `overridden_by_later_row`, listed in the batch review and the error report, never lost). `registers` overrides the default per register key. Covers the register templates; master, sites, stream, list-values and holiday templates are not covered (the first row wins there). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDuplicateRowsSettings"];
+        /**
+         * Change how a duplicate row in a file is treated (reason, If-Match, audited)
+         * @description 0.15.345. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). A register key that does not exist is 422 (`unknown_register`), a reason and If-Match are required. Saving the values in force is 409 `invalid_transition`. Audited as `imp_duplicate_policy_update` with the values before and after.
+         */
+        put: operations["setDuplicateRowsSettings"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -14117,6 +14161,10 @@ export interface components {
             capture_date?: string | null;
             /** @description A photo without an EXIF date: accepted and flagged for the reviewer. */
             unknown_capture_date?: boolean;
+            /** @description 0.15.377: this version is the signed copy (set by the person who uploaded it with the form field `signed`); absent when never marked. */
+            signed?: boolean;
+            /** @description 0.15.377: this version is the stamped copy (form field `stamped`); absent when never marked. */
+            stamped?: boolean;
             /**
              * Format: uuid
              * @description The file that replaced this version; null for the current version (and for a withdrawn file).
@@ -14146,6 +14194,12 @@ export interface components {
             doc_code: string;
             name_en: string;
             name_ar?: string | null;
+            /** @description 0.15.377: the document type needs a signed copy (setting documents.marks). */
+            needs_signature?: boolean;
+            /** @description 0.15.377: the document type needs a stamped copy. */
+            needs_stamp?: boolean;
+            /** @description 0.15.377: the type needs a copy and no current version carries the markers yet. Informs only; nothing is blocked. */
+            awaiting_signed_copy?: boolean;
             /** @enum {string} */
             kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
@@ -15989,6 +16043,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0432: of the `error` rows, those set aside because a later row of the same record in the file won (`overridden_by_later_row`, setting `imports.duplicate_rows` = last). Counted inside `error`; 0 while the setting is `first`. */
+                overridden?: number;
                 /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
                 duplicate?: number;
             };
@@ -17000,6 +17056,49 @@ export interface components {
             /** Format: date-time */
             at: string;
         };
+        /** @description 0.15.361. The Finance hub: which widgets of the page show, after how many days a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets. */
+        UiFinanceHub: {
+            widgets: {
+                advances: boolean;
+                invoices: boolean;
+                quick_links: boolean;
+                templates: boolean;
+            };
+            settle_warn_days: number;
+            aging_days: number[];
+        };
+        FinanceHubSummary: {
+            /** @description Null when the caller cannot view the financial_advances module. */
+            advances: {
+                /** @description Latest advances whose state is not settled, closed or cancelled. */
+                open_count: number;
+                /** @description Disbursed and unsettled for more than settle_warn_days. */
+                overdue_count: number;
+                /** @description Total open balance of the advances the caller may see amounts of (fin_amounts_visible); null when the rule shows the caller no amounts. */
+                open_amount: number | null;
+                /** @example LYD */
+                currency?: string;
+            } | null;
+            /** @description Null when the caller cannot view the invoices module. */
+            invoices: {
+                /** @description Latest invoices whose state is not Paid or Cancelled. */
+                open_count: number;
+                /** @description Open invoices per state (Received, UnderReview, Approved, Disputed); a state with none is listed with 0. */
+                by_state: {
+                    [key: string]: number;
+                };
+                aging: {
+                    /** @description Received up to aging_days[0] days ago. */
+                    first: number;
+                    /** @description Received aging_days[0]+1 to aging_days[1] days ago. */
+                    second: number;
+                    /** @description Received more than aging_days[1] days ago. */
+                    third: number;
+                };
+                /** @description Due date past, not Paid or Cancelled. */
+                overdue_count: number;
+            } | null;
+        };
         DataHubSummary: {
             batches: {
                 count: number;
@@ -17032,6 +17131,7 @@ export interface components {
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
+            finance_hub: components["schemas"]["UiFinanceHub"];
             panel: components["schemas"]["UiPanel"];
             unsaved_guard: components["schemas"]["UiUnsavedGuard"];
         };
@@ -17040,6 +17140,7 @@ export interface components {
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
+            finance_hub?: components["schemas"]["UiFinanceHub"];
             panel?: components["schemas"]["UiPanel"];
             unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
         };
@@ -18519,6 +18620,29 @@ export interface components {
                 items: components["schemas"]["TaskSummary"][];
             }[];
         };
+        /** @description 0.15.345. The setting `imports.duplicate_rows`. */
+        DuplicateRowsSettings: {
+            /** @enum {string} */
+            default: "first" | "last";
+            /** @description Register key to mode; a register not listed uses `default`. */
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        DuplicateRowsSettingsInput: {
+            /** @enum {string} */
+            default: "first" | "last";
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            reason: string;
+        };
         /** @description 0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background. */
         ImportsSettings: {
             async_rows: number;
@@ -18620,6 +18744,16 @@ export interface components {
              * @enum {string}
              */
             contrast?: "standard" | "high";
+            /**
+             * @description 0.15.369 (0526): the notification panel as an overlay, a floating window or docked.
+             * @enum {string}
+             */
+            inbox_panel?: "overlay" | "floating" | "docked";
+            /**
+             * @description 0.15.369 (0526): the corner of the floating panel.
+             * @enum {string}
+             */
+            inbox_anchor?: "end-top" | "end-bottom" | "start-top" | "start-bottom";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
@@ -30400,6 +30534,27 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getFinanceHubSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceHubSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listExportSchedules: {
         parameters: {
             query?: never;
@@ -33948,6 +34103,62 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateRowsSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getTemplateChangeNotice: {
