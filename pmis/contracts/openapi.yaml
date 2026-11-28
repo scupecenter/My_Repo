@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.483 (2026-11-28) compare two sites side by side (migration 0624, mirror `db/sql/623_site_compare.sql`, stacked on 0623). Additive, read only, no table. `GET /reports/site-compare?a=&b=` (needs `view` on `sites`, caller's regions; a site outside them answers 404 for the pair, the same site twice is 422). Per site the identity, the task counts that apply, approved, open and overdue with the worst delay in calendar days, and the stages of `getSiteStageTimes` merged by code with the days of each side and the difference (b minus a). No grant, role or permission change.
     - 0.15.482 (2026-11-28) time in stage per site (migration 0623, mirror `db/sql/622_stage_times.sql`). Additive, read only, no table. `GET /sites/{site_id}/stage-times` and `GET /reports/stage-times` (needs `view` on `sites`, caller's regions). A stage runs from its first start to the approval of its last counted task that applies (days are calendar days; an open stage counts up to today). Per site the stages are ranked slowest first with the planned days and the days over plan; across sites each stage has its finished count, average, 85th percentile and worst, its open count and average age, and the rank by average, plus the 25 slowest site and stage pairs. No grant, role or permission change.
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
@@ -18511,6 +18512,26 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /reports/site-compare:
+    get:
+      tags: [insights]
+      operationId: getSiteCompare
+      summary: Two sites side by side (0.15.483)
+      description: 0.15.483 (migration 0624). Needs `view` on `sites`; a site outside the caller's regions answers 404 for the pair. The same site twice is 422. Per site the identity, the task counts and the worst delay, and the stages of `getSiteStageTimes` merged by code with the days of each side and the difference (b minus a). Nothing is written.
+      x-db-path: site_compare
+      parameters:
+      - {name: a, in: query, required: true, schema: {type: string, format: uuid}}
+      - {name: b, in: query, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The comparison.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteCompare'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /reports/workload:
     get:
       tags: [insights]
@@ -30414,6 +30435,52 @@ components:
               tasks: { type: integer }
               done: { type: integer }
               rank: { type: [integer, 'null'] }
+    SiteCompareSide:
+      type: object
+      required: [id, site_code, region_id, status, tasks]
+      properties:
+        id: { type: string, format: uuid }
+        site_code: { type: string }
+        name: { type: [string, 'null'] }
+        name_ar: { type: [string, 'null'] }
+        region_id: { type: integer }
+        status: { type: string }
+        current_milestone: { type: [string, 'null'] }
+        delivery_scenario: { type: [string, 'null'] }
+        project_phase: { type: [string, 'null'] }
+        tasks:
+          type: object
+          required: [applicable, approved, open, overdue, worst_delay_days]
+          properties:
+            applicable: { type: integer }
+            approved: { type: integer }
+            open: { type: integer }
+            overdue: { type: integer }
+            worst_delay_days: { type: integer }
+    SiteCompare:
+      type: object
+      required: [as_of, a, b, stages]
+      properties:
+        as_of: { type: string, format: date }
+        a: { $ref: '#/components/schemas/SiteCompareSide' }
+        b: { $ref: '#/components/schemas/SiteCompareSide' }
+        stages:
+          type: array
+          items:
+            type: object
+            required: [code, seq, name_en]
+            properties:
+              code: { type: string }
+              seq: { type: integer }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              a_state: { type: [string, 'null'] }
+              a_days: { type: [integer, 'null'] }
+              a_finished: { type: [string, 'null'] }
+              b_state: { type: [string, 'null'] }
+              b_days: { type: [integer, 'null'] }
+              b_finished: { type: [string, 'null'] }
+              diff_days: { type: [integer, 'null'], description: 'b minus a; set when both sides have days.' }
     StageTimesReport:
       type: object
       required: [as_of, stages, slowest_sites]

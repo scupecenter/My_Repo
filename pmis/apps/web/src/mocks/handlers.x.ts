@@ -280,6 +280,18 @@ export const xHandlers = [
       ],
       slowest_sites: [{ site_id: '00000000-0000-4000-8000-000000000001', site_code: 'TRP-0001', region_id: 1, code: 'MS3', name_en: 'Civil works', name_ar: 'الأعمال المدنية', days: 120, open: false }] });
   }),
+  http.get(`${B}/reports/site-compare`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const q = new URL(request.url).searchParams;
+    const a = q.get('a') ?? '', b = q.get('b') ?? '';
+    if (!/^[0-9a-f-]{36}$/i.test(a) || !/^[0-9a-f-]{36}$/i.test(b) || a === b) return invalid('/b');
+    const side = (id: string, code: string, approved: number, overdue: number) => ({ id, site_code: code, name: `Site ${code}`, name_ar: `موقع ${code}`, region_id: 1, status: 'in_progress', current_milestone: 'MS3', delivery_scenario: 'greenfield', project_phase: null,
+      tasks: { applicable: 20, approved, open: 20 - approved, overdue, worst_delay_days: overdue * 6 } });
+    return HttpResponse.json({ as_of: '2026-11-28', a: side(a, 'TRP-0001', 12, 2), b: side(b, 'TRP-0002', 8, 5), stages: [
+      { code: 'MS1', seq: 1, name_en: 'Acquisition', name_ar: 'الاستحواذ', a_state: 'done', a_days: 30, a_finished: '2026-09-01', b_state: 'done', b_days: 45, b_finished: '2026-09-20', diff_days: 15 },
+      { code: 'MS2', seq: 2, name_en: 'Design', name_ar: 'التصميم', a_state: 'open', a_days: 20, a_finished: null, b_state: 'not_started', b_days: null, b_finished: null, diff_days: null },
+    ] });
+  }),
   http.get(`${B}/reports/time-in-state`, ({ request }) => {
     const g = guard(); if (g) return g;
     if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'module_forbidden', 'You cannot use reports');
