@@ -5,7 +5,10 @@ import type { AuthContext } from "../auth/auth.types";
 import { parseIfMatch } from "../common/etag";
 import { parse } from "../common/zod";
 import { DbService } from "../db/db.service";
-import { dashboardSettingsPutSchema } from "./dashboard-settings.schema";
+import {
+  dashboardSettingsPutSchema,
+  healthBandsPutSchema,
+} from "./dashboard-settings.schema";
 
 interface SettingsJson {
   version: number;
@@ -16,6 +19,14 @@ interface SettingsJson {
   updated_at: string | null;
   updated_by: string | null;
   catalogue: unknown;
+}
+
+interface HealthBandsJson {
+  green: number;
+  amber: number;
+  version: number;
+  updated_at: string | null;
+  updated_by: string | null;
 }
 
 /**
@@ -84,5 +95,53 @@ export class DashboardSettingsService {
     const r = await this.db.tx.$queryRaw<{ j: SettingsJson }[]>(Prisma.sql`
       SELECT admin_save_dashboard_settings(${JSON.stringify(config)}::jsonb, ${b.reason}::text, ${version}::int) AS j`);
     return this.dto(r[0]!.j);
+  }
+
+  private async bandsDto(j: HealthBandsJson) {
+    let updated_by: {
+      id: string;
+      display_name: string;
+      employee_id: string | null;
+    } | null = null;
+    if (j.updated_by) {
+      const u = await this.db.tx.$queryRaw<
+        { display_name: string; employee_id: string | null }[]
+      >`SELECT display_name, employee_id FROM users WHERE id = ${j.updated_by}::uuid`;
+      updated_by = {
+        id: j.updated_by,
+        display_name: u[0]?.display_name ?? "",
+        employee_id: u[0]?.employee_id?.trim() ?? null,
+      };
+    }
+    return {
+      version: j.version,
+      green: j.green,
+      amber: j.amber,
+      updated_at: j.updated_at,
+      updated_by,
+    };
+  }
+
+  /** GET /settings/dashboard/health-bands (0.15.435) */
+  async getHealthBands(auth: AuthContext) {
+    await this.access.requireModuleView(auth, "dashboard");
+    const r = await this.db.tx.$queryRaw<
+      { j: HealthBandsJson }[]
+    >`SELECT health_bands_json() AS j`;
+    return this.bandsDto(r[0]!.j);
+  }
+
+  /** PUT /settings/dashboard/health-bands (0.15.435) */
+  async putHealthBands(
+    _auth: AuthContext,
+    ifMatch: string | undefined,
+    raw: unknown,
+  ) {
+    await this.access.requireAdmin("admin.settings", "edit");
+    const version = parseIfMatch(ifMatch);
+    const b = parse(healthBandsPutSchema, raw);
+    const r = await this.db.tx.$queryRaw<{ j: HealthBandsJson }[]>(Prisma.sql`
+      SELECT admin_save_health_bands(${b.green}::int, ${b.amber}::int, ${b.reason}::text, ${version}::int) AS j`);
+    return this.bandsDto(r[0]!.j);
   }
 }

@@ -49,6 +49,8 @@ describe('alert rules (0342)', () => {
     };
     await fails(rule(`${PREFIX}-bad-kind`, { kind: 'nope' }), /validation_failed/);
     await fails(rule(`${PREFIX}-bad-aud`, { audience: { type: 'everyone' } }), /audience/);
+    await fails(rule(`${PREFIX}-bad-adv`, { kind: 'advance_unsettled', params: { days: 0 } }), /days/);
+    await fails(rule(`${PREFIX}-bad-inv`, { kind: 'invoice_due_soon', params: { when: 'soon' } }), /params/);
     await fails(rule(`${PREFIX}-bad-idle`, { kind: 'record_idle', params: { register_key: 'issues', state: 'entry', days: 'soon' } }), /days/);
     await fails(rule(`${PREFIX}-short`, { title_en: '  ' }), /title_en/);
   });
@@ -159,6 +161,34 @@ describe('alert rules (0342)', () => {
     await db.query('BEGIN');
     await beginAs(db, plain.id);
     await expect(save(rule(`${PREFIX}-noauth`), 'try without rights')).rejects.toThrow(/insufficient_privilege|admin path/);
+    await db.query('ROLLBACK');
+  });
+
+  it('advance_unsettled and invoice_due_soon fire once per advance and week and once per invoice and due date', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const adv = await save(rule(`${PREFIX}-adv`, { kind: 'advance_unsettled', params: { days: 10 }, title_en: 'Advance {{record}}', body_en: '{{state}} for {{days}} days' }), 'add the advance rule');
+    const inv = await save(rule(`${PREFIX}-inv`, { kind: 'invoice_due_soon', params: { days: 5 }, title_en: 'Invoice {{record}}', body_en: 'Due {{due}} in {{days}} days' }), 'add the invoice rule');
+    const site = await makeSite(db, REGION, { prefix: PREFIX.toUpperCase() });
+    const ins = (key: string, type: string | null, data: Record<string, unknown>) => db.query(
+      `INSERT INTO register_records (entity_id, register_key, record_type, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, created_by, data)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, false, true, 'approved', 1, 3, 0, $5, $6::jsonb) RETURNING id`,
+      [key, type, site.id, REGION, adminId, JSON.stringify(data)]);
+    const oldAdv = await ins('financial_advances', 'advance', { advance_state: 'disbursed', disbursed_date: '2031-03-01' });
+    await ins('financial_advances', 'advance', { advance_state: 'disbursed', disbursed_date: '2031-03-18' });
+    await ins('financial_advances', 'advance', { advance_state: 'settled', disbursed_date: '2031-03-01' });
+    const dueInv = await ins('invoices', null, { invoice_no: 'INV-T1', invoice_state: 'Approved', due_date: '2031-03-23' });
+    await ins('invoices', null, { invoice_no: 'INV-T2', invoice_state: 'Paid', due_date: '2031-03-23' });
+    await ins('invoices', null, { invoice_no: 'INV-T3', invoice_state: 'Approved', due_date: '2031-04-30' });
+    await db.query(`SELECT alert_rules_run('2031-03-21'::date) AS n`);
+    expect(await targetFires(adv.rows[0].j.id, 'week:2031-03-16', oldAdv.rows[0].id)).toBe(1);
+    expect(await targetFires(inv.rows[0].j.id, 'due:2031-03-23', dueInv.rows[0].id)).toBe(1);
+    const advFires = await db.query('SELECT count(*)::int AS c FROM alert_rule_fires WHERE rule_id = $1', [adv.rows[0].j.id]);
+    const invFires = await db.query('SELECT count(*)::int AS c FROM alert_rule_fires WHERE rule_id = $1', [inv.rows[0].j.id]);
+    expect(advFires.rows[0].c).toBeGreaterThanOrEqual(1);
+    expect(invFires.rows[0].c).toBeGreaterThanOrEqual(1);
+    await db.query(`SELECT alert_rules_run('2031-03-22'::date) AS n`);
+    expect((await db.query('SELECT count(*)::int AS c FROM alert_rule_fires WHERE rule_id = $1', [adv.rows[0].j.id])).rows[0].c).toBe(advFires.rows[0].c);
     await db.query('ROLLBACK');
   });
 

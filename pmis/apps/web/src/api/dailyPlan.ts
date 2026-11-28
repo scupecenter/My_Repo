@@ -40,6 +40,18 @@ export function useDailyPlanOps() {
 export const exportDailyPlan = (date: string, regions: number[], sites?: string[]) =>
   downloadFile('/daily-plans/export', { date, region_id: regions, site_id: sites && sites.length ? sites : undefined });
 
+/** 0564 (3b): TPL-DAILY-PLAN filled with the plan of the day (one region when the view has one), and its import (applied at once, one refused row refuses the file). */
+export const downloadDailyPlanTemplate = (date: string, regions: number[]) =>
+  downloadFile('/templates/TPL-DAILY-PLAN/download', { date, region_id: regions.length === 1 ? String(regions[0]) : undefined });
+export type DailyPlanImportResult = { id: string; rows: number; updated: number; added: number; removed: number; unchanged: number };
+export const useImportDailyPlan = () => {
+  const qc = useQueryClient();
+  return useMutation<DailyPlanImportResult, ApiError, { file: File }>({
+    mutationFn: ({ file }) => { const fd = new FormData(); fd.append('file', file); return api.post('/daily-plans/import', { idempotencyKey: crypto.randomUUID(), body: fd }); },
+    onSettled: () => void refresh(qc),
+  });
+};
+
 export const useDailyPlanSettings = () => useQuery({ queryKey: ['daily-plan-settings'], queryFn: () => api.get<DailyPlanSettings>('/settings/daily-plan') });
 export const useSetDailyPlanSettings = () => {
   const qc = useQueryClient();

@@ -55,6 +55,7 @@ const toBody = (f: Form): AlertRuleInput => ({
   kind: f.kind as AlertRuleInput['kind'],
   params: f.kind === 'record_idle' ? { register_key: f.register_key, state: f.state.trim(), days: Number(f.days) }
     : f.kind === 'link_orphans' ? { ...(f.register_key ? { register_key: f.register_key } : {}), ...(f.register_key && f.field_code.trim() ? { field_code: f.field_code.trim() } : {}), min_rows: Number(f.min_rows) }
+    : (f.kind === 'advance_unsettled' || f.kind === 'invoice_due_soon') && f.days.trim() !== '' ? { days: Number(f.days) }
     : f.kind === 'kpi_threshold' ? { kpi: f.kpi, op: f.op, value: Number(f.value) } : {},
   audience: f.audience === 'module' ? { type: 'module', module: f.module } : { type: 'system_admin' },
   title_en: f.title_en.trim(), title_ar: f.title_ar.trim(), body_en: f.body_en.trim(), body_ar: f.body_ar.trim(),
@@ -81,6 +82,7 @@ export function AlertRules() {
   const bad = !v || v.code.trim().length < 2
     || (v.kind === 'record_idle' && (v.register_key === '' || v.state.trim() === '' || !/^[0-9]+$/.test(v.days) || Number(v.days) < 1 || Number(v.days) > 3650))
     || (v.kind === 'link_orphans' && (!/^[0-9]+$/.test(v.min_rows) || Number(v.min_rows) < 1 || Number(v.min_rows) > 100000))
+    || ((v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && v.days.trim() !== '' && (!/^[0-9]+$/.test(v.days) || Number(v.days) > 365 || (v.kind === 'advance_unsettled' && Number(v.days) < 1)))
     || (v.kind === 'kpi_threshold' && (v.kpi === '' || v.value.trim() === '' || isNaN(Number(v.value)) || Number(v.value) < 0 || Number(v.value) > 100000))
     || (v.audience === 'module' && v.module === '')
     || v.title_en.trim() === '' || v.title_ar.trim() === '' || v.body_en.trim() === '' || v.body_ar.trim() === '';
@@ -155,6 +157,10 @@ export function AlertRules() {
               <label className="text-sm font-semibold">{t('alertRules.days')}
                 <input type="number" min={1} max={3650} className="input mt-1 w-28 font-normal" data-testid="ar-days" value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
             </div>
+          )}
+          {(v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && (
+            <label className="block text-sm font-semibold">{t('alertRules.days')}
+              <input type="number" min={v.kind === 'advance_unsettled' ? 1 : 0} max={365} className="input mt-1 w-28 font-normal" data-testid="ar-days" placeholder={v.kind === 'advance_unsettled' ? t('alertRules.days_hub') : '7'} value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
           )}
           {v.kind === 'link_orphans' && (
             <div className="flex flex-wrap gap-3">

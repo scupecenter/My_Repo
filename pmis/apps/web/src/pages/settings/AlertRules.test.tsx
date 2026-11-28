@@ -95,6 +95,18 @@ describe('Settings, alert rules', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('rule_locked');
   });
 
+  it('offers the two financial kinds with an optional days value', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    await u.click(await screen.findByTestId('ar-new'));
+    await u.selectOptions(screen.getByTestId('ar-kind'), 'advance_unsettled');
+    await u.clear(screen.getByTestId('ar-days'));
+    expect(screen.getByTestId('ar-days')).toHaveAttribute('placeholder');
+    await u.selectOptions(screen.getByTestId('ar-kind'), 'invoice_due_soon');
+    expect(screen.getByTestId('ar-days')).toBeInTheDocument();
+  });
+
   it('offers the orphans alert kind with a register, a field and the minimum rows', async () => {
     const u = userEvent.setup();
     await signIn('pm');

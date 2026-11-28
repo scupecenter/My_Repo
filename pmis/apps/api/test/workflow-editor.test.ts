@@ -17,6 +17,16 @@ let plain: Actor;
 beforeAll(async () => {
   app = await startApp({ databaseUrl: process.env.TEST_DATABASE_URL_WFE as string });
   db = await superDbWfe();
+  // 0547 seeds a draft workflow v2 (the B11 split); this suite creates its own draft, so it starts from none.
+  const draftWf = `(SELECT id FROM workflow_definitions WHERE status = 'draft')`;
+  const draftTd = `(SELECT id FROM task_definitions WHERE workflow_id IN ${draftWf})`;
+  await db.query(`DELETE FROM scenario_task_rules WHERE workflow_id IN ${draftWf}`);
+  await db.query(`DELETE FROM matrix_cells WHERE task_def_id IN ${draftTd} OR stage_id IN (SELECT id FROM stage_definitions WHERE workflow_id IN ${draftWf})`);
+  await db.query(`DELETE FROM sla_rule_set_items WHERE task_def_id IN ${draftTd}`);
+  await db.query(`DELETE FROM sla_rules WHERE task_def_id IN ${draftTd}`);
+  await db.query(`DELETE FROM document_type_placements WHERE task_def_id IN ${draftTd}`);
+  await db.query(`DELETE FROM task_predecessors WHERE task_def_id IN ${draftTd} OR predecessor_id IN ${draftTd}`);
+  await db.query(`DELETE FROM workflow_definitions WHERE status = 'draft'`);
   admin = await plainAdmin(app, db, true);
   noStep = await plainAdmin(app, db, false);
   plain = await actor(app, db, { level: 'entry' });
