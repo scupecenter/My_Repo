@@ -201,6 +201,7 @@ info:
     - 0.15.401 (2026-11-27): change the structure of a register by uploading a modified template (Data entry proposals S1 to S9, owner decision 2026-11-27 09:50 and 09:54; migration 0560, mirror `db/sql/559_structure_proposals.sql`). Additive. (1) The download of a register template carries a `Structure` sheet for who may edit the columns (`fields.edit`); the data upload ignores it. (2) New paths `GET|POST /structure-proposals`, `POST /structure-proposals/upload` (multipart `file` and `reason`; the Structure sheet becomes a proposal and nothing is written to the register), `GET /structure-proposals/{id}`, `GET /structure-proposals/{id}/differences` (.xlsx), `POST /structure-proposals/{id}/decision` (approve: System Admin with step-up, applied through the column doors of 0095 in one transaction, a new template version follows; reject needs a note) and `POST /structure-proposals/{id}/revert` (an undo is a proposal of its own). A blocked item (system column, values that do not convert, unknown section or list) disables the approval; a proposal that changes a type or hides a column needs a second System Admin.
     - 0.15.403 (2026-11-27): the rules of structure-change proposals (Data entry proposals S1 to S9, slice 2; owner decision 2026-11-27 09:55 "the settings are complete"; migration 0562, mirror `db/sql/561_structure_policy.sql`). Additive. New paths `GET|PUT /settings/structure-policy` (setting `registers.structure_change`: who proposes, who approves, the second person for every proposal or only for a type change or a hide, the most items in one proposal 1 to 500, the notice to the approvers and to the proposer; PUT needs a reason, If-Match and the step-up, audited). The doors of 0560 follow the setting; a proposal over the limit is 422 `too_many`. Two notification kinds, `structure_proposal` and `structure_decision`, join the mail catalogue (never mailed until an admin lists them).
     - 0.15.520 (2026-11-27): alternative names of a register column (Data entry proposals S1, owner decision 2026-11-27 21:29 "build what remains"; migration 0640, mirror `db/sql/639_structure_aliases.sql`). `import_aliases` (up to 20 names of up to 200 characters) is read and written with the column (`RegisterColumn`, `RegisterColumnCreate`, `RegisterColumnPatch`), travels in the Structure sheet (column "Import aliases") and in structure proposals and their undo, and the data upload accepts a header that equals the label or one of the aliases of its column (case and spaces ignored). The order of the columns, the typed values and the version rules (D112) are unchanged. Additive.
+    - 0.15.640 (2026-11-28): Settings screen of the expiry radar (migration 0760, mirror `db/sql/759_expiry_radar_screen.sql`). `GET` and `PUT /settings/expiry-radar` read and save the existing setting `expiry.radar` (the switch, and for each register the date field and the lead times in days, 1 to 6 times of 1 to 365). The notice job (0360), its recipients and the mail kind are unchanged. Additive.
     - 0.15.457 (2026-11-28): the Tools & Equipment register (C4, spec #517; migration 0597, mirror `db/sql/596_tools_equipment_register.sql`): the tools and equipment of the project, with the custodian (a user column) and the next calibration or inspection due date. Register key and module `tools_equipment` (`RegisterKey`, export parts); site-scoped, several per site, two levels; its Matrix row is empty in the seed (the admin names the holders; no permission is granted); lists EquipmentCategory, EquipmentStatus and EquipmentDueKind; template TPL-TOOLS-EQUIPMENT; one data reset part; the due date `next_due_date` is added to the expiry radar setting (30, 14 and 7 days). No new endpoint. Additive.
     - 0.15.571 (2026-11-28): the data upload validates link fields (L7; migration 0642, mirror `db/sql/641_import_link_validation.sql`). No path or field changes. A link cell that is not an id, or is the id of no record, is now a row error on its own column in the error report: the Procurement link of HLC, Car Dispatcher and Financial Advances, the vehicle and the booking to extend of Car Dispatcher, and the advance to extend of Financial Advances (codes `invalid`, `link_not_found`). An error that a rule of the register raises on the probe record (the links of invoices, issues, quality, change control, dismantle, risks) now keeps its own column and message instead of one generic line under Record ID. Blank cells are not errors. Additive.
     - 0.15.572 (2026-11-28): the register rules screen lists the rules keys of every register (L9; migration 0643, mirror `db/sql/642_register_rules_screen.sql`). `GET /settings/register-rules`: the catalogue also offers `currency` of Financial Advances and `master_export` (yes or no) of Car Dispatcher, Financial Advances and Daily Plan (changing `master_export` changes the Master template, which has to be downloaded again); `items` now lists every active register that has rules, each with `other`: the keys that are not editable here (scope maps, scopes, field lists, Daily Plan levels), read only. `PUT` is unchanged (catalogue keys only). Additive.
@@ -8728,6 +8729,67 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/IdleTaskAlertSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/expiry-radar:
+    get:
+      tags: [settings]
+      operationId: getExpiryRadarSetting
+      summary: Expiry radar setting (0.15.640)
+      description: System Admin or a delegate of `admin.settings` (view or edit). Besides the setting it lists the registers and the date fields that can be chosen (`candidates`).
+      responses:
+        '200':
+          description: Setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExpiryRadarSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setExpiryRadarSetting
+      summary: Save the expiry radar (0.15.640)
+      description: |
+        0.15.640 (migration 0760): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`). Each register must be active and enabled, once; its field an active date field of it; 1 to 6 different lead times of 1 to 365 days (`out_of_range`, `duplicate`, `invalid`). At most 40 registers. The list replaces the old one. Audited (`expiry_radar_update`, before and after).
+      x-db-path: admin_set_expiry_radar
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [enabled, registers]
+                properties:
+                  enabled: {type: boolean}
+                  registers:
+                    type: array
+                    maxItems: 40
+                    items:
+                      type: object
+                      required: [register_key, field, lead_days]
+                      properties:
+                        register_key: {type: string}
+                        field: {type: string}
+                        lead_days: {type: array, minItems: 1, maxItems: 6, items: {type: integer, minimum: 1, maximum: 365}}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExpiryRadarSetting'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -25631,6 +25693,43 @@ components:
         enabled: { type: boolean }
         working_days: { type: integer, minimum: 1, maximum: 30, description: 'Default 2.' }
         version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        updated_by: { $ref: '#/components/schemas/UserRef' }
+    ExpiryRadarRegister:
+      type: object
+      required: [register_key, field, lead_days]
+      properties:
+        register_key: { type: string }
+        name_en: { type: [string, 'null'] }
+        name_ar: { type: [string, 'null'] }
+        field: { type: string }
+        field_label_en: { type: [string, 'null'] }
+        field_label_ar: { type: [string, 'null'] }
+        lead_days: { type: array, items: { type: integer, minimum: 1, maximum: 365 }, description: 'Ascending.' }
+    ExpiryRadarCandidate:
+      type: object
+      required: [register_key, fields]
+      properties:
+        register_key: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        fields:
+          type: array
+          items:
+            type: object
+            required: [code, label_en]
+            properties:
+              code: { type: string }
+              label_en: { type: string }
+              label_ar: { type: [string, 'null'] }
+    ExpiryRadarSetting:
+      type: object
+      required: [enabled, version, registers, candidates]
+      properties:
+        enabled: { type: boolean }
+        version: { type: integer }
+        registers: { type: array, items: { $ref: '#/components/schemas/ExpiryRadarRegister' } }
+        candidates: { type: array, items: { $ref: '#/components/schemas/ExpiryRadarCandidate' }, description: 'Active, enabled registers with at least one active date field.' }
         updated_at: { type: string, format: date-time }
         updated_by: { $ref: '#/components/schemas/UserRef' }
     # ---------------------------------------------------------- daily plan (0.15.67)

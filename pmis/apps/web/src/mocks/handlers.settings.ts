@@ -1631,6 +1631,36 @@ export const settingsHandlers = [
     C().uiFeatures = { sections: { ...UF().sections, ...sec } as UiFeaturesSetting['sections'], version: UF().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();
     return HttpResponse.json(UF(), tag(UF().version));
   }),
+  // 0.15.640 (migration 0760): the expiry radar
+  http.get(`${B}/settings/expiry-radar`, () => { const g = needAdmin(); if (g) return g; return HttpResponse.json(C().expiryRadar, tag(C().expiryRadar.version)); }),
+  http.put(`${B}/settings/expiry-radar`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match.');
+    const p = ver(request, C().expiryRadar.version); if (p) return p;
+    const b = await body<{ enabled?: boolean; registers?: { register_key: string; field: string; lead_days: number[] }[]; reason?: string }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (!Array.isArray(b.registers)) errs.push({ path: '/registers', code: 'required' });
+    const cands = C().expiryRadar.candidates;
+    (b.registers ?? []).forEach((r, i) => {
+      const c = cands.find((x) => x.register_key === r.register_key);
+      if (!c) errs.push({ path: `/registers/${i}/register_key`, code: 'invalid' });
+      else if (!c.fields.some((x) => x.code === r.field)) errs.push({ path: `/registers/${i}/field`, code: 'invalid' });
+      const l = r.lead_days ?? [];
+      if (!Array.isArray(l) || l.length < 1 || l.length > 6) errs.push({ path: `/registers/${i}/lead_days`, code: 'invalid' });
+      else if (!l.every((d) => int(d, 1, 365))) errs.push({ path: `/registers/${i}/lead_days`, code: 'out_of_range' });
+      else if (new Set(l).size !== l.length) errs.push({ path: `/registers/${i}/lead_days`, code: 'duplicate' });
+    });
+    const r = reasonErr(b.reason); if (r) return r;
+    if (errs.length) return fields(...errs);
+    const regs = b.registers!.map((r) => {
+      const c = cands.find((x) => x.register_key === r.register_key)!;
+      const fl = c.fields.find((x) => x.code === r.field)!;
+      return { register_key: r.register_key, name_en: c.name_en, name_ar: c.name_ar, field: r.field, field_label_en: fl.label_en, field_label_ar: fl.label_ar, lead_days: [...r.lead_days].sort((x, y) => x - y) };
+    });
+    C().expiryRadar = { ...C().expiryRadar, enabled: b.enabled!, registers: regs, version: C().expiryRadar.version + 1 }; save();
+    return HttpResponse.json(C().expiryRadar, tag(C().expiryRadar.version));
+  }),
   http.get(`${B}/settings/idle-task-alert`, () => { const g = guard(); if (g) return g; return HttpResponse.json(C().idle, tag(C().idle.version)); }),
   http.put(`${B}/settings/idle-task-alert`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;

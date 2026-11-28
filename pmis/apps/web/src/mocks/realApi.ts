@@ -717,6 +717,8 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/ui-features'],
   ['get', '/settings/idle-task-alert'],
   ['put', '/settings/idle-task-alert'],
+  ['get', '/settings/expiry-radar'],
+  ['put', '/settings/expiry-radar'],
   ['get', '/settings/notification-policy/catalogue'],
   ['get', '/settings/notification-policy'],
   ['put', '/settings/notification-policy'],

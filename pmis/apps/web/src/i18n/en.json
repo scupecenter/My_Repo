@@ -1403,6 +1403,7 @@
     "section_security_newdevice": "New-device code",
     "section_security_passkeys": "Passkeys",
     "section_workflow_simulate": "Who approves?",
+    "section_alerts_expiry": "Expiry radar",
     "section_alerts_rules": "Alert rules",
     "section_documents_media": "Media",
     "section_security_limits": "Limits",
@@ -4887,6 +4888,24 @@
     "disable_note": "The register is hidden from menus, lists and the Matrix. No record, step, template or history is removed.",
     "lock_note": "The register stays readable. New records and changes (screen, upload, workflow step) are refused until it is unlocked; System Admins are exempt.",
     "restore_note": "The register is available again with all its records."
+  },
+  "radar": {
+    "title": "Expiry radar",
+    "note": "Warns the people who hold the register row (Matrix) in the bell when a date that ends something is close: a permit's valid-to date, a lease expiry, an equipment due date. One notice for each lead time reached. Nothing is changed on the record. Who is warned and whether the notice is also mailed are set in the Matrix and in Mail kinds.",
+    "enabled": "The radar is on",
+    "empty": "No register is watched. Add one below.",
+    "field": "Date field",
+    "lead": "Warn before",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "remove_hint": "Stop watching {{name}}",
+    "lead_remove_hint": "Remove the warning {{days}} days before",
+    "lead_add_label": "Days before the date (1 to 365)",
+    "lead_add_hint": "Add this warning (up to 6)",
+    "preview": "Warns {{days}} days before the date in \"{{field}}\".",
+    "add": "Watch another register",
+    "add_pick": "Choose a register",
+    "undo": "Discard changes"
   },
   "custreg": {
     "title": "Custom registers",
