@@ -294,3 +294,24 @@ describe('kpi_threshold alert rules (0348)', () => {
     await db.query('ROLLBACK');
   });
 });
+
+describe('company_doc_expiry alert rule (0771)', () => {
+  it('fires once per document and week for an expired or due document, and not for a valid one', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const r = await save(rule(`${PREFIX}-cdoc`, { kind: 'company_doc_expiry', params: {}, title_en: '{{company}} {{type}}', body_en: '{{date}} {{days}}' }), 'add the company document rule');
+    await db.query('SAVEPOINT s1');
+    await expect(save(rule(`${PREFIX}-cdoc-bad`, { kind: 'company_doc_expiry', params: { days: 3 } }), 'bad params')).rejects.toThrow(/params/);
+    await db.query('ROLLBACK TO s1');
+    const p = (await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', true) RETURNING id`, [`CDOC ${PREFIX}`])).rows[0].id as string;
+    const doc = async (exp: string) => (await db.query(`INSERT INTO company_documents (party_id, type_code, expires_on) VALUES ($1, 'insurance', $2::date) RETURNING id`, [p, exp])).rows[0].id as string;
+    const due = await doc('2031-03-25');
+    const valid = await doc('2032-03-25');
+    await db.query(`SELECT alert_rules_run('2031-03-21'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', due)).toBe(1);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', valid)).toBe(0);
+    await db.query(`SELECT alert_rules_run('2031-03-22'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', due)).toBe(1);
+    await db.query('ROLLBACK');
+  });
+});

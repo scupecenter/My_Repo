@@ -8538,6 +8538,8 @@
     "kind_kpi_threshold_help": "Fires when the live KPI of the dashboard crosses the rule's own threshold. Placeholders: {{kpi}}, {{value}}, {{threshold}}.",
     "kind_link_orphans": "Links leave records dangling",
     "kind_link_orphans_help": "Fires weekly for every declared register link that has at least the minimum rows (1 when empty) holding an id which is no current record of the target. Leave the register and field empty to check every link. Placeholders: {{register}}, {{field}}, {{target}}, {{count}}.",
+    "kind_company_doc_expiry": "Company document expired or expiring",
+    "kind_company_doc_expiry_help": "Fires weekly for every active company document that has expired or expires within the lead days of its document type (Settings, Company documents). Takes no params. Placeholders: {{company}}, {{type}}, {{date}}, {{days}}.",
     "min_rows": "Minimum rows",
     "any_link": "Any link",
     "field_code": "Field"
