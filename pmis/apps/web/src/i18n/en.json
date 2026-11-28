@@ -8208,7 +8208,21 @@
     "weekday_3": "Wednesday",
     "weekday_4": "Thursday",
     "weekday_5": "Friday",
-    "weekday_6": "Saturday"
+    "weekday_6": "Saturday",
+    "switch_title": "Unattended runs",
+    "switch_on": "On",
+    "switch_off": "Off",
+    "switch_note": "When this is on, a schedule marked unattended starts by itself every hour when it is due, even if nobody is signed in. It runs as its owner: the owner's export rights and regions are checked again at that moment, and the security lock on exports stops it. When this is off, schedules start only when their owner opens Exports. Only a System Admin changes it.",
+    "switch_reason": "Reason for the change",
+    "switch_turn_on": "Turn on",
+    "switch_turn_off": "Turn off",
+    "switch_saved": "Setting saved.",
+    "one_view": "One register view",
+    "unattended_tag": "unattended",
+    "mail_tag": "mail",
+    "mail": "Mail me when the export is done or failed (a text mail with a link, no file attached)",
+    "unattended": "Run when due without me signed in",
+    "unattended_off": "Unattended runs are off in this system: this schedule starts when you open Exports until a System Admin turns them on."
   },
   "motion": {
     "title": "Motion",

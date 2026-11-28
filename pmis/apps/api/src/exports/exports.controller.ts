@@ -3,6 +3,7 @@ import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Que
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
+import { etagHeader } from '../common/etag';
 import { ExportSchedulesService } from './export-schedules.service';
 import { MasterExportService } from './master-export.service';
 
@@ -42,6 +43,21 @@ export class ExportsController {
   @Put('schedules')
   saveSchedule(@Body() body: unknown) {
     return this.schedules.save(body);
+  }
+
+  /** The system switch for unattended scheduled exports (0659): read by every signed-in user, changed by a System Admin (reason, If-Match). */
+  @Get('unattended')
+  async unattended(@Res({ passthrough: true }) res: Response) {
+    const r = await this.schedules.unattendedSwitch();
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('unattended')
+  async setUnattended(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.schedules.setUnattendedSwitch(ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
   }
 
   @Delete('schedules/:id')

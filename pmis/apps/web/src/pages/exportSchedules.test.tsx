@@ -27,6 +27,28 @@ describe('Settings, Scheduled export', () => {
     await waitFor(() => expect(screen.queryByTestId(`es-row-${id}`)).toBeNull());
   });
 
+  it('shows the unattended switch (off by default), asks for a reason, turns it on, and saves the mail and unattended options', async () => {
+    await signIn('pm');
+    page();
+    expect(await screen.findByTestId('es-switch-state')).toHaveTextContent('Off');
+    const toggle = screen.getByTestId('es-switch-toggle');
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute('title', 'Turn on');
+    fireEvent.change(screen.getByTestId('es-switch-reason'), { target: { value: 'Nightly exports for the PMO' } });
+    fireEvent.click(screen.getByTestId('es-switch-toggle'));
+    await waitFor(() => expect(screen.getByTestId('es-switch-state')).toHaveTextContent('On'));
+    fireEvent.click(await screen.findByTestId('es-new'));
+    fireEvent.change(screen.getByTestId('es-name'), { target: { value: 'Nightly full' } });
+    fireEvent.click(screen.getByTestId('es-mail'));
+    fireEvent.click(screen.getByTestId('es-unattended'));
+    expect(screen.queryByTestId('es-unattended-off')).toBeNull();
+    fireEvent.click(screen.getByTestId('es-save'));
+    expect(await screen.findByText('Nightly full')).toBeInTheDocument();
+    const row = screen.getByText('Nightly full').closest('tr') as HTMLElement;
+    expect(row).toHaveTextContent('unattended');
+    expect(row).toHaveTextContent('mail');
+  });
+
   it('is in Arabic too', async () => {
     await signIn('pm');
     page({ locale: 'ar' });

@@ -56,7 +56,9 @@ const profileBody = (p: MockProfile) => ({
 });
 
 /** Scheduled Master exports (contract 0.15.99): demo rows. */
-type MockSchedule = { id: string; name: string; cadence: string; weekday?: number; day_of_month?: number; spec: { parts?: string[] }; enabled: boolean; created_at: string; last_started_at: string | null; last_job_id: string | null; last_error: string | null; next_due_at: string; due: boolean };
+type MockSchedule = { id: string; name: string; cadence: string; weekday?: number; day_of_month?: number; spec: { parts?: string[] }; enabled: boolean; mail?: boolean; unattended?: boolean; created_at: string; last_started_at: string | null; last_job_id: string | null; last_error: string | null; next_due_at: string; due: boolean };
+/** The switch for unattended scheduled exports (contract 0.15.584), default OFF. */
+const UNATTENDED = { enabled: false, version: 1 };
 const SCHEDULES: MockSchedule[] = [{ id: '00000000-0000-4000-8000-0000000000b1', name: 'Weekly Master', cadence: 'weekly', weekday: 1, spec: {}, enabled: true, created_at: '2026-11-20T08:00:00.000Z', last_started_at: null, last_job_id: null, last_error: null, next_due_at: '2026-11-30T22:00:00.000Z', due: true }];
 
 export const adminHandlers = [
@@ -586,11 +588,20 @@ export const adminHandlers = [
   http.get(`${B}/exports/schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: SCHEDULES }); }),
   http.put(`${B}/exports/schedules`, async ({ request }) => {
     const g = guard(); if (g) return g;
-    const b = (await request.json()) as { id?: string; name: string; cadence: string; weekday?: number; day_of_month?: number; spec?: { parts?: string[] }; enabled?: boolean };
+    const b = (await request.json()) as { id?: string; name: string; cadence: string; weekday?: number; day_of_month?: number; spec?: { parts?: string[] }; enabled?: boolean; mail?: boolean; unattended?: boolean };
     const row = { id: b.id ?? crypto.randomUUID(), name: b.name, cadence: b.cadence, ...(b.weekday !== undefined ? { weekday: b.weekday } : {}), ...(b.day_of_month !== undefined ? { day_of_month: b.day_of_month } : {}),
-      spec: b.spec ?? {}, enabled: b.enabled !== false, created_at: new Date().toISOString(), last_started_at: null, last_job_id: null, last_error: null, next_due_at: new Date(Date.now() + 86_400_000).toISOString(), due: false };
+      spec: b.spec ?? {}, enabled: b.enabled !== false, mail: b.mail === true, unattended: b.unattended === true, created_at: new Date().toISOString(), last_started_at: null, last_job_id: null, last_error: null, next_due_at: new Date(Date.now() + 86_400_000).toISOString(), due: false };
     const i = SCHEDULES.findIndex((x) => x.id === row.id); if (i >= 0) SCHEDULES[i] = row; else SCHEDULES.push(row);
     return HttpResponse.json({ items: SCHEDULES });
+  }),
+  http.get(`${B}/exports/unattended`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ enabled: UNATTENDED.enabled, updated_at: null, updated_by: null, version: UNATTENDED.version, can_edit: true }, { headers: { ETag: `"${UNATTENDED.version}"` } }); }),
+  http.put(`${B}/exports/unattended`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    const b = (await request.json()) as { enabled: boolean; reason?: string };
+    if (!b.reason || b.reason.trim().length < 3) return problem(422, 'validation_failed', 'A reason is required');
+    if (b.enabled === UNATTENDED.enabled) return problem(409, 'invalid_transition', 'This value is already set.');
+    UNATTENDED.enabled = b.enabled; UNATTENDED.version += 1;
+    return HttpResponse.json({ enabled: UNATTENDED.enabled, updated_at: new Date().toISOString(), updated_by: null, version: UNATTENDED.version, can_edit: true }, { headers: { ETag: `"${UNATTENDED.version}"` } });
   }),
   http.delete(`${B}/exports/schedules/:id`, ({ params }) => { const g = guard(); if (g) return g; const i = SCHEDULES.findIndex((x) => x.id === params.id); if (i >= 0) SCHEDULES.splice(i, 1); return HttpResponse.json({ items: SCHEDULES }); }),
   http.get(`${B}/exports/master`, () => {
