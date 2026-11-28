@@ -14,6 +14,7 @@ import { TaskDrawer } from '@/components/TaskDrawer';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from '@/components/TaskTiming';
 import { TasksBoard } from '@/components/TasksBoard';
 import { SavedViews } from '@/components/SavedViews';
+import { GroupSummary, type SummarySegment } from '@/components/GroupSummary';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
 import { ColumnMenu, Empty, HeaderRow, pin, rowPad, totalWidth, tracks, Trunc, useTablePrefs, type TableApi } from '@/components/TableKit';
 import { displayAttrs, ExportCsvButton, PastedChip, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
@@ -45,6 +46,9 @@ export function TaskCard({ task, onOpen }: { task: TaskSummary; onOpen?: (id: st
 // W8: My Work as a table like the Site Master lists: #, Site ID, Task, SLA, Ball in court, Since, grouped under the three buckets
 const DEFS: ColDef[] = [ROWNO_COL, { id: 'site', w: 110, min: 80, pinned: true }, { id: 'task', w: 300, min: 140 }, { id: 'sla', w: 220, min: 120 }, { id: 'ball', w: 220, min: 120 }, { id: 'since', w: 200, min: 120 }];
 const LABEL: Record<string, string> = { rowno: 'tstd.rowno', site: 'sites.code', task: 'grid.task', sla: 'grid.sla', ball: 'grid.ball', since: 'tstd.since' };
+const SLA_KEYS = ['red', 'amber', 'green', 'none'] as const;
+const SLA_TONE: Record<string, string> = { red: 'bg-lateInk', amber: 'bg-waitInk', green: 'bg-doneInk', none: 'bg-lockInk' };
+const slaOf = (x: TaskSummary): string => (x.sla?.colour && SLA_KEYS.includes(x.sla.colour as (typeof SLA_KEYS)[number]) ? x.sla.colour : 'none');
 const BUCKETS = [['late', AlertTriangle], ['do_now', Pencil], ['waiting', Clock]] as const;
 
 function Row({ task, n, tbl, onOpen }: { task: TaskSummary; n: number; tbl: TableApi; onOpen: (id: string) => void }) {
@@ -82,6 +86,8 @@ export function MyWork() {
   const board = sp.get('layout') === 'board';
   const mine = sp.get('mine') === 'true';
   const adv = sp.get('adv') ?? '';
+  // Item 9: the segment of the group summary bars that filters every group (kept in the URL, like the other filters of the screen)
+  const slaPick = SLA_KEYS.find((k) => k === sp.get('sla')) ?? null;
   const advTree = decodeFilter(adv);
   // W8: the search (one word, or a pasted list of Site IDs) goes to the server with the + Filter tree; the counts come back from it
   const q = sp.get('q') ?? '';
@@ -102,7 +108,7 @@ export function MyWork() {
     { id: 'board', label: t('board.board'), hint: t('view.mywork_board_hint'), icon: <Columns3 size={14} />, testid: 'my-work-layout-board' },
   ];
   // V7: one Layout panel for My Work, as on every screen — the list/board switcher and, while the list is on, the Display options
-  const switcher = <LayoutPanel testid="my-work-view" views={{ value: board ? 'board' : 'list', options: myViews, onChange: (id) => setParams({ layout: id === 'board' ? 'board' : '' }) }} table={board ? undefined : tbl} />;
+  const switcher = <LayoutPanel testid="my-work-view" views={{ value: board ? 'board' : 'list', options: myViews, onChange: (id) => setParams({ layout: id === 'board' ? 'board' : '' }) }} table={board ? undefined : tbl} grouped />;
   let n = 0;
   return (
     <div className="space-y-4" data-testid="page-my-work">
@@ -144,12 +150,15 @@ export function MyWork() {
         <div className="sticky top-0 z-20"><HeaderRow api={tbl} label={label} testid="my-work-head" /></div>
         <div role="list" style={{ minWidth: totalWidth(tbl.cols, false) }}>
           {BUCKETS.map(([id, Icon]) => {
-            const items = qs[id].data?.items ?? [];
+            const all = qs[id].data?.items ?? [];
+            const items = slaPick ? all.filter((x) => slaOf(x) === slaPick) : all;
+            const segments: SummarySegment[] = SLA_KEYS.map((k) => ({ key: k, label: t(`gsum.sla_${k}`), count: all.filter((x) => slaOf(x) === k).length, tone: SLA_TONE[k] }));
             return (
               <Fragment key={id}>
                 <section data-testid={`my-work-bucket-${id}`} aria-label={t(`myWork.${id}`)}>
                   <h2 className="flex items-center gap-2 border-b border-line bg-card2 px-3 py-2 text-sm font-bold"><Icon size={16} />{t(`myWork.${id}`)}
-                    <span className="chip border border-line" data-testid={`my-work-count-${id}`}>{qs[id].data?.counts?.filtered ?? items.length}</span></h2>
+                    <span className="chip border border-line" data-testid={`my-work-count-${id}`}>{slaPick ? items.length : (qs[id].data?.counts?.filtered ?? items.length)}</span>
+                    <GroupSummary testid={`my-work-summary-${id}`} group={t(`myWork.${id}`)} segments={segments} active={slaPick} onPick={(k) => setParams({ sla: k ?? '' })} show={tbl.display.groupbar} /></h2>
                   {items.length ? items.map((x) => <Row key={x.id} task={x} n={++n} tbl={tbl} onOpen={setOpen} />) : <p className="p-3 text-center text-sm text-mute">{t('myWork.nothing')}</p>}
                 </section>
               </Fragment>

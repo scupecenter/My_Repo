@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp, Eye, EyeOff, KeyRound, Lock, Mail, Palette, Pan
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
+import { DefaultViewsSection } from '@/components/DefaultViewsSection';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -84,6 +85,7 @@ export function Profile() {
         <MySessionsSection />
         <NotificationPrefsSection />
         <PushSection />
+        <DefaultViewsSection />
       </div>
     </div>
   );
