@@ -23,3 +23,18 @@ describe('Map settings (0.15.341)', () => {
     expect(screen.getByTestId('maps-save')).toBeEnabled();
   });
 });
+
+describe('Coordinates check on the Map settings', () => {
+  it('shows how many live sites have coordinates and lists the ones without', async () => {
+    await signIn('pm');
+    page();
+    const box = await screen.findByTestId('coords-check');
+    expect(box).toBeTruthy();
+    const ok = await screen.findByTestId('coords-ok');
+    expect(ok.textContent).toMatch(/\d+/);
+    const missing = await screen.findByTestId('coords-missing');
+    const n = Number(/\d+/.exec(missing.textContent ?? '')?.[0] ?? '0');
+    if (n === 0) expect(screen.getByTestId('coords-all-good')).toBeTruthy();
+    else expect(screen.getByTestId('coords-missing-list').querySelectorAll('li').length).toBeGreaterThan(0);
+  });
+});
