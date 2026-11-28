@@ -68,6 +68,7 @@ export class AlertRulesService {
           { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] },
           { kind: 'advance_unsettled', params: ['days'] },
           { kind: 'invoice_due_soon', params: ['days'] },
+          { kind: 'stock_below_reorder', params: [] },
         ],
         kpis,
         audiences: ['system_admin', 'module'],

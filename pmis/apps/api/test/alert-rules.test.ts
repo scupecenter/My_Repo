@@ -193,6 +193,25 @@ describe('alert rules (0342)', () => {
   });
 });
 
+describe('stock_below_reorder alert rule (0475)', () => {
+  it('fires once per item and week for an active item at or under its reorder level, and not for an item without a limit', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const r = await save(rule(`${PREFIX}-stock`, { kind: 'stock_below_reorder', params: {}, title_en: 'Low {{item}}', body_en: '{{available}} of {{level}}' }), 'add the stock rule');
+    await fails(rule(`${PREFIX}-stock-bad`, { kind: 'stock_below_reorder', params: { days: 3 } }), /params/);
+    const item = async (code: string) => (await db.query(`INSERT INTO warehouse_items (item_code, item_group, name) VALUES ($1, 'WL', $1) RETURNING id`, [code])).rows[0].id as string;
+    const low = await item(`${PREFIX.toUpperCase()}-LOW`);
+    const none = await item(`${PREFIX.toUpperCase()}-NONE`);
+    await db.query(`INSERT INTO warehouse_reorder_limits (item_id, reorder_level) VALUES ($1, 5)`, [low]);
+    await db.query(`SELECT alert_rules_run('2031-03-21'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', low)).toBe(1);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', none)).toBe(0);
+    await db.query(`SELECT alert_rules_run('2031-03-22'::date) AS n`);
+    expect(await targetFires(r.rows[0].j.id, 'week:2031-03-16', low)).toBe(1);
+    await db.query('ROLLBACK');
+  });
+});
+
 describe('kpi_threshold alert rules (0348)', () => {
   const kpiRule = (code: string, over: Record<string, unknown> = {}): Record<string, unknown> => rule(code, {
     kind: 'kpi_threshold', params: { kpi: 'sla_breach', op: 'above', value: 5 },
