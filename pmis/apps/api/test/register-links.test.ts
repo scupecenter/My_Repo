@@ -100,8 +100,10 @@ describe('extra register links (migration 0596, L10)', () => {
     await db.query(sql);
     const links = await db.query(
       `SELECT register_key || '.' || field_code AS k, target_register, same_site, enforce FROM register_links
-        WHERE (register_key, field_code) IN (('lessons_learned', 'incident_id'), ('lessons_learned', 'issue_id'), ('incidents', 'permit_id')) ORDER BY 1`);
+        WHERE (register_key, field_code) IN (('lessons_learned', 'incident_id'), ('lessons_learned', 'issue_id'), ('incidents', 'permit_id'), ('car_dispatcher', 'parent_booking_id'), ('financial_advances', 'parent_advance_id')) ORDER BY 1`);
     expect(links.rows).toEqual([
+      { k: 'car_dispatcher.parent_booking_id', target_register: 'car_dispatcher', same_site: true, enforce: false },
+      { k: 'financial_advances.parent_advance_id', target_register: 'financial_advances', same_site: true, enforce: false },
       { k: 'incidents.permit_id', target_register: 'permits_hse', same_site: true, enforce: false },
       { k: 'lessons_learned.incident_id', target_register: 'incidents', same_site: true, enforce: false },
       { k: 'lessons_learned.issue_id', target_register: 'issues', same_site: true, enforce: false },
