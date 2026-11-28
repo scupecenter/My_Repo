@@ -90,7 +90,7 @@ describe('register links (migration 0409)', () => {
   });
 });
 
-describe('orphan report of the links (migration 0655)', () => {
+describe('orphan report of the links (migration 0660)', () => {
   it('lists every active link with its counts for a System Admin, and refuses a call without an actor', async () => {
     await db.query('BEGIN');
     let none: unknown = null;

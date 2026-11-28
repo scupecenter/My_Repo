@@ -88,7 +88,7 @@ export class P4cService {
     return { items };
   }
 
-  /** GET /registers/links/orphans (D60 follow-up, 0655): per declared link, the rows that hold an id that is not a current record of the target. System Admin only (the database checks). */
+  /** GET /registers/links/orphans (D60 follow-up, 0660): per declared link, the rows that hold an id that is not a current record of the target. System Admin only (the database checks). */
   async registerLinkOrphans(auth: AuthContext): Promise<{ items: unknown[] }> {
     const r = await this.registers.call<{ items: unknown[] }>(auth, Prisma.sql`SELECT register_link_orphans_report() AS r`);
     return { items: r.items ?? [] };

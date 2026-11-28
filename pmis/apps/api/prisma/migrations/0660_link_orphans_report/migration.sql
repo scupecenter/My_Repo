@@ -1,5 +1,5 @@
--- 0655_link_orphans_report: the orphan counts of the declared links, for the badge in the Settings links editor (D60 follow-up, contract 0.15.512).
--- Mirror: db/sql/654_link_orphans_report.sql (kept identical to prisma/migrations/0655_link_orphans_report/migration.sql). Additive; no table, no column, no change to an existing grant.
+-- 0660_link_orphans_report: the orphan counts of the declared links, for the badge in the Settings links editor (D60 follow-up, contract 0.15.512).
+-- Mirror: db/sql/659_link_orphans_report.sql (kept identical to prisma/migrations/0660_link_orphans_report/migration.sql). Additive; no table, no column, no change to an existing grant.
 --
 -- WHY. register_link_orphans() (0409) is a read-only report that no one can call but the database owner. The Settings links editor shows, next to each link, how many current
 -- rows hold an id that is not a current record of the target, so an admin sees whether the check ("enforce") can be switched on. This adds one read door:
