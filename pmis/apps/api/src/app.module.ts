@@ -90,6 +90,10 @@ import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardCacheInvalidator, DashboardCacheService } from './dashboard/dashboard-cache.service';
 import { DashboardSettingsController } from './dashboard/dashboard-settings.controller';
 import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
+import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controller';
+import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
+import { ProgressRagController } from './dashboard/progress-rag.controller';
+import { ProgressRagService } from './dashboard/progress-rag.service';
 import { GoalsController } from './dashboard/goals.controller';
 import { GoalsService } from './dashboard/goals.service';
 import { SiteMapService } from './dashboard/site-map.service';
@@ -252,6 +256,8 @@ DashboardController, DashboardSharesController, DashboardSettingsController, Goa
 DashboardController, DashboardSharesController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController, OpsLimitsController,
       PartialCreditController, // 0.15.269 progress standards
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
+      SnapshotWeekdayController, // 0.15.430 (own line)
+      ProgressRagController, // 0.15.432 (own line)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
       CspReportController, // SEC-3
@@ -285,6 +291,8 @@ DashboardService, DashboardSharesService, DashboardSettingsService, GoalsService
 DashboardService, DashboardSharesService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
       PartialCreditService, // 0.15.269 progress standards
       MediaService, // 0.15.292
+      SnapshotWeekdayService, // 0.15.430 (own line)
+      ProgressRagService, // 0.15.432 (own line)
       PasskeyService, // S4
       DuplicateRowsSettingsService,
       TemplateNoticeSettingsService,

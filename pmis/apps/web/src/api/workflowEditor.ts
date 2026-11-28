@@ -147,3 +147,45 @@ export type SlaWeightItem = { task_code: string; counts_in_weight: boolean; weig
     breach_owner_role: string | null; escalation_role: string | null; pause_on_client_wait: boolean } | null };
 export const useSlaWeight = (v: number | null) =>
   useQuery({ queryKey: ['wf-sla-weight', v], enabled: v !== null, retry: false, queryFn: () => api.get<{ items: SlaWeightItem[] }>(`/workflow/versions/${v}/sla-weight`) });
+
+/**
+ * The inline edits of the Studio lists (tables of tasks, milestones and gates): every changed row is one write, one after the other, each with the version
+ * ETag read just before it (so the writes of one batch never collide with each other), one reason for the batch. Stops at the first refusal and says how many
+ * were done; the rest stays as edits on the screen. The guards are the server's own (reason, step-up, If-Match, frozen days, draft only).
+ */
+export type StudioBatch = {
+  reason: string;
+  tasks: { code: string; patch?: Omit<TaskPatchInput, 'reason'>; weight?: Omit<WeightInput, 'reason'>; sla?: Omit<SlaRuleInput, 'reason'> }[];
+  milestones: { code: string; patch: Omit<LightInput, 'reason'> }[];
+  gates: { code: string; patch: Omit<LightInput, 'reason'> }[];
+  order: { stage: string; task_codes: string[] }[];
+};
+export function useStudioBatch(version: number, etag: number) {
+  const qc = useQueryClient();
+  return useMutation<{ done: number }, ApiError, StudioBatch>({
+    mutationFn: async (b) => {
+      let tag = etag, done = 0;
+      /** Every write is sent with the ETag the previous answer returned; an answer without one is followed by a read of the version. */
+      const step = async (run: (e: number) => Promise<{ version_etag?: number } | null | undefined>) => {
+        const r = await run(tag);
+        tag = typeof r?.version_etag === 'number' ? r.version_etag : (await api.get<{ version_etag?: number }>(base(version))).version_etag ?? tag;
+        done += 1;
+      };
+      try {
+        for (const x of b.milestones) await step((e) => api.patch(`${base(version)}/milestones/${x.code}`, { body: { ...x.patch, reason: b.reason }, version: e }));
+        for (const x of b.gates) await step((e) => api.patch(`${base(version)}/gates/${x.code}`, { body: { ...x.patch, reason: b.reason }, version: e }));
+        for (const x of b.tasks) {
+          if (x.patch) await step((e) => api.patch(`${base(version)}/tasks/${x.code}`, { body: { ...x.patch, reason: b.reason }, version: e }));
+          if (x.sla) await step((e) => api.put(`${base(version)}/tasks/${x.code}/sla-rule`, { body: { ...x.sla, reason: b.reason }, version: e }));
+          if (x.weight) await step((e) => api.put(`${base(version)}/tasks/${x.code}/weight`, { body: { ...x.weight, reason: b.reason }, version: e }));
+        }
+        for (const x of b.order) await step((e) => api.put(`${base(version)}/milestones/${x.stage}/task-order`, { body: { task_codes: x.task_codes, reason: b.reason }, version: e }));
+      } catch (e) {
+        if (e instanceof Error) Object.assign(e, { done });
+        throw e;
+      }
+      return { done };
+    },
+    onSettled: () => { for (const k of [['wf-version', version], ['wf-versions'], ['task-definitions'], ['wf-sla-weight'], ['wf-weight-totals']]) void qc.invalidateQueries({ queryKey: k }); },
+  });
+}
