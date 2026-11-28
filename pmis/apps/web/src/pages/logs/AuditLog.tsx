@@ -16,6 +16,7 @@ import { decodeFilter, encodeFilter } from '@/api/views';
 import { LogTable } from '@/components/logs/LogTable';
 import { SavedViews } from '@/components/logs/SavedViews';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { ColumnMenu, useTablePrefs } from '@/components/TableKit';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
@@ -139,7 +140,7 @@ export function AuditLog() {
         filters={<SavedViews screen="audit-log" value={f} onApply={setF} empty={EMPTY_FILTER} table={tbl} />}
         count={<span className="text-sm text-mute" data-testid="audit-count">{t('logs.shown', { count: q.items.length })}</span>}
         tools={<>
-          <ColumnMenu api={tbl} label={(id) => t(`logs.c_${id}`)} />
+          <LayoutPanel testid="audit-log-layout" table={tbl} /><ColumnMenu density={false} api={tbl} label={(id) => t(`logs.c_${id}`)} />
           {admin && <button className="btn" data-testid="audit-integrity" disabled={verify.isPending} onClick={check}><ShieldCheck size={14} />{t('logs.integrity')}</button>}
           {canExport && <button className="btn" data-testid="audit-export" disabled={exporting} onClick={doExport}><Download size={14} />{t('logs.export')}</button>}
         </>} />

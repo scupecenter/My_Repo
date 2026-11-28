@@ -203,8 +203,11 @@ export class ZipService implements OnApplicationBootstrap {
           out.write(Buffer.from(chunk));
           if (final) out.end();
         });
+        // 0474: the signed and stamped markers (0555) of each file, as the last two columns of the index
+        const marks = (await this.db.tx.$queryRaw<{ j: Record<string, { signed?: boolean; stamped?: boolean }> }[]>(Prisma.sql`SELECT doc_file_marks(${rows.map((r) => r.id)}::uuid[]) AS j`))[0]?.j ?? {};
+        const mk = (id: string): string => `${csvCell(marks[id]?.signed === true ? 'yes' : 'no')},${csvCell(marks[id]?.stamped === true ? 'yes' : 'no')}`;
         const used = new Set<string>();
-        const manifest = [['path', 'original_name', 'sha256', 'version', 'is_current', 'slot_status', 'approved_date', 'uploaded_at'].map(csvCell).join(',')];
+        const manifest = [['path', 'original_name', 'sha256', 'version', 'is_current', 'slot_status', 'approved_date', 'uploaded_at', 'signed', 'stamped'].map(csvCell).join(',')];
         let i = 0;
         for (const r of included) {
           const archive = job.scope.naming === 'archive';
@@ -218,12 +221,12 @@ export class ZipService implements OnApplicationBootstrap {
           const stream = await this.storage.store.get(r.storage_key);
           for await (const chunk of stream) entry.push(new Uint8Array(chunk as Buffer));
           entry.push(new Uint8Array(0), true);
-          manifest.push([path, r.original_name, r.sha256, r.version, r.is_current, r.slot_status, r.approved_date, r.uploaded_at.toISOString()].map(csvCell).join(','));
+          manifest.push([path, r.original_name, r.sha256, r.version, r.is_current, r.slot_status, r.approved_date, r.uploaded_at.toISOString()].map(csvCell).join(',') + ',' + mk(r.id));
           i++;
           if (i % 20 === 0) await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${jobId}::uuid, 'running', ${i / included.length}::numeric, NULL, NULL, NULL, NULL)`);
         }
         for (const r of skipped) {
-          manifest.push(['', r.original_name, r.sha256, r.version, r.is_current, r.slot_status, r.approved_date, r.uploaded_at.toISOString()].map(csvCell).join(',') + ',' + csvCell('left out: waits for the virus scan'));
+          manifest.push(['', r.original_name, r.sha256, r.version, r.is_current, r.slot_status, r.approved_date, r.uploaded_at.toISOString()].map(csvCell).join(',') + ',' + mk(r.id) + ',' + csvCell('left out: waits for the virus scan'));
         }
         const m = new ZipPassThrough('manifest.csv');
         zip.add(m);

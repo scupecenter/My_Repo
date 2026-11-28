@@ -3834,7 +3834,22 @@
       "kind_date_change": "Date",
       "kind_suspension": "Suspension",
       "kind_resumption": "Resumption",
-      "kind_other": "Other"
+      "kind_other": "Other",
+      "finance_title": "Restricted financial summary",
+      "finance_hint": "Advances and the amount disbursed against the completion of their assignments. Only the configured roles see this card; it is never in a share link or an export. Invoice ages are not shown: the system holds no invoice data yet.",
+      "finance_advances": "Advances",
+      "finance_open": "Open",
+      "finance_hidden": "Amounts hidden: {{n}}",
+      "finance_approved": "Approved (LYD)",
+      "finance_disbursed": "Disbursed (LYD)",
+      "finance_returned": "Returned (LYD)",
+      "finance_open_disbursed": "Disbursed, still open (LYD)",
+      "finance_open_age": "Open advances by age since disbursement",
+      "finance_achievement": "Disbursed against completion",
+      "finance_assignments": "Assignments with an advance",
+      "finance_completed": "Completed",
+      "finance_on_done": "Disbursed on completed work (LYD)",
+      "finance_on_open": "Disbursed on open work (LYD)"
     },
     "scurve": {
       "title": "Progress curve",
@@ -3864,6 +3879,7 @@
   "docs": {
     "signed": "Signed",
     "stamped": "Stamped",
+    "photos_missing": "Photos missing: {{n}} of {{min}} required. Upload them; nothing is blocked.",
     "awaiting_signed": "Awaiting the signed and stamped copy: upload it as the next version.",
     "mark_signed": "This file is the signed copy",
     "mark_stamped": "This file is the stamped copy",
@@ -4799,6 +4815,9 @@
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
   "regrules": {
+    "other_title_one": "Other rules ({{count}}, read only)",
+    "other_title_other": "Other rules ({{count}}, read only)",
+    "other_note": "These keys are set by the system (scopes and their maps, field lists, levels). They are shown so nothing is hidden; they cannot be changed here.",
     "title": "Register rules",
     "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
     "saved": "Rule saved",
@@ -5435,6 +5454,14 @@
     "invalid": "Green is a whole number from 1 to 100, amber a whole number from 0 to 99, and green must be above amber."
   },
   "dashSettings": {
+    "fr_title": "Restricted financial summary",
+    "fr_note": "Off by default. When on, only holders of the chosen roles see the card on the dashboard; it never appears in a share link or an export.",
+    "fr_enabled": "Show the financial summary card",
+    "fr_roles": "Roles that may see it",
+    "fr_readonly": "Only a System Admin may change this.",
+    "fr_confirm_on": "Switch the financial summary on for the chosen roles?",
+    "fr_confirm_off": "Switch the financial summary off for everyone?",
+    "fr_save": "Save",
     "tp_title": "Manual targets (exception)",
     "tp_note": "Targets are derived from the scope: a phase target is its site count, the monthly On-Air target comes from the sites left and the planned dates. Nobody types them. Turn this on only when a typed number must replace the derived one.",
     "tp_on": "On: the typed numbers below apply where set.",
@@ -5678,6 +5705,10 @@
   "savedViews": {
     "label": "Saved views",
     "default": "Default view",
+    "set_default": "Make this my default view",
+    "clear_default": "Stop using this as my default",
+    "default_set": "Default view set",
+    "default_cleared": "Default view cleared",
     "mine": "My views",
     "shared_with_me": "Shared with me",
     "shared_mark": "shared",
@@ -7505,8 +7536,11 @@
       "uploaded_at": "Upload date",
       "approved_by": "Approved by",
       "approved_at": "Approval date",
+      "signed": "Signed copy",
+      "stamped": "Stamped copy",
       "actions": ""
     },
+    "mark_needed": "Needed",
     "tabs": "Library pages",
     "tab_forms": "Forms",
     "tab_templates": "Templates",
@@ -7826,6 +7860,13 @@
     "prev": "Previous month",
     "next": "Next month",
     "undated": "{{n}} tasks have no date"
+  },
+  "dv": {
+    "title": "Default views",
+    "hint": "The saved view each screen opens on. Choose it with the star next to the views on that screen.",
+    "none": "No default views yet.",
+    "reset": "Reset",
+    "reset_hint": "The screen opens on its built-in view again"
   },
   "tour": {
     "step": "Step {{i}} of {{n}}",
