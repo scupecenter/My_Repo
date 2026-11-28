@@ -8,6 +8,7 @@ import { useRegions } from '@/api/sites';
 import { api } from '@/api/client';
 import type { SiteTasks, TaskDetail } from '@/api/types';
 import { BoardGrid } from './Board';
+import { DragGrip } from './TextSelection';
 import { intentFor } from './TasksBoard';
 import { TaskDrawer, type DrawerIntent } from './TaskDrawer';
 import { useToast } from './Toast';
@@ -28,6 +29,7 @@ function Card({ c, region, column, onOpenAction }: { c: SiteBoardCard; region: s
   const name = (i18n.language === 'ar' && c.name_ar) || c.name;
   return (
     <div draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: c.id, column })); e.dataTransfer.effectAllowed = 'move'; }}>
+    <DragGrip className="float-end m-1" />
     <Link to={`/sites/${c.id}`} data-testid={`board-site-${c.site_code}`} data-ageing={c.ageing_wd}
         className="block rounded-md border border-line bg-card p-2 text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         aria-label={t('board.site_card', { code: c.site_code, name, days: c.ageing_wd })}>

@@ -5,6 +5,7 @@ import { api } from '@/api/client';
 import { useTasksBoard, type TaskBoardColumn, type TasksBoard as Board } from '@/api/boards';
 import type { TaskDetail, TaskSummary } from '@/api/types';
 import { Holders } from './HolderChip';
+import { DragGrip } from './TextSelection';
 import { BallSince, SlaOverrun, StaleBadge } from './TaskTiming';
 import { TaskDrawer, type DrawerIntent } from './TaskDrawer';
 import { useToast } from './Toast';
@@ -33,6 +34,7 @@ function Card({ task, column, onMove, onOpen }: { task: TaskSummary; column: Tas
     <li draggable data-testid={`board-task-${task.id}`} data-column={column}
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move'; }}
       className="rounded-md border border-line bg-card p-2 text-sm">
+      <DragGrip className="float-end" />
       <button type="button" className="block w-full text-start" data-testid={`board-task-open-${task.id}`} onClick={() => onOpen(task.id)}>
         <b className="mono" dir="ltr">{task.site_code}</b> {task.task_code} · {name}
       </button>
