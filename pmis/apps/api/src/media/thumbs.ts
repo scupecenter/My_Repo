@@ -37,3 +37,15 @@ export function thumbKey(sourceKey: string, size: 'small' | 'medium', px: number
   const key = parts.join('/');
   return /^[a-z0-9]+(\/[a-z0-9-]+)+$/.test(key) ? key : null;
 }
+
+/** Every thumbnail key a source can have under the current sizes (both formats, so a format switch leaves none behind). */
+export function thumbKeysOf(sourceKey: string, th: { small_px: number; medium_px: number }): string[] {
+  const out: string[] = [];
+  for (const f of ['webp', 'jpeg'] as ThumbFormat[]) {
+    for (const [size, px] of [['small', th.small_px], ['medium', th.medium_px]] as const) {
+      const k = thumbKey(sourceKey, size, px, f);
+      if (k) out.push(k);
+    }
+  }
+  return out;
+}
