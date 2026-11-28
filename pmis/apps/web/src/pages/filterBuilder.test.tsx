@@ -154,8 +154,8 @@ describe('unified filter', () => {
     await screen.findByTestId('sites-list');
     expect(document.documentElement.dir).toBe('rtl');
     const add = await screen.findByTestId('filter-add');
-    expect(add).toHaveTextContent('فلتر');
-    expect(add).toHaveAccessibleName('إضافة فلتر');
+    expect(add).toHaveTextContent('تصفية');
+    expect(add).toHaveAccessibleName('إضافة عامل تصفية');
     await u.click(add);
     expect(await screen.findByRole('group', { name: 'الموقع' })).toBeInTheDocument();
     expect(screen.getByTestId('filter-field-delivery_batch')).toHaveTextContent('دفعة التسليم');
