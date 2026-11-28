@@ -390,6 +390,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/me/home-pins'],
   ['post', '/saved-views/:id/pin'],
   ['post', '/saved-views/:id/unpin'],
+  // Contract 0.15.582 (0655): the default saved view per screen.
+  ['get', '/me/default-views'],
+  ['post', '/saved-views/:id/set-default'],
+  ['post', '/saved-views/:id/clear-default'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],

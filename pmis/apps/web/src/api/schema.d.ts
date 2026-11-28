@@ -12671,6 +12671,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/default-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's default saved view per screen (0.15.582)
+         * @description 0.15.582 (migration 0655). One default view per screen, personal. A view that was deactivated or became unreadable drops out of the list.
+         */
+        get: operations["getDefaultViews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/set-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a saved view my default for its screen (0.15.582)
+         * @description 0.15.582 (migration 0655). Personal. Replaces the caller's earlier default for the same screen. A view the caller may not read answers 404.
+         */
+        post: operations["setDefaultSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/clear-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear my default view of a screen (0.15.582)
+         * @description 0.15.582 (migration 0655). Removes the caller's default when it is this view; otherwise a no-op.
+         */
+        post: operations["clearDefaultSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/home-pins": {
         parameters: {
             query?: never;
@@ -46894,6 +46954,93 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getDefaultViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's defaults. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            screen_key: components["schemas"]["SavedViewScreenKey"];
+                            /** Format: uuid */
+                            view_id: string;
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDefaultSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        screen_key: components["schemas"]["SavedViewScreenKey"];
+                        /** @enum {boolean} */
+                        is_default: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    clearDefaultSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        screen_key?: string | null;
+                        /** @enum {boolean} */
+                        is_default: false;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     getHomePins: {
