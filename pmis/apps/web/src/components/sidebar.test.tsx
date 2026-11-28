@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { Shell } from '@/components/Shell';
@@ -124,15 +124,14 @@ describe('Sidebar tree (N1-N12)', () => {
     await waitFor(() => expect(screen.getByTestId('nav-approvals')).toHaveTextContent(/\d/));
   });
 
-  it('a parent heading opens its own page: Registers lists its screens as cards, the arrow still opens and closes the list', async () => {
+  it('Registers and Logs are labels with sub-menus only (no page of their own); the arrow opens and closes the list; an old /menu link opens the first screen', async () => {
     const u = userEvent.setup();
-    renderApp(<Routes><Route element={<Shell />}><Route path="/menu/:id" element={<MenuGroup />} /><Route path="*" element={<div />} /></Route></Routes>, { route: '/my-work' });
-    await screen.findByTestId('nav-group-open-registers');
-    await u.click(screen.getByTestId('nav-group-open-registers'));
-    const page = await screen.findByTestId('page-menu-group');
-    expect(page).toHaveAttribute('data-group', 'registers');
-    expect(within(page).getByTestId('menu-card-warehouse')).toHaveAttribute('href', '/warehouse');
-    expect(within(page).getByTestId('menu-card-gecol')).toBeInTheDocument();
+    renderApp(<Routes><Route element={<Shell />}><Route path="/menu/:id" element={<MenuGroup />} /><Route path="*" element={<div data-testid="elsewhere" />} /></Route></Routes>, { route: '/my-work' });
+    await screen.findByTestId('nav-group-name-registers');
+    expect(screen.queryByTestId('nav-group-open-registers')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-group-open-logs')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-group-registers')).toContainElement(screen.getByTestId('nav-warehouse'));
+    expect(screen.getByTestId('nav-warehouse')).toHaveAttribute('href', '/warehouse');
     await u.click(screen.getByTestId('nav-group-toggle-logs'));
     expect(screen.getByTestId('nav-group-toggle-logs')).toHaveAttribute('aria-expanded', 'false');
   });
@@ -227,7 +226,7 @@ describe('Sidebar tree (N1-N12)', () => {
     app();
     await screen.findByTestId('nav-sites');
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveTextContent('Registers & Logs');
-    expect(screen.getByTestId('nav-sites')).toHaveTextContent('Site Master');
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent('Site 360°');
     expect(screen.getByTestId('nav-group-work')).not.toContainElement(screen.getByTestId('nav-sites'));
     const sub = screen.getByTestId('nav-site-master-menus');
     expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
@@ -240,10 +239,12 @@ describe('Sidebar tree (N1-N12)', () => {
   it('shows one "Site Master" entry with exactly the 6 sub-menus (no Dismantle), and no older stream or view links', async () => {
     app();
     const entry = await screen.findByTestId('nav-sites');
-    expect(entry).toHaveTextContent(/^Site Master$/);
-    // the group heading is not drawn a second time: the entry is the only row with this name
-    expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Site Master')).toHaveLength(1);
+    expect(entry).toHaveTextContent(/^Site 360°$/);
+    // Site Master is a top-level group with no page of its own (no link to /menu/site_register); its first child is Site 360°, then the six sub-menus
+    expect(screen.getByTestId('nav-group-name-site_register')).toHaveTextContent('Site Master');
+    expect(screen.queryByTestId('nav-group-open-site_register')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-group-site_register')).toContainElement(entry);
+    expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveAttribute('aria-expanded', 'true'); // expanded by default
     expect(screen.queryByTestId('nav-site-master-master')).not.toBeInTheDocument();
     const menus = screen.getByTestId('nav-site-master-menus');
     expect([...menus.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
@@ -374,7 +375,7 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.getByTestId('nav-rf_design')).toHaveTextContent('الترددات والتصميم');
     expect(screen.getByTestId('nav-site-master-om')).toHaveTextContent('التشغيل والصيانة');
     expect(screen.getByTestId('nav-dismantle')).toHaveTextContent('الفك');
-    expect(screen.getByTestId('nav-sites')).toHaveTextContent('ماستر المواقع');
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent('الموقع 360°');
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveTextContent('السجلات والقيود');
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('سجل التغييرات');
     expect(screen.getByTestId('nav-sites-toggle')).toHaveAttribute('aria-expanded', 'true');

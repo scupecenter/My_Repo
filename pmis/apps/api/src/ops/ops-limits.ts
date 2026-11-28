@@ -20,6 +20,7 @@ export const OPS_LIMIT_DEFAULTS = {
   'login.ip_base_seconds': 2,
   'login.ip_max_seconds': 60,
   'login.identifier_attempts': 5,
+  'media.thumbnails_per_minute': 120,
 } as const;
 
 export type OpsLimitKey = keyof typeof OPS_LIMIT_DEFAULTS;
