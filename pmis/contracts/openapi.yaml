@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.473 (2026-11-28): the Automation centre over the alert rules (migration 0612, mirror `db/sql/611_automation_centre.sql`). Additive, notifications only. New `GET /settings/alert-rules/runs` (`getAlertRuleRuns`, System Admin): the last 50 runs of the rules (`rule_code`, `kind`, `run_at`, `fired` targets). The catalogue of `GET /settings/alert-rules` gains `templates`: the closed list of ready-made rules the centre offers (they only fill the form; saving goes through the existing create call with its checks and reason). The daily job now records one run row per enabled rule (new table `alert_rule_runs`, a LOG table of the data reset) and, when a rule fired, one audit row `alert_rule_run` written by the system (no actor, via job, job_name `alert_rules`). No rule, kind, audience, permission or grant changes.
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
     - 0.15.407 (2026-11-27): the Daily Plan template, hardening layer 3b (migration 0564, mirror `db/sql/563_daily_plan_template.sql`). Additive. (1) `Template.template_kind` lists `daily_plan`: `TPL-DAILY-PLAN`, downloaded with `GET /templates/TPL-DAILY-PLAN/download` (blank, or with `date` and `region_id` filled with the plan as the caller sees it). (2) `POST /daily-plans/import` (`importDailyPlan`): the template only, applied at once and all or nothing through the doors of the screen (`dp_add_site`, `dp_save_row`, `dp_remove_site`), so rights, region, lock and audit apply per row; one refused row refuses the file (`errors[]` at `/rows/<line>/<field>`); other files are 422 `template_rejected`. The editable parts are the manual values, Reason, Remark, sites added or removed by hand; Site name and Region are ignored. The Permits sub-streams and Procurement-HLC are covered by the existing templates (round-trip tests added).
@@ -8526,6 +8527,37 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /settings/alert-rules/runs:
+    get:
+      tags: [settings]
+      operationId: getAlertRuleRuns
+      summary: The last runs of the alert rules, run by the system (0.15.473)
+      description: |
+        0.15.473 (migration 0612): System Admin. The last 50 runs, newest first: the rule (`rule_id`, `rule_code`, `kind`), `run_at` and `fired` (the targets the rule fired for in that run, 0 when nothing was found). A run that fired is also an audit row `alert_rule_run` with no actor (the system), via job, job_name `alert_rules`.
+      x-db-path: alert_rule_runs_json
+      responses:
+        '200':
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, rule_id, rule_code, kind, run_at, fired]
+                      properties:
+                        id: {type: integer}
+                        rule_id: {type: string, format: uuid}
+                        rule_code: {type: string}
+                        kind: {type: string}
+                        run_at: {type: string, format: date-time}
+                        fired: {type: integer, minimum: 0}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /settings/alert-rules/link-orphans:
     get:
       tags: [settings]
@@ -25516,7 +25548,7 @@ components:
           items: { $ref: '#/components/schemas/AlertRule' }
         catalogue:
           type: object
-          required: [kinds, kpis, audiences, registers, modules]
+          required: [kinds, kpis, audiences, registers, modules, templates]
           properties:
             kinds:
               type: array
@@ -25539,6 +25571,22 @@ components:
                   unit: { type: string }
                   direction: { type: string, enum: [higher, lower] }
             audiences: { type: array, items: { type: string, enum: [system_admin, module] } }
+            templates:
+              type: array
+              description: '0.15.473: the ready-made rules of the Automation centre. They only fill the form; the save is the create call.'
+              items:
+                type: object
+                required: [id, kind, params, audience, title_en, title_ar, body_en, body_ar, link]
+                properties:
+                  id: { type: string }
+                  kind: { type: string }
+                  params: { type: object, additionalProperties: true }
+                  audience: { type: object, additionalProperties: true }
+                  title_en: { type: string }
+                  title_ar: { type: string }
+                  body_en: { type: string }
+                  body_ar: { type: string }
+                  link: { type: [string, 'null'] }
             registers:
               type: array
               items:

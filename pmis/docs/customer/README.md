@@ -27,3 +27,4 @@
 
 المصادر: `CLAUDE.md`، `CHANGELOG.md`، `docs/adr/`، `docs/spec/`، `db/erd.md`، `contracts/openapi.yaml`، `HANDOVER.md`. الإضافات المقترحة غير المؤكدة مكتوبة فيها «يُؤكَّد لاحقاً».
 | [shortage-draft-purchase-request.md](shortage-draft-purchase-request.md) | Draft purchase request from a material shortage line |
+| [automation-centre.md](automation-centre.md) | Automation centre: when/then view of the alert rules, templates and runs |

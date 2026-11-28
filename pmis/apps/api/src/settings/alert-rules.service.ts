@@ -44,6 +44,29 @@ interface RuleRow {
   link: string | null; enabled: boolean; locked: boolean; version: number; created_at: string; updated_at: string;
 }
 
+/**
+ * 0.15.473 (migration 0612): the ready-made rules of the Automation centre. A template only fills the existing alert rule form: the admin reviews it,
+ * gives a code and a reason and saves it through the same create call, so every check, the audit row and the notifications-only limit are those of the rules.
+ * The closed list lives here (no table); `params` and `audience` are exactly what admin_alert_rule_save accepts.
+ */
+const TEMPLATES = [
+  { id: 'weekly-status', kind: 'weekly_status_missing', params: {}, audience: { type: 'system_admin' }, link: '/status-updates',
+    title_en: 'Weekly status missing: {{region}}', title_ar: 'التحديث الأسبوعي غير مسلّم: {{region}}',
+    body_en: 'No weekly status update for {{region}} for the week of {{week}}.', body_ar: 'لا يوجد تحديث أسبوعي للمنطقة {{region}} لأسبوع {{week}}.' },
+  { id: 'issue-stuck', kind: 'record_idle', params: { register_key: 'issues', state: 'entry', days: 7 }, audience: { type: 'system_admin' }, link: null,
+    title_en: 'Issue idle for {{days}} days: {{record}}', title_ar: 'مشكلة بلا حركة منذ {{days}} أيام: {{record}}',
+    body_en: '{{record}} has been {{state}} for at least {{days}} days.', body_ar: '{{record}} في حالة {{state}} منذ {{days}} أيام على الأقل.' },
+  { id: 'advance-unsettled', kind: 'advance_unsettled', params: {}, audience: { type: 'system_admin' }, link: null,
+    title_en: 'Advance not settled: {{record}}', title_ar: 'سلفة غير مسوّاة: {{record}}',
+    body_en: '{{record}} is {{state}} and has been open for {{days}} days.', body_ar: '{{record}} في حالة {{state}} ومفتوحة منذ {{days}} أيام.' },
+  { id: 'invoice-due', kind: 'invoice_due_soon', params: { days: 7 }, audience: { type: 'system_admin' }, link: null,
+    title_en: 'Invoice due soon: {{record}}', title_ar: 'فاتورة تستحق قريباً: {{record}}',
+    body_en: 'Invoice {{record}} is due on {{due}} ({{days}} days left).', body_ar: 'الفاتورة {{record}} تستحق في {{due}} (متبقي {{days}} أيام).' },
+  { id: 'links-orphans', kind: 'link_orphans', params: { min_rows: 1 }, audience: { type: 'system_admin' }, link: '/admin/settings/alerts/rules',
+    title_en: 'Broken register links: {{register}}', title_ar: 'روابط سجلات مكسورة: {{register}}',
+    body_en: '{{count}} row(s) of {{register}} point to a record that no longer exists ({{field}}).', body_ar: '{{count}} صف في {{register}} يشير إلى سجل غير موجود ({{field}}).' },
+] as const;
+
 @Injectable()
 export class AlertRulesService {
   constructor(private readonly db: DbService, private readonly access: AccessService) {}
@@ -73,10 +96,17 @@ export class AlertRulesService {
         ],
         kpis,
         audiences: ['system_admin', 'module'],
+        templates: TEMPLATES,
         registers,
         modules: [...MODULES, ...(await customModuleDefs(this.db, true))].map((m) => ({ key: m.key, name_en: m.name_en })),
       },
     };
+  }
+
+  /** GET /settings/alert-rules/runs (0.15.473, migration 0612): the last runs of the rules, written by the system (audit action alert_rule_run, no actor). System Admin. */
+  async runs() {
+    await this.requireAdmin();
+    return { runs: (await this.db.tx.$queryRaw<{ j: unknown[] }[]>(Prisma.sql`SELECT alert_rule_runs_json(50) AS j`))[0]!.j };
   }
 
   /** GET /settings/alert-rules/link-orphans (0.15.510, migration 0650): the dangling-link report with example ids, System Admin. */

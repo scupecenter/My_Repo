@@ -5440,6 +5440,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/alert-rules/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The last runs of the alert rules, run by the system (0.15.473)
+         * @description 0.15.473 (migration 0612): System Admin. The last 50 runs, newest first: the rule (`rule_id`, `rule_code`, `kind`), `run_at` and `fired` (the targets the rule fired for in that run, 0 when nothing was found). A run that fired is also an audit row `alert_rule_run` with no actor (the system), via job, job_name `alert_rules`.
+         */
+        get: operations["getAlertRuleRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/alert-rules/link-orphans": {
         parameters: {
             query?: never;
@@ -18405,6 +18425,22 @@ export interface components {
                     direction: "higher" | "lower";
                 }[];
                 audiences: ("system_admin" | "module")[];
+                /** @description 0.15.473: the ready-made rules of the Automation centre. They only fill the form; the save is the create call. */
+                templates: {
+                    id: string;
+                    kind: string;
+                    params: {
+                        [key: string]: unknown;
+                    };
+                    audience: {
+                        [key: string]: unknown;
+                    };
+                    title_en: string;
+                    title_ar: string;
+                    body_en: string;
+                    body_ar: string;
+                    link: string | null;
+                }[];
                 registers: {
                     register_key: string;
                     name_en: string;
@@ -34182,6 +34218,39 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getAlertRuleRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runs: {
+                            id: number;
+                            /** Format: uuid */
+                            rule_id: string;
+                            rule_code: string;
+                            kind: string;
+                            /** Format: date-time */
+                            run_at: string;
+                            fired: number;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getLinkOrphans: {

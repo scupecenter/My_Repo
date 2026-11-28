@@ -11,6 +11,11 @@ export class AlertRulesController {
     return this.svc.get();
   }
 
+  @Get('runs')
+  runs() {
+    return this.svc.runs();
+  }
+
   @Get('link-orphans')
   linkOrphans() {
     return this.svc.linkOrphans();

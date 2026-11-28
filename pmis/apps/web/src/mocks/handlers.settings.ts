@@ -1716,6 +1716,13 @@ export const settingsHandlers = [
       { register_key: 'financial_advances', field_code: 'advance_id', target_register: 'financial_advances', rows_with_value: 5, orphan_rows: 0, examples: [] },
     ] });
   }),
+  http.get(`${B}/settings/alert-rules/runs`, () => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({ runs: [
+      { id: 2, rule_id: ALERT_RULES[0]?.id ?? '00000000-0000-4000-8000-000000000001', rule_code: ALERT_RULES[0]?.code ?? 'rule', kind: ALERT_RULES[0]?.kind ?? 'weekly_status_missing', run_at: '2026-11-28T03:00:00Z', fired: 3 },
+      { id: 1, rule_id: ALERT_RULES[0]?.id ?? '00000000-0000-4000-8000-000000000001', rule_code: ALERT_RULES[0]?.code ?? 'rule', kind: ALERT_RULES[0]?.kind ?? 'weekly_status_missing', run_at: '2026-11-27T03:00:00Z', fired: 0 },
+    ] });
+  }),
   http.get(`${B}/settings/alert-rules`, () => {
     const g = needAdmin(); if (g) return g;
     return HttpResponse.json({
@@ -1724,6 +1731,10 @@ export const settingsHandlers = [
         kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }, { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] }],
         kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
+        templates: [
+          { id: 'weekly-status', kind: 'weekly_status_missing', params: {}, audience: { type: 'system_admin' }, link: '/status-updates', title_en: 'Weekly status missing: {{region}}', title_ar: 'التحديث الأسبوعي غير مسلّم: {{region}}', body_en: 'No weekly status update for {{region}} for the week of {{week}}.', body_ar: 'لا يوجد تحديث أسبوعي للمنطقة {{region}} لأسبوع {{week}}.' },
+          { id: 'issue-stuck', kind: 'record_idle', params: { register_key: 'issues', state: 'entry', days: 7 }, audience: { type: 'system_admin' }, link: null, title_en: 'Issue idle for {{days}} days: {{record}}', title_ar: 'مشكلة بلا حركة منذ {{days}} أيام: {{record}}', body_en: '{{record}} has been {{state}} for at least {{days}} days.', body_ar: '{{record}} في حالة {{state}} منذ {{days}} أيام على الأقل.' },
+        ],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
         modules: [{ key: 'sites', name_en: 'Sites' }, { key: 'procurement', name_en: 'Procurement' }],
       },
