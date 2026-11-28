@@ -6,10 +6,10 @@ export type Density = 'comfortable' | 'normal' | 'compact';
 export const DENSITIES: Density[] = ['compact', 'normal', 'comfortable'];
 export const isDensity = (d: unknown): d is Density => d === 'comfortable' || d === 'normal' || d === 'compact';
 /** W8 item 4: the Display menu of a site-data table (the density is the column prefs' own). */
-export type DisplayOpts = { size: 'sm' | 'md' | 'lg'; align: 'start' | 'center'; wrap: boolean; zebra: boolean };
+export type DisplayOpts = { size: 'sm' | 'md' | 'lg'; align: 'start' | 'center'; wrap: boolean; zebra: boolean; /** Item 9: the count and the status distribution bar on the header of every group of a grouped table */ groupbar: boolean };
 export type Display = DisplayOpts & { density: Density };
 /** The look before W8, used until Settings > Display answers (and when it cannot be read). */
-export const DISPLAY_SEED: Display = { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true };
+export const DISPLAY_SEED: Display = { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true };
 /** Only the known Display keys with a valid value (a stored or saved value from an older build is dropped, never trusted). */
 export function cleanDisplay(d: unknown): Partial<DisplayOpts> | undefined {
   if (!d || typeof d !== 'object') return undefined;
@@ -18,6 +18,7 @@ export function cleanDisplay(d: unknown): Partial<DisplayOpts> | undefined {
   if (x.align === 'start' || x.align === 'center') out.align = x.align;
   if (typeof x.wrap === 'boolean') out.wrap = x.wrap;
   if (typeof x.zebra === 'boolean') out.zebra = x.zebra;
+  if (typeof x.groupbar === 'boolean') out.groupbar = x.groupbar;
   return Object.keys(out).length ? out : undefined;
 }
 /** `density` and `display` are the user's own choices; unset = the defaults of Settings > Display. */
