@@ -71,6 +71,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 
 **Linked records tab (0651, D60 phase 3).** The site page has a "Linked records" tab served by `site_linked_records(site)` (`GET /registers/site-linked/{site_id}`): for each enabled register the caller can read, the count of records of the site and the latest 10, with a flag for registers reached through a declared link. Read-only; it widens no rights (the caller's own register rights and site scope apply).
 
+**Orphans alert (0650, D60 follow-up).** `register_link_orphans()` (0409) counts, per declared link, the current rows whose id is no current record of the target. The alert kind `link_orphans` of the generic alert rules (`Settings > Alerts > Rules`; params `register_key`, `field_code`, `min_rows`) sends one in-app notification per link at or above `min_rows`, once per working week while it keeps dangling, to the rule's audience. `GET /settings/alert-rules/link-orphans` (System Admin) returns the same counts with up to 20 example record ids per link. Nothing is changed or cleared by the alert (hide, never delete), and no `enforce` value moves: the report is what the owner checks before switching a link on. The Settings editor of the links (#359) is not on main yet, so the per-link badge and the warning when switching `enforce` on are for that editor to add.
+
 ## 4. Gaps and proposals
 
 1. **Warehouse receipt to Procurement order.** A PL / OPEN receipt (stock coming in) names no order, so what arrived against a PO is not visible in
