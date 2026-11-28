@@ -8,3 +8,4 @@ A warehouse item gets a reorder level on the Warehouse Reorder tab (`PUT /wareho
 - In-app only, nothing public. The rule never changes stock or a record.
 - Stored in the existing alert rule tables: no new table, nothing added to the data reset plan.
 - The daily job `alert_rules_run` evaluates it, once per item and week (`alert_rule_fires`).
+- Optional param `draft_pr` (Settings, Alerts, Rules: "Open a prefilled purchase request"). The notification then opens the new Procurement form with the type PR and a remark that names the item, the available stock, the level and the suggested quantity (the reorder quantity, when set). The link is a form: nothing is created until a person who may create Procurement records submits it; the Matrix, the grants and the approval chain apply as for any request.

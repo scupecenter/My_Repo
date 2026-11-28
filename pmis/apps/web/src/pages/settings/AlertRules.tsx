@@ -22,6 +22,7 @@ interface Form {
   days: string;
   field_code: string;
   min_rows: string;
+  draft_pr: boolean;
   audience: string;
   module: string;
   title_en: string;
@@ -37,7 +38,7 @@ interface Form {
 }
 
 const EMPTY: Form = {
-  id: null, version: 0, code: '', kind: 'weekly_status_missing', register_key: '', state: '', days: '7', field_code: '', min_rows: '1',
+  id: null, version: 0, code: '', kind: 'weekly_status_missing', register_key: '', state: '', days: '7', field_code: '', min_rows: '1', draft_pr: false,
   audience: 'system_admin', module: '', title_en: '', title_ar: '', body_en: '', body_ar: '', link: '', enabled: true,
   kpi: '', op: 'above', value: '', locked: false,
 };
@@ -45,6 +46,7 @@ const EMPTY: Form = {
 const toForm = (r: AlertRule): Form => ({
   id: r.id, version: r.version, code: r.code, kind: r.kind,
   register_key: String(r.params.register_key ?? ''), state: String(r.params.state ?? ''), days: String(r.params.days ?? '7'), field_code: String(r.params.field_code ?? ''), min_rows: String(r.params.min_rows ?? '1'),
+  draft_pr: r.params.draft_pr === true,
   audience: String(r.audience.type ?? 'system_admin'), module: String(r.audience.module ?? ''),
   title_en: r.title_en, title_ar: r.title_ar, body_en: r.body_en, body_ar: r.body_ar, link: r.link ?? '', enabled: r.enabled,
   kpi: String(r.params.kpi ?? ''), op: String(r.params.op ?? 'above'), value: r.params.value === undefined ? '' : String(r.params.value), locked: r.locked,
@@ -55,6 +57,7 @@ const toBody = (f: Form): AlertRuleInput => ({
   kind: f.kind as AlertRuleInput['kind'],
   params: f.kind === 'record_idle' ? { register_key: f.register_key, state: f.state.trim(), days: Number(f.days) }
     : f.kind === 'link_orphans' ? { ...(f.register_key ? { register_key: f.register_key } : {}), ...(f.register_key && f.field_code.trim() ? { field_code: f.field_code.trim() } : {}), min_rows: Number(f.min_rows) }
+    : f.kind === 'stock_below_reorder' ? (f.draft_pr ? { draft_pr: true } : {})
     : (f.kind === 'advance_unsettled' || f.kind === 'invoice_due_soon') && f.days.trim() !== '' ? { days: Number(f.days) }
     : f.kind === 'kpi_threshold' ? { kpi: f.kpi, op: f.op, value: Number(f.value) } : {},
   audience: f.audience === 'module' ? { type: 'module', module: f.module } : { type: 'system_admin' },
@@ -176,6 +179,12 @@ export function AlertRules() {
               <label className="text-sm font-semibold">{t('alertRules.min_rows')}
                 <input type="number" min={1} max={100000} className="input mt-1 w-28 font-normal" data-testid="ar-min-rows" value={v.min_rows} onChange={(e) => setF({ ...v, min_rows: e.target.value })} /></label>
             </div>
+          )}
+          {v.kind === 'stock_below_reorder' && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" data-testid="ar-draft-pr" checked={v.draft_pr} onChange={(e) => setF({ ...v, draft_pr: e.target.checked })} />
+              <span><span className="font-semibold">{t('alertRules.draft_pr')}</span><span className="block text-xs text-mute">{t('alertRules.draft_pr_help')}</span></span>
+            </label>
           )}
           {v.kind === 'kpi_threshold' && (
             <div className="flex flex-wrap gap-3">

@@ -315,3 +315,21 @@ describe('kpi_threshold alert rules (0348)', () => {
     await db.query('ROLLBACK');
   });
 });
+
+describe('stock_below_reorder draft_pr param (0631)', () => {
+  it('accepts draft_pr only as a boolean and links the notification to the prefilled Procurement form', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    await db.query('SAVEPOINT s1');
+    await expect(save(rule(`${PREFIX}-dpr-bad`, { kind: 'stock_below_reorder', params: { draft_pr: 'yes' } }), 'bad param')).rejects.toThrow(/params/);
+    await db.query('ROLLBACK TO s1');
+    const r = await save(rule(`${PREFIX}-dpr`, { kind: 'stock_below_reorder', params: { draft_pr: true }, title_en: 'Low {{item}}', body_en: '{{available}} of {{level}}' }), 'add the draft rule');
+    const item = (await db.query(`INSERT INTO warehouse_items (item_code, item_group, name) VALUES ($1, 'WL', $1) RETURNING id`, [`${PREFIX.toUpperCase()}-DPR`])).rows[0].id as string;
+    await db.query(`INSERT INTO warehouse_reorder_limits (item_id, reorder_level, reorder_qty) VALUES ($1, 5, 20)`, [item]);
+    await db.query(`SELECT alert_rules_run('2031-04-21'::date) AS n`);
+    const link = (await db.query(`SELECT n.link FROM notifications n WHERE n.link LIKE '/registers/procurement?record=new&from=reorder&remark=%' AND n.link LIKE $1 ORDER BY n.created_at DESC LIMIT 1`, [`%${PREFIX.toUpperCase()}-DPR%`])).rows[0]?.link as string | undefined;
+    expect(link).toContain('suggested%20quantity%2020');
+    expect(r.rows[0].j.id).toBeTruthy();
+    await db.query('ROLLBACK');
+  });
+});

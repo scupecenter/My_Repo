@@ -1739,7 +1739,7 @@ export const settingsHandlers = [
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }, { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] }, { kind: 'stock_below_reorder', params: [] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }, { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] }, { kind: 'stock_below_reorder', params: ['draft_pr'] }],
         kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
