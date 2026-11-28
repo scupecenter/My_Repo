@@ -485,6 +485,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/ui/public/identity'],
   ['get', '/ui/public/logo/:purpose'],
   ['get', '/ui/assets/:key'],
+  ['get', '/settings/dashboard-finance-readers'],
+  ['put', '/settings/dashboard-finance-readers'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
