@@ -20275,7 +20275,7 @@ export interface components {
                 open_disbursed: number;
             } | null;
             open_aging: components["schemas"]["DashboardOpsAging"] | null;
-            /** @description 0.15.532: ages of the open invoices (state not Paid or Cancelled) from the invoices register; null when it has no approved records. */
+            /** @description 0.15.540: ages of the open invoices (state not Paid or Cancelled) from the invoices register; null when it has no approved records. */
             invoices: {
                 /** @description Invoices not yet Paid or Cancelled. */
                 open: number;

@@ -14,4 +14,4 @@ Status: DRAFT-SPEC. No code in this PR. The build goes into this same PR later, 
 - Additive only. Never replace accumulating SQL functions whole.
 
 ## Numbering reserved
-- Contract label 0.15.532. Migration only if needed: prisma 0526, db/sql 525 (re-verify live before the build).
+- Contract label 0.15.540. Migration only if needed: prisma 0526, db/sql 525 (re-verify live before the build).
