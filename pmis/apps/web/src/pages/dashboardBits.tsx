@@ -78,16 +78,20 @@ export function Bar({
   value,
   plan,
   tone = "bg-accent",
+  label,
 }: {
   value: number;
   plan?: number | null;
   tone?: string;
+  label?: string;
 }) {
   const v = Math.max(0, Math.min(100, value));
+  const { t } = useTranslation();
   return (
     <div
       className="relative h-3 w-full rounded-full bg-lockBg"
       role="progressbar"
+      aria-label={label ?? t("cells.progress")}
       aria-valuenow={Math.round(v)}
       aria-valuemin={0}
       aria-valuemax={100}

@@ -13,7 +13,7 @@ import { SessionService } from './session.service';
 import { StepUpService } from './step-up.service';
 import { SyslogService } from './syslog.service';
 import { UserStateService } from './user-state.service';
-import { limit } from '../ops/ops-limits';
+import { limit, loginLimits } from '../ops/ops-limits';
 import { CodeInput, TwoFactorService, TWO_FACTOR_PARAMS } from './two-factor.service';
 import { SecurityLogService } from '../logs/security-log.service';
 import { applyContext, RequestContext, UA_MAX } from '../logs/context';
@@ -50,12 +50,7 @@ function codeInput(b: { code?: string; recovery_code?: string }): CodeInput | nu
 const employeeIdSchema = z.object({ employee_id: z.string().regex(/^[0-9]{4}$/) }).strict();
 const changePasswordSchema =z.object({ current_password: z.string().max(128), new_password: z.string().max(1024) }).strict();
 
-export const LOGIN_LIMIT_PER_IP = 10;
-/** Progressive limiting per address (Q168): failures counted over 15 minutes; after LOGIN_LIMIT_PER_IP of them the wait doubles from 2 s up to 60 s. */
-export const LOGIN_IP_WINDOW_MS = 15 * 60_000;
-export const LOGIN_IP_BASE_SECONDS = 2;
-export const LOGIN_IP_MAX_SECONDS = 60;
-export const LOGIN_LIMIT_PER_IDENTIFIER = 5;
+/** Sign-in rate limits (Q168, progressive per address): the numbers are in Settings > Security > Limits (migration 0563); the defaults are 10 failures over 15 minutes, then a wait that doubles from 2 s up to 60 s, and 5 attempts per account. */
 export const PASSWORD_CHANGE_LIMIT = 10;
 
 interface LookupRow {
@@ -152,8 +147,8 @@ export class AuthService {
     const ctx = signInCtx(ip, userAgent, requestId);
 
     const ipKey = `login:ip:${ip ?? 'unknown'}`;
-    const ipWait = this.limiter.progressiveWait(ipKey, LOGIN_LIMIT_PER_IP, LOGIN_IP_WINDOW_MS, LOGIN_IP_BASE_SECONDS, LOGIN_IP_MAX_SECONDS);
-    const idWait = ipWait ? 0 : this.limiter.hit(`login:id:${masked}`, LOGIN_LIMIT_PER_IDENTIFIER);
+    const ipWait = this.limiter.progressiveWait(ipKey, loginLimits().perIp, loginLimits().windowMs, loginLimits().baseSeconds, loginLimits().maxSeconds);
+    const idWait = ipWait ? 0 : this.limiter.hit(`login:id:${masked}`, loginLimits().perIdentifier);
     if (ipWait || idWait) {
       await this.syslog.write('warn', 'local_sign_in_rate_limited', { identifier_hmac: masked, ip }, undefined, requestId);
       await this.securityLog.write({ event: 'sign_in_rate_limited', outcome: 'failure', identifier, ctx, detail: { by: ipWait ? 'ip' : 'identifier' } });
@@ -162,7 +157,7 @@ export class AuthService {
     // Reserved before the first await: parallel attempts from one address count as failures until they end, so they cannot all pass the check above.
     const release = this.limiter.progressiveBegin(ipKey);
     const failed = (): void => {
-      this.limiter.progressiveFail(ipKey, LOGIN_IP_WINDOW_MS);
+      this.limiter.progressiveFail(ipKey, loginLimits().windowMs);
       release();
     };
     try {
@@ -273,7 +268,7 @@ export class AuthService {
     if (needCode && (!input || (body.code !== undefined && body.recovery_code !== undefined))) {
       throw problems.validation([{ path: '/code', code: 'required', message: 'Send the code from your authenticator app (or one recovery code).' }]);
     }
-    const wait = this.limiter.hit(`stepup:${auth.user.id}`, LOGIN_LIMIT_PER_IDENTIFIER);
+    const wait = this.limiter.hit(`stepup:${auth.user.id}`, loginLimits().perIdentifier);
     if (wait) throw problems.rateLimited(wait);
     await this.checkOwnPassword(auth, body.password, 'step_up');
     // 0143 (ADR 0002 items 3 and 6): the same MFA rule as sign-in; an MFA exemption in force skips it
@@ -346,10 +341,10 @@ export class AuthService {
     const body = parse(twoFactorSchema, rawBody);
     const input = codeInput(body);
     if (!input) throw problems.validation([{ path: '/code', code: 'required' }]);
-    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, loginLimits().perIp);
     if (ipWait) throw problems.rateLimited(ipWait);
     const { userId } = await this.pendingOf(pendingToken, 'two_factor');
-    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, loginLimits().perIp);
     if (userWait) throw problems.rateLimited(userWait);
 
     const out = await this.asUser(userId, async () => {
@@ -377,10 +372,10 @@ export class AuthService {
 
   /** POST /auth/local/2fa/passkey/options: the passkey challenge for the pending two-factor sign-in (empty when the account has none or the feature is off). */
   async passkeySignInOptions(pendingToken: string | undefined, ip: string | null, requestId: string): Promise<{ available: boolean; options: Record<string, unknown> | null }> {
-    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, loginLimits().perIp);
     if (ipWait) throw problems.rateLimited(ipWait);
     const { userId } = await this.pendingOf(pendingToken, 'two_factor');
-    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, loginLimits().perIp);
     if (userWait) throw problems.rateLimited(userWait);
     const options = await this.asUser(userId, () => this.passkeys.signInOptions(userId), signInCtx(ip, undefined, requestId));
     return { available: options !== null, options };
@@ -389,10 +384,10 @@ export class AuthService {
   /** POST /auth/local/2fa/passkey: a passkey instead of the code. Same pending sign-in, same single use, same session as the code path. */
   async passkeySignIn(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody }> {
     const body = parse(passkeySignInBody, rawBody);
-    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, loginLimits().perIp);
     if (ipWait) throw problems.rateLimited(ipWait);
     const { userId } = await this.pendingOf(pendingToken, 'two_factor');
-    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, loginLimits().perIp);
     if (userWait) throw problems.rateLimited(userWait);
     const out = await this.asUser(userId, async () => {
       const r = await this.passkeys.signInVerify(userId, body.response);
@@ -424,12 +419,12 @@ export class AuthService {
   async deviceCodeSignIn(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody }> {
     const body = deviceCodeBody.safeParse(rawBody);
     if (!body.success) throw problems.validation([{ path: '/code', code: 'invalid' }]);
-    const ipWait = this.limiter.hit(`devcode:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    const ipWait = this.limiter.hit(`devcode:ip:${ip ?? 'unknown'}`, loginLimits().perIp);
     if (ipWait) throw problems.rateLimited(ipWait);
     const found = await this.newDevice.loadChallenge(pendingToken);
     if (!found || !pendingToken) throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
     const userId = found.userId;
-    const userWait = this.limiter.hit(`devcode:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    const userWait = this.limiter.hit(`devcode:user:${userId}`, loginLimits().perIp);
     if (userWait) throw problems.rateLimited(userWait);
     const out = await this.asUser(userId, async () => {
       const r = await this.newDevice.verify(userId, pendingToken, body.data.code, ip);
@@ -455,10 +450,10 @@ export class AuthService {
    */
   async enrolStart(pendingToken: string | undefined, rawBody: unknown, ip: string | null, requestId: string): Promise<Record<string, unknown>> {
     const { enrol_code } = parse(enrolStartSchema, rawBody);
-    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, loginLimits().perIp);
     if (ipWait) throw problems.rateLimited(ipWait);
     const { userId } = await this.pendingOf(pendingToken, 'enrol');
-    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, loginLimits().perIp);
     if (userWait) throw problems.rateLimited(userWait);
     const out = await this.asUser(userId, async () => {
       const rows = await this.db.tx.$queryRaw<{ email: string }[]>`SELECT email FROM users WHERE id = ${userId}::uuid`;
@@ -478,10 +473,10 @@ export class AuthService {
   /** POST /auth/local/2fa/enrol/confirm: the first code. Turns two-factor on for the user, returns the recovery codes once, and signs in. */
   async enrolConfirm(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody; recovery_codes: string[] }> {
     const { code, enrol_code } = parse(enrolConfirmSchema, rawBody);
-    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, loginLimits().perIp);
     if (ipWait) throw problems.rateLimited(ipWait);
     const { userId } = await this.pendingOf(pendingToken, 'enrol');
-    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, loginLimits().perIp);
     if (userWait) throw problems.rateLimited(userWait);
 
     const out = await this.asUser(userId, async () => {
@@ -515,7 +510,7 @@ export class AuthService {
     const { code } = parse(confirmSchema, rawBody);
     const tf = await this.twoFactor.state(auth.user.id);
     if (!tf.required || !tf.enrolled) throw new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for your account.' });
-    const wait = this.limiter.hit(`2fa:regen:${auth.user.id}`, LOGIN_LIMIT_PER_IDENTIFIER);
+    const wait = this.limiter.hit(`2fa:regen:${auth.user.id}`, loginLimits().perIdentifier);
     if (wait) throw problems.rateLimited(wait);
     const r = await this.twoFactor.check(auth.user.id, { code: code.replace(/\s/g, '') });
     if (!r.ok) {
@@ -542,8 +537,8 @@ export class AuthService {
    */
   async linkEmployeeId(auth: AuthContext, rawBody: unknown): Promise<never> {
     const { employee_id } = parse(employeeIdSchema, rawBody);
-    const ipWait = this.limiter.hit(`empid:ip:${auth.ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
-    const userWait = ipWait ? 0 : this.limiter.hit(`empid:user:${auth.user.id}`, LOGIN_LIMIT_PER_IDENTIFIER);
+    const ipWait = this.limiter.hit(`empid:ip:${auth.ip ?? 'unknown'}`, loginLimits().perIp);
+    const userWait = ipWait ? 0 : this.limiter.hit(`empid:user:${auth.user.id}`, loginLimits().perIdentifier);
     if (ipWait || userWait) {
       await this.syslog.write('warn', 'employee_id_link_rate_limited', { ip: auth.ip }, auth.user.id);
       const rl = problems.rateLimited(Math.max(ipWait, userWait));
