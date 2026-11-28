@@ -3647,6 +3647,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/lock-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The sequence lock mode of a draft version (strict or open)
+         * @description Migration 0491 (admin_wf_lock_mode). Needs workflow_versions.administer (the publish right), a step-up and If-Match. A draft only (a published version answers 409 `invalid_transition`; so does setting the value it already has). It changes no site: the per-site switch (`POST /sites/workflow-locks`) stays the override and the only way to open or lock a site.
+         */
+        put: operations["putWorkflowLockMode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/tasks/{task_code}/closing": {
         parameters: {
             query?: never;
@@ -5294,6 +5314,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/daily-plans/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload the TPL-DAILY-PLAN template (applied at once, all or nothing)
+         * @description 0.15.407 (migration 0564). The approved xlsx template `TPL-DAILY-PLAN` only (download: `GET /templates/TPL-DAILY-PLAN/download`, blank or with `date` and `region_id`). One row per date and site. The rows go through the same database doors as the screen (`dp_add_site`, `dp_save_row`, `dp_remove_site`), so the region scope, the Matrix level (L1 edits), the day lock, the audit and the plan version apply per row. What a file changes: the manual values of the auto-filled columns, Reason, Remark, a site added by hand (a row for a site not in the plan) and a site removed by hand (`Remove from plan` = yes). A cell equal to the value now shown, or empty, changes nothing. Site name and Region are read only and ignored. One refused row (a locked day, a region the caller may not edit, an unknown Site ID, a bad value) refuses the whole file: 422 `validation_failed` with `errors[]` at `/rows/<line>/<field>`. A file of another template, an older version or a changed header is 422 `template_rejected`.
+         */
+        post: operations["importDailyPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/daily-plans/export": {
         parameters: {
             query?: never;
@@ -6266,6 +6306,50 @@ export interface paths {
          * @description 0.15.62. Any System Admin acting without delegation, a reason and a step-up, while the request is `files_pending` (409 `invalid_transition` otherwise). Moves the keys still `pending` into the same quarantine directory with the same rules; a key already moved, missing or refused is never tried again. Audited (`data_reset_files_retry`).
          */
         post: operations["retryDataResetFiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the archive of an approved reset request (async)
+         * @description 0.15.266 (migration 0371). The System Admin who requested or approved the request, a step-up, while the request is `approved` and was made with `archive` download or keep_90 (409 `invalid_transition` otherwise; 409 `plan_incomplete`). Starts the build (an .xlsx on the current template per register with only the records the reset deletes, in every state, the files, a manifest, in one zip) and answers 202 with the request; poll `GET .../requests/{request_id}` until `archive.archive.status` is `ready` or `failed`. `POST .../run` is refused (409 `archive_required`) until the archive is ready (mode download, and downloaded once). Restore is the template upload again; the rows enter L1 then L2.
+         */
+        post: operations["makeDataResetArchive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/archive/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the archive zip of a reset request
+         * @description 0.15.266 (migration 0371). A System Admin acting without delegation and a step-up. Every download is a security-log entry (`project_data_reset`, step `archive_download`) and an audit row. 404 when no archive is ready; 410 `archive_expired` after `keep_until`.
+         */
+        get: operations["downloadDataResetArchive"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7964,6 +8048,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard-target-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether the typed dashboard targets may override the derived ones (0.15.367)
+         * @description Every signed-in user may read it. `manual_override` is false by default, so the dashboard targets are derived from the scope. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDashboardTargetPolicy"];
+        /**
+         * Turn the manual target override on or off (reason, step-up, If-Match, audited)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason of 3 to 1000 characters, a recent step-up (403
+         *     `step_up_required`) and `If-Match` (428 / 412) are required. Saving the current value answers 409 `invalid_transition`. Audited `dashboard_target_policy_update`
+         *     with before and after. While it is off, the typed numbers of `PUT /settings/dashboard` are kept but not used.
+         */
+        put: operations["setDashboardTargetPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/goals": {
         parameters: {
             query?: never;
@@ -8253,6 +8363,144 @@ export interface paths {
         /** Set the order of columns (the list is the new order) */
         put: operations["reorderRegisterColumns"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/structure-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The rules of structure-change proposals (registers.structure_change)
+         * @description 0.15.403 (migration 0562). Every signed-in user may read it. `who_proposes` (`fields_editors` or `admins`), `who_approves` (`admins` or `fields_editors`), `two_person` (`risky_only` or `always`; a type change or a hide always needs a second person), `max_items` (1 to 500) and the two notices.
+         */
+        get: operations["getStructurePolicy"];
+        /**
+         * Change the rules of structure-change proposals (reason, step-up, If-Match, audited)
+         * @description 0.15.403. A System Admin, or a delegate of `settings` edit for all regions (403), with the step-up (403). Only the keys given change; a reason and If-Match are required. Saving the values in force is 409 `invalid_transition`.
+         */
+        put: operations["setStructurePolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/structure-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Structure proposals (System Admin or a delegate of fields.edit) */
+        get: operations["listStructureProposals"];
+        put?: never;
+        /** Make a structure proposal from rows (nothing is written to the register) */
+        post: operations["createStructureProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/structure-proposals/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a modified register template (its Structure sheet becomes a proposal)
+         * @description The data sheets are not read. Refused with 422 `template_rejected` (reason `not_xlsx`, `macros_not_allowed`, `tpl_missing`, `not_register_template`, `structure_missing`, `headers_missing`, `bad_value`) or `validation_failed` when the sheet describes the structure the register has already.
+         */
+        post: operations["uploadStructureProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/structure-proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One structure proposal */
+        get: operations["getStructureProposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/structure-proposals/{id}/differences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** The differences of a proposal as an .xlsx (an audited download in the category templates) */
+        get: operations["downloadStructureProposalDifferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/structure-proposals/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve (System Admin, step-up) or reject (a note is needed) */
+        post: operations["decideStructureProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/structure-proposals/{id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make the opposite proposal of an applied one (it goes through the same approval) */
+        post: operations["revertStructureProposal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9865,6 +10113,46 @@ export interface paths {
          * @description 0.15.70: System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body, every key required: `hidden` and `order` (document codes; `unknown_document`, `duplicate`), `default_columns` (`unknown_column`), `zip_limit` 1..5000 (`out_of_range`); `unknown_key` at its path. Audited (`library_archive_update`, before and after).
          */
         put: operations["setLibraryArchiveSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/document-marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document types that need a signed copy and a stamped copy
+         * @description 0.15.377 (migration 0555). Every signed-in user. `types` holds only the document codes that need at least one; none by default.
+         */
+        get: operations["getDocumentMarksSetting"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/document-marks/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set whether one document type needs a signed copy and a stamped copy
+         * @description 0.15.377: System Admin or a delegate of document types (edit), password re-check and a reason; audited. Both false removes the entry. Hide, never delete: a deactivated type keeps its flags.
+         */
+        put: operations["setDocumentTypeMarks"];
         post?: never;
         delete?: never;
         options?: never;
@@ -12063,6 +12351,85 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The setting `registers.structure_change` (0.15.403). */
+        StructurePolicy: {
+            /** @enum {string} */
+            who_proposes: "fields_editors" | "admins";
+            /** @enum {string} */
+            who_approves: "admins" | "fields_editors";
+            /** @enum {string} */
+            two_person: "risky_only" | "always";
+            max_items: number;
+            notify_approvers: boolean;
+            notify_proposer: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            /** Format: uuid */
+            updated_by?: string | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        StructurePolicyInput: {
+            reason: string;
+            /** @enum {string} */
+            who_proposes?: "fields_editors" | "admins";
+            /** @enum {string} */
+            who_approves?: "admins" | "fields_editors";
+            /** @enum {string} */
+            two_person?: "risky_only" | "always";
+            max_items?: number;
+            notify_approvers?: boolean;
+            notify_proposer?: boolean;
+        };
+        StructureProposal: {
+            /** Format: uuid */
+            id: string;
+            register_key: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected" | "applied" | "reverted";
+            /** @enum {string} */
+            source: "excel" | "system";
+            template_version?: number | null;
+            submitted_by?: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            submitted_at: string;
+            reason: string;
+            items: {
+                code: string;
+                create: boolean;
+                changes: ("add" | "rename" | "reorder" | "section" | "visibility" | "hide" | "show" | "required" | "type")[];
+                patch: {
+                    [key: string]: unknown;
+                };
+                from?: {
+                    [key: string]: unknown;
+                } | null;
+                /** @enum {string|null} */
+                blocked?: "invalid_code" | "new_column_incomplete" | "system_column" | "conversion_blocked" | "unknown_section" | "unknown_list" | null;
+                impact?: {
+                    [key: string]: unknown;
+                } | null;
+            }[];
+            summary: {
+                [key: string]: number;
+            };
+            blocked_count: number;
+            needs_two_people: boolean;
+            /** Format: uuid */
+            reverts_id?: string | null;
+            decided_by?: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decide_note?: string | null;
+            /** Format: date-time */
+            applied_at?: string | null;
+            version: number;
+        };
         MyPush: {
             enabled: boolean;
             /** @description The VAPID public key (public by design); null while push is off. */
@@ -12980,7 +13347,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "archive_required" | "archive_expired" | "cooloff_active" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -14280,10 +14647,6 @@ export interface components {
             capture_date?: string | null;
             /** @description A photo without an EXIF date: accepted and flagged for the reviewer. */
             unknown_capture_date?: boolean;
-            /** @description 0.15.377: this version is the signed copy (set by the person who uploaded it with the form field `signed`); absent when never marked. */
-            signed?: boolean;
-            /** @description 0.15.377: this version is the stamped copy (form field `stamped`); absent when never marked. */
-            stamped?: boolean;
             /**
              * Format: uuid
              * @description The file that replaced this version; null for the current version (and for a withdrawn file).
@@ -14306,6 +14669,19 @@ export interface components {
             uploaded_at: string;
             /** Format: date */
             approved_date?: string | null;
+            /** @description 0.15.377: this version is the signed copy (set by the person who uploaded it with the form field `signed`); absent when never marked. */
+            signed?: boolean;
+            /** @description 0.15.377: this version is the stamped copy (form field `stamped`); absent when never marked. */
+            stamped?: boolean;
+        };
+        DocumentMarksSetting: {
+            types: {
+                [key: string]: {
+                    signature: boolean;
+                    stamp: boolean;
+                };
+            };
+            version: number;
         };
         DocumentSlot: {
             /** Format: uuid */
@@ -14791,6 +15167,11 @@ export interface components {
             published_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             published_at?: string | null;
+            /**
+             * @description 0.15.321 (migration 0491). The default of the sequence locks for new sites of this version; the per-site switch overrides it. Strict (default) is the behaviour before this field existed.
+             * @enum {string}
+             */
+            lock_mode?: "strict" | "open";
         };
         WorkflowMilestone: {
             code: string;
@@ -15922,10 +16303,10 @@ export interface components {
             kind: "data_import" | "assignment_import" | "config_import" | "master";
             module_key?: components["schemas"]["ModuleKey"];
             /**
-             * @description A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).
+             * @description A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar). `daily_plan` (0.15.407): the Daily Plan (`TPL-DAILY-PLAN`), downloaded here and uploaded with `POST /daily-plans/import`.
              * @enum {string}
              */
-            template_kind?: "register" | "stream" | "master" | "sites" | "list_values" | "holidays";
+            template_kind?: "register" | "stream" | "master" | "sites" | "list_values" | "holidays" | "daily_plan";
             /** @description The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER. */
             register_key?: string | null;
             /** @description The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE. */
@@ -17275,7 +17656,7 @@ export interface components {
             id: string;
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
             /** @description Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}. */
             params: {
                 [key: string]: unknown;
@@ -17302,7 +17683,7 @@ export interface components {
         AlertRuleInput: {
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
             params: {
                 [key: string]: unknown;
             };
@@ -17584,7 +17965,21 @@ export interface components {
             request_expiry_minutes: number;
             /** @description Age limit of the last successful database backup (default 24). */
             backup_max_age_hours: number;
+            /** @description 0.15.268. Waiting period between the approval and the run (default 1440; 0 = immediately). */
+            cooloff_minutes: number;
             version: number;
+        };
+        /** @description 0.15.268 (migration 0372). The waiting period of a request, inherited when it was made. */
+        DataResetCooloff: {
+            minutes: number;
+            /**
+             * Format: date-time
+             * @description Approval plus the wait; null before the approval.
+             */
+            run_after?: string | null;
+            /** @description True while approved and before run_after. */
+            active: boolean;
+            remaining_seconds?: number | null;
         };
         DataResetBackup: {
             /** @description A successful backup is recorded within `max_age_hours`. */
@@ -17741,6 +18136,34 @@ export interface components {
                 detail?: string | null;
             }[];
         };
+        /** @description 0.15.266 (migration 0371). The archive chosen by the request and the state of its archive (absent `archive` on a request made before 0.15.266 means mode none). */
+        DataResetArchiveInfo: {
+            /** @enum {string} */
+            mode: "none" | "download" | "keep_90";
+            /** @description The newest archive of the request (null while none was made). */
+            archive?: {
+                /** Format: uuid */
+                id?: string;
+                /** @enum {string} */
+                status?: "building" | "ready" | "failed" | "purged";
+                bytes?: number | null;
+                sha256?: string | null;
+                /** @description Rows per register, `records`, `files`, `files_bytes`. */
+                entries?: {
+                    [key: string]: unknown;
+                };
+                error?: string | null;
+                /** Format: date-time */
+                created_at?: string;
+                /** Format: date-time */
+                ready_at?: string | null;
+                /** Format: date-time */
+                keep_until?: string | null;
+                downloads?: number;
+                /** Format: date-time */
+                first_downloaded_at?: string | null;
+            } | null;
+        };
         DataResetRequest: {
             /** Format: uuid */
             id: string;
@@ -17788,6 +18211,8 @@ export interface components {
              * @default true
              */
             require_backup: boolean;
+            archive?: components["schemas"]["DataResetArchiveInfo"];
+            cooloff: components["schemas"]["DataResetCooloff"];
             /** @description 0.15.71. The hash the approval bound to (always equal to `scope_hash`). */
             approved_scope_hash?: string | null;
             /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table), and since 0.15.72 `require_backup`. */
@@ -18093,8 +18518,12 @@ export interface components {
                     is_active?: boolean;
                 };
             };
-            /** @description id -> original file name. */
+            /** @description id -> original file name (LIB-1: the name of the latest version of that file). */
             files?: {
+                [key: string]: string;
+            };
+            /** @description LIB-1: stored file id -> id of its latest version, present only when a newer version replaced it; a file field follows the latest version. */
+            files_latest?: {
                 [key: string]: string;
             };
             /** @description id -> task code. */
@@ -18864,15 +19293,20 @@ export interface components {
              */
             contrast?: "standard" | "high";
             /**
-             * @description 0.15.369 (0526): the notification panel as an overlay, a floating window or docked.
+             * @description 0.15.369 (0526): the notification panel as an overlay (default), a floating window or docked at the inline-end edge.
              * @enum {string}
              */
             inbox_panel?: "overlay" | "floating" | "docked";
             /**
-             * @description 0.15.369 (0526): the corner of the floating panel.
+             * @description 0.15.369 (0526): the corner of the floating panel (inline sides, so it mirrors in RTL).
              * @enum {string}
              */
             inbox_anchor?: "end-top" | "end-bottom" | "start-top" | "start-bottom";
+            /**
+             * @description 0.15.530 (0581): the More menu of the table screens as a list (default) or an icon grid with search.
+             * @enum {string}
+             */
+            more_menu?: "list" | "grid";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
@@ -19355,6 +19789,7 @@ export interface components {
             quality: components["schemas"]["DashboardOpsQuality"];
             approvals: components["schemas"]["DashboardOpsApprovals"];
             changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
+            phase_scope: components["schemas"]["DashboardOpsPhaseScope"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -19493,6 +19928,60 @@ export interface components {
             }[] | null;
             /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
             unassigned: number | null;
+        };
+        /** @description 0.15.367. The target policy (setting `dashboard.target_policy`, migration 0524). */
+        DashboardTargetPolicy: {
+            /** @description False (default): the dashboard targets are derived from the scope. True: the typed numbers of Settings > Dashboard apply where set. */
+            manual_override: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        DashboardTargetPolicyInput: components["schemas"]["WithReason"] & {
+            manual_override: boolean;
+        };
+        /** @description 0.15.367: the registered, not cancelled sites per project phase (sites.project_phase) with the share on air, and the targets derived from them. Only the sites and their On-Air task are read; nothing is typed. */
+        DashboardOpsPhaseScope: {
+            /** @description False when the caller has no dashboard region; every figure is then null. */
+            available: boolean;
+            /** @description One row per phase, in natural order; the sites with no phase are one row with phase null, last. */
+            phases: components["schemas"]["DashboardPhaseScopeRow"][] | null;
+            total: components["schemas"]["DashboardPhaseScopeRow"] | null;
+            /** @description The monthly On-Air target derived from the scope: sites not yet on air over the months left to the latest planned date of the On-Air task (30-day months, at least one). value is null when no planned date exists or nothing is left. */
+            monthly_on_air_auto: {
+                /** @description The target in force: the typed number when the manual override is on and a number is set, else the derived one (null when none can be derived). */
+                value: number | null;
+                /**
+                 * @description Where `value` comes from.
+                 * @enum {string}
+                 */
+                source: "derived" | "manual";
+                /** @description The derived value, always given, also while a manual one is in force. */
+                derived: number | null;
+                remaining: number;
+                /** Format: date */
+                planned_end: string | null;
+                months_left: number | null;
+            } | null;
+        };
+        DashboardPhaseScopeRow: {
+            /** @description The project phase of the site; null = no phase recorded. */
+            phase: string | null;
+            sites: number;
+            completed: number;
+            in_progress: number;
+            not_started: number;
+            on_hold: number;
+            /** @description Sites whose On-Air task (MS6) is approved. */
+            on_air: number;
+            /** @description on_air over sites, in percent (one decimal). */
+            progress_pct: number | null;
+            /** @description The target of the phase: all its registered sites. Derived, never typed. */
+            target_sites: number;
         };
         /** @description 0.15.205 (item 8): the pending change requests and the overdue meeting actions. */
         DashboardOpsChangesMeetings: {
@@ -29553,6 +30042,43 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    putWorkflowLockMode: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    lock_mode: "strict" | "open";
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     setTaskClosing: {
         parameters: {
             query?: never;
@@ -32521,6 +33047,56 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    importDailyPlan: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Applied. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        rows: number;
+                        updated: number;
+                        added: number;
+                        removed: number;
+                        unchanged: number;
+                        /** @example TPL-DAILY-PLAN */
+                        template_id: string;
+                        template_version: number;
+                        /** @example template */
+                        source?: string;
+                        file_name?: string;
+                        /** @example applied */
+                        status: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     exportDailyPlans: {
         parameters: {
             query: {
@@ -34019,6 +34595,8 @@ export interface operations {
                 "application/json": components["schemas"]["WithReason"] & {
                     request_expiry_minutes: number;
                     backup_max_age_hours: number;
+                    /** @description 0.15.268. Waiting period between the approval and the run, in minutes (default 1440). Optional: omitted keeps the current value. */
+                    cooloff_minutes?: number;
                 };
             };
         };
@@ -34063,6 +34641,12 @@ export interface operations {
                     narrow?: components["schemas"]["DataResetNarrow"];
                     /** @description 0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required. */
                     no_backup_confirm?: string;
+                    /**
+                     * @description 0.15.266. An archive made before the delete: `none` (as before), `download` (the run needs the archive made and downloaded once; kept 7 days at most) or `keep_90` (the run needs the archive made; kept 90 days, any number of downloads). Never changes after the request; shown to the approver, not part of `scope_hash`.
+                     * @default none
+                     * @enum {string}
+                     */
+                    archive?: "none" | "download" | "keep_90";
                 };
             };
         };
@@ -34259,6 +34843,68 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    makeDataResetArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The build started; the request. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    downloadDataResetArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip (`records.xlsx`, `files/`, `manifest.csv`). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The archive is no longer kept. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -37048,6 +37694,62 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getDashboardTargetPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The target policy. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTargetPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDashboardTargetPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardTargetPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTargetPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getGoals: {
         parameters: {
             query?: never;
@@ -37615,6 +38317,273 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getStructurePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructurePolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setStructurePolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StructurePolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructurePolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listStructureProposals: {
+        parameters: {
+            query?: {
+                register_key?: string;
+                status?: "pending" | "approved" | "rejected" | "applied" | "reverted";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, newest first, with the items, the summary and the blocked count. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["StructureProposal"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createStructureProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    register_key: string;
+                    rows: {
+                        [key: string]: unknown;
+                    }[];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The pending proposal. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureProposal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    uploadStructureProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The pending proposal. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureProposal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getStructureProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureProposal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadStructureProposalDifferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    decideStructureProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "approve" | "reject";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The proposal after the decision (applied or rejected). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureProposal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revertStructureProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The new pending proposal. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureProposal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -40587,6 +41556,59 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDocumentMarksSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentMarksSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDocumentTypeMarks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    signature: boolean;
+                    stamp: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentMarksSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listSiteDispatch: {

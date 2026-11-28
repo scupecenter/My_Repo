@@ -53,6 +53,10 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Quality inspection | Snag | foreign key (0182, `_idfk`, ON DELETE SET NULL) | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
 | Financial advances (expense, settlement) | Advance | register link | `advance_id` | checked in entry (approved advance of the same site, 0407); disbursed rule at submit; picker `advance-options` |
+| Financial advances (advance page) | Expense / settlement draft | prefilled create (D59) | `advance_id`, site, today, balance to return | web buttons on an approved, disbursed advance; the draft goes through the normal create and the 0407 check |
+| Alert rules (Settings > Security > Alerts) | Advances, invoices | notification kinds (0408) | `advance_unsettled`, `invoice_due_soon` | weekly per open advance, once per invoice and due date; days default to the Finance hub `settle_warn_days` |
+| Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); picker `invoices/order-options`; listed in `record_related` |
+| Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; picker `invoices/supplier-options` |
 | Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); PR No. and PO / WO No. read from the order (`order_pr_no`, `order_po_wo_no`, 0430); required when Settings > Register rules says so (`order_required`); picker `invoices/order-options`; listed in `record_related` |
 | Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; required when Settings > Register rules says so (`supplier_required`, 0430); picker `invoices/supplier-options` |
 | HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |

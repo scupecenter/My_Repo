@@ -28,7 +28,7 @@ import { useRegisterLinks } from '@/api/p4c';
 import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect, RecordLinkSelect, AdvanceSelect, SupplierSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
-import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
+import { AdvanceChildren, Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
 import { LegacyConversion } from './LegacyConversion';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -430,6 +430,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
         {record && <RelatedRecords registerKey={rk} entityId={record.entity_id as string} />}
         {record && rk === 'financial_advances' && <Balance record={record} />}
         {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}
+        {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && ['disbursed', 'settlement_in_progress'].includes(String((record.data as { advance_state?: string }).advance_state)) && <AdvanceChildren record={record} onDone={onCreated} />}
         {record && rk === 'car_dispatcher' && record.record_type === 'booking' && record.state === 'approved' && <ExtendBooking record={record} onDone={onCreated} />}
         </div>
 
