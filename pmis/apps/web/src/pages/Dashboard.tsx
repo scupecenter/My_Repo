@@ -42,6 +42,7 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { SiteHealthCard } from "./dashboardSiteHealth";
 import { OpsPhaseCard } from "./dashboardPhase";
 import { PinnedViewsCard } from "./dashboardPins";
 import { OpsScurveCard } from "./dashboardScurve";
@@ -1518,6 +1519,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.206 (owner approval 2026-11-26, item 9): restricted financial summary; renders nothing unless the caller is a configured reader */}
                   <OpsFinanceCard ops={ops.data} />
+                </>
+              ),
+
+              site_health: (
+                <>
+                  {/* 0.15.591: one health score and colour per site */}
+                  <SiteHealthCard />
                 </>
               ),
 

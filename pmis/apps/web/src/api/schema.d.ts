@@ -8428,6 +8428,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard/site-health-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The weights of the site health factors (0.15.591)
+         * @description 0.15.591. The setting `dashboard.site_health_weights`: how much tasks, documents, snags and delay count (default 40, 20, 25, 15). `version` is 0 until the first save. Needs `dashboard.view`.
+         */
+        get: operations["getSiteHealthWeights"];
+        /**
+         * Save the site health weights (reason, If-Match, audited)
+         * @description 0.15.591. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Each weight is a whole number from 0 to 100 and at least one must be above 0
+         *     (422 `invalid`, `all_zero`). One audit row `site_health_weights_update` with before and after values and the reason. The score is computed live, so the new weights apply at once.
+         */
+        put: operations["setSiteHealthWeights"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/dashboard/snapshot-schedule": {
         parameters: {
             query?: never;
@@ -12013,6 +12038,49 @@ export interface paths {
          * @description A System Admin or `view` on `admin.system_log` (403 `action_forbidden` otherwise). Separate from the Audit Log. Template rejections appear here (`source = template-check`, message `template upload rejected: <reason>`). Newest first (0.15.2: documented).
          */
         get: operations["listSystemLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/site-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health score and colour per site (0.15.591)
+         * @description 0.15.591. One score (0 to 100, higher is better) and a colour per active site, worst first. Four factors: `tasks` (share of SLA clocks inside the limit), `docs` (approved share of mandatory
+         *     document slots of approved tasks), `snags` (100 minus 30 per open critical, 15 per open major, 5 per other open snag) and `delay` (100 minus 10 per delay-period day in the last 30 days).
+         *     A factor with no data is left out and its weight shared by the others. The colour uses `dashboard.health_bands`. Needs `dashboard.view`; only sites of the caller's dashboard regions are listed.
+         *     422 `invalid_enum_value` for an unknown band.
+         */
+        get: operations["listSiteHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/site-health/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The factors behind one site's health score (0.15.591)
+         * @description 0.15.591. The four factors of one site with their weight, value and the number of items behind them. 404 for a site outside the caller's dashboard regions.
+         */
+        get: operations["getSiteHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -20935,6 +21003,78 @@ export interface components {
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        SiteHealthWeightsInput: {
+            tasks: number;
+            docs: number;
+            snags: number;
+            delay: number;
+        };
+        /** @description 0.15.591. The setting dashboard.site_health_weights (default 40, 20, 25, 15). */
+        SiteHealthWeights: components["schemas"]["SiteHealthWeightsInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        /** @enum {string} */
+        SiteHealthBand: "green" | "amber" | "red";
+        SiteHealthItem: {
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            site_name: string;
+            region_id: number;
+            /** @description 0 to 100. Null when no factor has data. */
+            score: number | null;
+            band: components["schemas"]["SiteHealthBand"] | null;
+            tasks: number | null;
+            docs: number | null;
+            snags: number;
+            delay: number;
+        };
+        SiteHealthList: {
+            bands: {
+                green: number;
+                amber: number;
+            };
+            weights: {
+                tasks: number;
+                docs: number;
+                snags: number;
+                delay: number;
+                version: number;
+            };
+            total: number;
+            counts: {
+                green: number;
+                amber: number;
+                red: number;
+                unscored: number;
+            };
+            items: components["schemas"]["SiteHealthItem"][];
+        };
+        SiteHealthDetail: {
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            site_name: string;
+            region_id: number;
+            score: number | null;
+            band: components["schemas"]["SiteHealthBand"] | null;
+            bands: {
+                green: number;
+                amber: number;
+            };
+            factors: {
+                /** @enum {string} */
+                code: "tasks" | "docs" | "snags" | "delay";
+                weight: number;
+                value: number | null;
+                /** @description Items behind the value: clocks, mandatory slots, open snags, delay periods. */
+                count: number;
+                excluded: boolean;
+            }[];
         };
         SnapshotScheduleInput: {
             /** @description The weekday of the weekly snapshot: 0 = Sunday ... 6 = Saturday. */
@@ -39368,6 +39508,62 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getSiteHealthWeights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The weights. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteHealthWeights"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setSiteHealthWeights: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["SiteHealthWeightsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteHealthWeights"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getSnapshotSchedule: {
         parameters: {
             query?: never;
@@ -46230,6 +46426,61 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listSiteHealth: {
+        parameters: {
+            query?: {
+                region_id?: number;
+                band?: "green" | "amber" | "red";
+                /** @description Site code or name contains. */
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteHealthList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSiteHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The detail. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteHealthDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getDashboardOps: {

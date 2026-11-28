@@ -9,6 +9,14 @@ import { MAP_MILESTONES, mapItem, SITE_COUNT, STREAMS as SITE_STREAMS } from './
 
 const B = API_BASE;
 
+const SITE_HEALTH = [
+  { site_id: '00000000-0000-4000-8000-0000000000a1', site_code: 'TRP-014', site_name: 'Souq al-Juma', region_id: 1, score: 58.4, band: 'red', tasks: 52, docs: 60, snags: 55, delay: 70 },
+  { site_id: '00000000-0000-4000-8000-0000000000a2', site_code: 'BNG-007', site_name: 'Al-Fuwayhat', region_id: 5, score: 74.9, band: 'amber', tasks: 80, docs: 70, snags: 70, delay: 85 },
+  { site_id: '00000000-0000-4000-8000-0000000000a3', site_code: 'TRP-021', site_name: 'Ghout al-Shaal', region_id: 1, score: 91.2, band: 'green', tasks: 95, docs: 88, snags: 95, delay: 100 },
+  { site_id: '00000000-0000-4000-8000-0000000000a4', site_code: 'MSR-003', site_name: 'Zawiyat al-Dahmani', region_id: 3, score: 96.5, band: 'green', tasks: 97, docs: null as number | null, snags: 100, delay: 100 },
+  { site_id: '00000000-0000-4000-8000-0000000000a5', site_code: 'SBH-002', site_name: 'Old Fort', region_id: 4, score: null as number | null, band: null as string | null, tasks: null as number | null, docs: null as number | null, snags: 100, delay: 100 },
+] as { site_id: string; site_code: string; site_name: string; region_id: number; score: number | null; band: string | null; tasks: number | null; docs: number | null; snags: number; delay: number }[];
+
 const COUNTERS_MOCK = {
   available: true,
   kpis: [
@@ -153,6 +161,35 @@ export const dashboardHandlers = [
         available: true,
         items: top.slice(0, 4).map((r) => ({ tag: r.band === 'high' ? 'act_now' : 'watch', risk_code: r.risk_code, statement: r.statement, score: r.score, band: r.band, risk_owner: r.risk_owner, region_id: r.region_id })),
       },
+    });
+  }),
+  // 0.15.591: site health score, a fixed demo set; the real score is computed by the API from tasks, documents, snags and delay periods
+  http.get(`${B}/dashboard/site-health`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const u = new URL(request.url);
+    const band = u.searchParams.get('band'), q = (u.searchParams.get('q') ?? '').toLowerCase();
+    const all = SITE_HEALTH.filter((s) => !q || s.site_code.toLowerCase().includes(q) || s.site_name.toLowerCase().includes(q));
+    const items = all.filter((s) => !band || s.band === band).slice(0, Number(u.searchParams.get('limit') ?? 50));
+    const n = (b: string | null) => all.filter((s) => s.band === b).length;
+    return HttpResponse.json({
+      bands: { green: 85, amber: 70 }, weights: { tasks: 40, docs: 20, snags: 25, delay: 15, version: 0 }, total: all.filter((s) => !band || s.band === band).length,
+      counts: { green: n('green'), amber: n('amber'), red: n('red'), unscored: n(null) }, items,
+    });
+  }),
+  http.get(`${B}/dashboard/site-health/:id`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const s = SITE_HEALTH.find((x) => x.site_id === params.id);
+    if (!s) return problem(404, 'not_found', 'There is no such site');
+    return HttpResponse.json({
+      site_id: s.site_id, site_code: s.site_code, site_name: s.site_name, region_id: s.region_id, score: s.score, band: s.band, bands: { green: 85, amber: 70 },
+      factors: [
+        { code: 'tasks', weight: 40, value: s.tasks, count: s.tasks === null ? 0 : 12, excluded: s.tasks === null },
+        { code: 'docs', weight: 20, value: s.docs, count: s.docs === null ? 0 : 6, excluded: s.docs === null },
+        { code: 'snags', weight: 25, value: s.snags, count: s.snags === 100 ? 0 : 2, excluded: false },
+        { code: 'delay', weight: 15, value: s.delay, count: s.delay === 100 ? 0 : 1, excluded: false },
+      ],
     });
   }),
   // 0.15.96: the follow-up sections (procurement and materials), synthetic figures

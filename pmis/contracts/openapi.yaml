@@ -135,6 +135,7 @@ info:
     - 0.15.370 (2026-11-27): the personal sidebar mode (migration 0527, mirror `db/sql/526_sidebar_mode.sql`; Ahmed's decision 2026-11-25). Additive. `UiNav` gains `mode` (`pinned` default, `autohide`); `ui_nav_check` is patched in place; a stored sidebar without it is unchanged. Audited like the other sidebar keys.
     - 0.15.371 (2026-11-27): weight item measure rule checked (migration 0552, mirror `db/sql/551_weight_rule_check.sql`; Settings review gap 1). Additive, no new path. `PUT /settings/weight-sets/{id}`: a measure rule that looks like JSON but does not parse is 422 `validation_failed` (it was 500). Publish and preview: `weight_set_errors` adds `measure_rule_invalid` (path `/activities/{n}/items`) for a rule that is not an object, has an unknown method (none, tasks, register), names no task, names a task code that is in no workflow, has a plan outside MS1 to MS10, or has a `central` that is not true/false.
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
+    - 0.15.591 (2026-11-28): site health score (migration 0714, mirror `db/sql/713_site_health_score.sql`). Additive. `GET /dashboard/site-health` (`listSiteHealth`) and `GET /dashboard/site-health/{site_id}` (`getSiteHealth`), both `dashboard.view` and limited to the caller's dashboard regions: one score 0 to 100 and a colour per site from four factors (tasks on time, documents, open snags, delay periods), coloured by the existing `dashboard.health_bands`. `GET`/`PUT /settings/dashboard/site-health-weights` (`getSiteHealthWeights`, `setSiteHealthWeights`, `admin.settings` edit, reason, If-Match, audited `site_health_weights_update`): the new setting `dashboard.site_health_weights` (default 40, 20, 25, 15). No new table.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.431 (2026-11-28): the number of weeks the dashboard forecast averages is editable (Settings review gap 4, approved by the owner 2026-11-27; migration 0572, mirror `db/sql/571_forecast_window.sql`). Additive. `GET /settings/dashboard/forecast-window` (`getForecastWindow`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-window` (`setForecastWindow`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_window_update` with before and after): the new setting `dashboard.forecast_window_weeks` (a whole number 2 to 12, default 4, the value that was fixed in the web code). The progress curve card reads it when it is drawn: the forecast date uses the mean weekly gain over that many last weeks of the saved snapshots. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
@@ -12983,6 +12984,53 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard/site-health-weights:
+    get:
+      tags: [settings]
+      operationId: getSiteHealthWeights
+      summary: The weights of the site health factors (0.15.591)
+      description: '0.15.591. The setting `dashboard.site_health_weights`: how much tasks, documents, snags and delay count (default 40, 20, 25, 15). `version` is 0 until the first save. Needs `dashboard.view`.'
+      responses:
+        '200':
+          description: The weights.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteHealthWeights'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setSiteHealthWeights
+      summary: Save the site health weights (reason, If-Match, audited)
+      description: |
+        0.15.591. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Each weight is a whole number from 0 to 100 and at least one must be above 0
+        (422 `invalid`, `all_zero`). One audit row `site_health_weights_update` with before and after values and the reason. The score is computed live, so the new weights apply at once.
+      x-db-path: admin_save_site_health_weights
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/SiteHealthWeightsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteHealthWeights'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/dashboard/snapshot-schedule:
     get:
       tags: [settings]
@@ -18644,6 +18692,48 @@ paths:
                       items: {$ref: '#/components/schemas/SystemLogEntry'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/site-health:
+    get:
+      tags: [dashboard]
+      operationId: listSiteHealth
+      summary: Health score and colour per site (0.15.591)
+      description: |
+        0.15.591. One score (0 to 100, higher is better) and a colour per active site, worst first. Four factors: `tasks` (share of SLA clocks inside the limit), `docs` (approved share of mandatory
+        document slots of approved tasks), `snags` (100 minus 30 per open critical, 15 per open major, 5 per other open snag) and `delay` (100 minus 10 per delay-period day in the last 30 days).
+        A factor with no data is left out and its weight shared by the others. The colour uses `dashboard.health_bands`. Needs `dashboard.view`; only sites of the caller's dashboard regions are listed.
+        422 `invalid_enum_value` for an unknown band.
+      parameters:
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1}}
+      - {name: band, in: query, schema: {type: string, enum: [green, amber, red]}}
+      - {name: q, in: query, description: 'Site code or name contains.', schema: {type: string, maxLength: 100}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: The page.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteHealthList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /dashboard/site-health/{site_id}:
+    get:
+      tags: [dashboard]
+      operationId: getSiteHealth
+      summary: The factors behind one site's health score (0.15.591)
+      description: '0.15.591. The four factors of one site with their weight, value and the number of items behind them. 404 for a site outside the caller''s dashboard regions.'
+      parameters:
+      - {name: site_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The detail.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteHealthDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /dashboard/ops:
     get:
       tags: [dashboard]
@@ -28126,6 +28216,94 @@ components:
           version: { type: integer, minimum: 0 }
           updated_at: { type: [string, 'null'], format: date-time }
           updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    SiteHealthWeightsInput:
+      type: object
+      required: [tasks, docs, snags, delay]
+      additionalProperties: false
+      properties:
+        tasks: { type: integer, minimum: 0, maximum: 100 }
+        docs: { type: integer, minimum: 0, maximum: 100 }
+        snags: { type: integer, minimum: 0, maximum: 100 }
+        delay: { type: integer, minimum: 0, maximum: 100 }
+    SiteHealthWeights:
+      description: '0.15.591. The setting dashboard.site_health_weights (default 40, 20, 25, 15).'
+      allOf:
+      - $ref: '#/components/schemas/SiteHealthWeightsInput'
+      - type: object
+        required: [version]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    SiteHealthBand:
+      type: string
+      enum: [green, amber, red]
+    SiteHealthItem:
+      type: object
+      required: [site_id, site_code, site_name, region_id, score, band, tasks, docs, snags, delay]
+      properties:
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        site_name: { type: string }
+        region_id: { type: integer }
+        score: { type: [number, 'null'], description: '0 to 100. Null when no factor has data.' }
+        band: { anyOf: [{ $ref: '#/components/schemas/SiteHealthBand' }, { type: 'null' }] }
+        tasks: { type: [number, 'null'] }
+        docs: { type: [number, 'null'] }
+        snags: { type: number }
+        delay: { type: number }
+    SiteHealthList:
+      type: object
+      required: [bands, weights, total, counts, items]
+      properties:
+        bands:
+          type: object
+          required: [green, amber]
+          properties: { green: { type: integer }, amber: { type: integer } }
+        weights:
+          type: object
+          required: [tasks, docs, snags, delay, version]
+          properties:
+            tasks: { type: integer }
+            docs: { type: integer }
+            snags: { type: integer }
+            delay: { type: integer }
+            version: { type: integer }
+        total: { type: integer }
+        counts:
+          type: object
+          required: [green, amber, red, unscored]
+          properties:
+            green: { type: integer }
+            amber: { type: integer }
+            red: { type: integer }
+            unscored: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/SiteHealthItem' } }
+    SiteHealthDetail:
+      type: object
+      required: [site_id, site_code, site_name, region_id, score, band, bands, factors]
+      properties:
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        site_name: { type: string }
+        region_id: { type: integer }
+        score: { type: [number, 'null'] }
+        band: { anyOf: [{ $ref: '#/components/schemas/SiteHealthBand' }, { type: 'null' }] }
+        bands:
+          type: object
+          required: [green, amber]
+          properties: { green: { type: integer }, amber: { type: integer } }
+        factors:
+          type: array
+          items:
+            type: object
+            required: [code, weight, value, count, excluded]
+            properties:
+              code: { type: string, enum: [tasks, docs, snags, delay] }
+              weight: { type: integer }
+              value: { type: [number, 'null'] }
+              count: { type: integer, description: 'Items behind the value: clocks, mandatory slots, open snags, delay periods.' }
+              excluded: { type: boolean }
     SnapshotScheduleInput:
       type: object
       required: [weekday]

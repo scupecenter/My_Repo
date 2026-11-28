@@ -90,6 +90,8 @@ import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardCacheInvalidator, DashboardCacheService } from './dashboard/dashboard-cache.service';
 import { DashboardSettingsController } from './dashboard/dashboard-settings.controller';
 import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
+import { SiteHealthController } from './dashboard/site-health.controller';
+import { SiteHealthService } from './dashboard/site-health.service';
 import { SnapshotWeekdayController } from './dashboard/snapshot-weekday.controller';
 import { SnapshotWeekdayService } from './dashboard/snapshot-weekday.service';
 import { ProgressRagController } from './dashboard/progress-rag.controller';
@@ -261,6 +263,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
 DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController, OpsLimitsController,
       PartialCreditController, // 0.15.269 progress standards
       DashboardFinanceController, // 0.15.206 (own line: the restricted financial summary)
+      SiteHealthController, // 0.15.591 (own line)
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
@@ -299,6 +302,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
 DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
       PartialCreditService, // 0.15.269 progress standards
       DashboardFinanceService, // 0.15.206 (own line)
+      SiteHealthService, // 0.15.591 (own line)
       MediaService, // 0.15.292
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)

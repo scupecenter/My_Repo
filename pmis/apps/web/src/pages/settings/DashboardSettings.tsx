@@ -21,6 +21,7 @@ import { ProgressRag } from "./ProgressRag";
 import { ForecastWindow } from "./ForecastWindow";
 import { SnapshotSchedule } from "./SnapshotSchedule";
 import { HealthBands } from "./HealthBands";
+import { SiteHealthWeights } from "./SiteHealthWeights";
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -159,6 +160,7 @@ export function DashboardSettings() {
       <ProgressRag />
       <ForecastWindow />
       <HealthBands />
+      <SiteHealthWeights />
 
       <fieldset
         className="space-y-2 rounded-md border border-line p-3"
