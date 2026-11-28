@@ -7203,6 +7203,7 @@
     "display_wrap": "Wrap long text",
     "display_zebra": "Zebra rows",
     "display_groupbar": "Group summary: count and status bar on each group header",
+    "display_colors": "Value colours",
     "display_reset": "Back to the defaults",
     "display_settings": "Defaults in Settings",
     "size_sm": "Small",
