@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useDownloadGate } from '@/lib/downloadGate';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Download, Eye, FilePlus2, Printer, Upload, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, downloadFile, type ApiError } from '@/api/client';
@@ -43,7 +43,7 @@ export function SitePicker({ value, onChange }: { value: SiteHit | null; onChang
 }
 
 /** Generate a filled document: pick the site, see the filled form (a sandboxed frame: no script runs), generate, then print, download and upload the signed copy. */
-export function GenerateDialog({ form, initialSite, onClose }: { form: LibraryForm; initialSite?: SiteHit | null; onClose: () => void }) {
+export function GenerateDialog({ form, initialSite, recordId, onClose }: { form: LibraryForm; initialSite?: SiteHit | null; recordId?: string; onClose: () => void }) {
   const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -56,7 +56,10 @@ export function GenerateDialog({ form, initialSite, onClose }: { form: LibraryFo
   const row = rows.data?.pages[0]?.items.find((r) => r.status !== 'superseded' && r.task_code === form.trigger_task_code) ?? rows.data?.pages[0]?.items[0];
   const [uploading, setUploading] = useState(false);
   const name = (i18n.language === 'ar' && form.name_ar) || form.name_en;
-  const runPreview = (s: SiteHit | null) => { if (s) preview.mutate({ templateId: form.id, siteId: s.id }); };
+  const ready = !!recordId || !!site;
+  const runPreview = (s: SiteHit | null) => { if (recordId) preview.mutate({ templateId: form.id, recordId }); else if (s) preview.mutate({ templateId: form.id, siteId: s.id }); };
+  // a document of a record: the site is the record's, so there is no site to pick and the filled form shows at once
+  useEffect(() => { if (recordId) preview.mutate({ templateId: form.id, recordId }); }, [recordId, form.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const upload = async (file: File) => {
     if (!row?.task_id) { toast(t('lib.upload_no_slot'), 'err'); return; }
     setUploading(true);
@@ -79,15 +82,16 @@ export function GenerateDialog({ form, initialSite, onClose }: { form: LibraryFo
           </div>
           <Dialog.Description className="text-sm text-mute">{form.doc_code} · {form.trigger_task_code}</Dialog.Description>
           <div className="grid gap-3 sm:grid-cols-2">
-            <SitePicker value={site} onChange={(s) => { setSite(s); setDone(null); preview.reset(); if (s) runPreview(s); }} />
+            {recordId ? <p className="text-sm text-mute" data-testid="lib-record-note">{t('lib.from_record')}</p>
+              : <SitePicker value={site} onChange={(s) => { setSite(s); setDone(null); preview.reset(); if (s) runPreview(s); }} />}
             <label className="block text-sm font-semibold">{t('lib.remarks')}
               <input className="input mt-1 w-full" data-testid="lib-remarks" maxLength={1000} value={remarks} onChange={(e) => setRemarks(e.target.value)} disabled={!!done} />
             </label>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn" data-testid="lib-preview" disabled={!site || preview.isPending} onClick={() => runPreview(site)}><Eye size={14} />{t('lib.preview')}</button>
-            {!done && <button type="button" className="btn btn-primary" data-testid="lib-generate" disabled={!site || gen.isPending}
-              onClick={() => site && gen.mutate({ templateId: form.id, siteId: site.id, remarks }, { onSuccess: (d) => { setDone(d); toast(t('lib.generated', { number: d.number })); }, onError: (e) => toast(errText(e), 'err') })}>
+            <button type="button" className="btn" data-testid="lib-preview" disabled={!ready || preview.isPending} onClick={() => runPreview(site)}><Eye size={14} />{t('lib.preview')}</button>
+            {!done && <button type="button" className="btn btn-primary" data-testid="lib-generate" disabled={!ready || gen.isPending}
+              onClick={() => ready && gen.mutate({ templateId: form.id, ...(recordId ? { recordId } : { siteId: site?.id }), remarks }, { onSuccess: (d) => { setDone(d); toast(t('lib.generated', { number: d.number })); }, onError: (e) => toast(errText(e), 'err') })}>
               <FilePlus2 size={14} />{t('lib.generate')}</button>}
             {done && (<>
               <span className="chip bg-doneBg text-doneInk" data-testid="lib-generated-number">{t('lib.number')}: <b className="mono">{done.number}</b></span>
