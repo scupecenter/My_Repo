@@ -12,7 +12,7 @@ Open, Open in a new tab, Select, Copy link, Copy value (the cell under the point
 The menu never decides what a person may do. An item exists only when the element already holds an enabled control for it. A disabled or missing control gives no item.
 
 ## Where it applies
-Grid rows (`.gx-row`) and every element marked `data-ctx`: task board cards, site board cards, Gantt rows, document grid rows. A new screen opts in with `data-ctx` and, for actions, `data-ctx-action`.
+Every table body row, ARIA row and list item with a test id, grid rows, and elements marked `data-ctx`. Actions come from the row's own enabled buttons: marked `data-ctx-action`, else a button whose test id names the action. Not in navigation, headers or `data-no-ctx`.
 
 ## Language and keys
 English and Arabic labels, mirrored placement in right-to-left, arrows, Home, End, Enter, Escape.

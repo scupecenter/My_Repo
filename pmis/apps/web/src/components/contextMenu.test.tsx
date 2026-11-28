@@ -54,3 +54,36 @@ describe('standard context menu on cards', () => {
     expect(screen.queryByTestId('row-menu')).toBeNull();
   });
 });
+
+describe('screens that do not mark their controls', () => {
+  it('a table row offers the buttons its own test ids name; the header and navigation get no menu', async () => {
+    const u = userEvent.setup();
+    const del = vi.fn();
+    render(
+      <div>
+        <RowActions />
+        <nav><ul><li data-testid="nav-a">Home</li></ul></nav>
+        <table>
+          <thead><tr data-testid="head"><th>Name</th></tr></thead>
+          <tbody>
+            <tr data-testid="row-1"><td>Ali</td><td><button type="button" data-testid="user-edit-1">e</button><button type="button" data-testid="user-delete-1" onClick={del}>d</button></td></tr>
+            <tr data-testid="row-2"><td>Omar</td><td><button type="button" data-testid="user-delete-2" disabled>d</button></td></tr>
+          </tbody>
+        </table>
+      </div>,
+    );
+    fireEvent.contextMenu(screen.getByTestId('head'));
+    expect(screen.queryByTestId('row-menu')).toBeNull();
+    fireEvent.contextMenu(screen.getByTestId('nav-a'));
+    expect(screen.queryByTestId('row-menu')).toBeNull();
+    fireEvent.contextMenu(screen.getByTestId('row-2'));
+    expect(await screen.findByTestId('row-menu-copy')).toBeInTheDocument();
+    expect(screen.queryByTestId('row-menu-delete')).toBeNull();
+    await u.keyboard('{Escape}');
+    fireEvent.contextMenu(screen.getByTestId('row-1'));
+    expect(await screen.findByTestId('row-menu-edit')).toBeInTheDocument();
+    await u.click(screen.getByTestId('row-menu-delete'));
+    await u.click(screen.getByTestId('row-menu-delete'));
+    expect(del).toHaveBeenCalledTimes(1);
+  });
+});
