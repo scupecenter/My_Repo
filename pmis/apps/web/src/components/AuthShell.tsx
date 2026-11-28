@@ -2,6 +2,7 @@ import { Languages, Moon, ShieldCheck, Sun, Eye, EyeOff, Network, Radio, MapPinn
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoginPagePublic } from '@/api/settings';
+import { LoginLogo } from './PublicLogo';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 
 /** The language and theme switches of the signed-out pages (same keys and functions as the signed-in shell). */
@@ -11,10 +12,10 @@ export function AuthToolbar() {
   const lang = currentLocale();
   return (
     <div className="flex items-center gap-2">
-      <button type="button" className="btn gap-1" data-testid="auth-lang" onClick={() => applyLocale(lang === 'ar' ? 'en' : 'ar')} aria-label={t('auth.switch_lang')}>
+      <button type="button" className="btn gap-1" data-testid="auth-lang" onClick={() => applyLocale(lang === 'ar' ? 'en' : 'ar')} aria-label={`${t('auth.switch_lang')}: ${lang === 'ar' ? 'English' : 'العربية'}`}>
         <Languages size={16} aria-hidden /> {lang === 'ar' ? 'English' : 'العربية'}
       </button>
-      <button type="button" className="btn gap-1" data-testid="auth-theme" aria-pressed={theme === 'dark'} aria-label={t('auth.switch_theme')}
+      <button type="button" className="btn gap-1" data-testid="auth-theme" aria-pressed={theme === 'dark'} aria-label={`${t('auth.switch_theme')}: ${theme === 'dark' ? t('auth.light') : t('auth.dark')}`}
         onClick={() => { const n = theme === 'dark' ? 'light' : 'dark'; applyTheme(n); setTheme(n); }}>
         {theme === 'dark' ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
         <span className="hidden sm:inline">{theme === 'dark' ? t('auth.light') : t('auth.dark')}</span>
@@ -119,7 +120,7 @@ export function AuthShell({ children, wide = false }: { children: ReactNode; wid
       <aside className="relative hidden overflow-hidden bg-accent p-10 text-accentInk lg:flex lg:flex-col lg:justify-between" aria-hidden>
         <div className="auth-brand-art pointer-events-none absolute inset-0" aria-hidden><NetworkArt className="h-full w-full" /></div>
         <div className="auth-enter relative flex items-center gap-3 text-xl font-bold">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/15 text-lg">G</span>{t('app.name')}
+          <LoginLogo className="h-10 w-10 rounded-lg bg-white/15 object-contain p-0.5" fallback={<span className="grid h-10 w-10 place-items-center rounded-lg bg-white/15 text-lg">G</span>} />{t('app.name')}
         </div>
         <div className="relative space-y-6">
           <h2 className="auth-enter auth-enter-d1 text-3xl font-bold leading-tight">{t('auth.brand.title')}</h2>
@@ -136,7 +137,7 @@ export function AuthShell({ children, wide = false }: { children: ReactNode; wid
       <main className="relative flex min-h-screen flex-col p-4 sm:p-6">
         <AuthBackdrop />
         <div className="relative flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 font-bold lg:invisible"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
+          <div className="flex items-center gap-2 font-bold lg:invisible"><LoginLogo className="h-8 w-8 rounded-md object-contain" fallback={<span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>} />{t('app.name')}</div>
           <AuthToolbar />
         </div>
         <div className="relative grid flex-1 place-items-center py-6">

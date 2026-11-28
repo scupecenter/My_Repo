@@ -1,10 +1,11 @@
-import { Bookmark, Save, Share2, Trash2, UserCheck } from 'lucide-react';
+import { Bookmark, Pin, PinOff, Save, Share2, Trash2, UserCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGroups, useRoles } from '@/api/admin';
 import { useRegions } from '@/api/sites';
 import type { UserPickerItem } from '@/api/types';
-import { importLocalViews, useSavedViewOps, useSavedViews, type LocalView, type SavedView, type SavedViewAudience, type SavedViewColumns, type SavedViewSort } from '@/api/views';
+import { importLocalViews, useHomePinOps, useHomePins, useSavedViewOps, useSavedViews, type LocalView, type SavedView, type SavedViewAudience, type SavedViewColumns, type SavedViewSort } from '@/api/views';
 import { loadPref } from '@/lib/localPref';
 import type { Prefs } from '@/lib/tablePrefs';
 import { errText, FormDialog } from './FormDialog';
@@ -12,7 +13,23 @@ import { PeoplePicker } from './PeoplePicker';
 import { useToast } from './Toast';
 
 /** The column control of the screen, when it has one (TableKit `useTablePrefs`). */
-export type ViewTable = { prefs: Prefs; apply: (c: SavedViewColumns) => void };
+export type ViewTable = { prefs: Prefs; apply: (c: SavedViewColumns) => void; screen?: string };
+
+/**
+ * Column isolation: a view stores the columns of the table it was saved from, and stamps that table's key in its filters
+ * (`_columns_for`). When one view screen serves two tables (Site tasks: grid and timeline; Library archive: set and seed;
+ * Daily Plan: its tabs; Site Master menus), a view applies its columns only to the table that saved it, so hiding, ordering or
+ * sizing a column in one list never changes another. The filters still apply everywhere. A view saved before the stamp existed
+ * has none: on a `sharedScreen` its columns are skipped, elsewhere they apply as before.
+ */
+export const COLUMNS_FOR = '_columns_for';
+export const columnsApply = (v: { filters?: Record<string, unknown>; columns?: unknown }, table: { screen?: string } | undefined, sharedScreen: boolean): boolean => {
+  if (!table || !Object.keys((v.columns ?? {}) as object).length) return false;
+  const stamp = v.filters?.[COLUMNS_FOR];
+  if (typeof stamp === 'string') return !table.screen || stamp === table.screen;
+  return !sharedScreen;
+};
+const withoutStamp = (f: Record<string, unknown> | undefined) => { const { [COLUMNS_FOR]: _drop, ...rest } = f ?? {}; void _drop; return rest; };
 
 /** The browser key of the old local views (before P10); they are imported to the server on first use and then removed. */
 export const legacyKey = (screen: string) => `pmis.logviews.${screen}`;
@@ -22,13 +39,17 @@ export const legacyKey = (screen: string) => `pmis.logviews.${screen}`;
  * and its sort, kept on the server per user. The owner may share it with roles, groups, people or everyone when they hold views.share; the server
  * strips columns a reader may not see and never shows another user's private view. Views are versioned and deactivated, never deleted.
  */
-export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSort }: {
+export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSort, sharedScreen = false }: {
   screen: string; value: F; onApply: (f: F) => void; empty: F; table?: ViewTable; sort?: SavedViewSort[]; onSort?: (s: SavedViewSort[]) => void;
+  /** another table uses this view screen too (see COLUMNS_FOR) */
+  sharedScreen?: boolean;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
   const q = useSavedViews(screen);
   const ops = useSavedViewOps(screen);
+  const pinsQ = useHomePins();
+  const pinOps = useHomePinOps();
   const [cur, setCur] = useState('');
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
@@ -53,15 +74,27 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
   }, [q.isSuccess, screen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const content = () => ({
-    filters: value as unknown as Record<string, unknown>,
+    filters: { ...(value as unknown as Record<string, unknown>), ...(table?.screen ? { [COLUMNS_FOR]: table.screen } : {}) },
     ...(table ? { columns: { order: table.prefs.order, hidden: table.prefs.hidden, width: table.prefs.width, density: table.prefs.density, ...(table.prefs.display ? { display: table.prefs.display } : {}) } } : {}),
     ...(sort ? { sort } : {}),
   });
   const apply = (v: SavedView | undefined) => {
-    onApply(v ? ({ ...(empty as object), ...v.filters } as F) : empty);
-    if (v && table && Object.keys(v.columns ?? {}).length) table.apply(v.columns);
+    onApply(v ? ({ ...(empty as object), ...withoutStamp(v.filters) } as F) : empty);
+    if (v && table && columnsApply(v, table, sharedScreen)) table.apply(v.columns);
     if (onSort) onSort(v?.sort ?? []);
   };
+
+  // 0.15.245: a link may name a view (?view_id, from the dashboard pins card): apply it once and drop the parameter.
+  const [sp, setSp] = useSearchParams();
+  const wantView = sp.get('view_id');
+  /* eslint-disable react-hooks/set-state-in-effect -- applying a linked view is a one-shot external trigger (the URL), not derived state */
+  useEffect(() => {
+    if (!wantView || !q.isSuccess) return;
+    const v = (q.data?.items ?? []).find((x) => x.id === wantView);
+    if (v) { setCur(v.id); apply(v); }
+    const next = new URLSearchParams(sp); next.delete('view_id'); setSp(next, { replace: true });
+  }, [wantView, q.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
   const save = () => {
     const n = name.trim();
     if (!n) return;
@@ -82,6 +115,9 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
       {view?.stripped_columns ? <span className="chip bg-waitBg text-waitInk" data-testid="views-stripped" title={t('savedViews.stripped_hint')}>{t('savedViews.stripped', { count: view.stripped_columns })}</span> : null}
       {view?.owner_left && <span className="chip bg-lateBg text-lateInk" data-testid="views-owner-left">{t('savedViews.owner_left')}</span>}
       {view?.can_edit && <button type="button" className="btn px-2" data-testid="views-update" aria-label={t('savedViews.update')} title={t('savedViews.update')} disabled={ops.update.isPending} onClick={() => update(view)}><Save size={14} aria-hidden /></button>}
+      {view && <button type="button" className="btn px-2" data-testid="views-pin-home" aria-label={(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? t('savedViews.unpin_home') : t('savedViews.pin_home')} title={(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? t('savedViews.unpin_home') : t('savedViews.pin_home')} aria-pressed={(pinsQ.data ?? []).some((p) => p.view_id === view.id)} disabled={pinOps.pin.isPending || pinOps.unpin.isPending}
+        onClick={() => { const pinned = (pinsQ.data ?? []).some((p) => p.view_id === view.id); (pinned ? pinOps.unpin : pinOps.pin).mutate(view.id, { onSuccess: () => toast(t(pinned ? 'savedViews.unpinned_home' : 'savedViews.pinned_home')), onError: fail }); }}>
+        {(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? <PinOff size={14} aria-hidden /> : <Pin size={14} aria-hidden />}</button>}
       {view?.can_share && <button type="button" className="btn px-2" data-testid="views-share" aria-label={t('savedViews.share')} title={t('savedViews.share')} onClick={() => setSharing(view)}><Share2 size={14} aria-hidden /></button>}
       {view?.can_edit && view.shared && <button type="button" className="btn px-2" data-testid="views-transfer" aria-label={t('savedViews.transfer')} title={t('savedViews.transfer')} onClick={() => setHanding(view)}><UserCheck size={14} aria-hidden /></button>}
       {view?.can_edit && <button type="button" className="btn px-2" data-testid="views-delete" aria-label={t('savedViews.deactivate')} title={t('savedViews.deactivate')}

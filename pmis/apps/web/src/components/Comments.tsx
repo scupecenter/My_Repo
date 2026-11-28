@@ -1,4 +1,5 @@
-import { MessageSquare } from 'lucide-react';
+import { Check, MessageSquare, ThumbsUp } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePicker } from '@/api/admin';
@@ -32,6 +33,7 @@ export function MentionBox({ onSend, pending, label }: { onSend: (body: string, 
   };
   return (
     <div className="relative mt-2">
+      <UnsavedGuard scope="composers" dirty={!!text.trim()} label={t('ui.guard_comment')} onSave={() => { send(); return true; }} />
       <div className="flex gap-2">
         <input className="input" data-testid="comment-input" aria-label={label} aria-autocomplete="list" aria-expanded={options.length > 0} placeholder={t('mention.placeholder')} value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape' && options.length) { e.stopPropagation(); setText((x) => x.replace(/@[^\s@()]*$/, '')); } }} />
@@ -55,21 +57,49 @@ export function MentionBox({ onSend, pending, label }: { onSend: (body: string, 
   );
 }
 
-/** A comment thread (task or register record): the list, the people each comment reached, and the box. The parent invalidates its own query after a send. */
-export function CommentsPanel({ items, loaded, pending, onSend, error, heading }: {
-  items: Comment[] | undefined; loaded: boolean; pending: boolean; onSend: (body: string, mentionIds: string[]) => void; error?: ReactNode; heading?: string;
+/**
+ * A comment thread (task or register record): the list, the people each comment reached, and the box. The parent invalidates its own query after a send.
+ * PM item 18 (0.15.247): each comment carries a 👍 "acknowledged" toggle and can be marked resolved; the parent passes the two handlers and
+ * invalidates its own query after each toggle.
+ */
+export function CommentsPanel({ items, loaded, pending, onSend, onReact, onToggleResolved, error, heading }: {
+  items: Comment[] | undefined; loaded: boolean; pending: boolean; onSend: (body: string, mentionIds: string[]) => void;
+  onReact?: (commentId: string, emoji: string, on: boolean) => void; onToggleResolved?: (commentId: string, resolved: boolean) => void;
+  error?: ReactNode; heading?: string;
 }) {
   const { t } = useTranslation();
   return (
     <section aria-labelledby="dr-comments">
       <h3 id="dr-comments" className="mb-1 flex items-center gap-1 font-semibold"><MessageSquare size={14} />{heading ?? t('drawer.comments')}</h3>
       <ul data-testid="comment-list" className="space-y-1 text-sm">
-        {items?.map((x) => (
-          <li key={x.id} className={`rounded-md p-2 ${x.is_rejection_note ? 'bg-lateBg text-lateInk' : 'bg-card2'}`}>
-            <b>{x.author.display_name}</b> · <CommentBody text={x.body} />
-            {!!x.mentions?.length && <p className="mt-1 text-xs text-mute" data-testid="comment-mentions">{t('mention.reached')}: {x.mentions.map((m) => m.display_name).join(', ')}</p>}
-          </li>
-        ))}
+        {items?.map((x) => {
+          const ack = x.reactions?.find((r) => r.emoji === '👍');
+          return (
+            <li key={x.id} className={`rounded-md p-2 ${x.is_rejection_note ? 'bg-lateBg text-lateInk' : 'bg-card2'}`}>
+              <b>{x.author.display_name}</b> · <CommentBody text={x.body} />
+              {!!x.mentions?.length && <p className="mt-1 text-xs text-mute" data-testid="comment-mentions">{t('mention.reached')}: {x.mentions.map((m) => m.display_name).join(', ')}</p>}
+              {(onReact || onToggleResolved) && (
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" data-testid={`comment-actions-${x.id}`}>
+                  {onReact && (
+                    <button type="button" aria-pressed={!!ack?.mine} title={ack?.mine ? t('comment.react_ack') : t('comment.react')} data-testid={`comment-react-${x.id}`}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${ack?.mine ? 'border-openInk bg-openBg text-openInk' : 'border-line text-mute hover:bg-hover'}`}
+                      onClick={() => onReact(x.id, '👍', !ack?.mine)}>
+                      <ThumbsUp size={12} aria-hidden />{t('comment.react_ack')}{ack?.count ? <span className="font-semibold" data-testid={`comment-react-count-${x.id}`}>{ack.count}</span> : null}
+                    </button>
+                  )}
+                  {onToggleResolved && (x.resolved ? (
+                    <>
+                      <span className="chip inline-flex items-center gap-1 bg-doneBg text-doneInk" data-testid={`comment-resolved-${x.id}`}><Check size={12} aria-hidden />{t('comment.resolved')} · {x.resolved.by.display_name}</span>
+                      <button type="button" className="text-mute underline hover:bg-hover" data-testid={`comment-reopen-${x.id}`} onClick={() => onToggleResolved(x.id, false)}>{t('comment.reopen')}</button>
+                    </>
+                  ) : (
+                    <button type="button" className="text-mute underline hover:bg-hover" data-testid={`comment-resolve-${x.id}`} onClick={() => onToggleResolved(x.id, true)}>{t('comment.resolve')}</button>
+                  ))}
+                </div>
+              )}
+            </li>
+          );
+        })}
         {loaded && !items?.length && <li className="text-mute">{t('drawer.no_comments')}</li>}
       </ul>
       {error && <p role="alert" className="mt-1 text-sm text-lateInk" data-testid="comment-error">{error}</p>}

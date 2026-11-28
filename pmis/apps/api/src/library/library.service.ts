@@ -287,6 +287,23 @@ export class LibraryMenuService {
     return this.one(Prisma.sql`SELECT lib_form_template_retire(${id}::uuid, ${b.reason}::text) AS j`);
   }
 
+  // ----------------------------------------------------------------------------------------------------------------- Signed and stamped copies (0555)
+
+  /** GET /settings/document-marks: {types: {<doc code>: {signature, stamp}}, version}. */
+  marksSetting(): Promise<{ types: Record<string, { signature: boolean; stamp: boolean }>; version: number }> {
+    return this.one(Prisma.sql`SELECT doc_marks_cfg() AS j`);
+  }
+
+  /** PUT /settings/document-marks/{code}: the two flags of one document type, with a reason (audited; System Admin or a delegation on document types). */
+  async setMarks(auth: AuthContext, code: string, raw: unknown): Promise<{ types: Record<string, { signature: boolean; stamp: boolean }>; version: number }> {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw problems.validation([{ path: '/', code: 'invalid', message: 'The body is a JSON object.' }]);
+    const { signature, stamp, reason } = raw as Record<string, unknown>;
+    if (typeof signature !== 'boolean' || typeof stamp !== 'boolean') throw problems.validation([{ path: '/', code: 'invalid', message: 'signature and stamp are true or false.' }]);
+    if (reason !== undefined && typeof reason !== 'string') throw problems.validation([{ path: '/reason', code: 'invalid', message: 'The reason is text.' }]);
+    await this.stepUp.require(auth);
+    return this.one(Prisma.sql`SELECT admin_set_document_type_marks(${code}::text, ${signature}::boolean, ${stamp}::boolean, ${(reason as string | undefined) ?? null}::text) AS j`);
+  }
+
   // ----------------------------------------------------------------------------------------------------------------- Archive settings
 
   archiveSetting(): Promise<{ version: number; hidden: string[]; order: string[]; default_columns: string[]; zip_limit: number }> {

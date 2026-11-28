@@ -1,11 +1,10 @@
-import { ChevronLeft, ChevronRight, ClipboardCopy, Download, Lock, LockOpen, Pencil, Plus, Search, Settings, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, ClipboardCopy, Download, FileSpreadsheet, Lock, LockOpen, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useMe } from '@/api/hooks';
-import { exportDailyPlan, useDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
+import { downloadDailyPlanTemplate, exportDailyPlan, useDailyPlan, useImportDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
 import { errText, FormDialog } from '@/components/FormDialog';
-import { PageHeader } from '@/components/PageHeader';
+import { MoreMenu, PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { LayoutPanel } from '@/components/LayoutPanel';
@@ -24,13 +23,6 @@ const SCREEN = 'daily-plan';
 const WIDE = new Set<DpColumn>(['planned_work', 'actual_work', 'reason', 'remark', 'sow', 'contractor', 'aat_se']);
 const colDefs = (cols: DpColumn[]): ColDef[] => cols.map((id) => ({ id, w: id === 'no' ? 56 : WIDE.has(id) ? 220 : 130, pinned: id === 'no' || id === 'site_code' }));
 
-/** The person may open Settings > My Work > Daily Plan (a System Admin, or edit on the settings of the administration). */
-function canOpenSettings(me: ReturnType<typeof useMe>['data']): boolean {
-  if (!me) return false;
-  if (me.is_system_admin) return true;
-  return me.effective.grants.some((g) => g.action === 'edit' && (g.module_key === '*' || g.module_key === 'admin' || g.module_key === 'admin.settings'));
-}
-
 /**
  * My Work > Daily Plan (plan W7, owner decisions 2026-11-23): Daily Progress of a day and Tomorrow Plan of the next working day, one plan per region per day.
  * The rows come filled from system data; L1 changes them by hand (audited), adds or removes sites and gives the Reason and Remark; L2 locks the day.
@@ -40,7 +32,6 @@ function canOpenSettings(me: ReturnType<typeof useMe>['data']): boolean {
 export function DailyPlan() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const me = useMe(true);
   const [sp, setSp] = useSearchParams();
   const isWeek = sp.get('tab') === 'week';
   const tab: DailyPlanTab = sp.get('tab') === 'tomorrow' ? 'tomorrow' : 'progress';
@@ -96,6 +87,10 @@ export function DailyPlan() {
       toast(t('dailyPlan.copy_failed'), 'err');
     }
   };
+  const importer = useImportDailyPlan();
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const doTemplate = () => { downloadDailyPlanTemplate(date, scope(progress.data)).then((n) => toast(t('grid.downloaded', { name: n })), fail); };
   const doExport = () => {
     const filtered = Object.entries(filters).some(([k, v]) => k !== 'region' && !!v);
     const sites = filtered ? [...new Set([...rowsOf(progress.data), ...rowsOf(tomorrow.data)].map((r) => r.site_id))] : undefined;
@@ -109,8 +104,7 @@ export function DailyPlan() {
 
   return (
     <div className="space-y-3" data-testid="page-daily-plan">
-      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header" settings="daily_plan"
-        context={canOpenSettings(me.data) ? <Link to="/admin/settings/my-work/daily-plan" className="btn px-2 py-1 text-xs" data-testid="daily-plan-settings-link"><Settings size={14} aria-hidden />{t('dailyPlan.settings')}</Link> : undefined} />
+      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header" />
 
       <div className="flex flex-wrap items-center gap-2">
         <div role="tablist" aria-label={t('dailyPlan.title')} className="inline-flex gap-1" data-testid="daily-plan-tabs">
@@ -129,7 +123,7 @@ export function DailyPlan() {
       {isWeek ? <WeekCycle date={date} regions={scope(progress.data)} onDate={(d) => setParams({ date: d })} /> : <>
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2" data-testid="daily-plan-toolbar">
-        <SavedViews screen={SCREEN} value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
+        <SavedViews screen={SCREEN} sharedScreen value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
           onApply={(v) => setParams({ region: v.region || 'all', contractor: v.contractor, aat_se: v.aat_se, sow: v.sow, q: v.q })} />
         <UnifiedFilter screen={SCREEN} value={null} onChange={() => undefined} onClearAll={() => setParams({ region: 'all', contractor: '', aat_se: '', sow: '', q: '' })}
           extras={[
@@ -148,9 +142,15 @@ export function DailyPlan() {
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
           <LayoutPanel testid="daily-plan-layout" table={table} />
-          <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
-          <button type="button" className="btn" data-testid="daily-plan-export" disabled={!progress.data} onClick={doExport}><Download size={16} aria-hidden />{t('dailyPlan.export')}</button>
-          <button type="button" className="btn" data-testid="daily-plan-copy" disabled={!progress.data || !tomorrow.data} onClick={() => void copy()}><ClipboardCopy size={16} aria-hidden />{t('dailyPlan.copy')}</button>
+          <ColumnMenu density={false} api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
+          <MoreMenu
+            settings="daily_plan"
+            items={[
+              { id: 'export', label: t('dailyPlan.export'), icon: <Download size={16} aria-hidden />, testid: 'daily-plan-export', disabled: !progress.data, onSelect: doExport },
+              { id: 'template', label: t('dailyPlan.template'), icon: <FileSpreadsheet size={16} aria-hidden />, testid: 'daily-plan-template', disabled: !progress.data, onSelect: doTemplate },
+              ...(plans.some((p) => p.can_edit) ? [{ id: 'import', label: t('dailyPlan.import'), icon: <Upload size={16} aria-hidden />, testid: 'daily-plan-import', onSelect: () => importInput.current?.click() }] : []),
+              { id: 'copy', label: t('dailyPlan.copy'), icon: <ClipboardCopy size={16} aria-hidden />, testid: 'daily-plan-copy', disabled: !progress.data || !tomorrow.data, onSelect: () => void copy() },
+            ]} />
         </span>
       </div>
 
@@ -212,6 +212,16 @@ export function DailyPlan() {
         </div>
       )}
 
+      <input ref={importInput} type="file" accept=".xlsx" className="sr-only" tabIndex={-1} data-testid="daily-plan-import-file" aria-label={t('dailyPlan.import')}
+        onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); importer.reset(); e.target.value = ''; }} />
+      {importFile && (
+        <FormDialog open withReason={false} onClose={() => setImportFile(null)} testid="daily-plan-import-dialog" title={t('dailyPlan.import')} submitLabel={t('dailyPlan.import_apply')} busy={importer.isPending}
+          error={importer.isError ? errText(importer.error, t) : null}
+          onSubmit={() => importer.mutate({ file: importFile }, { onSuccess: (r) => { setImportFile(null); toast(t('dailyPlan.imported', { updated: r.updated, added: r.added, removed: r.removed, unchanged: r.unchanged })); } })}>
+          <p className="mono text-sm" dir="ltr" data-testid="daily-plan-import-name">{importFile.name}</p>
+          <p className="mt-2 text-sm text-mute">{t('dailyPlan.import_note')}</p>
+        </FormDialog>
+      )}
       {edit && <RowDialog row={edit} tab={tab} onClose={() => setEdit(null)} busy={ops.save.isPending} error={ops.save.isError ? errText(ops.save.error, t) : null}
         onSave={(body) => { const p = planOf(edit.region_id); if (p) ops.save.mutate({ date: shownDate, region: edit.region_id, site: edit.site_id, version: p.version, body }, { onSuccess: () => { setEdit(null); toast(t('dailyPlan.saved')); } }); }} />}
       {adding && <AddDialog plans={plans.filter((p) => p.can_edit)} name={regionName} onClose={() => setAdding(false)} busy={ops.add.isPending} error={ops.add.isError ? errText(ops.add.error, t) : null}

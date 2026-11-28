@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from './client';
+import { api, ApiError, downloadFile } from './client';
 import type { components } from './schema';
 
 type S = components['schemas'];
@@ -10,6 +10,33 @@ export type DataResetPlanTable = S['DataResetPlanTable'];
 export type DataResetPlan = S['DataResetPlan'];
 export type DataResetPart = S['DataResetPart'];
 export type DataResetScope = S['DataResetScope'];
+export type DataResetNarrow = S['DataResetNarrow'];
+export type DataResetNarrowOptions = S['DataResetNarrowOptions'];
+export type DataResetArchiveInfo = S['DataResetArchiveInfo'];
+export type ArchiveMode = 'none' | 'download' | 'keep_90';
+
+/** Contract 0.15.266 (migration 0371): the archive mode of a request (absent on a request made before: none) and the state of its archive. */
+export const archiveMode = (r: Pick<DataResetRequest, 'archive'> | null | undefined): ArchiveMode => r?.archive?.mode ?? 'none';
+export const archiveOf = (r: Pick<DataResetRequest, 'archive'> | null | undefined) => r?.archive?.archive ?? null;
+/** The run is refused until the archive is ready (mode download: and downloaded once); the database decides, the screen only says why the button waits. */
+export function archiveReady(r: Pick<DataResetRequest, 'archive'> | null | undefined): boolean {
+  const m = archiveMode(r), a = archiveOf(r);
+  if (m === 'none') return true;
+  return a?.status === 'ready' && (m === 'keep_90' || (a.downloads ?? 0) > 0);
+}
+
+/** True when the filter names nothing (the whole part goes). */
+export const narrowEmpty = (n: DataResetNarrow | null | undefined) => !n || (!(n.regions?.length) && !(n.batches?.length) && !n.from && !n.to);
+/** The filter as the server takes it: only the keys that are set. */
+export const narrowBody = (n: DataResetNarrow | null | undefined): DataResetNarrow | undefined => {
+  if (narrowEmpty(n)) return undefined;
+  const o: DataResetNarrow = {};
+  if (n?.regions?.length) o.regions = n.regions;
+  if (n?.batches?.length) o.batches = n.batches;
+  if (n?.from) o.from = n.from;
+  if (n?.to) o.to = n.to;
+  return o;
+};
 
 /**
  * Contract 0.15.71 (migration 0152): the closure of a choice as the screen shows it before asking the server (every part that depends on a chosen part
@@ -25,10 +52,19 @@ export function closureOf(chosen: readonly string[], catalogue: readonly Pick<Da
 }
 
 /** The dry run of a chosen scope (null = everything): counts per part and per table. */
-export const useDataResetPlan = (parts: string[] | null, enabled = true) =>
+export const useDataResetPlan = (parts: string[] | null, enabled = true, narrow?: DataResetNarrow) =>
   useQuery({
-    queryKey: ['data-reset', 'plan', parts?.join(',') ?? '*'], enabled: enabled && (parts === null || parts.length > 0), retry: false, refetchOnWindowFocus: false,
-    queryFn: () => api.get<DataResetPlan>('/settings/data-reset/plan', { query: { parts: parts?.join(',') } }),
+    queryKey: ['data-reset', 'plan', parts?.join(',') ?? '*', narrow ?? null], enabled: enabled && (parts === null || parts.length > 0), retry: false, refetchOnWindowFocus: false,
+    queryFn: () => api.get<DataResetPlan>('/settings/data-reset/plan', {
+      query: { parts: parts?.join(','), regions: narrow?.regions?.join(','), batches: narrow?.batches?.join(','), from: narrow?.from, to: narrow?.to },
+    }),
+  });
+
+/** Contract 0.15.265 (migration 0370): the regions and recent import batches the picker offers for narrowing a part (null: any part). */
+export const useDataResetNarrowOptions = (part: string | null, enabled = true) =>
+  useQuery({
+    queryKey: ['data-reset', 'narrow-options', part ?? '*'], enabled, retry: false, refetchOnWindowFocus: false,
+    queryFn: () => api.get<DataResetNarrowOptions>('/settings/data-reset/narrow-options', { query: { part: part ?? undefined } }),
   });
 
 /** Statuses during which the screen polls (the run happens in the background on the server). */
@@ -46,7 +82,7 @@ export const useDataResetRequest = (id: string | null, poll: boolean) =>
   useQuery({
     queryKey: ['data-reset', 'request', id], enabled: !!id && poll, retry: false,
     queryFn: () => api.get<DataResetRequest>(`/settings/data-reset/requests/${id}`, { headers: { 'X-PMIS-Live': '1' } }),
-    refetchInterval: (q) => (!q.state.data || q.state.data.status === 'running' ? 2000 : q.state.data.status === 'files_pending' ? 10_000 : false),
+    refetchInterval: (q) => (!q.state.data || q.state.data.status === 'running' || archiveOf(q.state.data)?.status === 'building' ? 2000 : q.state.data.status === 'files_pending' ? 10_000 : false),
   });
 
 function useAct<B>(fn: (b: B) => Promise<unknown>) {
@@ -55,7 +91,7 @@ function useAct<B>(fn: (b: B) => Promise<unknown>) {
 }
 
 export const useRequestDataReset = () =>
-  useAct((b: { reason: string; confirm_text: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string }) =>
+  useAct((b: { reason: string; confirm_text: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string; narrow?: DataResetNarrow; archive?: ArchiveMode }) =>
     api.post('/settings/data-reset/requests', { body: b }));
 /** Contract 0.15.72: a request made without a backup (`require_backup` false); a missing field (an older server) means a backup is required. */
 export const requiresBackup = (r: Pick<DataResetRequest, 'require_backup'> | null | undefined) => r?.require_backup !== false;
@@ -72,3 +108,8 @@ export const useRetryDataResetFiles = () =>
 export const useSetDataResetSettings = () =>
   useAct((b: { version: number; reason: string; request_expiry_minutes: number; backup_max_age_hours: number }) =>
     api.put('/settings/data-reset/settings', { body: { reason: b.reason, request_expiry_minutes: b.request_expiry_minutes, backup_max_age_hours: b.backup_max_age_hours }, version: b.version }));
+
+/** Contract 0.15.266: makes the archive of an approved request (the build runs on the server; the request is polled until it is ready or failed). */
+export const useMakeDataResetArchive = () => useAct((b: { id: string }) => api.post(`/settings/data-reset/requests/${b.id}/archive`));
+/** The archive zip: a System Admin with a step-up (asked once), one security-log entry per download. Returns the file name. */
+export const downloadDataResetArchive = (id: string) => downloadFile(`/settings/data-reset/requests/${id}/archive/download`);

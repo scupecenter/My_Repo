@@ -295,6 +295,84 @@ describe('the scope of a request (0.15.71)', () => {
     const c = await post(admin1, `/requests/${id}/cancel`, { reason: 'Scope test only' }, etag(ok));
     expect(c.status).toBe(200);
   });
+
+  it('narrowing (migration 0370): the dry run counts only the matching records, the filter is bound into the scope hash, and parts that cannot follow one record refuse it', async () => {
+    const count = async (q2: string) => {
+      const r = await admin1.api.call('get', `/settings/data-reset/plan?${q2}`);
+      expect(r.status).toBe(200);
+      return r;
+    };
+    const whole = await count('parts=procurement');
+    const tripoli = await count('parts=procurement&regions=1');
+    const nowhere = await count('parts=procurement&from=2100-01-01&to=2100-12-31');
+    const unknownRegion = await admin1.api.call('get', '/settings/data-reset/plan?parts=procurement&regions=999');
+    expect(unknownRegion.status).toBe(422);
+    expect(unknownRegion.body.code).toBe('validation_failed');
+    const rows = (r: { body: { plan?: unknown; tables?: { table: string; delete: number }[] } }, t: string) =>
+      (r.body.tables ?? []).find((x) => x.table === t)?.delete ?? 0;
+    expect(rows(whole, 'procurement_records')).toBe(1);
+    expect(rows(tripoli, 'procurement_records')).toBe(1);
+    expect(rows(nowhere, 'procurement_records')).toBe(0);
+    expect(rows(nowhere, 'register_records')).toBe(0);
+    expect(tripoli.body.scope.narrow).toMatchObject({ regions: [1] });
+    expect(tripoli.body.scope.hash).not.toBe(whole.body.scope.hash);
+    expect((await count('parts=procurement&from=2000-01-01&to=2100-01-01')).body.tables.find((x: { table: string }) => x.table === 'procurement_records').delete).toBe(1);
+    const sitesNarrow = await admin1.api.call('get', '/settings/data-reset/plan?parts=sites&regions=1');
+    expect(sitesNarrow.status).toBeGreaterThanOrEqual(400);
+    expect(sitesNarrow.status).toBeLessThan(500);
+    const opts = await admin1.api.call('get', '/settings/data-reset/narrow-options?part=procurement');
+    expect(opts.status).toBe(200);
+    expect(opts.body.regions.length).toBeGreaterThan(0);
+    expect((await plain.api.call('get', '/settings/data-reset/narrow-options')).status).toBe(403);
+    // the request stores the filter in its scope, bound into the hash the approver approves
+    const r = await post(admin1, '/requests', { reason: 'Narrow scope synthetic test', confirm_text: phrase, parts: ['procurement'], narrow: { regions: [1] } });
+    expect(r.status).toBe(201);
+    expect(r.body.scope.narrow).toMatchObject({ regions: [1] });
+    expect(r.body.scope_hash).toBe(tripoli.body.scope.hash);
+    await expect(db.query(`UPDATE data_reset_requests SET scope = jsonb_set(scope, '{narrow}', '{"regions":[2]}') WHERE id = $1`, [r.body.id])).rejects.toThrow();
+    const c = await post(admin1, `/requests/${r.body.id}/cancel`, { reason: 'Narrow scope test only' }, etag(r));
+    expect(c.status).toBe(200);
+  });
+
+  it('archive before delete (migration 0371): the run is refused until the archive is made and (mode download) downloaded once; the download is System Admin only and logged', async () => {
+    // no backup row is written here: a later test of this file relies on there being none (the request says it needs none)
+    const r = await post(admin1, '/requests', { reason: 'Archive synthetic test', confirm_text: phrase, parts: ['procurement'], archive: 'download', require_backup: false, no_backup_confirm: 'NO BACKUP' });
+    expect(r.status).toBe(201);
+    expect(r.body.archive).toMatchObject({ mode: 'download', archive: null });
+    const id = r.body.id as string;
+    // the archive is made while the request is approved, not before
+    expect((await post(admin1, `/requests/${id}/archive`, {})).status).toBe(409);
+    const ap = await post(admin2, `/requests/${id}/approve`, { reason: 'Archive synthetic approval', scope_hash: r.body.scope_hash }, etag(r));
+    expect(ap.status).toBe(200);
+    const run1 = await post(admin1, `/requests/${id}/run`, { confirm_text: phrase }, etag(ap));
+    expect(run1.status).toBe(409);
+    expect(run1.body.code).toBe('archive_required');
+    expect((await post(plain, `/requests/${id}/archive`, {})).status).toBe(403);
+    const made = await post(admin1, `/requests/${id}/archive`, {});
+    expect(made.status).toBe(202);
+    const { DataResetArchiveService } = await import('../src/settings/data-reset-archive.service');
+    for (let i = 0; i < 400 && app.get(DataResetArchiveService).running.size > 0; i++) await Promise.all([...app.get(DataResetArchiveService).running]);
+    const got = await admin1.api.call('get', `/settings/data-reset/requests/${id}`);
+    expect(got.body.archive.archive).toMatchObject({ status: 'ready', downloads: 0 });
+    expect(got.body.archive.archive.bytes).toBeGreaterThan(0);
+    expect(got.body.archive.archive.entries.records).toBeGreaterThan(0);
+    // mode download: still refused before the first download
+    const run2 = await post(admin1, `/requests/${id}/run`, { confirm_text: phrase }, etag(got));
+    expect(run2.status).toBe(409);
+    expect(run2.body.code).toBe('archive_required');
+    expect((await plain.api.call('get', `/settings/data-reset/requests/${id}/archive/download`)).status).toBe(403);
+    expect((await adminNoStep.api.call('get', `/settings/data-reset/requests/${id}/archive/download`)).status).toBe(401);
+    const dl = await admin1.api.call('get', `/settings/data-reset/requests/${id}/archive/download`);
+    expect(dl.status).toBe(200);
+    expect(String(dl.headers['content-type'])).toContain('application/zip');
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_archive_download' AND actor_id = $1`, [admin1.user.id])).toHaveLength(1);
+    expect((await q<{ downloads: number }>(db, `SELECT downloads FROM data_reset_archives WHERE request_id = $1`, [id]))[0]!.downloads).toBe(1);
+    // the mode never changes with the request
+    await expect(db.query(`UPDATE data_reset_requests SET archive_mode = 'none' WHERE id = $1`, [id])).rejects.toThrow();
+    const last = await admin1.api.call('get', `/settings/data-reset/requests/${id}`);
+    const c = await post(admin1, `/requests/${id}/cancel`, { reason: 'Archive test only' }, etag(last));
+    expect(c.status).toBe(200);
+  });
 });
 
 describe('the guarded settings', () => {

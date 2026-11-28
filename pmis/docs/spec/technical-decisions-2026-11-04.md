@@ -412,6 +412,7 @@ The owner (2026-11-10): "Accept all historical data as it is and do not lock it.
 | Data load | The historical-load document waiver (migration 0073, contract 0.14.3) | Q462 |
 | Data load | Big New sites batches in the background, faster site creation (migration 0074, contract 0.14.4) | 2026-11-05 (4) |
 | Data load | Register and stream batches and the Master import apply in the background, faster holder checks, Settings, Imports (migration 0075, contract 0.14.6) | 2026-11-05 (6) |
+| Data load | Upload policy of the imports, Enforce or Accept incomplete: Settings > Data > Imports, `imports.upload_policy`; Accept incomplete opens the sites of a Master import file when it is applied, through the existing unlock door (migration 0492, contract 0.15.322; valid rows only follows separately) | D49 part 3, 2026-11-27 |
 
 ## Owner data still needed
 

@@ -1,11 +1,13 @@
-import { AlertOctagon, DatabaseBackup, ShieldCheck } from 'lucide-react';
+import { AlertOctagon, Archive, DatabaseBackup, Download, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { fmtDateTime } from '@/lib/time';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/api/client';
 import {
-  closureOf, requiresBackup, RUNNING, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
-  useRunDataReset, useSetDataResetSettings, type DataResetPart, type DataResetPlanTable, type DataResetRequest,
+  archiveMode, archiveOf, archiveReady, downloadDataResetArchive, useMakeDataResetArchive, type ArchiveMode,
+  closureOf, narrowBody, narrowEmpty, requiresBackup, RUNNING, useDataResetNarrowOptions, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
+  useRunDataReset, useSetDataResetSettings, type DataResetNarrow, type DataResetPart, type DataResetPlanTable, type DataResetRequest,
 } from '@/api/dataReset';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -29,13 +31,14 @@ export function DataReset() {
   const q = useDataReset();
   const s = q.data;
   const open = s?.request ?? null;
-  const live = useDataResetRequest(open?.id ?? null, !!open && RUNNING.has(open.status));
+  const live = useDataResetRequest(open?.id ?? null, !!open && (RUNNING.has(open.status) || archiveOf(open)?.status === 'building'));
   const req: DataResetRequest | null = live.data ?? open;
   const running = !!req && RUNNING.has(req.status);
   useEffect(() => { if (live.data && !RUNNING.has(live.data.status)) void qc.invalidateQueries({ queryKey: ['data-reset'] }); }, [live.data, qc]);
 
   const ask = useRequestDataReset(), approve = useApproveDataReset(), cancel = useCancelDataReset(), run = useRunDataReset();
-  const retry = useRetryDataResetFiles(), setCfg = useSetDataResetSettings();
+  const retry = useRetryDataResetFiles(), setCfg = useSetDataResetSettings(), makeArchive = useMakeDataResetArchive();
+  const [archive, setArchive] = useState<ArchiveMode>('download');
   const [dialog, setDialog] = useState<Dialog>(null);
   const [reason, setReason] = useState('');
   const [typed, setTyped] = useState('');
@@ -45,9 +48,14 @@ export function DataReset() {
   const [chosen, setChosen] = useState<string[]>([]);
   const [requireBackup, setRequireBackup] = useState(true);
   const [noBackupTyped, setNoBackupTyped] = useState('');
+  const [narrow, setNarrow] = useState<DataResetNarrow>({});
   const requested = mode === 'custom' ? [...chosen].sort() : null;
-  const dry = useDataResetPlan(requested, mode === 'custom' && !!s && !open);
-  const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+  const narrowable = new Set((s?.plan.parts ?? []).filter((p) => p.narrowable).map((p) => p.code));
+  // a narrowing is offered only when every chosen part can follow one record; it is dropped when the choice changes to something else
+  const canNarrow = mode === 'custom' && chosen.length > 0 && chosen.every((c) => narrowable.has(c));
+  const nb = canNarrow ? narrowBody(narrow) : undefined;
+  const dry = useDataResetPlan(requested, mode === 'custom' && !!s && !open, nb);
+  const when = (iso: string | null | undefined) => (iso ? fmtDateTime(iso, i18n.language === 'ar' ? 'ar' : 'en') || '—' : '—');
   const close = () => setDialog(null);
 
   if (q.isError) {
@@ -122,19 +130,21 @@ export function DataReset() {
           <p className="font-semibold" data-testid="dr-request-status">{t(`dr.status_${req.status}`)}</p>
           <ScopeView r={req} catalogue={catalogue} />
           <BackupView r={req} hours={s.settings.backup_max_age_hours} />
+          <ArchivePanel r={req} canMake={!!s.can.start && req.status === 'approved'} making={makeArchive.isPending} error={makeArchive.isError ? errText(makeArchive.error, t) : null}
+            onMake={() => { makeArchive.reset(); makeArchive.mutate({ id: req.id }); }} when={when} />
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by">{req.requested_by.display_name} · {when(req.requested_at)}</dd>
+            <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by"><bdi>{req.requested_by.display_name}</bdi> · <bdi>{when(req.requested_at)}</bdi></dd>
             <dt>{t('common.reason')}</dt><dd>{req.request_reason}</dd>
-            {req.approved_by && <><dt>{t('dr.approved_by')}</dt><dd data-testid="dr-approved-by">{req.approved_by.display_name} · {when(req.approved_at)}</dd></>}
-            {(req.status === 'requested' || req.status === 'approved') && <><dt>{t('dr.expires')}</dt><dd data-testid="dr-expires">{when(req.expires_at)}</dd></>}
-            {req.run_by && <><dt>{t('dr.run_by')}</dt><dd>{req.run_by.display_name} · {when(req.run_started_at)}</dd></>}
+            {req.approved_by && <><dt>{t('dr.approved_by')}</dt><dd data-testid="dr-approved-by"><bdi>{req.approved_by.display_name}</bdi> · <bdi>{when(req.approved_at)}</bdi></dd></>}
+            {(req.status === 'requested' || req.status === 'approved') && <><dt>{t('dr.expires')}</dt><dd data-testid="dr-expires"><bdi>{when(req.expires_at)}</bdi></dd></>}
+            {req.run_by && <><dt>{t('dr.run_by')}</dt><dd><bdi>{req.run_by.display_name}</bdi> · <bdi>{when(req.run_started_at)}</bdi></dd></>}
           </dl>
           {req.status === 'requested' && !s.can.approve && <p className="text-sm text-mute" data-testid="dr-wait-other">{t('dr.wait_other')}</p>}
           {running && <p className="text-sm" data-testid="dr-progress">{req.status === 'running' ? t('dr.progress_db') : t('dr.progress_files', { done: req.files.moved + req.files.missing + req.files.refused, total: req.files.total })}</p>}
           {req.stalled && <p className="text-sm text-lateInk" data-testid="dr-stalled">{t('dr.stalled')}</p>}
           <div className="flex flex-wrap gap-2">
             {s.can.approve && <button className="btn btn-danger" data-testid="dr-approve" onClick={() => { approve.reset(); setDialog('approve'); }}>{t('dr.approve')}</button>}
-            {s.can.start && <button className="btn btn-danger" data-testid="dr-run" disabled={(needBackup && !s.backup.ok) || !s.storage.supported} onClick={() => { run.reset(); setRunTyped(''); setDialog('run'); }}>{t('dr.run')}</button>}
+            {s.can.start && <button className="btn btn-danger" data-testid="dr-run" disabled={(needBackup && !s.backup.ok) || !s.storage.supported || !archiveReady(req)} onClick={() => { run.reset(); setRunTyped(''); setDialog('run'); }}>{t('dr.run')}</button>}
             {s.can.cancel && <button className="btn" data-testid="dr-cancel" onClick={() => { cancel.reset(); setDialog('cancel'); }}>{t('dr.cancel')}</button>}
             {req.status === 'files_pending' && s.can.retry_files && <button className="btn" data-testid="dr-retry-files" onClick={() => { retry.reset(); setDialog('retry'); }}>{t('dr.retry_files')}</button>}
           </div>
@@ -147,6 +157,10 @@ export function DataReset() {
           <h3 className="font-bold">{t('dr.new_request')}</h3>
           <ScopePicker catalogue={catalogue} mode={mode} setMode={setMode} chosen={chosen} setChosen={setChosen} disabled={!s.can.request}
             closure={mode === 'everything' ? (s.everything ?? []) : (dry.data?.scope.parts ?? closureOf(chosen, catalogue))} />
+          {mode === 'custom' && <p className="text-sm text-mute" data-testid="dr-narrow-whole">{t('dr.narrow_whole')}</p>}
+          {canNarrow && <NarrowPicker part={chosen.length === 1 ? chosen[0] : null} narrow={narrow} setNarrow={setNarrow} disabled={!s.can.request} />}
+          {mode === 'custom' && chosen.length > 0 && !canNarrow && !narrowEmpty(narrow) && <p className="text-sm text-lateInk" data-testid="dr-narrow-dropped">{t('dr.narrow_dropped')}</p>}
+          <ArchiveChoice value={archive} setValue={setArchive} disabled={!s.can.request} />
           <BackupChoice requireBackup={requireBackup} setRequireBackup={(v) => { setRequireBackup(v); setNoBackupTyped(''); }} typed={noBackupTyped} setTyped={setNoBackupTyped}
             phrase={noBackupPhrase} hours={s.settings.backup_max_age_hours} disabled={!s.can.request} />
           <label className="block text-sm font-semibold">{t('dr.reason_label')}
@@ -157,9 +171,9 @@ export function DataReset() {
           </label>
           {ask.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-form-error">{errText(ask.error, t)}</p>}
           <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || !scopeOk || !noBackupOk || ask.isPending}
-            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}),
+            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}), ...(nb ? { narrow: nb } : {}), archive,
               ...(requireBackup ? {} : { require_backup: false, no_backup_confirm: noBackupTyped }) },
-              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); setRequireBackup(true); setNoBackupTyped(''); } })}>
+              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); setNarrow({}); setRequireBackup(true); setNoBackupTyped(''); setArchive('download'); } })}>
             {t('dr.submit')}
           </button>
         </section>
@@ -370,6 +384,7 @@ function ScopeView({ r, catalogue }: { r: DataResetRequest; catalogue: DataReset
               </li>
             ))}
           </ul>
+          {sc?.narrow && <NarrowView narrow={sc.narrow} />}
           {identity.length > 0 && <p role="alert" className="font-semibold text-lateInk" data-testid="dr-request-scope-identity">{t('dr.identity_warning', { parts: identity.join(', ') })}</p>}
           {r.scope_hash && <p className="text-xs text-mute">{t('dr.scope_hash')}: <span className="mono" dir="ltr" data-testid="dr-request-scope-hash">{r.scope_hash.slice(0, 12)}</span></p>}
         </>
@@ -423,5 +438,159 @@ function BackupView({ r, hours, testid = 'dr-request-backup' }: { r: DataResetRe
       <AlertOctagon size={16} className="mt-0.5 shrink-0" aria-hidden />
       <span><span>{t('dr.backup_requirement')}: {t('dr.backup_not_required_value')}.</span> <span>{t('dr.no_backup_warning')}</span></span>
     </p>
+  );
+}
+
+const dayText = (d: string | undefined, lang: string) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium' }) : '');
+
+/**
+ * Contract 0.15.265 (migration 0370): narrow the chosen register parts to regions, import batches and a first-created period (every given filter must match).
+ * The dry run above recounts with the filter; the filter is part of the scope the approver sees and the hash they approve.
+ */
+function NarrowPicker({ part, narrow, setNarrow, disabled }: { part: string | null; narrow: DataResetNarrow; setNarrow: (n: DataResetNarrow) => void; disabled: boolean }) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const opt = useDataResetNarrowOptions(part);
+  const regions = opt.data?.regions ?? [], batches = opt.data?.batches ?? [];
+  const toggle = <K extends 'regions' | 'batches'>(key: K, v: NonNullable<DataResetNarrow[K]>[number]) => {
+    const cur = ((narrow[key] ?? []) as (typeof v)[]);
+    const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
+    setNarrow({ ...narrow, [key]: next });
+  };
+  return (
+    <fieldset className="space-y-2 rounded-md border border-line p-3" data-testid="dr-narrow" disabled={disabled}>
+      <legend className="px-1 text-sm font-semibold">{t('dr.narrow_title')}</legend>
+      <p className="text-sm text-mute">{t('dr.narrow_hint')}</p>
+      {opt.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-narrow-error">{t('errors.generic')}</p>}
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-1 rounded-md bg-card2 p-2" data-testid="dr-narrow-regions">
+          <h4 className="text-sm font-semibold">{t('dr.narrow_regions')}</h4>
+          {regions.map((r) => (
+            <label key={r.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid={`dr-narrow-region-${r.id}`} checked={(narrow.regions ?? []).includes(r.id)} onChange={() => toggle('regions', r.id)} />
+              <span>{lang === 'ar' && r.name_ar ? r.name_ar : r.name_en}</span>
+            </label>
+          ))}
+        </div>
+        <div className="space-y-1 rounded-md bg-card2 p-2" data-testid="dr-narrow-batches">
+          <h4 className="text-sm font-semibold">{t('dr.narrow_batches')}</h4>
+          {batches.length === 0 && <p className="text-xs text-mute">{t('dr.narrow_no_batches')}</p>}
+          <div className="max-h-40 space-y-1 overflow-y-auto">
+            {batches.map((b) => (
+              <label key={b.id} className="flex items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-1" data-testid={`dr-narrow-batch-${b.id}`} checked={(narrow.batches ?? []).includes(b.id)} onChange={() => toggle('batches', b.id)} />
+                <span className="min-w-0"><span className="mono break-all text-xs" dir="ltr">{b.file_name}</span>
+                  <span className="block text-xs text-mute">{t('dr.narrow_batch_meta', { rows: b.rows_total, when: dayText(b.created_at.slice(0, 10), lang) })}</span></span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2 rounded-md bg-card2 p-2" data-testid="dr-narrow-period">
+          <h4 className="text-sm font-semibold">{t('dr.narrow_period')}</h4>
+          <label className="block text-sm">{t('dr.narrow_from')}
+            <input type="date" className="input mt-1" data-testid="dr-narrow-from" value={narrow.from ?? ''} max={narrow.to ?? undefined} onChange={(e) => setNarrow({ ...narrow, from: e.target.value || undefined })} />
+          </label>
+          <label className="block text-sm">{t('dr.narrow_to')}
+            <input type="date" className="input mt-1" data-testid="dr-narrow-to" value={narrow.to ?? ''} min={narrow.from ?? undefined} onChange={(e) => setNarrow({ ...narrow, to: e.target.value || undefined })} />
+          </label>
+        </div>
+      </div>
+      {!narrowEmpty(narrow) && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-line p-2 text-sm" data-testid="dr-narrow-active">
+          <span>{t('dr.narrow_active')}</span>
+          <button type="button" className="btn btn-ghost p-1" data-testid="dr-narrow-clear" aria-label={t('dr.narrow_clear')} onClick={() => setNarrow({})}><X size={16} aria-hidden /></button>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** The narrowing of a request, read-only (requester, approver, runner). */
+function NarrowView({ narrow }: { narrow: DataResetNarrow }) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const needNames = !!narrow.regions?.length;
+  const opt = useDataResetNarrowOptions(null, needNames || !!narrow.batches?.length);
+  const rname = (id: number) => { const r = opt.data?.regions.find((x) => x.id === id); return r ? (lang === 'ar' && r.name_ar ? r.name_ar : r.name_en) : `#${id}`; };
+  const bname = (id: string) => opt.data?.batches.find((x) => x.id === id)?.file_name ?? id.slice(0, 8);
+  const bits: string[] = [];
+  if (narrow.regions?.length) bits.push(`${t('dr.narrow_regions')}: ${narrow.regions.map(rname).join(', ')}`);
+  if (narrow.batches?.length) bits.push(`${t('dr.narrow_batches')}: ${narrow.batches.map(bname).join(', ')}`);
+  if (narrow.from || narrow.to) bits.push(`${t('dr.narrow_period')}: ${dayText(narrow.from, lang) || '…'} – ${dayText(narrow.to, lang) || '…'}`);
+  return (
+    <p className="rounded-md border border-lateInk/40 bg-lateBg p-2 font-semibold text-lateInk" data-testid="dr-request-narrow">
+      {t('dr.narrow_view')} {bits.join(' · ')}
+    </p>
+  );
+}
+
+/** Contract 0.15.266 (migration 0371, Data entry proposal P2): the archive made before the delete. Restore is the template upload again. */
+function ArchiveChoice({ value, setValue, disabled }: { value: ArchiveMode; setValue: (v: ArchiveMode) => void; disabled: boolean }) {
+  const { t } = useTranslation();
+  const opts: { v: ArchiveMode; id: string }[] = [{ v: 'download', id: 'dr-archive-download' }, { v: 'keep_90', id: 'dr-archive-keep' }, { v: 'none', id: 'dr-archive-none-option' }];
+  return (
+    <fieldset className="space-y-2 rounded-md border border-line p-3" data-testid="dr-archive-choice" data-mode={value} disabled={disabled}>
+      <legend className="flex items-center gap-1 px-1 text-sm font-semibold"><Archive size={14} aria-hidden />{t('dr.archive_choice')}</legend>
+      {opts.map((o) => (
+        <label key={o.v} className="flex items-start gap-2 text-sm">
+          <input type="radio" name="dr-archive-choice" className="mt-1" data-testid={o.id} checked={value === o.v} onChange={() => setValue(o.v)} />
+          <span><span className={`font-semibold ${o.v === 'none' ? 'text-lateInk' : ''}`}>{t(`dr.archive_${o.v}`)}</span><span className="block text-mute">{t(`dr.archive_${o.v}_hint`)}</span></span>
+        </label>
+      ))}
+      <p className="text-xs text-mute" data-testid="dr-archive-restore-note">{t('dr.archive_restore_note')}</p>
+    </fieldset>
+  );
+}
+
+/** The archive of a request: its mode (read-only), its state, the make and download buttons (a System Admin, step-up asked by the request layer). */
+function ArchivePanel({ r, canMake, making, error, onMake, when }: {
+  r: DataResetRequest; canMake: boolean; making: boolean; error: string | null; onMake: () => void; when: (s: string | null | undefined) => string;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [dl, setDl] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const mode = archiveMode(r), a = archiveOf(r);
+  if (mode === 'none') return <p className="text-sm" data-testid="dr-request-archive" data-mode="none"><span className="font-semibold">{t('dr.archive_label')}:</span> {t('dr.archive_none_value')}</p>;
+  const open = r.status === 'requested' || r.status === 'approved';
+  const download = async () => {
+    setDl({ busy: true, error: null });
+    try {
+      const name = await downloadDataResetArchive(r.id);
+      toast(t('dr.archive_downloaded', { name }));
+      setDl({ busy: false, error: null });
+      void qc.invalidateQueries({ queryKey: ['data-reset'] });
+    } catch (e) {
+      setDl({ busy: false, error: errText(e, t) });
+    }
+  };
+  const needDownload = mode === 'download' && a?.status === 'ready' && (a.downloads ?? 0) === 0;
+  return (
+    <div className="space-y-2 rounded-md border border-line p-2 text-sm" data-testid="dr-request-archive" data-mode={mode} data-status={a?.status ?? 'none'}>
+      <p className="flex items-center gap-1 font-semibold"><Archive size={14} aria-hidden />{t('dr.archive_label')}: {t(`dr.archive_${mode}_value`)}</p>
+      {!a && open && <p className="text-mute" data-testid="dr-archive-state">{r.status === 'approved' ? t('dr.archive_not_made') : t('dr.archive_after_approval')}</p>}
+      {a?.status === 'building' && <p role="status" data-testid="dr-archive-state">{t('dr.archive_building')}</p>}
+      {a?.status === 'failed' && <p role="alert" className="text-lateInk" data-testid="dr-archive-state">{t('dr.archive_failed', { error: a.error ?? '—' })}</p>}
+      {a?.status === 'purged' && <p className="text-mute" data-testid="dr-archive-state">{t('dr.archive_purged')}</p>}
+      {a?.status === 'ready' && (
+        <p data-testid="dr-archive-state">{t('dr.archive_ready', { size: Math.max(1, Math.round((a.bytes ?? 0) / 1024)), until: when(a.keep_until), count: a.downloads ?? 0 })}</p>
+      )}
+      {a?.status === 'ready' && a.sha256 && <p className="text-xs text-mute"><bdi dir="ltr">SHA-256</bdi> <span className="mono" dir="ltr" data-testid="dr-archive-sha">{a.sha256.slice(0, 12)}</span></p>}
+      {needDownload && <p className="text-lateInk" data-testid="dr-archive-need-download">{t('dr.archive_need_download')}</p>}
+      <div className="flex flex-wrap gap-2">
+        {canMake && (!a || a.status === 'failed') && (
+          <button className="btn" data-testid="dr-archive-make" disabled={making} aria-label={t('dr.archive_make')} title={t('dr.archive_make_hint')} onClick={onMake}>
+            <Archive size={14} aria-hidden /> {t('dr.archive_make')}
+          </button>
+        )}
+        {a?.status === 'ready' && (
+          <button className="btn" data-testid="dr-archive-download-btn" disabled={dl.busy} aria-label={t('dr.archive_download_btn')} title={t('dr.archive_download_btn_hint')} onClick={() => void download()}>
+            <Download size={14} aria-hidden /> {t('dr.archive_download_btn')}
+          </button>
+        )}
+      </div>
+      {(error || dl.error) && <p role="alert" className="text-lateInk" data-testid="dr-archive-error">{error ?? dl.error}</p>}
+      <p className="text-xs text-mute">{t('dr.archive_restore_note')}</p>
+    </div>
   );
 }

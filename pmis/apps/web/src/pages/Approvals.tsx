@@ -84,7 +84,9 @@ export function Approvals() {
           rows={() => items.map((i, k) => [k + 1, i.task.site_code, i.task.task_code, i.task.name_en, i.submitted_by?.display_name ?? '', i.task.sla?.colour ?? ''])} />} />
       <div className="grid gap-4 lg:grid-cols-[minmax(320px,5fr)_7fr]">
         <section className="card overflow-hidden">
-          <div role="tablist" className="flex border-b border-line">
+          {/* P3: tabs, quick filters and sort share one row */}
+          <div className="flex flex-wrap items-center border-b border-line">
+          <div role="tablist" className="flex">
             {TABS.map((k) => (
               <button key={k} role="tab" aria-selected={tab === k} data-testid={`approvals-tab-${k}`} onClick={() => setTab(k)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold ${tab === k ? 'border-b-2 border-accent text-accentText' : 'text-mute'}`}>
@@ -92,10 +94,7 @@ export function Approvals() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3 border-b border-line p-3">
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="approval-select-all" checked={allChecked} onChange={() => setChecked(allChecked ? new Set() : new Set(items.map((i) => i.task.id)))} />{t('approvals.select_all')}</label>
-          </div>
-          <div role="toolbar" aria-label={t('timing.filters')} className="flex flex-wrap items-center gap-2 border-b border-line p-3" data-testid="approvals-timing">
+          <div role="toolbar" aria-label={t('timing.filters')} className="flex flex-wrap items-center gap-2 p-2 ms-auto" data-testid="approvals-timing">
             {COLOURS.map((c) => <QuickFilter key={c} testid={`approvals-colour-${c}`} on={colours.includes(c)} onClick={() => setColours((x) => (x.includes(c) ? x.filter((y) => y !== c) : [...x, c]))}>{t(`timing.filter_${c}`)}</QuickFilter>)}
             <QuickFilter testid="approvals-stale" on={stale} onClick={() => setStale((x) => !x)}>{t('timing.filter_stale')}</QuickFilter>
             <label className="ms-auto flex items-center gap-1 text-sm"><span className="text-mute">{t('timing.sort')}</span>
@@ -103,6 +102,7 @@ export function Approvals() {
                 {TIMING_SORTS.map((k) => <option key={k} value={k}>{t(`timing.sort_${k}`)}</option>)}
               </select>
             </label>
+          </div>
           </div>
           {picked.length > 0 && (
             <div className="flex items-center gap-2 border-b border-line bg-accentSoft p-3" data-testid="bulk-bar">
@@ -117,9 +117,12 @@ export function Approvals() {
               <ul>{report.map((r) => <li key={r.ref} data-testid={`bulk-issue-${r.code}`}><b className="mono">{r.site}</b> · {t(r.kind === 'failed' ? 'approvals.bulk_failed' : 'approvals.bulk_skipped')}: {r.message}</li>)}</ul>
             </div>
           )}
+          <div className="flex items-center gap-3 border-b border-line p-3" data-testid="approvals-list-header">
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="approval-select-all" checked={allChecked} onChange={() => setChecked(allChecked ? new Set() : new Set(items.map((i) => i.task.id)))} />{t('approvals.select_all')}</label>
+          </div>
           <ul data-testid="approvals-list" {...displayAttrs(tbl.display)}>
             {items.map((i, k) => (
-              <li key={i.task.id} data-testid={`approval-row-${i.task.id}`} data-site={i.task.site_code} aria-selected={sel === i.task.id}
+              <li key={i.task.id} data-testid={`approval-row-${i.task.id}`} data-site={i.task.site_code} aria-current={sel === i.task.id ? 'true' : undefined}
                 role="listitem" data-zebra={k % 2 ? '1' : '0'}
                 className={`flex items-center gap-3 border-b border-line ${tbl.display.density === 'compact' ? 'p-1.5' : tbl.display.density === 'normal' ? 'p-2' : 'p-3'} ${sel === i.task.id ? 'bg-openBg' : tbl.display.zebra && k % 2 ? 'bg-card2 hover:bg-hover' : 'hover:bg-hover'}`}>
                 <span data-col="rowno" className="w-6 shrink-0"><RowNo n={k + 1} /></span>

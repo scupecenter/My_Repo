@@ -63,23 +63,34 @@ const CATALOGUE: P[] = [
   ['staff', 'identity', 'Staff registry and absences', 'سجل الموظفين والغيابات', [], 40],
 ];
 const IDENT = ['users', 'roles', 'staff'];
+// Contract 0.15.265: the parts a filter can follow (the database's data_reset_narrowable())
+const NARROWABLE = ['procurement', 'issues', 'risks', 'car_dispatcher', 'financial_advances'];
+type Narrow = NonNullable<DataResetScope['narrow']>;
+const narrowOf = (q: URLSearchParams): Narrow | null => {
+  const n: Narrow = {}; const r = q.get('regions'), b = q.get('batches');
+  if (r) n.regions = r.split(',').map(Number);
+  if (b) n.batches = b.split(',');
+  if (q.get('from')) n.from = q.get('from')!;
+  if (q.get('to')) n.to = q.get('to')!;
+  return Object.keys(n).length ? n : null;
+};
 const EVERYTHING = CATALOGUE.filter((c) => c[1] !== 'identity').map((c) => c[0]).sort();
 const hashOf = (parts: string[]) => [...parts].sort().join(',').split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(16).padStart(8, '0').repeat(8);
-function scopeOf(requested: string[] | null): DataResetScope {
+function scopeOf(requested: string[] | null, narrow: Narrow | null = null): DataResetScope {
   const parts = requested ? closureOf(requested, CATALOGUE.map(([code, , , , deps]) => ({ code, depends_on: deps }))) : EVERYTHING;
   const req = requested ? [...new Set(requested)].sort() : parts;
   return { version: 1, requested: req, parts, added: parts.filter((p) => !req.includes(p)), everything: EVERYTHING.every((p) => parts.includes(p)),
-    identity: parts.filter((p) => IDENT.includes(p)), hash: hashOf(parts) };
+    identity: parts.filter((p) => IDENT.includes(p)), hash: hashOf(narrow ? [...parts, JSON.stringify(narrow)] : parts), ...(narrow ? { narrow } : {}) };
 }
-function planOf(requested: string[] | null): DataResetPlan {
-  const scope = scopeOf(requested), sel = new Set(scope.parts ?? []), req = new Set(scope.requested ?? []);
+function planOf(requested: string[] | null, narrow: Narrow | null = null): DataResetPlan {
+  const scope = scopeOf(requested, narrow), sel = new Set(scope.parts ?? []), req = new Set(scope.requested ?? []);
   const tables = TABLES.map((t) => (sel.has(t.part ?? '') || (t.part === '*' && sel.has('sites')) ? t : { ...t, delete: 0, keep: t.rows }));
   return {
     scope, tables, files: sel.has('documents') ? 31 : 0,
     delete_rows: tables.reduce((n, t) => n + (t.table === 'users' ? 0 : t.delete), 0), keep_rows: tables.reduce((n, t) => n + t.keep, 0),
     accounts_to_deactivate: sel.has('users') ? 23 : 0, error: null,
     parts: CATALOGUE.map(([code, group, label_en, label_ar, deps, rows]) => ({
-      code, group, kind: group === 'identity' ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
+      code, group, narrowable: NARROWABLE.includes(code), kind: group === 'identity' ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
       dependents: CATALOGUE.filter((c) => c[4].includes(code)).map((c) => c[0]), rows, tables: {}, requested: req.has(code), selected: sel.has(code),
       added: sel.has(code) && !req.has(code) })),
   };
@@ -98,6 +109,11 @@ function view(): DataResetState {
   };
 }
 
+/** The run waits for a ready archive (mode download: and downloaded once), as the database does. */
+const archiveOk = (r: DataResetRequest) => {
+  const m = r.archive?.mode ?? 'none', a = r.archive?.archive;
+  return m === 'none' || (a?.status === 'ready' && (m === 'keep_90' || (a.downloads ?? 0) > 0));
+};
 function admin() {
   const g = guard(); if (g) return g;
   if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin may use the project data reset.' });
@@ -105,13 +121,13 @@ function admin() {
 }
 /** The mock's binding hash: the scope's hash, or another one when the request runs without a backup (as the database does). */
 const bound = (parts: string[] | null, requireBackup: boolean) => (requireBackup ? scopeOf(parts).hash ?? null : hashOf([...(scopeOf(parts).parts ?? []), 'no-backup']));
-const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number, parts: string[] | null = null, requireBackup = true): DataResetRequest => ({
+const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number, parts: string[] | null = null, requireBackup = true, archive: 'none' | 'download' | 'keep_90' = 'none'): DataResetRequest => ({
   id: crypto.randomUUID(), status: 'requested', version: 1, database_name: 'pmis', requested_by: by, requested_at: now(), request_reason: reason,
   expires_at: new Date(Date.now() + minutes * 60_000).toISOString(), expired: false, approved_by: null, approved_at: null, approve_reason: null, cancelled_by: null,
   cancelled_at: null, cancel_reason: null, run_by: null, run_started_at: null, db_committed_at: null, finished_at: null, stalled: false, backup: null,
   plan_at_request: { delete_rows: planOf(parts).delete_rows, files: planOf(parts).files, sites: 12,
     parts: Object.fromEntries(CATALOGUE.filter((c) => (scopeOf(parts).parts ?? []).includes(c[0])).map((c) => [c[0], c[5]])) },
-  scope: scopeOf(parts), scope_hash: bound(parts, requireBackup), approved_scope_hash: null, require_backup: requireBackup,
+  scope: scopeOf(parts), scope_hash: bound(parts, requireBackup), approved_scope_hash: null, require_backup: requireBackup, archive: { mode: archive, archive: null },
   result: null, quarantine_dir: null, error: null,
   files: { total: 0, moved: 0, missing: 0, refused: 0, pending: 0, problems: [] },
 });
@@ -127,8 +143,8 @@ const reason = (b: { reason?: string }, min: number) =>
 
 export const dataResetHandlers = [
   http.post(`${B}/__mock/data-reset/request-by-other`, async ({ request }) => {
-    const b = (await request.json().catch(() => ({}))) as { parts?: string[]; require_backup?: boolean } | null;
-    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null, b?.require_backup ?? true);
+    const b = (await request.json().catch(() => ({}))) as { parts?: string[]; require_backup?: boolean; archive?: 'none' | 'download' | 'keep_90' } | null;
+    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null, b?.require_backup ?? true, b?.archive ?? 'none');
     return HttpResponse.json(st().request);
   }),
   http.get(`${B}/settings/data-reset/plan`, ({ request }) => {
@@ -136,8 +152,12 @@ export const dataResetHandlers = [
     const raw = new URL(request.url).searchParams.get('parts');
     const parts = raw ? raw.split(',') : null;
     if (parts?.some((p) => !CATALOGUE.some((c) => c[0] === p))) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: 'unknown_part' }] as never });
-    return HttpResponse.json(planOf(parts));
+    if (parts && narrowOf(new URL(request.url).searchParams) && parts.some((p) => !NARROWABLE.includes(p))) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/narrow', code: 'not_narrowable' }] as never });
+    return HttpResponse.json(planOf(parts, narrowOf(new URL(request.url).searchParams)));
   }),
+  http.get(`${B}/settings/data-reset/narrow-options`, () => admin() ?? HttpResponse.json({
+    regions: [{ id: 1, name_en: 'Tripoli', name_ar: 'طرابلس' }, { id: 2, name_en: 'Benghazi', name_ar: 'بنغازي' }],
+    batches: [{ id: 'b0000000-0000-4000-8000-000000000001', file_name: 'procurement-2026-11.xlsx', rows_total: 14, created_at: '2026-11-20T08:00:00Z' }] })),
   http.post(`${B}/__mock/data-reset/backup`, async ({ request }) => { st().backupOk = ((await request.json()) as { ok: boolean }).ok; return HttpResponse.json({}); }),
   http.get(`${B}/settings/data-reset`, () => admin() ?? HttpResponse.json(view())),
   http.get(`${B}/settings/data-reset/requests/:id`, ({ params }) => {
@@ -148,7 +168,7 @@ export const dataResetHandlers = [
   http.post(`${B}/settings/data-reset/requests`, async ({ request }) => {
     const g = admin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string };
+    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string; narrow?: Narrow; archive?: 'none' | 'download' | 'keep_90' };
     const bad = reason(b, 10); if (bad) return bad;
     if (b.parts && (b.parts.length === 0 || b.parts.some((p) => !CATALOGUE.some((c) => c[0] === p)))) {
       return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: b.parts.length ? 'unknown_part' : 'required' }] as never });
@@ -160,7 +180,8 @@ export const dataResetHandlers = [
     }
     const s = st();
     if (s.request) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'Another data reset request is open.' });
-    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null, need);
+    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null, need, b.archive ?? 'none');
+    if (b.narrow) { s.request.scope = scopeOf(b.parts ?? null, b.narrow); s.request.scope_hash = s.request.scope.hash ?? null; }
     return json(s.request, 201);
   }),
   http.post(`${B}/settings/data-reset/requests/:id/approve`, async ({ params, request }) => {
@@ -197,6 +218,7 @@ export const dataResetHandlers = [
     const v = version(request, r); if (v) return v;
     if ((await request.json() as { confirm_text?: string }).confirm_text !== PHRASE) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match');
     if (r.status !== 'approved') return problem(409, 'invalid_transition', 'Not possible now');
+    if (!archiveOk(r)) return problem(409, 'archive_required', 'The archive of this reset is not ready', { detail: 'Make the archive first (mode download: and download it once).' });
     if ((r.require_backup ?? true) && !s.backupOk) return problem(409, 'backup_missing', 'No recent successful database backup', { detail: 'No successful database backup in the last 24 hours.' });
     const t0 = now();
     s.last = { ...r, status: 'completed', version: r.version + 3, run_by: me(), run_started_at: t0, db_committed_at: t0, finished_at: t0,
@@ -205,6 +227,25 @@ export const dataResetHandlers = [
       files: { total: 31, moved: 30, missing: 1, refused: 0, pending: 0, problems: [{ storage_key: 'docs/2026/11/synthetic-missing', outcome: 'missing', detail: null }] } };
     s.request = null;
     return json({ ...r, status: 'running', version: r.version + 1, run_by: me(), run_started_at: t0 }, 202);
+  }),
+  http.post(`${B}/settings/data-reset/requests/:id/archive`, ({ params }) => {
+    const g = admin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const r = st().request;
+    if (!r || r.id !== params.id) return problem(404, 'not_found', 'Not found');
+    if (r.status !== 'approved' || (r.archive?.mode ?? 'none') === 'none') return problem(409, 'invalid_transition', 'Not possible now');
+    const t0 = now(), keep = r.archive?.mode === 'keep_90' ? 90 : 7;
+    r.archive = { mode: r.archive?.mode ?? 'none', archive: { id: crypto.randomUUID(), status: 'ready', bytes: 482_113, sha256: 'a'.repeat(64), error: null, created_at: t0, ready_at: t0,
+      keep_until: new Date(Date.now() + keep * 86_400_000).toISOString(), downloads: 0, first_downloaded_at: null, entries: { records: 128, files: 31, files_bytes: 3_204_551, registers: [{ register: 'procurement', rows: 96 }, { register: 'issue_log', rows: 32 }] } } };
+    return json(r, 202);
+  }),
+  http.get(`${B}/settings/data-reset/requests/:id/archive/download`, ({ params }) => {
+    const g = admin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const r = st().request, a = r?.archive?.archive;
+    if (!r || r.id !== params.id || !a || a.status !== 'ready') return problem(404, 'not_found', 'Not found');
+    a.downloads = (a.downloads ?? 0) + 1; a.first_downloaded_at ??= now();
+    return new HttpResponse('PK-synthetic-archive', { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="GSDN_DataReset_Archive_20261127.zip"' } });
   }),
   http.post(`${B}/settings/data-reset/requests/:id/retry-files`, () => admin() ?? problem(409, 'invalid_transition', 'Not possible now')),
   http.put(`${B}/settings/data-reset/settings`, async ({ request }) => {
