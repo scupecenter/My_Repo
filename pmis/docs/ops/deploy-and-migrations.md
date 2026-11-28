@@ -70,3 +70,7 @@ Never delete a row of `pmis_admin.migrations` for a migration that finished corr
 5. When it ends, check the API: the service is active, and `GET /health` answers (see `pmis/infra/RUNBOOK.md`).
 6. Sign in, open the Site Master list and one register. Check `GET /admin/deployments` shows the new commit and migrations.
 7. If something is wrong, do not roll the code back by hand. Report it with the log; a rollback of the database means restoring the backup of step 2 together with the previous commit, and the owner decides.
+
+## Migration 0700: log line of the scenario-rule probe (diagnostic)
+
+`site_new_clean` checks the scope flags against the scenario rules with a probe site that is rolled back. When that probe fails for any reason the person sees "The site could not be checked against the scenario rules." Since 0700 the database log also gets one line, `site_new_clean probe failed: sqlstate <code> message <text>`. Nothing else changes: same answer, same rows, same rights. Search the log for that text when a row of a New sites batch is refused with that message.
