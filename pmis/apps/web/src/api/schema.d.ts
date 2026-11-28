@@ -1525,6 +1525,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/intake-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The public intake forms the caller manages (all of them for a System Admin)
+         * @description 0.15.600. A form's owner and creator and a System Admin see it. `sharing_locked` is true while the lock `block_public_sharing` is on (links then answer like unknown links). The token is never listed (only its last 4 characters, `token_hint`).
+         */
+        get: operations["listIntakeForms"];
+        put?: never;
+        /**
+         * Make a public intake form and its link
+         * @description 0.15.600. The caller becomes the owner: the records of the form are created as this person, so the caller must hold the create right of the register and be an entry holder of its Matrix row (403 `action_forbidden`, 403 `not_eligible_holder`). Only a register with a triage queue (422 `validation_failed`, code `no_triage`). `field_codes` are the asked fields (active, typed by a person: text, number, date, list, yes/no). `fixed` presets other fields (a date field accepts the word `@today`). Refused with 403 `action_forbidden` (`sharing_locked`) while the admin lock `block_public_sharing` is on. The answer carries `token` once: only its hash is stored, it cannot be shown again (replace the link instead).
+         */
+        post: operations["createIntakeForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/intake-forms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a form that is switched off
+         * @description 0.15.600. 409 `invalid_transition` while the form is on. The records it created stay.
+         */
+        delete: operations["deleteIntakeForm"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a form, switch it off or on, set its expiry and limits
+         * @description 0.15.600. The register and the site never change (make a new form). Switching a form on is refused while the lock `block_public_sharing` is on. Switching it off ends the link at once.
+         */
+        patch: operations["updateIntakeForm"];
+        trace?: never;
+    };
+    "/intake-forms/{id}/replace-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a new link; the old one stops working at once
+         * @description 0.15.600. The new `token` is in this answer only. Refused while the lock `block_public_sharing` is on.
+         */
+        post: operations["replaceIntakeFormLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/intake-forms/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The last 50 submissions of a form
+         * @description 0.15.600. Who sent it (name and contact as typed, both optional), when, the record created and its triage state.
+         */
+        get: operations["listIntakeSubmissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/intake/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the shared page shows (public, no session)
+         * @description 0.15.600. Answers only the name, the texts and the asked fields; never the site, the register, the owner or any record. An unknown, switched-off, expired or malformed link, an owner who is no longer active, and any link while the lock `block_public_sharing` is on, all answer the same 404 `not_found`. Rate limited per client address (429 `rate_limited`). No cookie is read or set.
+         */
+        get: operations["getPublicIntakeForm"];
+        put?: never;
+        /**
+         * Send the form (public, no session)
+         * @description 0.15.600. Only the asked fields count, each checked by its type (422 `validation_failed` with `errors[]`; plain text only: `<`, `>` and HTML entities are refused). The hidden field `website` is the honeypot: when it is filled the answer is the same 201 and nothing is written. The record is created as the form owner by the register's own create function (so its rules, the owner's live rights, the audit and the triage queue apply); when that fails for any reason about the owner or the register the sender gets the same 404 as an unknown link. Limits: the form's `max_per_hour`, a share of it per sender, and 10 sends an hour per address (429 `rate_limited`, `Retry-After`).
+         */
+        post: operations["submitPublicIntakeForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invitations/{token}": {
         parameters: {
             query?: never;
@@ -16838,6 +16952,130 @@ export interface components {
             revoked_at?: string | null;
             revoke_reason?: string | null;
         };
+        IntakeFormCreate: {
+            name: string;
+            /** @description A register with a triage queue (issues */
+            register_key: string;
+            /** Format: uuid */
+            site_id: string;
+            record_type?: string | null;
+            /** @description The asked fields */
+            field_codes: string[];
+            /** @description Preset values of other fields; `@today` in a date field. */
+            fixed?: {
+                [key: string]: string | number | boolean;
+            };
+            intro_en?: string | null;
+            intro_ar?: string | null;
+            thanks_en?: string | null;
+            thanks_ar?: string | null;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** @default 20 */
+            max_per_hour: number;
+            /**
+             * @description Ask the sender for a name and a way to reach them (both optional).
+             * @default true
+             */
+            ask_contact: boolean;
+        };
+        IntakeFormPatch: {
+            name?: string;
+            record_type?: string | null;
+            field_codes?: string[];
+            fixed?: {
+                [key: string]: string | number | boolean;
+            };
+            intro_en?: string | null;
+            intro_ar?: string | null;
+            thanks_en?: string | null;
+            thanks_ar?: string | null;
+            /** Format: date-time */
+            expires_at?: string | null;
+            max_per_hour?: number;
+            ask_contact?: boolean;
+            is_active?: boolean;
+        };
+        IntakeForm: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            register_key: string;
+            register_name_en?: string;
+            register_name_ar?: string | null;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            record_type?: string | null;
+            field_codes: string[];
+            fixed: {
+                [key: string]: unknown;
+            };
+            intro_en?: string | null;
+            intro_ar?: string | null;
+            thanks_en?: string | null;
+            thanks_ar?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            owner_name: string;
+            /** @description The last 4 characters of the link token. */
+            token_hint: string;
+            is_active: boolean;
+            /** Format: date-time */
+            expires_at?: string | null;
+            max_per_hour: number;
+            ask_contact: boolean;
+            version: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            submissions_total: number;
+            submissions_24h: number;
+            /** Format: date-time */
+            last_submission_at?: string | null;
+        };
+        IntakeFormWithToken: components["schemas"]["IntakeForm"] & {
+            /** @description The link token. Present only in the answer of create and replace-link; it is not stored and cannot be shown again. */
+            token?: string;
+        };
+        IntakeSubmission: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            created_at: string;
+            reporter_name?: string | null;
+            reporter_contact?: string | null;
+            /** Format: uuid */
+            record_id?: string | null;
+            /** @enum {string|null} */
+            triage_state?: "pending" | "accepted" | "rejected" | "duplicate" | "deferred" | null;
+            state?: string | null;
+        };
+        PublicIntakeForm: {
+            name: string;
+            intro_en?: string | null;
+            intro_ar?: string | null;
+            ask_contact: boolean;
+            fields: {
+                code: string;
+                label_en: string;
+                label_ar?: string | null;
+                /** @enum {string} */
+                type: "text" | "number" | "date" | "list" | "yes_no";
+                required: boolean;
+                options?: string[] | null;
+            }[];
+        };
+        PublicIntakeSubmit: {
+            values: {
+                [key: string]: string | number | boolean | null;
+            };
+            reporter_name?: string;
+            reporter_contact?: string;
+            /** @description The honeypot. Leave it empty. */
+            website?: string;
+        };
         InvitationPreview: {
             display_name: string;
             email: string;
@@ -27067,6 +27305,238 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listIntakeForms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The forms. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sharing_locked: boolean;
+                        items: components["schemas"]["IntakeForm"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createIntakeForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeFormCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeFormWithToken"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteIntakeForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateIntakeForm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeFormPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeFormWithToken"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    replaceIntakeFormLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form with its new token. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeFormWithToken"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listIntakeSubmissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The submissions, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["IntakeSubmission"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicIntakeForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicIntakeForm"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    submitPublicIntakeForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicIntakeSubmit"];
+            };
+        };
+        responses: {
+            /** @description Received. */
+            201: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        thanks_en?: string | null;
+                        thanks_ar?: string | null;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getInvitationByToken: {

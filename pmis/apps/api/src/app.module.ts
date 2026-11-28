@@ -24,6 +24,8 @@ import { RegisterRulesController } from './registers/register-rules.controller';
 import { RegisterRulesService } from './registers/register-rules.service';
 import { RegisterColumnsService } from './registers/register-columns.service';
 import { CustomRegistersController } from './custom-registers/custom-registers.controller';
+import { IntakeFormsController, PublicIntakeController } from './intake/intake.controller';
+import { IntakeFormsService, PublicIntakeService } from './intake/intake.service';
 import { CustomRegistersService } from './custom-registers/custom-registers.service';
 import { StructureProposalsService } from './registers/structure-proposals.service';
 import { RegistersService } from './registers/registers.service';
@@ -252,6 +254,8 @@ export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
       CustomRegistersController,
+      IntakeFormsController,
+      PublicIntakeController,
       InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
@@ -288,6 +292,8 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
     ],
     providers: [
       CustomRegistersService,
+      IntakeFormsService,
+      PublicIntakeService,
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, PasswordResetService, RateLimiter, SessionService, UserStateService, StepUpService,
       InvitationsService, // 0091

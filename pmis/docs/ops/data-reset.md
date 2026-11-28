@@ -442,6 +442,8 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | announcement_recipients | KEEP | Announcement recipients. |
 | announcement_responses | KEEP | Answers (append-only). |
 | saved_views | KEEP | Saved views (user preferences). |
+| intake_forms | KEEP | Public intake forms (configuration, token stored as a hash; 0730). |
+| intake_submissions | KEEP | Public intake submissions log (sender hash, reporter name and contact; 0730). |
 | home_view_pins | KEEP | Saved views pinned as home dashboard cards (personal display preference, 0344). |
 | saved_view_versions | KEEP | Saved view history (append-only). |
 | saved_view_targets | KEEP | Saved view sharing. |
