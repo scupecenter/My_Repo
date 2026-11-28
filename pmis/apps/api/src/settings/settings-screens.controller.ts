@@ -35,6 +35,20 @@ export class SettingsScreensController {
     return r;
   }
 
+  @Get('expiry-radar')
+  async expiryRadar(@Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.expiryRadar();
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('expiry-radar')
+  async setExpiryRadar(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.setExpiryRadar(ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
   @Get('table-display')
   async tableDisplay(@Res({ passthrough: true }) res: Response) {
     const r = await this.screens.tableDisplay();

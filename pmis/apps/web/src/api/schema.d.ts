@@ -5552,6 +5552,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/expiry-radar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Expiry radar setting (0.15.640)
+         * @description System Admin or a delegate of `admin.settings` (view or edit). Besides the setting it lists the registers and the date fields that can be chosen (`candidates`).
+         */
+        get: operations["getExpiryRadarSetting"];
+        /**
+         * Save the expiry radar (0.15.640)
+         * @description 0.15.640 (migration 0760): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`). Each register must be active and enabled, once; its field an active date field of it; 1 to 6 different lead times of 1 to 365 days (`out_of_range`, `duplicate`, `invalid`). At most 40 registers. The list replaces the old one. Audited (`expiry_radar_update`, before and after).
+         */
+        put: operations["setExpiryRadarSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/daily-plans": {
         parameters: {
             query?: never;
@@ -18465,6 +18489,36 @@ export interface components {
             /** @description Default 2. */
             working_days: number;
             version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
+        ExpiryRadarRegister: {
+            register_key: string;
+            name_en?: string | null;
+            name_ar?: string | null;
+            field: string;
+            field_label_en?: string | null;
+            field_label_ar?: string | null;
+            /** @description Ascending. */
+            lead_days: number[];
+        };
+        ExpiryRadarCandidate: {
+            register_key: string;
+            name_en?: string;
+            name_ar?: string | null;
+            fields: {
+                code: string;
+                label_en: string;
+                label_ar?: string | null;
+            }[];
+        };
+        ExpiryRadarSetting: {
+            enabled: boolean;
+            version: number;
+            registers: components["schemas"]["ExpiryRadarRegister"][];
+            /** @description Active, enabled registers with at least one active date field. */
+            candidates: components["schemas"]["ExpiryRadarCandidate"][];
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
@@ -34458,6 +34512,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdleTaskAlertSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getExpiryRadarSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryRadarSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setExpiryRadarSetting: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    enabled: boolean;
+                    registers: {
+                        register_key: string;
+                        field: string;
+                        lead_days: number[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryRadarSetting"];
                 };
             };
             401: components["responses"]["Unauthorized"];

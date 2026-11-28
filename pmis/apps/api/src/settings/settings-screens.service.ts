@@ -76,6 +76,19 @@ export class SettingsScreensService {
     return this.one(Prisma.sql`SELECT admin_set_idle_task_alert(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
   }
 
+  // ------------------------------------------------------------------ expiry radar (migration 0760)
+  /** GET /settings/expiry-radar (System Admin or a delegate of admin.settings: the radar's lead times and the date fields that can be chosen) */
+  expiryRadar(): Promise<{ version: number }> {
+    return this.one(Prisma.sql`SELECT expiry_radar_json() AS j`);
+  }
+
+  /** PUT /settings/expiry-radar (If-Match) */
+  setExpiryRadar(ifMatch: string | undefined, raw: unknown): Promise<{ version: number }> {
+    const version = parseIfMatch(ifMatch);
+    const { reason, rest } = split(raw);
+    return this.one(Prisma.sql`SELECT admin_set_expiry_radar(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
+  }
+
   // ------------------------------------------------------------------ table display (W8, migration 0148)
   /** GET /settings/table-display (every signed-in user: every site-data table starts from these defaults) */
   tableDisplay(): Promise<{ version: number }> {

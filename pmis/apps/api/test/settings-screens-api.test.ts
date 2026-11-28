@@ -177,6 +177,58 @@ describe('idle-task alert', () => {
 });
 
 // =====================================================================================================================
+// Expiry radar screen (migration 0760, contract 0.15.640)
+// =====================================================================================================================
+describe('expiry radar setting', () => {
+  const put = (who: Actor, body: unknown, tag?: string) => who.api.call('put', '/settings/expiry-radar', body, tag === undefined ? {} : { 'If-Match': tag });
+
+  it('is read by an admin with the seed registers and the date fields that can be chosen; a plain user gets 403', async () => {
+    expect((await plain.api.call('get', '/settings/expiry-radar')).status).toBe(403);
+    const res = await admin.api.call('get', '/settings/expiry-radar');
+    expect(res.status).toBe(200);
+    expect(res.body.enabled).toBe(true);
+    const permits = res.body.registers.find((r: { register_key: string }) => r.register_key === 'permits_hse');
+    expect(permits).toMatchObject({ field: 'valid_to', lead_days: [7, 14, 30] });
+    const cand = res.body.candidates.find((c: { register_key: string }) => c.register_key === 'permits_hse');
+    expect(cand.fields.map((f: { code: string }) => f.code)).toContain('valid_to');
+    expect(etag(res)).toBe(`"${res.body.version}"`);
+  });
+
+  it('refuses a plain user and a region delegate; needs If-Match and a reason; checks register, field and lead times', async () => {
+    const cur = await admin.api.call('get', '/settings/expiry-radar');
+    const ok = { enabled: true, registers: [{ register_key: 'permits_hse', field: 'valid_to', lead_days: [30, 7] }] };
+    expect((await put(plain, { ...ok, reason: 'Try it' }, etag(cur))).status).toBe(403);
+    expect((await put(delegateReg, { ...ok, reason: 'Try it' }, etag(cur))).status).toBe(403);
+    expect((await put(admin, { ...ok, reason: 'No ETag' })).status).toBe(428);
+    expect((await put(admin, ok, etag(cur))).status).toBe(422);  // no reason
+    const bad = await put(admin, {
+      enabled: 'yes', extra: 1, reason: 'Bad values',
+      registers: [{ register_key: 'no_such_register', field: 'x', lead_days: [7] }, { register_key: 'permits_hse', field: 'permit_no', lead_days: [7, 7, 400] }, { register_key: 'permits_hse', field: 'valid_to', lead_days: [] }],
+    }, etag(cur));
+    expect(bad.status).toBe(422);
+    expect(codes(bad)).toEqual(expect.arrayContaining(['/enabled:required', '/extra:unknown_key', '/registers/0/register_key:invalid', '/registers/1/field:invalid', '/registers/1/lead_days:out_of_range', '/registers/1/lead_days:duplicate', '/registers/2/lead_days:invalid']));
+  });
+
+  it('saves the list (sorted lead times), audited with before and after; the notice job reads it; a stale save is refused', async () => {
+    const cur = await admin.api.call('get', '/settings/expiry-radar');
+    const res = await put(delegateAll, { enabled: true, registers: [{ register_key: 'permits_hse', field: 'valid_to', lead_days: [60, 14, 3] }], reason: 'Permits need an earlier warning' }, etag(cur));
+    expect(res.status).toBe(200);
+    expect(res.body.registers).toHaveLength(1);
+    expect(res.body.registers[0]).toMatchObject({ register_key: 'permits_hse', lead_days: [3, 14, 60] });
+    expect(res.body.updated_by).toMatchObject({ id: delegateAll.user.id });
+    expect((await q<{ v: any }>(db, `SELECT value AS v FROM settings WHERE key = 'expiry.radar'`))[0]!.v.registers.permits_hse).toEqual({ field: 'valid_to', lead_days: [3, 14, 60] });
+    const rows = await audit('expiry_radar_update');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ entity_id: 'expiry.radar', reason: 'Permits need an earlier warning' });
+    expect((await put(admin, { enabled: true, registers: [], reason: 'Stale' }, etag(cur))).status).toBe(412);
+    // put the seed back so the suite leaves the radar as it found it
+    const again = await admin.api.call('get', '/settings/expiry-radar');
+    const back = await put(admin, { enabled: true, registers: cur.body.registers.map((r: { register_key: string; field: string; lead_days: number[] }) => ({ register_key: r.register_key, field: r.field, lead_days: r.lead_days })), reason: 'Back to the seed' }, etag(again));
+    expect(back.status).toBe(200);
+  });
+});
+
+// =====================================================================================================================
 // Notification policy
 // =====================================================================================================================
 describe('notification policy', () => {

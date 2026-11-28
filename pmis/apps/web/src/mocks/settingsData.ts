@@ -1,5 +1,6 @@
 // Synthetic state for phase 3b: calendar, rules, freeze, DLP, notification policy, retention, sessions, security log.
 import type { TableDisplaySetting } from '@/api/display';
+import type { ExpiryRadarSetting } from '@/api/expiryRadar';
 import type { UiFeaturesSetting } from '@/api/uiFeatures';
 import type {
   ActiveSession, ContractorRules, ContractorsCompletenessReport, DlpSettings, IdleTaskAlertSetting, LogRetention, NotificationPolicy, NotificationTypeDef, SecurityLogEntry, SlaRuleSet, SlaTaskRule,
@@ -101,6 +102,19 @@ export function initCfg() {
       { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' },
       { version: 1, cw_months: 3, te_months: 12, effective_from: '2026-01-01', reason: 'Seed', changed_by: ref('1001'), changed_at: '2026-01-01T08:00:00Z' }] } as DlpSettings,
     idle: { enabled: true, working_days: 2, version: 1 } as IdleTaskAlertSetting,
+    // 0.15.640 (migration 0760): the expiry radar (the registers it watches, and the date fields that can be chosen)
+    expiryRadar: {
+      enabled: true, version: 1,
+      registers: [
+        { register_key: 'permits_hse', name_en: 'Permits & HSE', name_ar: 'التصاريح والسلامة', field: 'valid_to', field_label_en: 'Valid To', field_label_ar: 'ساري حتى', lead_days: [7, 14, 30] },
+        { register_key: 'acquisition', name_en: 'Acquisition', name_ar: 'الاستحواذ', field: 'lease_expiry_date', field_label_en: 'Lease Expiry Date', field_label_ar: null, lead_days: [7, 14, 30] },
+      ],
+      candidates: [
+        { register_key: 'permits_hse', name_en: 'Permits & HSE', name_ar: 'التصاريح والسلامة', fields: [{ code: 'valid_from', label_en: 'Valid From', label_ar: 'ساري من' }, { code: 'valid_to', label_en: 'Valid To', label_ar: 'ساري حتى' }] },
+        { register_key: 'acquisition', name_en: 'Acquisition', name_ar: 'الاستحواذ', fields: [{ code: 'lease_expiry_date', label_en: 'Lease Expiry Date', label_ar: null }] },
+        { register_key: 'tools_equipment', name_en: 'Tools & Equipment', name_ar: 'الأدوات والمعدات', fields: [{ code: 'next_due_date', label_en: 'Next Due Date', label_ar: 'تاريخ الاستحقاق القادم' }] },
+      ],
+    } as ExpiryRadarSetting,
     // 0.15.64 (W8): the defaults of the Display menu of the site-data tables (null until read, then the seed)
     tableDisplay: undefined as TableDisplaySetting | undefined,
     uiFeatures: undefined as UiFeaturesSetting | undefined,
