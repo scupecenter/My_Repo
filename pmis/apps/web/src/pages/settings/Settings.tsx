@@ -32,6 +32,7 @@ import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { SequenceSettings } from './SequenceSettings';
 import { DataReset } from './DataReset';
+import { StructureByTemplate } from './StructureByTemplate';
 import { Imports, TemplateNoticeCard } from './Imports';
 import { DuplicateRowsCard } from './DuplicateRows';
 import { KanbanWip } from './KanbanWip';
@@ -55,6 +56,7 @@ import { AlertSettingsPanel } from './AlertSettings';
 import { PEOPLE_TABS, peopleTabAllowed } from '@/components/PeopleAdmin';
 import { TemplateMappingPanel } from '../TemplateMapping';
 import { LoginPageSettings } from './LoginPage';
+import { MediaSettingsScreen } from './MediaSettings';
 import { DataHubSettings } from './DataHubSettings';
 import { FinanceHubSettings } from './FinanceHubSettings';
 import { InterfaceSettings } from './InterfaceSettings';
@@ -71,8 +73,8 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
-  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }, { key: 'search', adminOnly: true }] },
-  { key: 'data', sections: [{ key: 'imports' }, { key: 'mapping' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
+  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'media' }, { key: 'numbering' }, { key: 'search', adminOnly: true }] },
+  { key: 'data', sections: [{ key: 'imports' }, { key: 'mapping' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'structure', adminOnly: true }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
@@ -262,6 +264,7 @@ export function SettingsRoutes() {
           <Route path="library" element={<LegacyRedirect to="documents/types" />} />
           <Route path="forms" element={<FormTemplates />} />
           <Route path="archive" element={<ArchiveSettings />} />
+          <Route path="media" element={<MediaSettingsScreen />} />
           <Route path="numbering" element={<NumberSequences />} />
           <Route path="search" element={<DocumentSearchIndex />} />
         </Route>
@@ -272,6 +275,7 @@ export function SettingsRoutes() {
           <Route path="historical" element={<HistoricalWaiver />} />
           <Route path="counts" element={<GecolHlcCounts />} />
           <Route path="export" element={<ExportSchedulesScreen />} />
+          <Route path="structure" element={<StructureByTemplate />} />
           <Route path="reset" element={<DataReset />} />
         </Route>
         <Route path="security" element={<TabFrame tab="security" />}>
