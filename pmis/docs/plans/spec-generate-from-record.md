@@ -1,6 +1,6 @@
 # Spec: generate a document from an approved register record
 
-Status: DRAFT-SPEC (no code in this PR). Requested by the owner (voice, 2026-11-28 09:57 and 10:00, relayed by Main): a record that is uploaded and approved (a receipt, a handover) must be able to produce its document without retyping: press Generate on the record, the saved template opens filled with the site data and the record's own fields, and the document is placed in its predefined place. Part 1 (task documents: Generate, Open, Replace, unsigned generated copy inside the slot) is PR #553.
+Status: DRAFT, API and database built in this PR (migration 0711, mirror db/sql/710); web button in the stacked web PR. Requested by the owner (voice, 2026-11-28 09:57 and 10:00, relayed by Main): a record that is uploaded and approved (a receipt, a handover) must be able to produce its document without retyping: press Generate on the record, the saved template opens filled with the site data and the record's own fields, and the document is placed in its predefined place. Part 1 (task documents: Generate, Open, Replace, unsigned generated copy inside the slot) is PR #553.
 
 ## What exists (main)
 Library > Forms (0.15.70, migration 0151): `lib_preview` / `lib_generate` fill an approved HTML template with `lib_form_context` (site, region, task, doc, template, generated_by), number it from the form's sequence, keep it in `library_generated_docs` (task_id NOT NULL), audit it. Rights: L1 holder of the trigger task or grant `library.forms` create for the region, while the task is open. The signed copy is uploaded into the task's slot; L2 approves.
@@ -26,3 +26,9 @@ No permission, role, grant or default change; additive columns only; the data re
 API: preview and generate from a record; refused for a draft record; field-permission filtering; sequence number; audit; data reset dry run counts the column rows. Web: dialog from a record slot; unsigned entry; slot status unchanged.
 
 Changelog entry (PR body only): Registers: generate a document from an approved record, filled with the record's fields.
+
+## As built (differences from the design above)
+- No FK on `register_entity_id`: `register_records.entity_id` is not unique, so a FK is impossible. The column is nullable, with the CHECK that a task or a record owns the document.
+- Four new functions (`lib_record_context`, `lib_check_generate_record`, `lib_preview_record`, `lib_generate_record`); the task-document functions are untouched. `lib_generated_json` uses LEFT JOINs (no task for a record document).
+- Any approved template can be used for a record (`trigger_register_key` is left for the answer to open question 1, so no template-save change now).
+- Register fields have no per-field permission (checked in 018); the whole record is read only by a holder of `library.forms` create for the record's region.
