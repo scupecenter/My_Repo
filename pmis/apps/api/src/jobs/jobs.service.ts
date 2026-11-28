@@ -188,6 +188,9 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       if (!lock[0]?.ok) return 0;
       const r = await tx.$queryRaw<{ t: Record<string, number> }[]>`SELECT notif_policy_tick() AS t`;
       counts = r[0]?.t ?? {};
+      // 0472: photo slots below their minimum (setting media.gallery); the same lock and transaction as the policy tick
+      const media = (await tx.$queryRaw<{ n: number }[]>`SELECT media_notify_tick() AS n`)[0]?.n ?? 0;
+      if (media > 0) counts = { ...counts, mediaMinPhotos: Number(media) };
       due = (await tx.$queryRaw<{ d: boolean }[]>`SELECT notif_digest_due() AS d`)[0]?.d === true;
       return Object.values(counts).reduce((x, y) => x + Number(y), 0);
     });

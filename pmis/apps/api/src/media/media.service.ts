@@ -31,6 +31,8 @@ const putBody = z.object({
   enabled: z.boolean(), snag_photos: z.boolean(), include_site_documents: z.boolean(), image_only: z.boolean(), show_withdrawn: z.boolean(),
   document_kinds: z.array(z.string()).max(5), register_keys: z.array(z.string()).max(60), exclude_doc_codes: z.array(z.string()).max(100),
   page_size: z.number().int(), export_max_mb: z.number().int().optional(),
+  notify_new_photo: z.boolean().optional(), notify_min_photos: z.boolean().optional(), notify_export_ready: z.boolean().optional(),
+  min_photos_after_hours: z.number().int().optional(), min_photos_repeat_days: z.number().int().optional(),
   thumbnails: z.object({ enabled: z.boolean(), small_px: z.number().int(), medium_px: z.number().int(), quality: z.number().int(), format: z.string(), max_source_mb: z.number().int() }).strict(),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
@@ -38,6 +40,7 @@ const putBody = z.object({
 export interface MediaCfg {
   enabled: boolean; snag_photos: boolean; include_site_documents: boolean; image_only: boolean; show_withdrawn: boolean;
   document_kinds: string[]; register_keys: string[]; exclude_doc_codes: string[]; page_size: number; export_max_mb: number;
+  notify_new_photo: boolean; notify_min_photos: boolean; notify_export_ready: boolean; min_photos_after_hours: number; min_photos_repeat_days: number;
   thumbnails: { enabled: boolean; small_px: number; medium_px: number; quality: number; format: ThumbFormat; max_source_mb: number };
 }
 export type MediaSettingsDto = MediaCfg & { updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null; version: number; can_edit: boolean; thumbnails_available: boolean };
@@ -74,7 +77,9 @@ export class MediaService {
 
   async setSettings(auth: AuthContext, ifMatch: string | undefined, raw: unknown): Promise<MediaSettingsDto> {
     const { reason, ...parsed } = parse(putBody, raw);
-    const body = { ...parsed, export_max_mb: parsed.export_max_mb ?? (await this.config()).export_max_mb };   // an older client that leaves the cap out keeps the current one
+    const cur = await this.config();
+    const keep = (k: 'export_max_mb' | 'notify_new_photo' | 'notify_min_photos' | 'notify_export_ready' | 'min_photos_after_hours' | 'min_photos_repeat_days') => parsed[k] ?? cur[k];
+    const body = { ...parsed, export_max_mb: keep('export_max_mb'), notify_new_photo: keep('notify_new_photo'), notify_min_photos: keep('notify_min_photos'), notify_export_ready: keep('notify_export_ready'), min_photos_after_hours: keep('min_photos_after_hours'), min_photos_repeat_days: keep('min_photos_repeat_days') };   // an older client that leaves the cap out keeps the current one
     await this.access.requireAdmin('settings', 'edit');
     const etag = parseIfMatch(ifMatch);
     await this.stepUp.require(auth);

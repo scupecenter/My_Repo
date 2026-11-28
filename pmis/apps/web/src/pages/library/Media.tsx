@@ -119,7 +119,8 @@ export function LibraryMedia() {
   const pickView = (id: string) => { applyView(id); remember(id); };
   const toast = useToast();
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [jobId, setJobId] = useState<string | null>(null);
+  // a link from the "export ready" notice (?export=<job id>) picks the finished job up and downloads it once
+  const [jobId, setJobId] = useState<string | null>(() => { const e = sp.get('export'); return e && /^[0-9a-f-]{36}$/i.test(e) ? e : null; });
   const start = useStartMediaExport();
   const job = useMediaExportJob(jobId).data;
   const pick: Pick = { picked, toggle: (it) => setPicked((p) => { const n = new Set(p); if (!n.delete(pickKey(it))) n.add(pickKey(it)); return n; }) };
@@ -133,7 +134,7 @@ export function LibraryMedia() {
   const busy = !!jobId && !finished;
   useEffect(() => {
     if (!job || !jobId || handled.current === jobId) return;
-    if (job.status === 'done' && job.result) { handled.current = jobId; void downloadFile(job.result.download_path).then(() => toast(t('media.export_ready'))).catch(() => toast(t('errors.generic'), 'err')); }
+    if (job.status === 'done' && job.result) { handled.current = jobId; void downloadFile(job.result.download_path).then(() => { toast(t('media.export_ready')); if (sp.has('export')) { const n = new URLSearchParams(sp); n.delete('export'); setSp(n, { replace: true }); } }).catch(() => toast(t('errors.generic'), 'err')); }
     else if (job.status === 'failed') { handled.current = jobId; toast(t('media.export_failed'), 'err'); }
     // the download starts once per finished job
     // eslint-disable-next-line react-hooks/exhaustive-deps

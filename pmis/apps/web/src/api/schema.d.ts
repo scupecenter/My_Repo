@@ -20145,6 +20145,16 @@ export interface components {
             page_size: number;
             /** @description Size cap of an export of a selection (0.15.532). */
             export_max_mb: number;
+            /** @description On: followers of a site are told of a new photo (0.15.534). */
+            notify_new_photo: boolean;
+            /** @description On: the record owner and the Team Leads are told of photo slots below their minimum (0.15.534). */
+            notify_min_photos: boolean;
+            /** @description On: the person who asked is told when a media export is ready (0.15.534). */
+            notify_export_ready: boolean;
+            /** @description Hours after which a photo slot below its minimum counts as late (0.15.534). */
+            min_photos_after_hours: number;
+            /** @description Days before the same site is told again (0.15.534). */
+            min_photos_repeat_days: number;
             thumbnails: components["schemas"]["MediaThumbnails"];
             /** Format: date-time */
             updated_at?: string | null;
@@ -20165,6 +20175,11 @@ export interface components {
             show_withdrawn: boolean;
             page_size: number;
             export_max_mb?: number;
+            notify_new_photo?: boolean;
+            notify_min_photos?: boolean;
+            notify_export_ready?: boolean;
+            min_photos_after_hours?: number;
+            min_photos_repeat_days?: number;
             thumbnails: components["schemas"]["MediaThumbnails"];
         };
         MediaExportInput: {

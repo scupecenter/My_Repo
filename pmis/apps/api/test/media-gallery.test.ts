@@ -26,7 +26,7 @@ let nobody: Actor;        // no Documents grant
 const REASON = 'Owner decision GAL-1 2026-11-27';
 const DEFAULT = {
   enabled: true, snag_photos: true, document_kinds: ['photo', 'scanned_document'], register_keys: [], include_site_documents: true, exclude_doc_codes: [], image_only: true,
-  show_withdrawn: false, page_size: 48, export_max_mb: 500, thumbnails: { enabled: true, small_px: 240, medium_px: 640, quality: 78, format: 'webp', max_source_mb: 50 },
+  show_withdrawn: false, page_size: 48, export_max_mb: 500, notify_new_photo: true, notify_min_photos: true, notify_export_ready: true, min_photos_after_hours: 24, min_photos_repeat_days: 7, thumbnails: { enabled: true, small_px: 240, medium_px: 640, quality: 78, format: 'webp', max_source_mb: 50 },
 };
 const ids: Record<string, string> = {};
 let png = Buffer.alloc(0);

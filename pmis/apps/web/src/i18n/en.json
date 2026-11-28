@@ -8531,6 +8531,16 @@
     "state_pending_evidence": "Awaiting evidence decision"
   },
   "mediaSet": {
+    "notify": "Notices",
+    "notify_note": "Sent through the notification mechanism (the bell, and e-mail where the policy allows). Each person can turn their own notice types off in Profile > Notifications.",
+    "n_new": "New photo on a followed site",
+    "n_new_note": "People who follow a site are told when a photo is added to it, if they can read it.",
+    "n_min": "Photos below the minimum",
+    "n_min_note": "The record owner and the Team Leads of the region are told, once per site, when a photo slot has fewer photos than its minimum.",
+    "n_after": "Late after (hours)",
+    "n_repeat": "Tell the same site again after (days)",
+    "n_export": "Export ready",
+    "n_export_note": "The person who asked is told when the export of a selection is ready.",
     "export_max": "Largest export (MB)",
     "export_max_note": "The most a person can export from the gallery in one zip, counted from the recorded file sizes (10 to 5000).",
     "title": "Media gallery",

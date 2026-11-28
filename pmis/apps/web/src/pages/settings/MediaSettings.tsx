@@ -8,7 +8,7 @@ import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useToast } from '@/components/Toast';
 
 const KINDS = ['photo', 'scanned_document', 'email', 'report', 'excel_template'] as const;
-type Draft = Pick<MediaSettings, 'enabled' | 'snag_photos' | 'document_kinds' | 'register_keys' | 'include_site_documents' | 'exclude_doc_codes' | 'image_only' | 'show_withdrawn' | 'page_size' | 'export_max_mb' | 'thumbnails'>;
+type Draft = Pick<MediaSettings, 'enabled' | 'snag_photos' | 'document_kinds' | 'register_keys' | 'include_site_documents' | 'exclude_doc_codes' | 'image_only' | 'show_withdrawn' | 'page_size' | 'export_max_mb' | 'notify_new_photo' | 'notify_min_photos' | 'notify_export_ready' | 'min_photos_after_hours' | 'min_photos_repeat_days' | 'thumbnails'>;
 const list = (s: string) => s.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
 
 /** Settings > Documents > Media (GAL-1): what the gallery reads and how its thumbnails are made. Audited, with a reason, a step-up and If-Match. */
@@ -22,7 +22,7 @@ export function MediaSettingsScreen() {
   const [open, setOpen] = useState(false);
   if (!q.data) return <QueryFallback queries={[q]} testid="media-settings-loading" />;
   const cur = q.data;
-  const base: Draft = { enabled: cur.enabled, snag_photos: cur.snag_photos, document_kinds: cur.document_kinds, register_keys: cur.register_keys, include_site_documents: cur.include_site_documents, exclude_doc_codes: cur.exclude_doc_codes, image_only: cur.image_only, show_withdrawn: cur.show_withdrawn, page_size: cur.page_size, export_max_mb: cur.export_max_mb, thumbnails: cur.thumbnails };
+  const base: Draft = { enabled: cur.enabled, snag_photos: cur.snag_photos, document_kinds: cur.document_kinds, register_keys: cur.register_keys, include_site_documents: cur.include_site_documents, exclude_doc_codes: cur.exclude_doc_codes, image_only: cur.image_only, show_withdrawn: cur.show_withdrawn, page_size: cur.page_size, export_max_mb: cur.export_max_mb, notify_new_photo: cur.notify_new_photo, notify_min_photos: cur.notify_min_photos, notify_export_ready: cur.notify_export_ready, min_photos_after_hours: cur.min_photos_after_hours, min_photos_repeat_days: cur.min_photos_repeat_days, thumbnails: cur.thumbnails };
   const v: Draft = { ...(draft ?? base), register_keys: regs !== null ? list(regs) : (draft ?? base).register_keys, exclude_doc_codes: excl !== null ? list(excl) : (draft ?? base).exclude_doc_codes };
   const dirty = JSON.stringify(v) !== JSON.stringify(base);
   const ro = !cur.can_edit;
@@ -54,6 +54,16 @@ export function MediaSettingsScreen() {
       </div>
       {num('ms-page-size', t('mediaSet.page_size'), v.page_size, (n) => patch({ page_size: n }), 12, 200)}
       <div>{num('ms-export-max', t('mediaSet.export_max'), v.export_max_mb, (n) => patch({ export_max_mb: n }), 10, 5000)}<p className="mt-1 text-xs text-mute">{t('mediaSet.export_max_note')}</p></div>
+      <fieldset className="space-y-3"><legend className="mb-1 text-sm font-semibold">{t('mediaSet.notify')}</legend>
+        <p className="text-xs text-mute">{t('mediaSet.notify_note')}</p>
+        {bool('ms-n-new', t('mediaSet.n_new'), t('mediaSet.n_new_note'), v.notify_new_photo, (b) => patch({ notify_new_photo: b }))}
+        {bool('ms-n-min', t('mediaSet.n_min'), t('mediaSet.n_min_note'), v.notify_min_photos, (b) => patch({ notify_min_photos: b }))}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {num('ms-n-after', t('mediaSet.n_after'), v.min_photos_after_hours, (n) => patch({ min_photos_after_hours: n }), 1, 720)}
+          {num('ms-n-repeat', t('mediaSet.n_repeat'), v.min_photos_repeat_days, (n) => patch({ min_photos_repeat_days: n }), 1, 90)}
+        </div>
+        {bool('ms-n-export', t('mediaSet.n_export'), t('mediaSet.n_export_note'), v.notify_export_ready, (b) => patch({ notify_export_ready: b }))}
+      </fieldset>
       <fieldset className="space-y-3"><legend className="mb-1 text-sm font-semibold">{t('mediaSet.thumbs')}</legend>
         {bool('ms-th-enabled', t('mediaSet.th_enabled'), cur.thumbnails_available ? t('mediaSet.th_enabled_note') : t('mediaSet.th_unavailable'), v.thumbnails.enabled, (b) => th({ enabled: b }))}
         <div className="grid gap-3 sm:grid-cols-4">
