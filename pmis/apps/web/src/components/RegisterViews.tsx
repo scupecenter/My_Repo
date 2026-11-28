@@ -10,6 +10,7 @@ import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { STATE_TONE } from '@/components/RegisterDrawer';
 import { SiteMap } from '@/components/SiteMap';
 import { ChartView, type ChartKind } from '@/components/ChartView';
+import { FieldValue } from '@/components/FieldValue';
 import { StatusChip } from '@/components/TableKit';
 import { EmptyState } from '@/components/States';
 import { WideTable, type WideCell, type WideColumn, type WideInput, type WideTableRow } from '@/components/WideTable';
@@ -22,8 +23,8 @@ import type { Display } from '@/lib/tablePrefs';
  * the board and the map are the same shared components as Site Master (WideTable, BoardGrid, SiteMap), fed by the register's own list
  * (GET /registers/{key}/records with the same filters, so every layout shows the same records, with the caller's rights and field rules).
  */
-export type RegisterLayout = 'list' | 'wide' | 'board' | 'feed' | 'map' | 'calendar' | 'chart';
-export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'feed', 'map', 'calendar', 'chart'];
+export type RegisterLayout = 'list' | 'wide' | 'board' | 'gallery' | 'feed' | 'map' | 'calendar' | 'chart';
+export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'gallery', 'feed', 'map', 'calendar', 'chart'];
 
 /** The board's grouping on the approval state of the records (entry, in review, in approval, approved, voided), which every register has. */
 export const BY_STATE = 'state';
@@ -55,10 +56,10 @@ export const numericFields = (def: RegisterDefinition): RegisterField[] => def.f
 /** The date fields a register has: a date-typed field of the definition. */
 export const dateFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'date');
 
-/** The layouts a register offers: list, wide table, board and chart on every register; the map only where the records carry a site (and its coordinates);
-    the calendar (decision V2) where the definition has at least one date field. */
+/** The layouts a register offers: list, wide table, board, gallery (V9) and chart on every register; the map only where the records carry a
+    site (and its coordinates); the calendar (decision V2) where the definition has at least one date field. */
 export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => [
-  'list', 'wide', 'board', 'feed',
+  'list', 'wide', 'board', 'gallery', 'feed',
   ...(def.site_scoped ? (['map'] as const) : []),
   ...(dateFields(def).length ? (['calendar'] as const) : []),
   'chart',
@@ -342,6 +343,75 @@ export function RegisterCalendar({ def, records, field, onOpen, partial }: {
     <section className="card p-3" data-testid="register-calendar-card" aria-label={t('calview.title')}>
       <CalendarGrid testid="register-calendar" items={items} onOpen={onOpen}
         head={partial ? <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-calendar-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span> : undefined} />
+    </section>
+  );
+}
+
+/** Fields a gallery card lists under the title: the register's in_list fields after the title field, at most three, with a value. */
+function galleryFields(def: RegisterDefinition, r: RegisterRecord, titleCode: string | undefined): RegisterField[] {
+  const out: RegisterField[] = [];
+  for (const f of def.fields) {
+    if (!f.in_list || f.code === titleCode) continue;
+    const v = r.data[f.code];
+    if (v === undefined || v === null || v === '') continue;
+    out.push(f);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+/**
+ * Decision V9 (2026-11-28, 0.15.576): the gallery, a flat grid of record cards on every register — no grouping, the records of the current
+ * filters in the list's order (up to ALL_CAP, like the board and the map). A card shows the site code, the title (the first listed field with a
+ * value), up to three more listed fields as label: value (their cells honour the V8 value-colours switch), the state, the region and the record
+ * type. Read only: a card opens its record (drawer or page, per V5). The V6 card-size option extends here when both land (separate PRs).
+ */
+export function RegisterGallery({ def, records, regionName, onOpen, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; regionName: (id: number | null | undefined) => string;
+  onOpen: (id: string) => void; partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const titleOf = (r: RegisterRecord) => {
+    const f = def.fields.find((y) => y.in_list && r.data[y.code] !== undefined && r.data[y.code] !== null && r.data[y.code] !== '');
+    return { code: f?.code, text: f ? valueText(f, r.data[f.code], lang, t) : '' };
+  };
+  return (
+    <section className="space-y-2" data-testid="register-gallery" aria-label={t('view.gallery')}>
+      <div className="flex flex-wrap items-center gap-2">
+        {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-gallery-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
+        <span className="ms-auto text-xs text-mute">{t('regviews.board_read_only')}</span>
+      </div>
+      {!records.length ? <EmptyState testid="register-gallery-empty" title={t('registers.empty')} /> : (
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" data-testid="register-gallery-grid">
+          {records.map((r) => {
+            const tt = titleOf(r);
+            return (
+              <li key={r.id}>
+                <button type="button" onClick={() => onOpen(r.id)} data-testid={`register-gallery-card-${r.id}`} data-state={r.state}
+                  className="block h-full w-full rounded-md border border-line bg-card p-2 text-start text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  aria-label={t('regviews.card', { code: r.site_code ?? '', title: tt.text })}>
+                  <div className="flex items-baseline gap-2">{r.site_code && <b className="mono" dir="ltr">{r.site_code}</b>}<span className="truncate font-medium" data-testid={`register-gallery-title-${r.id}`}>{tt.text}</span></div>
+                  <dl className="mt-1 space-y-0.5 text-xs text-mute">
+                    {galleryFields(def, r, tt.code).map((f) => (
+                      <div key={f.code} className="flex items-baseline gap-1" data-testid={`register-gallery-field-${r.id}-${f.code}`}>
+                        <dt className="shrink-0">{fieldLabel(f, lang)}:</dt>
+                        <dd className="truncate"><FieldValue f={f} v={r.data[f.code]} testid={`register-gallery-value-${r.id}-${f.code}`} /></dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-mute">
+                    <span className={`chip ${STATE_TONE[r.state] ?? ''}`} data-testid={`register-gallery-value-${r.id}-state`}>{t(`regState.${r.state}`)}</span>
+                    {r.region_id ? <span data-testid={`register-gallery-value-${r.id}-site`}>{regionName(r.region_id as number)}</span> : null}
+                    {r.record_type && <span className="chip border border-line">{r.record_type.toUpperCase()}</span>}
+                    {r.locked && <span className="chip bg-hover" data-testid={`register-gallery-locked-${r.id}`}>{t('registers.locked_badge')}</span>}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }
