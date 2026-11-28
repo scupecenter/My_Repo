@@ -151,7 +151,8 @@
     "link_adv_all": "All advance records",
     "link_adv_open": "Advances",
     "link_adv_expenses": "Expenses",
-    "link_adv_settlements": "Settlements", "link_adv_triage": "Advances waiting for triage",
+    "link_adv_settlements": "Settlements",
+    "link_adv_triage": "Advances waiting for triage",
     "link_inv_all": "All invoices",
     "link_inv_triage": "Invoices waiting for triage",
     "templates_title": "Templates",
@@ -5670,7 +5671,11 @@
     "pin_home": "Pin to home",
     "unpin_home": "Unpin from home",
     "pinned_home": "Pinned to the home dashboard",
-    "unpinned_home": "Unpinned from the home dashboard"
+    "unpinned_home": "Unpinned from the home dashboard",
+    "set_default": "Make this my default view",
+    "clear_default": "Stop using this as my default",
+    "default_set": "Default view set",
+    "default_cleared": "Default view cleared"
   },
   "draft": {
     "found": "You have an unsaved draft from {{at}}.",
@@ -8348,7 +8353,12 @@
     "kind_invoice_due_soon_help": "Fires once per invoice and due date for every approved invoice that is not paid or cancelled and is due within the days (7 when empty) or already late. Placeholders: {{record}}, {{due}}, {{days}}.",
     "days_hub": "Hub value",
     "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}.",
-    "col_locked": "Locked", "kpi": "KPI", "op": "Comparison", "op_above": "above", "op_below": "below", "value": "Threshold",
+    "col_locked": "Locked",
+    "kpi": "KPI",
+    "op": "Comparison",
+    "op_above": "above",
+    "op_below": "below",
+    "value": "Threshold",
     "locked": "Locked (no edits until unlocked)",
     "kind_kpi_threshold": "KPI crosses a threshold",
     "kind_kpi_threshold_help": "Fires when the live KPI of the dashboard crosses the rule's own threshold. Placeholders: {{kpi}}, {{value}}, {{threshold}}."
@@ -8574,5 +8584,12 @@
     "note": "Note",
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
+  },
+  "dv": {
+    "title": "Default views",
+    "hint": "The saved view each screen opens on. Choose it with the star next to the views on that screen.",
+    "none": "No default views yet.",
+    "reset": "Reset",
+    "reset_hint": "The screen opens on its built-in view again"
   }
 }

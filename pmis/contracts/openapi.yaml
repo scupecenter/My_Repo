@@ -149,6 +149,7 @@ info:
     - 0.15.71 (2026-11-24): the project data reset becomes selectable (owner decision 2026-11-24; migration 0152, mirror `db/sql/151_data_reset_scope.sql`; CHANGELOG 207). Additive and backward compatible: a request without `parts` is everything as before. New path `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`): the counts of a chosen scope per part and per table, the closure and its hash. `POST /settings/data-reset/requests` takes optional `parts` (codes of the catalogue `DataResetPart`); the database adds every dependent part (`depends_on`) and stores the normalised closure and its SHA-256 on the request (`DataResetRequest.scope`, `scope_hash`). `POST .../approve` takes optional `scope_hash` (the scope the approver saw): a different hash, or a request whose closure would be different today, is 409 `scope_changed`; the approval stores `approved_scope_hash`, and start and execute check it again. `DataResetState.plan` is a `DataResetPlan` (now with `parts`, the catalogue with labels EN/AR, `depends_on`, `dependents` and rows, `scope`, `accounts_to_deactivate`) and `everything` (the parts of "everything"). Three optional identity parts, never in everything: `users` (deactivate every account but the System Admins, the break-glass account, the requester, the approver and the runner), `roles` (assignments, groups but the System Admins group, delegations), `staff` (staff registry, absences). `DataResetPlanTable` gains `part` and the action `optional`. New `ErrorCode` `scope_changed`.
     - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
     - 0.15.69 (2026-11-24): W2 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 204; 0.15.62 to 0.15.68 are used by the work merged before it). Documentation only, no path, schema or rule changes. A saved view of a register screen (`register-<register key>`) keeps the layout of the screen's view switcher as quick parameters of `filters`, as `site360-<menu>` does since 0.15.49: `layout` = empty (the list), `wide`, `board` or `map`; `board_by` = the code of the register field the board's columns follow, or `state` (the approval state); `lane` = empty, `region` or `type`. They are stored as given, like any other quick parameter; the filter tree in `filters.advanced` keeps its validation. `RegisterDefinition.site_scoped` also decides whether the screen offers the map. Inline edits of the wide table use `PATCH /registers/{register_key}/records/{record_id}` with `If-Match`, the same route, rights, field rules and locks as the record form.
+    - 0.15.582 (2026-11-28): a default saved view per screen, chosen by each person (migration 0655, table `user_default_views`). Additive. `POST /saved-views/{view_id}/set-default` makes the view the caller's default for its screen (one per screen; a view the caller may not read answers 404, like `GET /saved-views/{view_id}`), `POST /saved-views/{view_id}/clear-default` clears it (a missing default is a no-op) and `GET /me/default-views` lists the caller's defaults (a deactivated or unreadable view drops out, and the screen then opens on its built-in view). Personal display preference: no grant, role, permission, visibility or audit change.
     - 0.15.68 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; renumbered from 0.15.64 at the merge with main, which holds 0.15.62 to 0.15.67). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site-master/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site-master/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
     - 0.15.67 (2026-11-24): My Work > Daily Plan, the daily progress and the plan of the next working day (plan W7, owner decisions 2026-11-23; migration 0149, mirror `db/sql/148_daily_plan.sql`; CHANGELOG 203; 0.15.62 to 0.15.66 are used by other branches). Additive. New tag `daily-plan`: (1) `GET /daily-plans?date=&region_id=` returns one plan per region per day for the regions the caller sees (the Project Manager and the System Admins see all), with the auto-filled rows (Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW; the Procurement assignment of the day: Vendor / Contractor and AAT SE; a CW permit or B3: Access Valid; tasks and field work of the day: Planned Work and Actual Work), the manual values over them, Reason and Remark, the counts and the flags `below_target` and `reason_missing`, plus `next_working_day` (weekend Friday and Saturday, holidays of the calendar). (2) `PATCH`, `POST` and `DELETE` under `/daily-plans/{date}/regions/{region_id}/sites` change a row, add a site or remove one: `view` on `daily_plan` or `sites` for the region and L1 of the new Matrix row `daily_plan` (or a System Admin), `If-Match` = the plan version (`0` before the first change), a row below target without a reason is 422 (`/reason` `required`), a locked day is 409 `plan_locked`, every change audited with before and after. (3) `POST .../lock` (L2 of the row or a System Admin; 422 with the sites that lack a reason) freezes the day; `POST .../unlock` is an admin override (System Admin or a delegate of `overrides.unlock` for the region, reason, step-up, flagged). (4) `GET /daily-plans/export` downloads both tables as one Excel sheet in the exact column order of the owner's sheet (`export` on `daily_plan` or `sites` per region, audited). Reading needs `view` on `daily_plan` or `sites` for the region, as the menu does. (5) `GET`/`PUT /settings/daily-plan`: visible columns and their order per tab, default region scope, automatic lock time, reminder hour (System Admin or an all-regions `admin.settings` delegate, reason, `If-Match`, closed body). The automatic lock and the reminder (notification kind `daily_plan_reminder`) run in the background job.
     - 0.15.62 (2026-11-24): the project data reset in Settings, with two System Admins (owner decisions 2026-11-24; migration 0146, mirror `db/sql/145_settings_data_reset.sql`; CHANGELOG 198). Additive. New paths `GET /settings/data-reset`, `PUT /settings/data-reset/settings`, `POST /settings/data-reset/requests`, `GET /settings/data-reset/requests/{request_id}`, `POST .../approve`, `POST .../cancel`, `POST .../run` (202) and `POST .../retry-files`; schemas `DataResetState`, `DataResetRequest`, `DataResetSettings`, `DataResetBackup`, `DataResetPlanTable`, `DataResetFiles`. Every route is for a System Admin acting without delegation (403 `delegate_forbidden` for a delegate). A request needs a reason, a step-up and the typed phrase `RESET <database>`; a different System Admin approves (403 `self_approval_forbidden` for the requester), with their own step-up and reason; the requester or the approver starts the run (step-up, the phrase again, If-Match). A request expires after `data_reset.settings.request_expiry_minutes` (default 30; 409 `request_expired`); either admin cancels. With fewer than two active System Admins a request is 409 `single_admin` (the operator script on the server is the way). A run is refused unless the System Log records a successful database backup within `backup_max_age_hours` (default 24; 409 `backup_missing`), with documents in S3/MinIO (409 `storage_not_supported`), or while the operator script runs (409 `reset_running`). While a run's database transaction is open every route but the two reads answers 503 `maintenance` (`components/responses/ServiceUnavailable`). New `ErrorCode` values `single_admin`, `backup_missing`, `request_expired`, `reset_running`, `plan_incomplete`, `storage_not_supported`, `quarantine_unavailable`, `maintenance`; `NotificationKind` `data_reset_request`; `SecurityEvent` `project_data_reset`.
@@ -19362,6 +19363,75 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /me/default-views:
+    get:
+      tags: [saved-views]
+      operationId: getDefaultViews
+      summary: The caller's default saved view per screen (0.15.582)
+      description: 0.15.582 (migration 0655). One default view per screen, personal. A view that was deactivated or became unreadable drops out of the list.
+      responses:
+        '200':
+          description: The caller's defaults.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [screen_key, view_id, name]
+                      additionalProperties: false
+                      properties:
+                        screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+                        view_id: {type: string, format: uuid}
+                        name: {type: string, maxLength: 120}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /saved-views/{view_id}/set-default:
+    post:
+      tags: [saved-views]
+      operationId: setDefaultSavedView
+      summary: Make a saved view my default for its screen (0.15.582)
+      description: 0.15.582 (migration 0655). Personal. Replaces the caller's earlier default for the same screen. A view the caller may not read answers 404.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Set.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, screen_key, is_default]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+                  is_default: {type: boolean, enum: [true]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /saved-views/{view_id}/clear-default:
+    post:
+      tags: [saved-views]
+      operationId: clearDefaultSavedView
+      summary: Clear my default view of a screen (0.15.582)
+      description: 0.15.582 (migration 0655). Removes the caller's default when it is this view; otherwise a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Cleared.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, is_default]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  screen_key: {type: [string, 'null']}
+                  is_default: {type: boolean, enum: [false]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
   /me/home-pins:
     get:
       tags: [saved-views]
