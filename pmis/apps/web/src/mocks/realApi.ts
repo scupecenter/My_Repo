@@ -237,6 +237,7 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
   ['get', '/settings/alert-rules'],
   ['get', '/settings/alert-rules/link-orphans'],
+  ['get', '/settings/alert-rules/runs'],
   ['post', '/settings/alert-rules'],
   ['put', '/settings/alert-rules/:id'],
   ['get', '/settings/assignment-rules'],
