@@ -46,7 +46,7 @@ const REGISTER_CODES = ['site_creation', 'procurement', 'procurement_hlc', 'cont
  *  permits_hse_acq, permits_hse_om: the Acquisition / RF & Design and O&M stream rows of Permits & HSE (migration 0054, Q220); O&M has no default holder.
  *  procurement_hlc: the Matrix row of the Procurement scope HLC (migration 0042, owner decision 2026-11-02), seeded on two levels from the start. */
 const BUILT = ['procurement', 'procurement_hlc', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te', 'permits_hse_acq', 'permits_hse_om'];
-/** car_dispatcher and financial_advances (migration 0076), incidents (migration 0183) and lessons_learned (migration 0184): built, with empty holders in the seed (the admin names them; B10 sends a holderless level to the System Admins). */ site_contacts (migration 0562): the Matrix row is seeded empty by convention.
+/** car_dispatcher and financial_advances (migration 0076), incidents (migration 0183) and lessons_learned (migration 0184): built, with empty holders in the seed (the admin names them; B10 sends a holderless level to the System Admins). site_contacts (migration 0562): the Matrix row is seeded empty by convention. */
 const EMPTY_SEED = ['car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'site_contacts'];
 const NOT_BUILT = [...REGISTER_CODES.filter((c) => !BUILT.includes(c) && !EMPTY_SEED.includes(c)), 'dismantle'];
 
