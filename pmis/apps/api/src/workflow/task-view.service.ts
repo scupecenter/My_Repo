@@ -51,6 +51,10 @@ export interface TaskSummaryDto {
   name_ar: string | null;
   stage_code: string;
   stream_code: string | null;
+  /** 0.15.269: the workflow version the site runs on; the milestone/gate date rule applies from version 2. */
+  workflow_version: number;
+  /** 0.15.269: the task is the milestone task of its stage; on workflow version 2+ its date is computed, never typed. */
+  is_milestone_task: boolean;
   state: string;
   current_level: number;
   levels_required: number;
@@ -168,6 +172,7 @@ export interface TaskRow {
   pinned_user: string | null;
   external_party_id: string | null;
   workflow_version: number;
+  is_milestone_task: boolean;
   kind: string | null;
   cell_id: string | null;
   rule: string | null;
@@ -241,7 +246,7 @@ const ACTIVE_STATES = ['open', 'entry', 'in_review', 'in_approval'];
 export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.empty): Prisma.Sql {
   return Prisma.sql`
     SELECT t.id::text AS id, t.site_id::text AS site_id, s.site_code, t.region_id, t.task_def_id::text AS task_def_id,
-      td.code AS task_code, td.name_en, td.name_ar, st.code AS stage_code, st.stream_code,
+      td.code AS task_code, td.name_en, td.name_ar, st.code AS stage_code, st.stream_code, td.is_milestone_task,
       t.state::text AS state, t.current_level, lv.n AS n_levels, (t.path_frozen_at IS NOT NULL) AS frozen,
       t.planned_date::text AS planned_date, t.actual_date::text AS actual_date, t.due_date::text AS due_date,
       t.planned_start::text AS planned_start, t.actual_start::text AS actual_start, t.submitted_date::text AS submitted_date,
@@ -374,6 +379,8 @@ export class TaskViewService {
         name_ar: r.name_ar,
         stage_code: r.stage_code,
         stream_code: r.stream_code,
+        workflow_version: r.workflow_version,
+        is_milestone_task: r.is_milestone_task,
         state: r.state === 'rejected' ? 'entry' : r.state,
         current_level: r.current_level,
         levels_required: r.n_levels,

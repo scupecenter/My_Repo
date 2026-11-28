@@ -61,10 +61,16 @@ const etag = (res: { headers: Record<string, unknown> }): string => String(res.h
 async function bigBatch(who: Actor, count: number): Promise<{ id: string; tag: string; codes: string[] }> {
   const codes = Array.from({ length: count }, () => code());
   const file = await fillTemplate((await downloadTemplate(who.api, 'TPL-NEW-SITES')).buffer, codes.map((c, i) => ({
-    'Site ID': c, Region: 'Benghazi', 'Site Name (EN)': `Async ${i + 1}`, 'Delivery Scenario': i % 5 === 0 ? 'Hot Swap' : i % 7 === 0 ? 'Expansion' : 'New Build',
+    'Site ID': c, Region: 'Benghazi', 'Site Name (EN)': `Async ${TAG} ${i + 1}`, 'Delivery Scenario': i % 5 === 0 ? 'Hot Swap' : i % 7 === 0 ? 'Expansion' : 'New Build',
   })));
   const up = await uploadFile(who.api, file);
   expect(up.status).toBe(202);
+  if (up.body.counts.create !== count) {
+    // diagnostics for a flaky short count: what the other rows were classified as
+    const rows = (await who.api.call('get', `/import-batches/${up.body.id}/rows?limit=200`)).body;
+    const items = ((rows as { items?: Record<string, unknown>[] }).items ?? []).filter((r) => r.action !== 'create').slice(0, 8);
+    throw new Error(`staged ${up.body.counts.create} create of ${count}; counts ${JSON.stringify(up.body.counts)}; other rows ${JSON.stringify(items)}`);
+  }
   expect(up.body.counts.create).toBe(count);
   return { id: up.body.id as string, tag: etag(up), codes };
 }
