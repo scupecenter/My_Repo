@@ -20001,6 +20001,9 @@ export interface components {
             quality: components["schemas"]["DashboardOpsQuality"];
             approvals: components["schemas"]["DashboardOpsApprovals"];
             changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
+            invoices_due: components["schemas"]["DashboardOpsInvoicesDue"];
+            warehouse_pending: components["schemas"]["DashboardOpsWarehousePending"];
+            stale_open: components["schemas"]["DashboardOpsStaleOpen"];
             phase_scope: components["schemas"]["DashboardOpsPhaseScope"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
@@ -20196,6 +20199,47 @@ export interface components {
             target_sites: number;
         };
         /** @description 0.15.205 (item 8): the pending change requests and the overdue meeting actions. */
+        /** @description 0.15.563 (L4): the open invoices (approved, not Paid, not Cancelled) of the regions in scope. Counts and ages only. */
+        DashboardOpsInvoicesDue: {
+            /** @description False without the invoices view; every figure is then null. */
+            available: boolean;
+            open: number | null;
+            /** @description Due date before today. */
+            overdue: number | null;
+            /** @description Due within the next 7 days. */
+            due_soon: number | null;
+            no_due_date: number | null;
+            overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
+            age_aging: components["schemas"]["DashboardOpsAging"] | null;
+        };
+        /** @description 0.15.563 (L4): the warehouse movements still in entry, review or approval. */
+        DashboardOpsWarehousePending: {
+            /** @description False without the warehouse view; every figure is then null. */
+            available: boolean;
+            pending: number | null;
+            by_state: {
+                /** @enum {string} */
+                state: "entry" | "in_review" | "in_approval";
+                count: number;
+            }[] | null;
+            aging: components["schemas"]["DashboardOpsAging"] | null;
+        };
+        /** @description 0.15.563 (L4): the open risks and issues with no change for stale_days days or more. Each register answers only with its own view right. */
+        DashboardOpsStaleOpen: {
+            /** @description False when the caller has neither the risks nor the issues view. */
+            available: boolean;
+            /** @description The fixed threshold, 30 days. */
+            stale_days: number | null;
+            risks: {
+                open: number;
+                stale: number;
+            } | null;
+            issues: {
+                open: number;
+                stale: number;
+            } | null;
+            idle_aging: components["schemas"]["DashboardOpsAging"] | null;
+        };
         DashboardOpsChangesMeetings: {
             /** @description False when the caller has neither the change control nor the meetings view. */
             available: boolean;
