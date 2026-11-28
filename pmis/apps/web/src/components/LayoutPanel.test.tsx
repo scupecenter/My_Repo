@@ -11,7 +11,7 @@ const OPTIONS: ViewOption[] = ['list', 'wide', 'board'].map((id) => ({ id, label
 function tableStub(): TableApi {
   return {
     prefs: { order: [], hidden: [], width: {} },
-    display: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true },
+    display: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true, colors: true },
     setDisplay: vi.fn(),
     setDensity: vi.fn(),
     setPinned: vi.fn(),
@@ -92,6 +92,8 @@ describe('LayoutPanel', () => {
     expect(table.setDensity).toHaveBeenCalledWith('compact');
     await u.click(screen.getByTestId('display-pin'));
     expect(table.setPinned).toHaveBeenCalledWith(false);
+    await u.click(screen.getByTestId('display-colors'));
+    expect(table.setDisplay).toHaveBeenCalledWith({ colors: false });
     await u.click(screen.getByTestId('display-reset'));
     expect(table.resetDisplay).toHaveBeenCalled();
   });
