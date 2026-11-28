@@ -123,7 +123,7 @@ export function DailyPlan() {
       {isWeek ? <WeekCycle date={date} regions={scope(progress.data)} onDate={(d) => setParams({ date: d })} /> : <>
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2" data-testid="daily-plan-toolbar">
-        <SavedViews screen={SCREEN} value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
+        <SavedViews screen={SCREEN} sharedScreen value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
           onApply={(v) => setParams({ region: v.region || 'all', contractor: v.contractor, aat_se: v.aat_se, sow: v.sow, q: v.q })} />
         <UnifiedFilter screen={SCREEN} value={null} onChange={() => undefined} onClearAll={() => setParams({ region: 'all', contractor: '', aat_se: '', sow: '', q: '' })}
           extras={[
@@ -142,7 +142,7 @@ export function DailyPlan() {
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
           <LayoutPanel testid="daily-plan-layout" table={table} />
-          <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
+          <ColumnMenu density={false} api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
           <MoreMenu
             settings="daily_plan"
             items={[
