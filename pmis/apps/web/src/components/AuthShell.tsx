@@ -12,10 +12,10 @@ export function AuthToolbar() {
   const lang = currentLocale();
   return (
     <div className="flex items-center gap-2">
-      <button type="button" className="btn gap-1" data-testid="auth-lang" onClick={() => applyLocale(lang === 'ar' ? 'en' : 'ar')} aria-label={t('auth.switch_lang')}>
+      <button type="button" className="btn gap-1" data-testid="auth-lang" onClick={() => applyLocale(lang === 'ar' ? 'en' : 'ar')} aria-label={`${t('auth.switch_lang')}: ${lang === 'ar' ? 'English' : 'العربية'}`}>
         <Languages size={16} aria-hidden /> {lang === 'ar' ? 'English' : 'العربية'}
       </button>
-      <button type="button" className="btn gap-1" data-testid="auth-theme" aria-pressed={theme === 'dark'} aria-label={t('auth.switch_theme')}
+      <button type="button" className="btn gap-1" data-testid="auth-theme" aria-pressed={theme === 'dark'} aria-label={`${t('auth.switch_theme')}: ${theme === 'dark' ? t('auth.light') : t('auth.dark')}`}
         onClick={() => { const n = theme === 'dark' ? 'light' : 'dark'; applyTheme(n); setTheme(n); }}>
         {theme === 'dark' ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
         <span className="hidden sm:inline">{theme === 'dark' ? t('auth.light') : t('auth.dark')}</span>
