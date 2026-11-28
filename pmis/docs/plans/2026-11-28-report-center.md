@@ -22,6 +22,10 @@ Management asks for a report on contractors, sites, procurement, warehouse, issu
 5. **Settings (short).** Settings > Reports: logo and header text, formats allowed per role, row limit, hide a ready report, retention of the delivery log. Changes need a reason and are audited, like other settings.
 6. **Contractor ranking report.** The first library report. The scoring (factors, weights summing to 100, thresholds) is configured in Settings; see the open question below.
 
+## Two more approved items (relayed by main, 2026-11-28 15:34)
+- **As of stamp and snapshot (extra 5).** Every run carries "as of" (date and time, Africa/Tripoli) and a data freshness note; each run is saved as a snapshot (parameters, row counts, the figures shown, the author) so a figure can be reproduced later. It reuses the delivery log table of step 4 (a run is a log row with a stored result), kept for the retention period. Lands with steps 1 and 4.
+- **Scheduled reports to saved company contacts (automation item 7).** The recipients are the contacts saved on a company (Companies work, #620), an audience outside the system users. It is built as its own PR after step 4, and its send path stays OFF and unreachable until the owner confirms the external mail path (main is asked first). Until then schedules go to system users only.
+
 ## Rules kept
 Additive migrations only; no permission widened; a report never shows more than the screens show; no public links; recipients are system users only; hide, never delete; EN/AR RTL; tips and aria-labels; every PR has docs, tests (API and web), a Playwright EN/AR spec and an Arabic changelog entry in its body.
 
