@@ -132,6 +132,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/calendar-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * State of the caller's personal calendar feed
+         * @description 0.15.460 (D4). `enabled` is false until the caller turns the feed on. The secret link is never returned here (only its hash is stored).
+         */
+        get: operations["getMyCalendarFeed"];
+        put?: never;
+        /**
+         * Turn on or rotate the personal calendar feed
+         * @description 0.15.460 (D4). Makes a new secret link and shows it once in `path` (relative to the API base); a rotated link replaces the old one at once. The feed lists only the caller's own dated items.
+         */
+        post: operations["setMyCalendarFeed"];
+        /**
+         * Turn off the personal calendar feed
+         * @description 0.15.460 (D4). The link stops working at once.
+         */
+        delete: operations["revokeMyCalendarFeed"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/calendar-feed/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a personal calendar feed (secret link, no session)
+         * @description 0.15.460 (D4). `file` is the secret followed by `.ics`. An unknown, rotated or revoked link answers 404. The body is an iCalendar file of the owner's own open tasks pinned to them with a planned date and the Valid To date of their own permits; nothing else. Not cached.
+         */
+        get: operations["readMyCalendarFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/push/subscribe": {
         parameters: {
             query?: never;
@@ -25110,6 +25158,108 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getMyCalendarFeed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enabled: boolean;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        rotated_at?: string | null;
+                        /** Format: date-time */
+                        last_read_at?: string | null;
+                        read_count?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setMyCalendarFeed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done; the link is shown once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enabled: boolean;
+                        rotated: boolean;
+                        path: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    revokeMyCalendarFeed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enabled: boolean;
+                        removed: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    readMyCalendarFeed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The calendar. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/calendar": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     subscribeMyPush: {

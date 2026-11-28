@@ -13,6 +13,7 @@ import {
 } from '@/api/profile';
 import { errText } from '@/components/FormDialog';
 import { NotificationPrefsSection } from '@/components/NotificationPrefsSection';
+import { CalendarFeedSection } from '@/components/CalendarFeedSection';
 import { PushSection } from '@/components/PushSection';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
@@ -73,6 +74,7 @@ export function Profile() {
         <MySessionsSection />
         <NotificationPrefsSection />
         <PushSection />
+        <CalendarFeedSection />
         <DefaultViewsSection />
       </div>
     </div>

@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { AllowIncomplete, Auth } from '../auth/decorators';
+import { AllowIncomplete, Auth, Public } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
+import { problems } from '../common/problem';
 import { contentVersion, etagHeader } from '../common/etag';
 import { MeDto, MeService } from './me.service';
 import { MySessionsService } from './my-sessions.service';
@@ -31,6 +32,37 @@ export class MeController {
   @HttpCode(202)
   async notifyAdmins(@Auth() auth: AuthContext, @Body() body: unknown): Promise<void> {
     await this.notify.notify(auth, body);
+  }
+
+  /** 0.15.460 (D4): my personal calendar feed. Off until I turn it on; the link is shown once; rotate replaces it, revoke removes it. Own data only. */
+  @Get('calendar-feed')
+  feedStatus(@Auth() auth: AuthContext) {
+    return this.me.feedStatus(auth);
+  }
+
+  @Post('calendar-feed')
+  @HttpCode(200)
+  feedSet(@Auth() auth: AuthContext, @Res({ passthrough: true }) res: Response) {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.me.feedSet(auth);
+  }
+
+  @Delete('calendar-feed')
+  feedRevoke(@Auth() auth: AuthContext) {
+    return this.me.feedRevoke(auth);
+  }
+
+  /** The feed itself, read by a calendar app with the secret link and no session. A wrong, rotated or revoked link answers 404 and nothing else. */
+  @Public()
+  @Get('calendar-feed/:file')
+  async feedRead(@Param('file') file: string, @Res({ passthrough: true }) res: Response): Promise<string> {
+    const body = file.endsWith('.ics') ? await this.me.feedIcs(file.slice(0, -4)) : null;
+    if (body === null) throw problems.notFound('This calendar link is not active.');
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return body;
   }
 
   /** 0.15.102: my own sessions (device list) and ending them. Own rows only; the current session is ended by sign out. */
