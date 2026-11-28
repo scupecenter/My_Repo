@@ -62,6 +62,12 @@ describe('register rules', () => {
     const res = await admin.call('get', '/settings/register-rules');
     expect(res.status).toBe(200);
     expect((res.body.catalogue as { key: string }[]).map((c) => c.key)).toEqual(expect.arrayContaining(['currency', 'order_required', 'supplier_required']));
+    // 0643: the keys of other registers are offered, and the system keys of a register are listed read only under `other`
+    const cat = res.body.catalogue as { register_key: string; key: string }[];
+    expect(cat).toEqual(expect.arrayContaining([expect.objectContaining({ register_key: 'financial_advances', key: 'currency' }), expect.objectContaining({ register_key: 'car_dispatcher', key: 'master_export' })]));
+    const items = res.body.items as { register_key: string; other: Record<string, unknown> }[];
+    expect(items.find((i) => i.register_key === 'procurement')?.other).toHaveProperty('scope_rows');
+    expect(items.find((i) => i.register_key === 'invoices')?.other).toEqual({});
     expect((await inv.entry.api.call('get', '/settings/register-rules')).status).toBe(403);
     expect((await admin.call('put', '/settings/register-rules/invoices', { rules: { nope: true }, reason: 'valid reason' })).status).toBe(422);
     expect((await admin.call('put', '/settings/register-rules/invoices', { rules: { order_required: 'yes' }, reason: 'valid reason' })).status).toBe(422);
