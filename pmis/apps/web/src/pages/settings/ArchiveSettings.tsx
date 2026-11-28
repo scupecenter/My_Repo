@@ -1,10 +1,12 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApiError } from '@/api/client';
 import { ARCHIVE_COLUMNS, useArchive, useArchiveSetting, useSaveArchiveSetting } from '@/api/library';
 import { FormDialog } from '@/components/FormDialog';
 import { QueryFallback } from '@/components/States';
+import { DocumentMarksSettings } from './DocumentMarksSettings';
 import { useToast } from '@/components/Toast';
 
 type Col = (typeof ARCHIVE_COLUMNS)[number];
@@ -55,7 +57,9 @@ export function ArchiveSettings() {
           ))}
         </div>
       </fieldset>
+      <DocumentMarksSettings types={known.map((c) => ({ code: c.doc_code, name: nameOf(c.doc_code) }))} />
       <label className="block max-w-xs text-sm font-semibold">{t('as.zip_limit')}<input type="number" min={1} max={5000} className="input mt-1 w-full" data-testid="as-zip" value={d.zip} onChange={(e) => setDraft({ ...d, zip: e.target.value })} /></label>
+      <UnsavedGuard scope="settings" dirty={!!draft && valid} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => save.mutate({ hidden: d.hidden, order: d.order, default_columns: d.cols, zip_limit: zip, reason, version: s.data!.version }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }))} />
       <button type="button" className="btn btn-primary" data-testid="as-save" disabled={!valid || !draft} onClick={() => setSaving(true)}>{t('as.save')}</button>
       <FormDialog open={saving} onClose={() => setSaving(false)} title={t('as.title')} testid="as-save-dialog" busy={save.isPending} error={save.isError ? errText(save.error) : null}
         onSubmit={(reason) => save.mutate({ hidden: d.hidden, order: d.order, default_columns: d.cols, zip_limit: zip, reason, version: s.data!.version },

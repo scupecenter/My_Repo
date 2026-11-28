@@ -2,7 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
@@ -17,7 +17,7 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { FieldInput, fieldLabel, issueText, showValue, SiteCodeField, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
-import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
+import { DrawerFrame, DrawerTabs, panelProps, useDrawerSettled, useReportDirty } from './DrawerFrame';
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
@@ -27,7 +27,7 @@ import { SiteGateField } from './SiteGateField';
 import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect, AdvanceSelect, SupplierSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
-import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
+import { AdvanceChildren, Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
 import { LegacyConversion } from './LegacyConversion';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -151,13 +151,20 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
   const ctx = { refs: record?.refs, files: (recSlots.data?.items ?? []).flatMap((sl) => sl.files.filter((f) => !f.superseded_by).map((f) => ({ id: f.id, name: f.original_name }))) };
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
-  const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
+  // A10: a shortage row of the dashboard opens a new Procurement record with the site, the request type and a remark that names the item; nothing is saved until the person submits
+  const [shortageSp] = useSearchParams();
+  const fromShortage = !record && rawDef.register_key === 'procurement' && shortageSp.get('from') === 'shortage';
+  const [data, setData] = useState<Data>(() => {
+    const base = record?.data ?? defaultsFor(rawDef.register_key, rawDef);
+    const remark = shortageSp.get('remark');
+    return fromShortage && remark ? { ...base, remark: remark.slice(0, 500) } : base;
+  });
   // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement picks it, GECOL and HLC show it read-only)
   const hasContractor = ['procurement', 'gecol', 'hlc', 'issues', 'quality'].includes(rawDef.register_key);
   const [party, setParty] = useState<string>(record?.external_party?.id ?? '');
   const companies = useContractorCompanies(rawDef.register_key === 'procurement');
-  const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
-  const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
+  const [site, setSite] = useState<SiteSel>(fromShortage && shortageSp.get('site') ? { id: shortageSp.get('site') as string, code: shortageSp.get('site_code') ?? '' } : record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
+  const [rtype, setRtype] = useState<string>(record?.record_type ?? (fromShortage ? 'pr' : ''));
   // 0.15.103: the columns prefilled from the admin's defaults on a new record; a column leaves the set when the person edits it
   const [prefilled, setPrefilled] = useState<Set<string>>(() => (record ? new Set() : new Set(Object.keys(columnDefaults(rawDef)))));
   const [dirty, setDirty] = useState(false);
@@ -169,6 +176,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const [cancelling, setCancelling] = useState(false);
   const [tab, setTab] = useState('data');
   useReportDirty(dirty);
+  const settle = useDrawerSettled();
 
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
@@ -227,7 +235,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
     if (!record) {
       create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
-        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); onCreated(r.id); }, onError: (e) => { fail(e); onCreated(r.id); } }),
+        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); settle(); onCreated(r.id); }, onError: (e) => { fail(e); settle(); onCreated(r.id); } }),
         onError: fail,
       });
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
@@ -342,7 +350,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
           )}
           {sections.map((s) => (
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
-              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
+              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: (lang === 'ar' && s.title_ar) || s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {s.fields.filter((f) => !(rk === 'warehouse' && f.code === 'procurement_order_id' && (!rtype || rtype === 'adj')) && !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
@@ -418,6 +426,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
         {record && <RelatedRecords registerKey={rk} entityId={record.entity_id as string} />}
         {record && rk === 'financial_advances' && <Balance record={record} />}
         {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}
+        {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && ['disbursed', 'settlement_in_progress'].includes(String((record.data as { advance_state?: string }).advance_state)) && <AdvanceChildren record={record} onDone={onCreated} />}
         {record && rk === 'car_dispatcher' && record.record_type === 'booking' && record.state === 'approved' && <ExtendBooking record={record} onDone={onCreated} />}
         </div>
 

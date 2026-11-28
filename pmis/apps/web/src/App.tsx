@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { setPasswordChangeHandler } from '@/api/client';
 import { useSession } from '@/api/hooks';
 import type { Session } from '@/api/types';
@@ -30,6 +30,7 @@ import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage, RegisterRecordPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { DataHubPage } from '@/pages/DataHub';
+import { FinanceHubPage } from '@/pages/FinanceHub';
 import { TemplatesPage } from '@/pages/Templates';
 import { LibraryForms } from '@/pages/library/Forms';
 import { LibraryTemplates } from '@/pages/library/Templates';
@@ -67,6 +68,13 @@ import { IntegrityRuns } from '@/pages/logs/IntegrityRuns';
 import { SystemLog } from '@/pages/logs/SystemLog';
 import { SettingsRoutes } from '@/pages/settings/Settings';
 import { FaviconSync } from '@/components/PublicLogo';
+
+/** `/settings/...` is not a route of its own: Settings live under /admin/settings (review item 11), so the short address opens the same page instead of the placeholder. */
+export function SettingsAlias() {
+  const { pathname, search, hash } = useLocation();
+  const rest = pathname.replace(/^\/settings\/?/, '');
+  return <Navigate to={{ pathname: rest ? `/admin/settings/${rest}` : '/admin/settings/all', search, hash }} replace />;
+}
 
 function Soon() {
   const { t } = useTranslation();
@@ -120,6 +128,7 @@ function gated(session: Session) {
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="data-hub" element={<DataHubPage />} />
+        <Route path="finance-hub" element={<FinanceHubPage />} />
         <Route path="templates" element={<TemplatesPage />} />
         {/* W5: Library (Forms and Archive) */}
         <Route path="library" element={<Navigate to="/library/forms" replace />} />
@@ -158,6 +167,7 @@ function gated(session: Session) {
         <Route path="admin/logs/mail" element={<MailDelivery />} />
         <Route path="admin/logs/system" element={<SystemLog />} />
         <Route path="admin/logs/integrity" element={<IntegrityRuns />} />
+        <Route path="settings/*" element={<SettingsAlias />} />
         <Route path="*" element={<Soon />} />
       </Route>
     </Routes>

@@ -11,6 +11,12 @@ export type UiNav = components['schemas']['UiNav'];
 export type BadgeStyle = NonNullable<UiNav['badge_style']>;
 export const BADGE_STYLES: BadgeStyle[] = ['full', 'dot', 'none'];
 
+/** Screens a person can never hide: Dashboard is the fixed first entry of the menu (it is the way home). */
+export const NEVER_HIDDEN: readonly string[] = ['dashboard'];
+export const isHideable = (key: string) => !NEVER_HIDDEN.includes(key);
+/** Device-local choice (Profile, My sidebar): whether the search box (Ctrl+K) also finds the screens hidden from the menu. Off by default. */
+export const PALETTE_HIDDEN_KEY = 'pmis.palette.include_hidden';
+
 const KEY = /^[a-z0-9_.]{1,60}$/;
 const cleanList = (v: unknown, max: number): string[] | undefined => {
   if (!Array.isArray(v)) return undefined;
@@ -30,13 +36,19 @@ export function sanitizeUiNav(raw: unknown): UiNav {
   const bs = r.badge_style;
   if (bs === 'full' || bs === 'dot' || bs === 'none') out.badge_style = bs;
   if (r.mode === 'pinned' || r.mode === 'autohide') out.mode = r.mode;
-  const hidden = cleanList(r.hidden, 200); if (hidden) out.hidden = hidden;
+  const hidden = cleanList(r.hidden, 200)?.filter(isHideable); if (hidden) out.hidden = hidden;
   const order = cleanList(r.order, 200); if (order) out.order = order;
   const pins = cleanList(r.pins, 20); if (pins) out.pins = pins;
   return out;
 }
 
 const isSub = (c: string | NavSub): c is NavSub => typeof c === 'object' && c !== null;
+
+/** The permitted screens minus the ones the person hid (the screens the menu shows), for the search box and the group pages. */
+export const withoutHidden = <T extends { key: string }>(items: T[], prefs: UiNav | null | undefined): T[] => {
+  const h = new Set(sanitizeUiNav(prefs ?? {}).hidden ?? []);
+  return items.filter((i) => !h.has(i.key));
+};
 
 /**
  * The personal overlay over the organization layout: a hidden screen drops out; the `order` list sorts the screens of each
