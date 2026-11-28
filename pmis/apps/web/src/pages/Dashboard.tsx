@@ -54,7 +54,8 @@ import { OpsChangesCard } from "./dashboardChanges";
 import { OpsFinanceCard } from "./dashboardFinance";
 import { OpsCompareCard } from "./dashboardCompare";
 import { QuickSiteFilters } from "./dashboardQuickFilters";
-import { useDashboardSettings } from "@/api/dashboardSettings";
+import { useDashboardSettings, useProgressRag } from "@/api/dashboardSettings";
+import { RAG_CLASS, ragTone } from "@/lib/progressRag";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
@@ -568,6 +569,7 @@ export function Dashboard() {
     tabsAllowed,
   );
   const dashSettings = useDashboardSettings();
+  const rag = useProgressRag().data?.items;
   const q: DashboardQuery = {
     ref_date: sp.get("ref_date") ?? "",
     region_id: sp.get("region_id") ?? "",
@@ -1061,6 +1063,10 @@ export function Dashboard() {
     region_name_ar?: string | null;
   }) => (ar && r.region_name_ar ? r.region_name_ar : r.region_name);
   const ps = d?.headline.project_status;
+  // contract 0.15.432: the colours of the SPI and of the progress against plan, only for the figures an admin turned on (`rag` is read at the top of the component)
+  const spiValue = ps?.progress_vs_plan_index ?? ps?.spi ?? null;
+  const spiTone = ragTone(rag, "spi", spiValue === null ? null : Number(spiValue));
+  const gapTone = ragTone(rag, "progress_gap", ps?.progress_pct != null && ps?.planned_pct != null ? ps.progress_pct - ps.planned_pct : null);
   const fc = d?.headline.final_closure;
   const basis = d?.basis;
   /** The data basis of a card. The headline, pipeline and stream figures come from a snapshot when one exists; SLA, issues, delay and health are computed as of the date. */
@@ -1574,8 +1580,9 @@ export function Dashboard() {
                           {pct(ps?.progress_pct)}
                         </span>
                         <span
-                          className="chip border border-line"
+                          className={`chip border border-line ${gapTone ? RAG_CLASS[gapTone] : ""}`}
                           data-testid="dash-planned"
+                          data-rag={gapTone ?? undefined}
                         >
                           {t("dash.kpi.planned")}:{" "}
                           {ps?.planned_pct === null ||
@@ -1584,8 +1591,9 @@ export function Dashboard() {
                             : pct(ps.planned_pct)}
                         </span>
                         <span
-                          className="chip border border-line"
+                          className={`chip border border-line ${spiTone ? RAG_CLASS[spiTone] : ""}`}
                           data-testid="dash-spi"
+                          data-rag={spiTone ?? undefined}
                           title={t("dash.kpi.not_evm")}
                         >
                           {t("dash.kpi.spi")}:{" "}
