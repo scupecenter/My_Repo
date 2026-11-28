@@ -46,6 +46,8 @@ export const useReorderTasks = (v: number, etag: number) => useWrite<{ stage: st
 export const useMilestoneLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/milestones/${code}`, { body, version: e }));
 export const useGateLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/gates/${code}`, { body, version: e }));
 export const usePublish = (v: number, etag: number) => useWrite<{ reason: string; confirm_text: string; confirm_master_impact?: string }, WorkflowVersion>(v, etag, (body, e) => api.post(`${base(v)}/publish`, { body, version: e }));
+/** 0.15.321 (migration 0491): the sequence lock mode of a draft version (strict or open); the per-site switch stays the override. */
+export const useSetLockMode = (v: number, etag: number) => useWrite<{ lock_mode: 'strict' | 'open'; reason: string }, unknown>(v, etag, (body, e) => api.put(`${base(v)}/lock-mode`, { body, version: e }));
 /** 0.15.16 (migration 0096): the task that closes its milestone, chosen in a draft. */
 export const useSetClosing = (v: number, etag: number) => useWrite<{ code: string; closing: boolean; reason: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/closing`, { body, version: e }));
 export type InsertInput = TaskCreateInput & { successors?: string[]; remove_direct_links?: boolean; add_to_open_sites?: boolean };

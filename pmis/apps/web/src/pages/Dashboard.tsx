@@ -42,6 +42,7 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { OpsPhaseCard } from "./dashboardPhase";
 import { PinnedViewsCard } from "./dashboardPins";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
@@ -1503,6 +1504,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.204 (owner approval 2026-11-26, item 7): tasks waiting review or approval, ages per ball-in-court role */}
                   <OpsApprovalsCard ops={ops.data} />
+                </>
+              ),
+
+              ops_phase: (
+                <>
+                  {/* 0.15.367: sites per project phase with progress; targets derived from the scope */}
+                  <OpsPhaseCard ops={ops.data} />
                 </>
               ),
 

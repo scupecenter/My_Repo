@@ -441,6 +441,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/media/facets'],
   ['get', '/media/items/:kind/:id/thumbnail'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
+  ['get', '/settings/dashboard-target-policy'],
+  ['put', '/settings/dashboard-target-policy'],
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
   // Contract 0.15.193 (migration 0293; apps/api: security): the download lock categories (Settings, Security, Lock keys).
@@ -572,6 +574,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/workflow/versions'],
   ['get', '/workflow/versions/:version'],
   ['put', '/workflow/versions/:version'],
+  ['put', '/workflow/versions/:version/lock-mode'],
   ['post', '/workflow/versions/:version/remove'],
   ['post', '/workflow/versions/:version/discard'],
   ['post', '/workflow/versions/:version/migrations'],
@@ -747,6 +750,16 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/library-archive'],
   ['get', '/settings/document-marks'],
   ['put', '/settings/document-marks/:code'],
+  // Contract 0.15.401 (migration 0560): structure proposals, the change of a register's columns made from a modified template.
+  ['get', '/settings/structure-policy'],
+  ['put', '/settings/structure-policy'],
+  ['get', '/structure-proposals'],
+  ['post', '/structure-proposals'],
+  ['post', '/structure-proposals/upload'],
+  ['get', '/structure-proposals/:id'],
+  ['get', '/structure-proposals/:id/differences'],
+  ['post', '/structure-proposals/:id/decision'],
+  ['post', '/structure-proposals/:id/revert'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
