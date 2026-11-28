@@ -13331,6 +13331,14 @@ export interface components {
             approved_by?: components["schemas"]["UserRef"] | null;
             /** Format: date */
             approved_at?: string | null;
+            /** @description 0.15.536: the current version is marked as the signed copy (0555); null when the row has no file. */
+            signed?: boolean | null;
+            /** @description 0.15.536: the current version is marked as the stamped copy; null when the row has no file. */
+            stamped?: boolean | null;
+            /** @description 0.15.536: the document type needs a signed copy (Settings > Documents > Archive marks). Informs only. */
+            needs_signature?: boolean;
+            /** @description 0.15.536: the document type needs a stamped copy. Informs only. */
+            needs_stamp?: boolean;
             /** Format: date-time */
             generated_at?: string | null;
             /**
@@ -13342,7 +13350,7 @@ export interface components {
         LibraryArchiveConfig: {
             hidden: string[];
             order: string[];
-            default_columns: ("site" | "site_name" | "region" | "cluster" | "doc_type" | "doc_number" | "version" | "status" | "task" | "uploaded_by" | "uploaded_at" | "approved_by" | "approved_at")[];
+            default_columns: ("site" | "site_name" | "region" | "cluster" | "doc_type" | "doc_number" | "version" | "status" | "task" | "uploaded_by" | "uploaded_at" | "approved_by" | "approved_at" | "signed" | "stamped")[];
             zip_limit: number;
         };
         LibraryArchiveSetting: components["schemas"]["LibraryArchiveConfig"] & {

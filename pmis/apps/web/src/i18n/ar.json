@@ -7556,8 +7556,11 @@
       "uploaded_at": "تاريخ الرفع",
       "approved_by": "اعتمده",
       "approved_at": "تاريخ الاعتماد",
+      "signed": "نسخة موقعة",
+      "stamped": "نسخة مختومة",
       "actions": ""
     },
+    "mark_needed": "مطلوبة",
     "tabs": "صفحات المكتبة",
     "tab_forms": "النماذج",
     "tab_templates": "القوالب",

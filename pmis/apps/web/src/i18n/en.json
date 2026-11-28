@@ -7488,8 +7488,11 @@
       "uploaded_at": "Upload date",
       "approved_by": "Approved by",
       "approved_at": "Approval date",
+      "signed": "Signed copy",
+      "stamped": "Stamped copy",
       "actions": ""
     },
+    "mark_needed": "Needed",
     "tabs": "Library pages",
     "tab_forms": "Forms",
     "tab_templates": "Templates",
