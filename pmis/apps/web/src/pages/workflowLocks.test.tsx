@@ -127,6 +127,8 @@ describe('New site: the Workflow locks field', () => {
     await u.type(screen.getByTestId('ns-site_code'), 'WL-OPEN-1');
     await u.selectOptions(screen.getByTestId('ns-region_id'), '1');
     await u.type(screen.getByTestId('ns-name'), 'Open site');
+    await u.type(screen.getByTestId('ns-latitude'), '32.5');
+    await u.type(screen.getByTestId('ns-longitude'), '13.2');
     await u.selectOptions(sel, 'Open');
     expect(screen.getByTestId('ns-workflow-locks-hint')).toHaveTextContent(/delegated right to unlock/);
     await u.click(screen.getByTestId('ns-save'));
