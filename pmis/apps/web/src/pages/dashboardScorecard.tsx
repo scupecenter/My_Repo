@@ -75,6 +75,10 @@ export function OpsScorecardCard({ ops }: { ops: Ops }) {
                 {s.avg_delay_days ?? "—"} {s.avg_delay_days !== null ? t("dash.ops.days") : ""}
               </b>
             </span>
+            <span className="chip border border-line" data-testid="dash-scorecard-late-days" title={t("dash.ops.scorecard_late_days_hint")}>
+              {t("dash.ops.scorecard_late_days")}{" "}
+              <b className="ms-1 tnum">{s.late_days_total} {t("dash.ops.days")}</b>
+            </span>
             <span className="chip border border-line" data-testid="dash-scorecard-quality">
               {t("dash.ops.scorecard_rejection")}{" "}
               <b

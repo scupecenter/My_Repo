@@ -209,7 +209,7 @@ export const dashboardHandlers = [
       contractor_scorecard: {
         available: true, parties: 12,
         by_level: { ok: 7, amber: 3, red: 1, insufficient: 1 },
-        avg_delay_days: 6.4, on_time_pct: 81.2, quality_fail_pct: 4.8,
+        avg_delay_days: 6.4, late_days_total: 173, on_time_pct: 81.2, quality_fail_pct: 4.8,
         snags: { total: 160, open: 34, overdue: 30, returned: 12 },
         quality: { total: 125, failed: 6 },
         worst: [

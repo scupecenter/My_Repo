@@ -131,6 +131,7 @@ describe("dashboard ops: contractor and supplier scorecard (0.15.202)", () => {
     expect(s.parties).toBe(6);
     expect(s.by_level).toEqual({ ok: 3, amber: 1, red: 1, insufficient: 1 });
     expect(s.avg_delay_days).toBe(15);
+    expect(s.late_days_total).toBe(0); // fixtures carry no penalty block
     expect(s.on_time_pct).toBe(76);
     expect(s.quality_fail_pct).toBe(10);
     expect(s.snags).toEqual({ total: 25, open: 8, overdue: 6, returned: 1 });
