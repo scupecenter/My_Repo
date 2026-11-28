@@ -49,7 +49,35 @@ Arabic labels for outputs: عرض، تنزيل، طباعة، إرسال بال�
 9. Closing or approving fills the linked handover and invoice fields where the link is defined.
 10. The idle-record rule is on by default for the main registers.
 
-Proposed next (awaiting decision): auto-fill from linked records, suggested links, link health board, rollups on the site and company pages, cross-module triggers, one-click linked record creation, early conflict warnings, relationship view, consistency alerts, automatic recipients.
+### Links and automation (approved, all ten)
+| # | Item | Owner area |
+|---|---|---|
+| L1 | Auto-fill derived fields from the linked record | registers |
+| L2 | Suggested links when a record is saved without one | registers |
+| L3 | Link health board (orphan, broken, incomplete) with one-click fix | registers |
+| L4 | Rollups from linked records on the site and company pages | companies |
+| L5 | Cross-module triggers (quality approval, stock receipt, task close update what is linked) | automation |
+| L6 | Create a linked record in one click with prefilled data | registers |
+| L7 | Early conflict warning before save (team, scope, contract, expired licence) | companies |
+| L8 | Read-only relationship view of a site or company | dashboards |
+| L9 | Consistency alerts (closed record with an open linked record) | automation |
+| L10 | Recipients and owners filled from links (company contacts, region owners) | companies |
+
+### Further additions (approved, all ten)
+| # | Item | Owner area |
+|---|---|---|
+| E1 | Settings search and "where is this used" | dashboards and settings UI |
+| E2 | Preview of what a setting change does | dashboards and settings UI |
+| E3 | Export and import of the whole settings set | templates |
+| E4 | Rule log and dry run for automation rules | automation |
+| E5 | "As of" stamp and saved snapshot of each report run | Report Center |
+| E6 | Merge duplicate companies, sites and records with links moved | companies and registers |
+| E7 | Link-aware search results | registers |
+| E8 | Alerts on a saved view ("tell me when this view gets a new row") | automation |
+| E9 | Project start checklist from a template | templates |
+| E10 | Approver stand-in suggestion from delegations | automation |
+
+Order: E4, E5, E6, E8, E1 first, then E2, E3, E7, E9, E10; links L1, L4, L3, L5 first, then L6, L10, L2, then L7, L9, L8.
 
 ## 4. Gap review items (approved)
 Documentation of this batch (this file), search coverage for risks, issues, invoices, sub-tasks and company contacts and documents, Arabic wording pass, security tests for the public intake form, the order value field, a what's-new entry and short Arabic guide, a load test of the Report Center and PDF, and an ordered merge of the register view PRs.
