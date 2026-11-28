@@ -17,6 +17,7 @@ Status: in progress. One PR, one branch `feat/progress-standards`, contract labe
 - [DONE] API + contract + web for the date rule: `is_milestone_task` and `workflow_version` on TaskSummary, and the drawer's actual date is read-only with a hint on a v2+ milestone task (`35610e8c`).
 - [DONE] Docs EN+AR (this note and rules.md §6.1).
 - [DONE] 0590 merge compatibility with 0552 (main, #471): in migration-number order the 0552 in-place replace of weight_set_errors runs after 0540/0544 and would drop their register and warehouse blocks, and its method whitelist does not know warehouse; 0590 extends the whitelist and re-applies both blocks, idempotently, so deployed databases that already applied 0552 change nothing.
+- [DONE] 0591 doc_live_spec dedupe: 0547's version-2 copy of document placements left two active placement rows for tasks placed on both sides of a split stage; 0591 keeps one placement per task (verified: A2 one placement, B9 keeps [B8,B9]).
 
 ## What stayed manual
 

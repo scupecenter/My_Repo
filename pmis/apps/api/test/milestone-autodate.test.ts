@@ -1,6 +1,6 @@
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { superDb } from './helpers';
+import { superDbPstd } from './helpers';
 
 /**
  * Migration 0548 (0.15.269, owner decision 2026-11-27): the milestone and phase-gate date rule. On a site whose workflow is
@@ -12,7 +12,7 @@ import { superDb } from './helpers';
 let db: PgClient;
 
 beforeAll(async () => {
-  db = await superDb();
+  db = await superDbPstd();
 });
 afterAll(async () => {
   await db.end();

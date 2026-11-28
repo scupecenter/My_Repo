@@ -1,6 +1,6 @@
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { superDb } from './helpers';
+import { superDbPstd } from './helpers';
 
 /**
  * Migration 0546 (0.15.269): the Arabic names of the 45 progress weight items are backfilled in every project_status set (published and drafts), an
@@ -9,7 +9,7 @@ import { superDb } from './helpers';
 let db: PgClient;
 
 beforeAll(async () => {
-  db = await superDb();
+  db = await superDbPstd();
 });
 afterAll(async () => {
   await db.end();
@@ -27,9 +27,10 @@ describe('name_ar backfill (0546)', () => {
   it('keeps the owner-approved antenna names', async () => {
     const r = await db.query(`SELECT i.code, i.name_ar ${ITEMS} AND s.status = 'published' AND i.code IN ('3.2', '3.3', '3.4')`);
     const m = Object.fromEntries(r.rows.map((x) => [x.code, x.name_ar]));
-    expect(m['3.2']).toBe('هوائي الراديو');
-    expect(m['3.3']).toBe('هوائي التراسل');
-    expect(m['3.4']).toBe('هوائي طرفي');
+    // 0549: the owner-approved names carry the Latin acronym at the end in parentheses.
+    expect(m['3.2']).toBe('هوائي الراديو (BTS)');
+    expect(m['3.3']).toBe('هوائي التراسل (PtP)');
+    expect(m['3.4']).toBe('هوائي طرفي (CPE)');
   });
 
   it('still blocks a weight change on the published set but allows a name_ar-only update', async () => {

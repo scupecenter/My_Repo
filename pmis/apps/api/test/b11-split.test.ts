@@ -1,6 +1,6 @@
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { superDb } from './helpers';
+import { superDbPstd } from './helpers';
 
 /**
  * Migration 0547 (0.15.269, owner decision 2026-11-27): the B11 split. Draft workflow v2 carries B12 (Internal AC/DC) and B16 (Site internal fiber)
@@ -11,7 +11,7 @@ import { superDb } from './helpers';
 let db: PgClient;
 
 beforeAll(async () => {
-  db = await superDb();
+  db = await superDbPstd();
 });
 afterAll(async () => {
   await db.end();
