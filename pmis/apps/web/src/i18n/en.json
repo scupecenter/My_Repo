@@ -3926,7 +3926,14 @@
     "pins": {
       "title": "Pinned views",
       "hint": "Your pinned views; the counter is what you may see there.",
-      "empty": "No pinned views yet. Pin a view from its screen with the pin button."
+      "empty": "No pinned views yet. Pin a view from its screen with the pin button.",
+      "watch": "Alert me at N rows",
+      "watch_title": "Alert me when this view has at least this many rows",
+      "min_rows": "At least (rows)",
+      "save": "Save alert",
+      "remove": "Remove alert",
+      "watching": "Alert at {{n}} rows or more",
+      "hint_alert": "One notification a day at most, shown when you open the home page."
     },
     "region_health": {
       "title": "Region health",

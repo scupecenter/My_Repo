@@ -397,6 +397,11 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/me/home-pins'],
   ['post', '/saved-views/:id/pin'],
   ['post', '/saved-views/:id/unpin'],
+  // Contract 0.15.487 (0628): a personal "alert me when this view has at least N rows" watch.
+  ['get', '/me/view-watches'],
+  ['post', '/saved-views/:id/watch'],
+  ['post', '/saved-views/:id/unwatch'],
+  ['post', '/saved-views/:id/watch-report'],
   // Contract 0.15.582 (0655): the default saved view per screen.
   ['get', '/me/default-views'],
   ['post', '/saved-views/:id/set-default'],

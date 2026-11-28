@@ -28,3 +28,4 @@
 المصادر: `CLAUDE.md`، `CHANGELOG.md`، `docs/adr/`، `docs/spec/`، `db/erd.md`، `contracts/openapi.yaml`، `HANDOVER.md`. الإضافات المقترحة غير المؤكدة مكتوبة فيها «يُؤكَّد لاحقاً».
 | [shortage-draft-purchase-request.md](shortage-draft-purchase-request.md) | Draft purchase request from a material shortage line |
 | [site-acceptance-pack.md](site-acceptance-pack.md) | One archive of the approved PAC, FAC and HOTO files of a site |
+| [saved-view-alert.md](saved-view-alert.md) | A personal alert when a pinned saved view has at least N rows |
