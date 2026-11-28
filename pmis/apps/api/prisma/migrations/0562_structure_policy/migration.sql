@@ -159,6 +159,25 @@ BEGIN
   END IF;
 END $$;
 
+-- the reset role reads it and updates it (KEEP: user references are blanked for deactivated accounts like in the other kept tables)
+GRANT SELECT, UPDATE ON structure_proposals TO pmis_reset_owner;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'structure_proposals' AND policyname = 'structure_proposals_reset') THEN
+    CREATE POLICY structure_proposals_reset ON structure_proposals FOR ALL TO pmis_reset_owner USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- the proposals table (0560) has a decision in the reset plan: KEEP, like the register definitions it changes (configuration, not project data).
+DO $$
+DECLARE def text; n text := '''register_column_locks'', ';
+BEGIN
+  def := pg_get_functiondef('public.data_reset_plan()'::regprocedure);
+  IF position('structure_proposals' IN def) = 0 THEN
+    IF position(n IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan: the configuration list (register_column_locks) was not found'; END IF;
+    EXECUTE replace(def, n, n || '''structure_proposals'', ');
+  END IF;
+END $$;
+
 -- owners and grants
 DO $$
 DECLARE fn text;
