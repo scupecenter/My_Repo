@@ -33,6 +33,7 @@ info:
     ## Versions
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.539 (2026-11-28): where a photo was taken, and panorama and drone files in the Media gallery (migration 0477, mirror `db/sql/476_media_geotag.sql`; depends on 0.15.292). Additive. New table `media_geo` (derived from the file: the GPS point of the EXIF block, the altitude, the capture time, the camera make, the pixel size and the media kind `photo`, `panorama` or `drone`; a row goes with its file; rows are visible only with the file or photo they describe). The point is read when a file is uploaded to a document slot or a QC snag (a snag photo without a point in its file keeps the device point of the in-app camera) and, for older files, by `POST /media/geo/scan` (a System Admin or an all-regions delegate of `settings` edit; up to 200 images per call; audited in the system log as `media_geo_scan`). `GET /media/items` gains `media_kind` and `geo` (`lat`, `lon`, `altitude_m`, `taken_at`, `source` exif, device or none, `make`, `model`, `width_px`, `height_px`, `distance_m` to the site, `far`), the site gains `latitude` and `longitude`, and two filters: `geo` (far, near, has, missing, unscanned) and `media_kind`. New `GET` and `PUT /media/geo/settings` (setting `media.geotag`: `enabled`, `max_distance_m` 50 to 100000, `flag_missing`, `panorama`, `panorama_min_ratio`, `panorama_min_width_px`, `drone_makes`; read by every signed-in user, changed by a System Admin or an all-regions delegate of `settings` edit with a reason, a step-up and If-Match, audited `media_geo_update`) and `GET /media/geo/status`. The file is never changed and the original download is unchanged; thumbnails still carry no location. No permission, visibility or authentication change.
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
     - 0.15.407 (2026-11-27): the Daily Plan template, hardening layer 3b (migration 0564, mirror `db/sql/563_daily_plan_template.sql`). Additive. (1) `Template.template_kind` lists `daily_plan`: `TPL-DAILY-PLAN`, downloaded with `GET /templates/TPL-DAILY-PLAN/download` (blank, or with `date` and `region_id` filled with the plan as the caller sees it). (2) `POST /daily-plans/import` (`importDailyPlan`): the template only, applied at once and all or nothing through the doors of the screen (`dp_add_site`, `dp_save_row`, `dp_remove_site`), so rights, region, lock and audit apply per row; one refused row refuses the file (`errors[]` at `/rows/<line>/<field>`); other files are 422 `template_rejected`. The editable parts are the manual values, Reason, Remark, sites added or removed by hand; Site name and Region are ignored. The Permits sub-streams and Procurement-HLC are covered by the existing templates (round-trip tests added).
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
@@ -10802,6 +10803,85 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /media/geo/settings:
+    get:
+      tags: [media]
+      operationId: getMediaGeoSettings
+      summary: The geotag settings of the Media gallery (0.15.539)
+      description: Every signed-in user may read them. `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit.
+      x-db-path: media_geo_state
+      responses:
+        '200':
+          description: The settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaGeoSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [media]
+      operationId: setMediaGeoSettings
+      summary: Set the geotag settings (reason, step-up, If-Match, audited) (0.15.539)
+      description: A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and invalid values are 422; saving the values in force is 409 `invalid_transition`. Audited `media_geo_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_media_geo
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MediaGeoSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaGeoSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /media/geo/status:
+    get:
+      tags: [media]
+      operationId: getMediaGeoStatus
+      summary: How many images have been scanned for a location (0.15.539)
+      description: Needs `settings` view. `pending` counts the current images without a row yet.
+      x-db-path: media_geo_status
+      responses:
+        '200':
+          description: The counts.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaGeoStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /media/geo/scan:
+    post:
+      tags: [media]
+      operationId: scanMediaGeo
+      summary: Read the location of older images (0.15.539)
+      description: A System Admin or an all-regions delegate of `settings` edit. Reads up to `limit` (1 to 200, default 50) images that have no row yet, oldest first, and writes one row each. Nothing in the file or its record changes. Audited in the system log as `media_geo_scan`. Does nothing while the setting is off.
+      x-db-path: media_geo_pending
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, properties: {limit: {type: integer, minimum: 1, maximum: 200}}}
+      responses:
+        '201':
+          description: What was done and what is left.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaGeoScanResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /media/items:
     get:
       tags: [media]
@@ -10822,6 +10902,8 @@ paths:
       - {name: uploaded_by, in: query, schema: {type: string, format: uuid}}
       - {name: uploaded_from, in: query, schema: {type: string, format: date}}
       - {name: uploaded_to, in: query, schema: {type: string, format: date}}
+      - {name: geo, in: query, description: '0.15.539. far and near compare the distance to the site with the setting `max_distance_m`; has has a point; missing was scanned and has none; unscanned has no row yet.', schema: {type: string, enum: [far, near, has, missing, unscanned]}}
+      - {name: media_kind, in: query, description: '0.15.539.', schema: {type: string, enum: [photo, panorama, drone]}}
       - {name: q, in: query, schema: {type: string}}
       - {name: cursor, in: query, schema: {type: string}}
       - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
@@ -27240,6 +27322,69 @@ components:
         link: { type: object, description: 'The owning record: {kind: snag|register|task|site, ...ids}.' }
         has_thumbnail: { type: boolean }
         download_url: { type: string }
+        media_kind: { type: string, enum: [photo, panorama, drone], description: '0.15.539.' }
+        geo:
+          description: '0.15.539. null until the image is scanned (or when the setting is off).'
+          type: [object, 'null']
+          required: [lat, lon, altitude_m, taken_at, source, make, model, width_px, height_px, distance_m, far]
+          properties:
+            lat: { type: [number, 'null'] }
+            lon: { type: [number, 'null'] }
+            altitude_m: { type: [number, 'null'] }
+            taken_at: { type: [string, 'null'], format: date-time }
+            source: { type: string, enum: [exif, device, none] }
+            make: { type: [string, 'null'] }
+            model: { type: [string, 'null'] }
+            width_px: { type: [integer, 'null'] }
+            height_px: { type: [integer, 'null'] }
+            distance_m: { type: [integer, 'null'], description: 'Metres from the photo to the site.' }
+            far: { type: [boolean, 'null'], description: 'distance_m over the setting max_distance_m; null without a distance.' }
+    MediaGeoSettingsInput:
+      type: object
+      required: [enabled, max_distance_m, flag_missing, panorama, panorama_min_ratio, panorama_min_width_px, drone_makes, reason]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        max_distance_m: { type: integer, minimum: 50, maximum: 100000 }
+        flag_missing: { type: boolean }
+        panorama: { type: boolean }
+        panorama_min_ratio: { type: number, minimum: 1.5, maximum: 4 }
+        panorama_min_width_px: { type: integer, minimum: 1000, maximum: 30000 }
+        drone_makes: { type: array, maxItems: 20, items: { type: string } }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+    MediaGeoSettings:
+      type: object
+      description: '0.15.539. Setting `media.geotag` (migration 0477).'
+      required: [enabled, max_distance_m, flag_missing, panorama, panorama_min_ratio, panorama_min_width_px, drone_makes, version, can_edit]
+      properties:
+        enabled: { type: boolean }
+        max_distance_m: { type: integer }
+        flag_missing: { type: boolean }
+        panorama: { type: boolean }
+        panorama_min_ratio: { type: number }
+        panorama_min_width_px: { type: integer }
+        drone_makes: { type: array, items: { type: string } }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { type: [object, 'null'] }
+        version: { type: integer }
+        can_edit: { type: boolean }
+    MediaGeoStatus:
+      type: object
+      required: [scanned, with_location, panorama, drone, pending]
+      properties:
+        scanned: { type: integer }
+        with_location: { type: integer }
+        panorama: { type: integer }
+        drone: { type: integer }
+        pending: { type: integer }
+        last_scanned_at: { type: [string, 'null'], format: date-time }
+    MediaGeoScanResult:
+      allOf:
+      - { $ref: '#/components/schemas/MediaGeoStatus' }
+      - type: object
+        required: [done]
+        properties:
+          done: { type: integer, description: 'Images read by this call.' }
     MediaItemPage:
       type: object
       required: [enabled, items, page]

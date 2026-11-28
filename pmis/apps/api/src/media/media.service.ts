@@ -15,6 +15,7 @@ import { StorageService } from '../documents/storage.service';
 import { RateLimiter } from '../auth/rate-limiter';
 import { SyslogService } from '../auth/syslog.service';
 import { limit } from '../ops/ops-limits';
+import { GeoService } from './geo.service';
 import { isThumbSource, loadSharp, makeThumb, thumbKey, thumbMime, ThumbFormat } from './thumbs';
 
 /**
@@ -47,7 +48,16 @@ type Row = {
   type_code: string; type_name_en: string; type_name_ar: string | null; doc_kind: string | null; mime_type: string; name: string | null; size_bytes: bigint; uploaded_by: string;
   state: string; version: number | null; status: string | null; register_key: string | null; record_id: string | null; task_id: string | null; snag_id: string | null; shot_type: string | null;
   storage_key?: string;
+  geo_lat: number | null; geo_lon: number | null; geo_alt: number | null; geo_taken_at: Date | null; geo_source: string | null; media_kind: string; geo_scanned: boolean;
+  geo_make: string | null; geo_model: string | null; width_px: number | null; height_px: number | null; geo_distance_m: number | null; site_lat: number | null; site_lon: number | null;
 };
+
+/** Metres from the photo to its site (haversine), null when either point is missing. The same formula as geo.ts distanceM. */
+const GEO_COLS = Prisma.sql`, g.lat::float8 AS geo_lat, g.lon::float8 AS geo_lon, g.alt_m::float8 AS geo_alt, g.taken_at AS geo_taken_at, g.source AS geo_source,
+          coalesce(g.media_kind, 'photo') AS media_kind, (g.id IS NOT NULL) AS geo_scanned, g.make AS geo_make, g.model AS geo_model, g.width_px, g.height_px,
+          CASE WHEN g.lat IS NOT NULL AND si.latitude IS NOT NULL AND si.longitude IS NOT NULL THEN round(6371000 * 2 * asin(sqrt(
+            power(sin(radians((si.latitude - g.lat)::float8) / 2), 2) + cos(radians(g.lat::float8)) * cos(radians(si.latitude::float8)) * power(sin(radians((si.longitude - g.lon)::float8) / 2), 2))))::int END AS geo_distance_m,
+          si.latitude::float8 AS site_lat, si.longitude::float8 AS site_lon`;
 
 @Injectable()
 export class MediaService {
@@ -59,6 +69,7 @@ export class MediaService {
     private readonly storage: StorageService,
     private readonly limiter: RateLimiter,
     private readonly syslog: SyslogService,
+    private readonly geo: GeoService,
   ) {}
 
   // ------------------------------------------------------------------------------------------------------------------ settings
@@ -128,8 +139,8 @@ export class MediaService {
         SELECT 'document_file'::text AS kind, f.id::text AS id, f.uploaded_at, s.site_id::text AS site_id, s.region_id, coalesce(si.site_code, 'GLOBAL') AS site_code, si.name AS site_name,
           dt.code AS type_code, dt.name_en AS type_name_en, dt.name_ar AS type_name_ar, dt.kind::text AS doc_kind, f.mime_type, f.original_name AS name, f.size_bytes, f.uploaded_by::text AS uploaded_by,
           CASE WHEN f.withdrawn_at IS NOT NULL THEN 'withdrawn' WHEN NOT f.is_current THEN 'superseded' ELSE 'current' END AS state, f.version, s.status::text AS status,
-          s.register_key, COALESCE((SELECT x.id::text FROM register_records x WHERE x.entity_id = s.register_entity_id ORDER BY x.is_current DESC, x.version_no DESC LIMIT 1), s.register_entity_id::text) AS record_id, s.task_id::text AS task_id, NULL::text AS snag_id, NULL::text AS shot_type, f.storage_key
-        FROM document_files f JOIN document_slots s ON s.id = f.slot_id LEFT JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id
+          s.register_key, COALESCE((SELECT x.id::text FROM register_records x WHERE x.entity_id = s.register_entity_id ORDER BY x.is_current DESC, x.version_no DESC LIMIT 1), s.register_entity_id::text) AS record_id, s.task_id::text AS task_id, NULL::text AS snag_id, NULL::text AS shot_type, f.storage_key ${GEO_COLS}
+        FROM document_files f JOIN document_slots s ON s.id = f.slot_id LEFT JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id LEFT JOIN media_geo g ON g.doc_file_id = f.id
         WHERE ${Prisma.join(c, ' AND ')}`);
     }
 
@@ -157,8 +168,8 @@ export class MediaService {
         SELECT 'snag_photo'::text AS kind, p.id::text AS id, p.uploaded_at, sg.site_id::text AS site_id, sg.region_id, si.site_code AS site_code, si.name AS site_name,
           st.code AS type_code, st.name_en AS type_name_en, st.name_ar AS type_name_ar, 'photo'::text AS doc_kind, p.mime_type, NULL::text AS name, p.size_bytes, p.uploaded_by::text AS uploaded_by,
           CASE WHEN p.withdrawn_at IS NOT NULL THEN 'withdrawn' WHEN p.rejected_at IS NOT NULL THEN 'rejected' WHEN p.evidence_status = 'pending_evidence' THEN 'pending_evidence' ELSE 'current' END AS state,
-          NULL::int AS version, sg.status::text AS status, NULL::text AS register_key, NULL::text AS record_id, sg.task_id::text AS task_id, sg.id::text AS snag_id, p.shot_type, p.storage_key
-        FROM snag_photos p JOIN snags sg ON sg.id = p.snag_id JOIN sites si ON si.id = sg.site_id JOIN snag_types st ON st.id = sg.snag_type_id
+          NULL::int AS version, sg.status::text AS status, NULL::text AS register_key, NULL::text AS record_id, sg.task_id::text AS task_id, sg.id::text AS snag_id, p.shot_type, p.storage_key ${GEO_COLS}
+        FROM snag_photos p JOIN snags sg ON sg.id = p.snag_id JOIN sites si ON si.id = sg.site_id JOIN snag_types st ON st.id = sg.snag_type_id LEFT JOIN media_geo g ON g.snag_photo_id = p.id
         WHERE ${Prisma.join(c, ' AND ')}`);
     }
     return out;
@@ -183,7 +194,19 @@ export class MediaService {
     const cur = decodeTypedCursor(typeof q.cursor === 'string' ? q.cursor : undefined, ['ts', 'uuid']);
     const parts = await this.branches(cfg, q);
     if (parts.length === 0) return { enabled: true, items: [], page: { limit, next_cursor: null } };
-    const keyset = cur ? Prisma.sql`WHERE (u.uploaded_at, u.id::uuid) < (${cur[0]}::timestamptz, ${cur[1]}::uuid)` : Prisma.empty;
+    const outer: Prisma.Sql[] = [];
+    if (cur) outer.push(Prisma.sql`(u.uploaded_at, u.id::uuid) < (${cur[0]}::timestamptz, ${cur[1]}::uuid)`);
+    const geoF = oneParam(q, 'geo'); const kindF = oneParam(q, 'media_kind');
+    if (geoF !== undefined && !['far', 'near', 'has', 'missing', 'unscanned'].includes(geoF)) throw problems.validation([{ path: '/geo', code: 'invalid', message: 'geo is far, near, has, missing or unscanned.' }]);
+    if (kindF !== undefined && !['photo', 'panorama', 'drone'].includes(kindF)) throw problems.validation([{ path: '/media_kind', code: 'invalid', message: 'media_kind is photo, panorama or drone.' }]);
+    const gcfg = await this.geo.getSettings();
+    if (geoF === 'far') outer.push(Prisma.sql`u.geo_distance_m > ${gcfg.max_distance_m}::int`);
+    if (geoF === 'near') outer.push(Prisma.sql`u.geo_distance_m <= ${gcfg.max_distance_m}::int`);
+    if (geoF === 'has') outer.push(Prisma.sql`u.geo_lat IS NOT NULL`);
+    if (geoF === 'missing') outer.push(Prisma.sql`(u.geo_scanned AND u.geo_lat IS NULL)`);
+    if (geoF === 'unscanned') outer.push(Prisma.sql`NOT u.geo_scanned`);
+    if (kindF) outer.push(Prisma.sql`u.media_kind = ${kindF}::text`);
+    const keyset = outer.length > 0 ? Prisma.sql`WHERE ${Prisma.join(outer, ' AND ')}` : Prisma.empty;
     const rows = await this.db.tx.$queryRaw<Row[]>(Prisma.sql`
       SELECT u.*, to_char(u.uploaded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cur_text FROM (${Prisma.join(parts, ' UNION ALL ')}) u
       ${keyset} ORDER BY u.uploaded_at DESC, u.id DESC LIMIT ${limit + 1}`);
@@ -196,7 +219,12 @@ export class MediaService {
         kind: r.kind, id: r.id, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, state: r.state, version: r.version, slot_status: r.kind === 'document_file' ? r.status : null, snag_status: r.kind === 'snag_photo' ? r.status : null,
         mime_type: r.mime_type, name: r.name, size_bytes: Number(r.size_bytes), shot_type: r.shot_type,
         type: { code: r.type_code, name_en: r.type_name_en, name_ar: r.type_name_ar, kind: r.doc_kind },
-        site: r.site_id ? { id: r.site_id, code: r.site_code, name: r.site_name, region_id: r.region_id } : null,
+        site: r.site_id ? { id: r.site_id, code: r.site_code, name: r.site_name, region_id: r.region_id, latitude: r.site_lat, longitude: r.site_lon } : null,
+        media_kind: r.media_kind,
+        geo: gcfg.enabled && r.geo_scanned ? {
+          lat: r.geo_lat, lon: r.geo_lon, altitude_m: r.geo_alt, taken_at: r.geo_taken_at, source: r.geo_source, make: r.geo_make, model: r.geo_model, width_px: r.width_px, height_px: r.height_px,
+          distance_m: r.geo_distance_m, far: r.geo_distance_m === null || !gcfg.enabled ? null : r.geo_distance_m > gcfg.max_distance_m,
+        } : null,
         link: this.link(r),
         has_thumbnail: thumbs && isThumbSource(r.mime_type) && Number(r.size_bytes) <= cfg.thumbnails.max_source_mb * 1024 * 1024,
         download_url: `/files/${r.id}/download`,

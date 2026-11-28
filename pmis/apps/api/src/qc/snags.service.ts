@@ -1,3 +1,4 @@
+import { GeoService } from '../media/geo.service';
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -171,6 +172,7 @@ export class SnagsService {
     private readonly view: TaskViewService,
     private readonly storage: StorageService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly geo: GeoService,
   ) {}
 
   private async call<T>(auth: AuthContext, sql: Prisma.Sql): Promise<T> {
@@ -524,6 +526,8 @@ export class SnagsService {
         in_app_camera: body?.in_app_camera === 'true' || body?.in_app_camera === true, device_lat: num(body?.device_lat), device_lon: num(body?.device_lon),
       };
       const pid = await this.call<string>(auth, Prisma.sql`SELECT qc_attach_photo(${id}::uuid, ${JSON.stringify(meta)}::jsonb)::text AS r`);
+      // Media geotag (0477): the point of the file, else the device point of the in-app camera (never fails the upload)
+      if (sn.image) await this.geo.record('snag_photo', pid, file.buffer, sn.mime, { lat: meta.device_lat, lon: meta.device_lon });
       const after = await this.get(auth, id);
       const photo = (after.photos as { id: string }[]).find((p) => p.id === pid);
       if (!photo) throw problems.notFound();

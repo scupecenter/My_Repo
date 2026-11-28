@@ -12,8 +12,8 @@ export type MediaFacets = {
   registers: string[];
 };
 /** The filters of the Media tab; each one is a query parameter of GET /media/items (contract 0.15.292). */
-export type MediaFilter = { q: string; source: '' | 'documents' | 'snags'; status: '' | 'withdrawn' | 'pending_evidence'; doc_code: string; snag_type: string; uploaded_from: string; uploaded_to: string };
-export const EMPTY_MEDIA_FILTER: MediaFilter = { q: '', source: '', status: '', doc_code: '', snag_type: '', uploaded_from: '', uploaded_to: '' };
+export type MediaFilter = { q: string; source: '' | 'documents' | 'snags'; status: '' | 'withdrawn' | 'pending_evidence'; doc_code: string; snag_type: string; uploaded_from: string; uploaded_to: string; geo: '' | 'far' | 'near' | 'has' | 'missing' | 'unscanned'; media_kind: '' | 'photo' | 'panorama' | 'drone' };
+export const EMPTY_MEDIA_FILTER: MediaFilter = { q: '', source: '', status: '', doc_code: '', snag_type: '', uploaded_from: '', uploaded_to: '', geo: '', media_kind: '' };
 
 export const useMediaSettings = () => useQuery({ queryKey: ['media-settings'], queryFn: () => api.get<MediaSettings>('/media/settings') });
 export const useSetMediaSettings = () => {
@@ -21,6 +21,30 @@ export const useSetMediaSettings = () => {
   return useMutation<MediaSettings, ApiError, { version: number } & MediaSettingsInput>({
     mutationFn: ({ version, ...body }) => api.put('/media/settings', { version, body }),
     onSettled: () => { void qc.invalidateQueries({ queryKey: ['media-settings'] }); void qc.invalidateQueries({ queryKey: ['media-items'] }); void qc.invalidateQueries({ queryKey: ['media-facets'] }); },
+  });
+};
+
+export type MediaGeoSettings = S['MediaGeoSettings'];
+export type MediaGeoSettingsInput = S['MediaGeoSettingsInput'];
+export type MediaGeoStatus = S['MediaGeoStatus'];
+/** The location block of a gallery item (contract 0.15.539); null until the image is scanned. */
+export type MediaGeo = NonNullable<MediaItem['geo']>;
+export type MediaSite = { id: string; code?: string | null; name?: string | null; region_id?: number | null; latitude?: number | null; longitude?: number | null };
+export const useMediaGeoSettings = () => useQuery({ queryKey: ['media-geo-settings'], queryFn: () => api.get<MediaGeoSettings>('/media/geo/settings') });
+export const useSetMediaGeoSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<MediaGeoSettings, ApiError, { version: number } & MediaGeoSettingsInput>({
+    mutationFn: ({ version, ...body }) => api.put('/media/geo/settings', { version, body }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['media-geo-settings'] }); void qc.invalidateQueries({ queryKey: ['media-items'] }); void qc.invalidateQueries({ queryKey: ['media-geo-status'] }); },
+  });
+};
+export const useMediaGeoStatus = (enabled: boolean) => useQuery({ queryKey: ['media-geo-status'], enabled, queryFn: () => api.get<MediaGeoStatus>('/media/geo/status') });
+/** Reads the location of older images, a batch at a time; the screen calls it again while `pending` is above 0. */
+export const useScanMediaGeo = () => {
+  const qc = useQueryClient();
+  return useMutation<MediaGeoStatus & { done: number }, ApiError, void>({
+    mutationFn: () => api.post('/media/geo/scan', { body: { limit: 100 } }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['media-geo-status'] }); void qc.invalidateQueries({ queryKey: ['media-items'] }); },
   });
 };
 export const useMediaFacets = () => useQuery({ queryKey: ['media-facets'], queryFn: () => api.get<MediaFacets>('/media/facets') });
@@ -57,3 +81,7 @@ export function mediaLinkTo(l: Record<string, unknown>): string | null {
   if (l.kind === 'register' && s('register_key')) return s('record_id') ? `/registers/${s('register_key')}?record=${s('record_id')}` : `/registers/${s('register_key')}`;
   return s('site_id') ? `/sites/${s('site_id')}` : null;
 }
+
+/** The original image through the session cookie (the audited download route), as an object URL, for the viewer. */
+export const useMediaOriginal = (it: MediaItem, enabled: boolean) =>
+  useQuery({ queryKey: ['media-original', it.kind, it.id], enabled, staleTime: 5 * 60_000, retry: false, queryFn: async () => URL.createObjectURL(await fetchBlob(it.download_url)) });

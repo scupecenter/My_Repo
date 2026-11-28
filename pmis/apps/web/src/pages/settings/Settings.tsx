@@ -58,6 +58,7 @@ import { PEOPLE_TABS, peopleTabAllowed } from '@/components/PeopleAdmin';
 import { TemplateMappingPanel } from '../TemplateMapping';
 import { LoginPageSettings } from './LoginPage';
 import { MediaSettingsScreen } from './MediaSettings';
+import { MediaGeoSettingsCard } from './MediaGeoSettings';
 import { DataHubSettings } from './DataHubSettings';
 import { MapSettings } from './MapSettings';
 import { FinanceHubSettings } from './FinanceHubSettings';
@@ -268,7 +269,7 @@ export function SettingsRoutes() {
           <Route path="library" element={<LegacyRedirect to="documents/types" />} />
           <Route path="forms" element={<FormTemplates />} />
           <Route path="archive" element={<ArchiveSettings />} />
-          <Route path="media" element={<MediaSettingsScreen />} />
+          <Route path="media" element={<><MediaSettingsScreen /><MediaGeoSettingsCard /></>} />
           <Route path="numbering" element={<NumberSequences />} />
           <Route path="search" element={<DocumentSearchIndex />} />
         </Route>
