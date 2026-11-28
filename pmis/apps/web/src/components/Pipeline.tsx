@@ -40,7 +40,7 @@ function FlatTrack({ nodes, selected, onSelect, stats, label }: PipelineProps) {
               <li key={m.code} className="min-w-0 flex-1">
                 <button type="button" data-testid={`pipe-node-${m.code}`} data-state={m.state}
                   className={`group block w-full rounded-md p-1 text-start motion-lift focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${selected === m.code ? 'bg-accentSoft' : ''}`}
-                  aria-pressed={selected === m.code} aria-label={label ? label(m) : `${name}: ${t(`pipe.${m.state}`)}`} onClick={() => onSelect?.(m.code)}>
+                  aria-pressed={selected === m.code} title={label ? label(m) : undefined} onClick={() => onSelect?.(m.code)}>
                   <div className={`relative h-3 overflow-hidden bg-lockBg ${i === 0 ? 'rounded-s-full' : ''} ${i === ms.length - 1 ? 'rounded-e-full' : ''}`} aria-hidden="true">
                     {m.state !== 'na' && <i className={`motion-fill absolute inset-y-0 start-0 ${SEG_FILL[m.state] ?? 'bg-lock'}`} style={{ width: `${p * 100}%` }} />}
                   </div>
@@ -86,7 +86,7 @@ function RingPipeline({ nodes, selected, onSelect, stats, label }: PipelineProps
             const p = m.progress ?? 0, cls = CLS[m.state];
             return (
               <button key={m.code} type="button" data-testid={`pipe-node-${m.code}`} data-state={m.state} className={`st ${cls} ${selected === m.code ? 'sel' : ''}`}
-                aria-pressed={selected === m.code} aria-label={label ? label(m) : `${name}: ${t(`pipe.${m.state}`)}`} onClick={() => onSelect?.(m.code)}>
+                aria-pressed={selected === m.code} title={label ? label(m) : undefined} onClick={() => onSelect?.(m.code)}>
                 <div className="node">
                   {m.state !== 'planned' && m.state !== 'na' && <Ring p={p} color={COLOR[m.state] ?? 'var(--lock)'} />}
                   <b style={p >= 1 ? { fontSize: 15 } : undefined}>{m.state === 'na' ? '—' : `${Math.round(p * 100)}%`}</b>
