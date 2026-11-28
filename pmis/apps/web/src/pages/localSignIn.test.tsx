@@ -404,6 +404,8 @@ describe('hybrid mode list', () => {
       // contract 0.15.625 (migration 0745): company contacts, documents with expiry, compliance and the document types
       'GET /settings/company-document-types', 'PUT /settings/company-document-types', 'GET /companies/compliance', 'GET /companies/:id/compliance', 'GET /companies/:id/contacts', 'POST /companies/:id/contacts', 'PATCH /companies/:id/contacts/:contact_id',
       'GET /companies/:id/documents', 'POST /companies/:id/documents', 'PATCH /companies/:id/documents/:doc_id', 'GET /companies/:id/documents/:doc_id/file',
+      // contract 0.15.626 (migration 0746): the onboarding checklist, the bulk change and the import of the company templates
+      'GET /settings/company-onboarding-items', 'PUT /settings/company-onboarding-items', 'GET /companies/onboarding', 'POST /companies/onboarding-bulk', 'POST /companies/import', 'GET /companies/:id/onboarding', 'PUT /companies/:id/onboarding/:item',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

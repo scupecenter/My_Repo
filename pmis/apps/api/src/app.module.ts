@@ -232,6 +232,8 @@ import { MasterImportController, TemplateMappingController } from './master-impo
 import { MasterImportService } from './master-import/master-import.service';
 import { ContractorsController } from './contractors/contractors.controller';
 import { ContractorsService } from './contractors/contractors.service';
+import { CompanyOnboardingController } from './contractors/company-onboarding.controller';
+import { CompanyOnboardingService } from './contractors/company-onboarding.service';
 import { CompanyRecordsController } from './contractors/company-records.controller';
 import { CompanyRecordsService } from './contractors/company-records.service';
 import { ContractorPerformanceService } from './contractors/contractor-performance.service';
@@ -278,7 +280,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       ListCataloguesController,
       MasterImportController, TemplateMappingController,
       ContractorsController,
-      CompanyRecordsController,
+      CompanyRecordsController, CompanyOnboardingController,
       PresenceController,
       SavedViewsController,
       SearchController, // 0.15.17 (F4)
@@ -317,7 +319,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       { provide: MailPort, useClass: OutboxMail },
       MasterImportService, MappingService,
       ContractorsService,
-      CompanyRecordsService,
+      CompanyRecordsService, CompanyOnboardingService,
       ContractorPerformanceService,
       SavedViewsService, FilterCatalogService,
       SearchService, // 0.15.17 (F4)

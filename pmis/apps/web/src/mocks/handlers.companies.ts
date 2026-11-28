@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE as B } from '@/api/client';
-import type { CompanyCompliance, CompanyContact, CompanyDocument, CompanyDocumentType } from '@/api/companies';
+import type { CompanyCompliance, CompanyContact, CompanyDocument, CompanyDocumentType, CompanyOnboardingItem, CompanyOnboardingStatus, OnboardingState } from '@/api/companies';
+import { MOCK_COMPANIES } from './handlers.registers';
 import { viewer } from './db';
 import { guard, problem } from './handlers';
 
@@ -15,7 +16,27 @@ let typesVersion = 7;
 let contacts: CompanyContact[] = [];
 let docs: CompanyDocument[] = [];
 const uid = () => crypto.randomUUID();
-export const resetCompanies = () => { types = TYPES0.map((t) => ({ ...t })); typesVersion = 7; contacts = []; docs = []; };
+/** Companies K4 (contract 0.15.626): the checklist items (applies to nobody until set), the statuses, the bulk change and the import. */
+const ITEMS0: CompanyOnboardingItem[] = [['documents_received', 'Documents received', 'استلام المستندات'], ['safety_induction', 'Safety induction', 'التوعية بالسلامة'], ['insurance', 'Insurance', 'التأمين'], ['reference_check', 'Reference check', 'التحقق من المراجع']]
+  .map(([code, label_en, label_ar]) => ({ code: code!, label_en: label_en!, label_ar: label_ar!, required_for: [], is_active: true }));
+let items = ITEMS0.map((x) => ({ ...x }));
+let itemsVersion = 4;
+let onb: { party: string; item: string; status: OnboardingState; note: string | null; approver_name: string | null; decided_at: string | null }[] = [];
+export const resetCompanies = () => { types = TYPES0.map((t) => ({ ...t })); typesVersion = 7; contacts = []; docs = []; items = ITEMS0.map((x) => ({ ...x })); itemsVersion = 4; onb = []; };
+const PARTY_TYPES = ['cw_contractor', 'te_vendor', 'gecol', 'hlc', 'supplier', 'landlord', 'other'];
+const typeOf = (party: string) => (MOCK_COMPANIES.find((c) => c.id === party)?.type ?? 'other');
+const applies = (party: string) => items.filter((i) => i.is_active && i.required_for.includes(typeOf(party)));
+const checklist = (party: string): CompanyOnboardingStatus[] => items
+  .filter((i) => applies(party).some((a) => a.code === i.code) || onb.some((o) => o.party === party && o.item === i.code))
+  .map((i) => { const o = onb.find((x) => x.party === party && x.item === i.code); return { code: i.code, label_en: i.label_en, label_ar: i.label_ar ?? null, status: o?.status ?? 'not_started', approver_id: null, approver_name: o?.approver_name ?? null, decided_at: o?.decided_at ?? null, note: o?.note ?? null, updated_at: null }; });
+const applyStatus = (party: string, item: string, status: OnboardingState, note: string | null | undefined) => {
+  const i = onb.findIndex((x) => x.party === party && x.item === item);
+  const was = i < 0 ? null : onb[i]!;
+  if (was && was.status === status && (note === undefined || note === was.note)) return false;
+  const row = { party, item, status, note: note === undefined ? (was?.note ?? null) : note, approver_name: status === 'approved' ? (was?.approver_name ?? 'Test admin') : null, decided_at: status === 'approved' ? (was?.decided_at ?? new Date().toISOString()) : null };
+  if (i < 0) onb.push(row); else onb[i] = row;
+  return true;
+};
 const isAdmin = () => viewer()?.key === 'pm';
 const now = () => new Date().toISOString();
 const status = (exp: string | null, lead: number) => {
@@ -122,5 +143,59 @@ export const companiesHandlers = [
     const g = guard();
     if (g) return g;
     return new HttpResponse('synthetic', { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="document.txt"' } });
+  }),
+  http.get(`${B}/settings/company-onboarding-items`, () => {
+    const g = guard();
+    if (g) return g;
+    return HttpResponse.json({ items, party_types: PARTY_TYPES, version: itemsVersion, can_edit: isAdmin() }, tag(itemsVersion));
+  }),
+  http.put(`${B}/settings/company-onboarding-items`, async ({ request }) => {
+    const g = guard();
+    if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'You are not allowed to do this.');
+    const b = (await request.json()) as { reason?: string; items?: CompanyOnboardingItem[] };
+    if ((b.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required' }] });
+    for (const n of b.items ?? []) {
+      const o = items.find((x) => x.code === n.code);
+      if (o) Object.assign(o, n); else items.push(n);
+    }
+    itemsVersion += 1;
+    return HttpResponse.json({ items, party_types: PARTY_TYPES, version: itemsVersion, can_edit: true }, tag(itemsVersion));
+  }),
+  http.get(`${B}/companies/onboarding`, () => {
+    const g = guard();
+    if (g) return g;
+    return HttpResponse.json({ items: MOCK_COMPANIES.map((c) => {
+      const list = checklist(c.id), approved = list.filter((x) => x.status === 'approved').length, inProgress = list.filter((x) => x.status === 'in_progress').length;
+      return { party_id: c.id, total: list.length, approved, in_progress: inProgress, status: list.length === 0 ? 'none' : approved === list.length ? 'approved' : approved + inProgress > 0 ? 'in_progress' : 'not_started' };
+    }) });
+  }),
+  http.post(`${B}/companies/onboarding-bulk`, async ({ request }) => {
+    const g = guard();
+    if (g) return g;
+    const b = (await request.json()) as { party_ids: string[]; item: string; status: OnboardingState };
+    const errors = b.party_ids.flatMap((p, n) => (applies(p).some((a) => a.code === b.item) || onb.some((o) => o.party === p && o.item === b.item) ? [] : [{ path: `/parties/${n + 1}`, code: 'not_applicable' }]));
+    if (errors.length) return problem(422, 'validation_failed', 'Validation failed', { errors });
+    let changed = 0;
+    for (const p of b.party_ids) if (applyStatus(p, b.item, b.status, undefined)) changed += 1;
+    return HttpResponse.json({ companies: b.party_ids.length, changed, unchanged: b.party_ids.length - changed, item: b.item, status: b.status });
+  }),
+  http.post(`${B}/companies/import`, () => {
+    const g = guard();
+    if (g) return g;
+    return HttpResponse.json({ id: crypto.randomUUID(), rows: 1, added: 1, updated: 0, unchanged: 0, template_id: 'TPL-COMPANY-CONTACTS', template_version: 1, source: 'template', file_name: 'companies.xlsx', status: 'applied' }, { status: 202 });
+  }),
+  http.get(`${B}/companies/:id/onboarding`, ({ params }) => {
+    const g = guard();
+    if (g) return g;
+    return HttpResponse.json({ items: checklist(String(params.id)) });
+  }),
+  http.put(`${B}/companies/:id/onboarding/:item`, async ({ params, request }) => {
+    const g = guard();
+    if (g) return g;
+    const b = (await request.json()) as { status: OnboardingState; note?: string | null };
+    const party = String(params.id), item = String(params.item);
+    if (!applies(party).some((a) => a.code === item) && !onb.some((o) => o.party === party && o.item === item)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/item', code: 'not_applicable' }] });
+    return HttpResponse.json({ party_id: party, item, status: b.status, changed: applyStatus(party, item, b.status, b.note) });
   }),
 ];

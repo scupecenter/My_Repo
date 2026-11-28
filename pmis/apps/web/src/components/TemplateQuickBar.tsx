@@ -10,7 +10,7 @@ import { Combobox, type ComboOption } from './Combobox';
 import { useToast } from './Toast';
 import { TemplateUploadDialog } from './TemplateUploadDialog';
 
-const ownScreen = (x: Template) => x.template_kind === 'list_values' || x.template_kind === 'holidays' || x.template_kind === 'daily_plan';
+const ownScreen = (x: Template) => x.template_kind === 'list_values' || x.template_kind === 'holidays' || x.template_kind === 'daily_plan' || !!x.template_kind?.startsWith('company_');
 export type QuickAction = 'blank' | 'prefill' | 'upload' | 'open';
 
 /**
