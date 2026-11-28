@@ -103,11 +103,15 @@ describe('Media export', () => {
     await setCap(10);
     expect((await settings()).export_max_mb).toBe(10);
     expect((await docsQuality.api.call('post', '/media/exports', both())).status).toBe(202);      // a few hundred bytes are under 10 MB
-    await db.query('UPDATE document_files SET size_bytes = $2 WHERE id = $1', [ids.file, 11 * 1024 * 1024]);   // the recorded size is what the cap counts
-    const big = await docsQuality.api.call('post', '/media/exports', sel(['document_file', ids.file!]));
+    // the recorded size is what the cap counts (a stored file never changes, so a second, larger file is added to the same slot and withdrawn after)
+    const bigFile = (await db.query(
+      `INSERT INTO document_files (slot_id, file_group_id, original_name, stored_name, storage_key, mime_type, ext, size_bytes, sha256, uploaded_by, is_current)
+       SELECT slot_id, gen_random_uuid(), 'big.png', 'big.png', $2, 'image/png', 'png', $3, $4, $5, true FROM document_files WHERE id = $1 RETURNING id`,
+      [ids.file, key(), 11 * 1024 * 1024, 'd'.repeat(64), admin.user.id])).rows[0].id as string;
+    const big = await docsQuality.api.call('post', '/media/exports', sel(['document_file', bigFile]));
     expect(big.status).toBe(422);
     expect(JSON.stringify(big.body)).toContain('export_too_large');
-    await db.query('UPDATE document_files SET size_bytes = $2 WHERE id = $1', [ids.file, png.length]);
+    await db.query('UPDATE document_files SET is_current = false, withdrawn_at = now() WHERE id = $1', [bigFile]);
     await app.get(MediaExportService).idle();
   });
 
