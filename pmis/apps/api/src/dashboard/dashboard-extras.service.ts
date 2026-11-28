@@ -6,6 +6,7 @@ import { Query } from "../common/query";
 import { DbService } from "../db/db.service";
 import { FilterCatalogService } from "../views/filter-catalog.service";
 import { SCENARIOS, dashboardParams } from "./dashboard.service";
+import { monthlyOnAirTarget } from "./dashboard-targets";
 import {
   aggregateGaps,
   kpiColour,
@@ -467,7 +468,8 @@ export class DashboardExtrasService {
       time_in_state_p85:
         Number(timeInState.n) > 0 ? roundDays(timeInState.p85) : null,
       stale_tasks: sharePct(Number(stale.stale), Number(stale.open_total)),
-      on_air_vs_target: targetPct(Number(onAir.n), cfg.targets.monthly_on_air),
+      // 0.15.367: the target in force, derived from the scope unless the manual override is on (then the typed number of Settings)
+      on_air_vs_target: targetPct(Number(onAir.n), (await monthlyOnAirTarget(this.db, siteWhere)).value),
     };
   }
 

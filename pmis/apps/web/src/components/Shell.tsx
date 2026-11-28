@@ -17,7 +17,7 @@ import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
 import { API_BASE } from '@/api/client';
-import { sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { PALETTE_HIDDEN_KEY, sanitizeUiNav, withoutHidden, type UiNav } from '@/lib/sidebarPrefs';
 import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
@@ -132,7 +132,9 @@ function ShellFrame() {
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
   const sideItems = visibleNavItems(me.data);
-  const paletteItems = permittedNavItems(me.data);
+  // the search box follows the personal menu: screens the person hid are left out unless they turned on "also search hidden screens" (Profile, My sidebar)
+  const paletteAll = loadPref<boolean>(PALETTE_HIDDEN_KEY, false) === true;
+  const paletteItems = paletteAll ? permittedNavItems(me.data) : withoutHidden(permittedNavItems(me.data), side);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
@@ -231,13 +233,13 @@ function ShellFrame() {
             <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>
           </button>
           <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.centre')}</button>
-          <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
+          <button className="btn" data-testid="topbar-lang" aria-label={`${t('top.language')}: ${lang === 'en' ? 'ع' : 'EN'}`} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <QuickCreate me={me.data} allowed={allowed} />
           <NotificationBell count={pending} />
           <Popover.Root>
             <Popover.Trigger asChild>
-              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" aria-label={t('top.account')}>
+              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" title={t('top.account')}>
                 <Avatar name={me.data?.user.display_name} size="sm" />
                 {me.data?.user.display_name}
               </button>
