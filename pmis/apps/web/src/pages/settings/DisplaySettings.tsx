@@ -47,6 +47,7 @@ export function DisplaySettings() {
       {radio('density', DENSITIES, v.density, (x) => setF({ ...v, density: x }), (x) => t(`table.${x}`))}
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can} data-testid="display-default-wrap" checked={v.wrap} onChange={(e) => setF({ ...v, wrap: e.target.checked })} />{t('tstd.display_wrap')}</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can} data-testid="display-default-zebra" checked={v.zebra} onChange={(e) => setF({ ...v, zebra: e.target.checked })} />{t('tstd.display_zebra')}</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can} data-testid="display-default-groupbar" checked={v.groupbar} onChange={(e) => setF({ ...v, groupbar: e.target.checked })} />{t('tstd.display_groupbar')}</label>
       {/* a small sample drawn with the chosen options */}
       <div className="card gx overflow-hidden" {...displayAttrs(v)} data-testid="display-preview">
         {['TR101', 'MI102', 'WM103'].map((code, i) => (

@@ -17864,6 +17864,8 @@ export interface components {
             density: "compact" | "normal" | "comfortable";
             wrap: boolean;
             zebra: boolean;
+            /** @description 0.15.561 (0652). The count and status distribution bar on the header of each group of a grouped table (My Work). Optional in a PUT (an older client that does not send it keeps working); the GET always returns it (default true). */
+            groupbar?: boolean;
         };
         TableDisplaySetting: {
             defaults: components["schemas"]["TableDisplay"];
@@ -22708,6 +22710,7 @@ export interface components {
                 align?: "start" | "center";
                 wrap?: boolean;
                 zebra?: boolean;
+                groupbar?: boolean;
             };
         };
         SavedViewSort: {
