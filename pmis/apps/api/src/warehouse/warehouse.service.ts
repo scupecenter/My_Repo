@@ -448,6 +448,15 @@ export class WarehouseService {
     }
   }
 
+  /** 0567: audit-fed history of one item, newest first, with the field changes. */
+  async itemHistory(auth: AuthContext, rawId: string): Promise<unknown[]> {
+    const id = parse(uuidSchema, rawId);
+    return this.call<unknown[]>(
+      auth,
+      Prisma.sql`SELECT wh_item_history(${id}::uuid) AS r`,
+    );
+  }
+
   // ------------------------------------------------------------------ P6: custom columns of the item master (field_definitions of warehouse_item)
   async itemColumns(auth: AuthContext, q: Query): Promise<{ items: unknown[] }> {
     const all = boolParam(q, "include_inactive");
