@@ -11,10 +11,12 @@ import {
   type DashboardSettingsInput,
   type DashboardTab,
 } from "@/api/dashboardSettings";
+import { usePartialCredit, useSetPartialCredit } from "@/api/partialCredit";
 import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
+import { HealthBands } from "./HealthBands";
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -98,6 +100,7 @@ export function DashboardSettings() {
   });
 
   return (
+    <>
     <section
       className="card space-y-4 p-4"
       data-testid="page-dashboard-settings"
@@ -147,6 +150,8 @@ export function DashboardSettings() {
           {t("dashSettings.targets_derived")}
         </p>
       )}
+
+      <HealthBands />
 
       <fieldset
         className="space-y-2 rounded-md border border-line p-3"
@@ -324,6 +329,57 @@ export function DashboardSettings() {
                   toast(t("settings.audited"));
                   setOpen(false);
                   setDraft(null);
+                },
+              },
+            )
+          }
+        />
+      )}
+    </section>
+    <PartialCreditCard />
+    </>
+  );
+}
+
+/** Migration 0543: the partial-credit switch of the progress calculation (off by default). A separate setting with its own audited save. */
+function PartialCreditCard() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const q = usePartialCredit();
+  const set = useSetPartialCredit();
+  const [open, setOpen] = useState(false);
+  if (!q.data)
+    return (
+      <section className="card p-4" data-testid="partial-credit-card">
+        <QueryFallback queries={[q]} testid="partial-credit-loading" />
+      </section>
+    );
+  const s = q.data;
+  return (
+    <section className="card space-y-2 p-4" data-testid="partial-credit-card">
+      <h2 className="font-bold">{t("dashSettings.partial_credit_title")}</h2>
+      <p className="text-sm text-mute">{t("dashSettings.partial_credit_note")}</p>
+      <p className="text-sm" data-testid="partial-credit-state">
+        {s.enabled ? t("dashSettings.partial_credit_on") : t("dashSettings.partial_credit_off")}
+      </p>
+      <button className="btn" data-testid="partial-credit-change" onClick={() => setOpen(true)}>
+        {s.enabled ? t("dashSettings.partial_credit_turn_off") : t("dashSettings.partial_credit_turn_on")}
+      </button>
+      {open && (
+        <FormDialog
+          open
+          onClose={() => setOpen(false)}
+          testid="partial-credit-dialog"
+          title={t("dashSettings.partial_credit_title")}
+          busy={set.isPending}
+          error={set.isError ? errText(set.error, t) : null}
+          onSubmit={(reason) =>
+            set.mutate(
+              { version: s.version, body: { enabled: !s.enabled, reason } },
+              {
+                onSuccess: () => {
+                  toast(t("settings.audited"));
+                  setOpen(false);
                 },
               },
             )

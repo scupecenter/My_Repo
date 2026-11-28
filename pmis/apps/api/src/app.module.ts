@@ -37,6 +37,8 @@ import { FilterCatalogService } from './views/filter-catalog.service';
 import { InsightsController } from './insights/insights.controller';
 import { InsightsService } from './insights/insights.service';
 import { NotificationsController } from './notifications/notifications.controller';
+import { NotificationPersonalController } from './notifications/notification-personal.controller';
+import { NotificationPersonalService } from './notifications/notification-personal.service';
 import { NotificationsService } from './notifications/notifications.service';
 import { StatusUpdatesController } from './status-updates/status-updates.controller';
 import { StatusUpdatesService } from './status-updates/status-updates.service';
@@ -115,6 +117,8 @@ import { DeriveRulesController } from './settings/derive-rules.controller';
 import { DeriveRulesService } from './settings/derive-rules.service';
 import { MailPolicyController } from './settings/mail-policy.controller';
 import { MailPolicyService } from './settings/mail-policy.service';
+import { PartialCreditController } from './settings/partial-credit.controller';
+import { PartialCreditService } from './settings/partial-credit.service';
 import { MailKindsController } from './settings/mail-kinds.controller';
 import { MailKindsService } from './settings/mail-kinds.service';
 import { StructuralFreezeController } from './settings/structural-freeze.controller';
@@ -241,9 +245,10 @@ export function appModuleFor(config: AppConfig) {
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DocumentTextController, PushController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, StructureProposalsController, StructurePolicyController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController, RegisterRulesController,
-      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
+      NotificationsController, NotificationPersonalController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
 DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, DashboardTargetPolicyController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
 DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController, OpsLimitsController,
+      PartialCreditController, // 0.15.269 progress standards
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
@@ -273,9 +278,10 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       AccessService, AuthService, UsersRepo, MeService, NotifyAdminsService, MySessionsService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, StructureProposalsService, RegisterRulesService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
-      NotificationsService, DocumentTextService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, PushService, SnagsService,
+      NotificationsService, NotificationPersonalService, DocumentTextService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, PushService, SnagsService,
 DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, DashboardTargetPolicyService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
 DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
+      PartialCreditService, // 0.15.269 progress standards
       MediaService, // 0.15.292
       PasskeyService, // S4
       DuplicateRowsSettingsService,

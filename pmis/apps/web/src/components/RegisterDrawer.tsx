@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
-import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
+import { useHandoverOpenCounts, useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { EditingNotice } from './EditingNotice';
 import { useAddRegisterComment, useCommentReaction, useCommentResolved, useRegisterComments } from '@/api/x';
@@ -231,9 +231,14 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
     onSuccess: () => { toast(t(o === 'void' ? 'registers.voided' : 'approvals.done')); setRejecting(false); setVoiding(false); },
     onError: (e) => { setRejecting(false); setVoiding(false); fail(e); },
   });
+  /** A8: the readiness handover asks for a confirmation when snags, issues or quality records are still open on the site (a warning, never a block). */
+  const handover = useHandoverOpenCounts(site?.id, key === 'readiness_handover' && (!record || record.state === 'entry'));
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const submit = () => {
     setTried(true);
     if (issueList.length) return;
+    if (key === 'readiness_handover' && handover.total > 0 && !confirmOpen) { setConfirmOpen(true); return; }
+    setConfirmOpen(false);
     if (!record) {
       create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
@@ -466,6 +471,17 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
         {editable && (!record || act('submit')) && (finalSelf || skipTo) && <p className="text-sm text-waitInk" data-testid="reg-skip-note">{finalSelf ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: skipTo })}</p>}
         {docsMissing.length > 0 && (!record || act('submit')) && <p className="text-sm text-lateInk" data-testid="reg-docs-missing">{t('recDocs.missing', { list: docsMissing.join(', ') })}</p>}
         {editable && tried && issueList.length > 0 && <p className="text-sm text-lateInk" data-testid="reg-missing">{t('registers.fix_list', { list: issueList.map((c) => (c === 'site_id' ? t('registers.site') : labelOf(c))).join(', ') })}</p>}
+        {confirmOpen && handover.total > 0 && (
+          <div role="alertdialog" aria-label={t('handoverWarn.title')} className="space-y-2 rounded-md border border-waitInk bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-handover-warn">
+            <p className="font-semibold">{t('handoverWarn.title')}</p>
+            <p data-testid="reg-handover-counts">{t('handoverWarn.counts', { snags: handover.snags, issues: handover.issues, quality: handover.quality })}</p>
+            <p>{t('handoverWarn.ask')}</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn" data-testid="reg-handover-cancel" onClick={() => setConfirmOpen(false)}>{t('handoverWarn.cancel')}</button>
+              <button type="button" className="btn btn-primary" data-testid="reg-handover-confirm" disabled={busy} onClick={submit}>{t('handoverWarn.confirm')}</button>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           {record && act('new_version') && <button className="btn" data-testid="reg-new-version" disabled={busy} onClick={() => newVersion.mutate(record, { onSuccess: (r) => { toast(t('registers.version_created')); onCreated(r.id); }, onError: fail })}><FilePlus2 size={16} />{t('registers.new_version')}</button>}
           {record && act('transfer') && <button className="btn" data-testid="reg-transfer" disabled={busy} onClick={() => transfer.mutate({ record }, { onSuccess: () => toast(t('registers.transferred')), onError: fail })}><ArrowRightLeft size={16} />{t('registers.transfer')}</button>}

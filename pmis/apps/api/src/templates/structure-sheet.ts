@@ -9,12 +9,12 @@ export const STRUCTURE_SHEET = 'Structure';
 
 export interface StructureField {
   code: string; label_en: string; label_ar: string | null; type: string; list_catalogue: string | null; required: boolean; sort_order: number; section: string | null;
-  in_list: boolean; in_filter: boolean; in_template: boolean; in_export: boolean; is_active: boolean; is_system: boolean;
+  in_list: boolean; in_filter: boolean; in_template: boolean; in_export: boolean; is_active: boolean; is_system: boolean; import_aliases?: string[];
 }
 
-export const STRUCTURE_HEADERS = ['Code', 'Label EN', 'Label AR', 'Type', 'List', 'Required', 'Order', 'Section', 'In list', 'In filter', 'In template', 'In export', 'Active', 'System'] as const;
-type Key = 'code' | 'label_en' | 'label_ar' | 'type' | 'list_catalogue' | 'required' | 'sort_order' | 'section' | 'in_list' | 'in_filter' | 'in_template' | 'in_export' | 'is_active' | 'system';
-const KEYS: Key[] = ['code', 'label_en', 'label_ar', 'type', 'list_catalogue', 'required', 'sort_order', 'section', 'in_list', 'in_filter', 'in_template', 'in_export', 'is_active', 'system'];
+export const STRUCTURE_HEADERS = ['Code', 'Label EN', 'Label AR', 'Type', 'List', 'Required', 'Order', 'Section', 'In list', 'In filter', 'In template', 'In export', 'Active', 'System', 'Import aliases'] as const;
+type Key = 'code' | 'label_en' | 'label_ar' | 'type' | 'list_catalogue' | 'required' | 'sort_order' | 'section' | 'in_list' | 'in_filter' | 'in_template' | 'in_export' | 'is_active' | 'system' | 'import_aliases';
+const KEYS: Key[] = ['code', 'label_en', 'label_ar', 'type', 'list_catalogue', 'required', 'sort_order', 'section', 'in_list', 'in_filter', 'in_template', 'in_export', 'is_active', 'system', 'import_aliases'];
 const BOOLS: Key[] = ['required', 'in_list', 'in_filter', 'in_template', 'in_export', 'is_active'];
 
 /** What the sheet cannot do (S8), written in the sheet itself so the person editing it sees the limits. */
@@ -27,6 +27,7 @@ export const STRUCTURE_NOTES = [
   'A type change is accepted only when every value converts. Columns the system needs (grey rows) can change label, order and visibility only.',
   'This sheet cannot create or delete a register, the computed Master columns, workflow stages, rights or roles.',
   'Yes / No for the flag columns.',
+  'Import aliases: other names of the column, separated by ; . The data upload accepts a header that equals the label or one of the aliases. A blank cell leaves the aliases as they are.',
 ];
 
 const yn = (b: boolean): string => (b ? 'Yes' : 'No');
@@ -42,10 +43,10 @@ export function writeStructureSheet(wb: ExcelJS.Workbook, fields: StructureField
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 0 || i === 13 ? 'FF6B7280' : 'FF3E8FA3' } };
     c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     c.border = border;
-    ws.getColumn(i + 1).width = [22, 28, 28, 14, 20, 10, 8, 20, 9, 9, 11, 10, 8, 9][i] ?? 12;
+    ws.getColumn(i + 1).width = [22, 28, 28, 14, 20, 10, 8, 20, 9, 9, 11, 10, 8, 9, 34][i] ?? 12;
   });
   fields.forEach((f, ri) => {
-    const vals: (string | number)[] = [f.code, f.label_en, f.label_ar ?? '', f.type, f.list_catalogue ?? '', yn(f.required), f.sort_order, f.section ?? '', yn(f.in_list), yn(f.in_filter), yn(f.in_template), yn(f.in_export), yn(f.is_active), f.is_system ? 'System' : ''];
+    const vals: (string | number)[] = [f.code, f.label_en, f.label_ar ?? '', f.type, f.list_catalogue ?? '', yn(f.required), f.sort_order, f.section ?? '', yn(f.in_list), yn(f.in_filter), yn(f.in_template), yn(f.in_export), yn(f.is_active), f.is_system ? 'System' : '', (f.import_aliases ?? []).join('; ')];
     vals.forEach((v, ci) => {
       const cell = ws.getCell(ri + 2, ci + 1);
       cell.value = v;
@@ -112,6 +113,10 @@ export function readStructureSheet(ws: ExcelJS.Worksheet): SheetRow[] {
         const b = /^(yes|true|1|y|نعم)$/i.test(t) ? true : /^(no|false|0|n|لا)$/i.test(t) ? false : null;
         if (b === null) throw new StructureSheetError('bad_value', `Row ${r}, ${STRUCTURE_HEADERS[KEYS.indexOf(k)]}: "${t.slice(0, 20)}" is not Yes or No.`);
         o[k] = b;
+      } else if (k === 'import_aliases') {
+        const list = t.split(/[;\u061B|\n]/).map((x) => x.trim()).filter((x) => x !== '');
+        if (list.length > 20 || list.some((x) => x.length > 200)) throw new StructureSheetError('bad_value', `Row ${r}, Import aliases: at most 20 names of up to 200 characters.`);
+        o[k] = list;
       } else if (k === 'sort_order') {
         const n = Number(t);
         if (!Number.isInteger(n) || n < 0 || n > 100000) throw new StructureSheetError('bad_value', `Row ${r}, Order: "${t.slice(0, 20)}" is not a whole number from 0 to 100000.`);
