@@ -17,7 +17,7 @@ The code of a column never changes. A column that holds values is hidden (Active
 Submit, reject, apply and undo are audited (`structure_proposal_*`, with the before and after). The table `structure_proposals` is written only by the doors (owner `pmis_definer`; no write right for the API role, see `db/sql/app_grants.sql`). The proposals screen and the doors need `fields.edit` for all regions; the approval needs a System Admin.
 
 ## Not in this slice
-Alternative names (import aliases) are not stored and not in the sheet: the data upload checks the header row of the issued template exactly (D112), so an alias would change the upload contract and waits for a decision. The Data hub (admin widget) links to this screen with the number of proposals waiting; the register screen's columns menu opens the Structure changes tab of its register.
+The Data hub (admin widget) links to this screen with the number of proposals waiting; the register screen's columns menu opens the Structure changes tab of its register.
 
 ## Rules, review tab and shortcut (contract 0.15.403, migration 0562)
 
@@ -26,3 +26,12 @@ Alternative names (import aliases) are not stored and not in the sheet: the data
 - **Shortcut.** The register screen has "Edit the structure" in its columns menu; it opens that tab for the register.
 - **Notices.** In-app kinds `structure_proposal` (to the approvers) and `structure_decision` (to the proposer, on approval and on rejection). Both are in the mail catalogue; they are not mailed until an admin lists them (Settings > Alerts > Mail).
 - Nothing else changes: the doors of 0560 are patched in place and follow the rules; no table, grant or permission is added.
+
+## Alternative names (import aliases, migration 0640)
+
+A column keeps its code, but people name it in different ways in their own copies of a template. Each column can have up to 20 alternative names (`register_fields.import_aliases`).
+
+- Where they are edited: the "Import aliases" column of the Structure sheet (names separated by `;`, a blank cell leaves them as they are) and the "Import aliases" cell of Settings > Registers > Columns (every change needs a reason and is audited). Both reach the same door as any column change; through the sheet they are a proposal like every other change.
+- What they do: the data upload checks the header row of a file against the issued template. A header that equals the label of the column, or one of its aliases (case and surrounding spaces ignored), is that column. The order of the columns, the typed values and the version rules (D112) are unchanged: a header that is neither a label nor an alias is still refused as before.
+- Aliases apply to register columns only (not to the Site ID or other fixed columns) and are never used to guess a column that is missing.
+- They travel in the proposal differences, in the undo of an applied proposal and in the audit record of the column.

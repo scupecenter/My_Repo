@@ -18255,6 +18255,8 @@ export interface components {
             in_filter?: boolean;
             in_template?: boolean;
             in_export?: boolean;
+            /** @description 0.15.520 (migration 0640). Other names of the column that the data upload accepts as its header (sorted, distinct). In a patch the list replaces the old one. */
+            import_aliases?: string[];
             /** @description 0.15.154. Prefilled on a new record (null or absent = none). */
             default_value?: unknown;
             is_active: boolean;
@@ -18311,6 +18313,8 @@ export interface components {
             in_filter?: boolean;
             in_template?: boolean;
             in_export?: boolean;
+            /** @description 0.15.520 (migration 0640). Other names of the column that the data upload accepts as its header (sorted, distinct). In a patch the list replaces the old one. */
+            import_aliases?: string[];
             reason: components["schemas"]["Reason"];
         };
         RegisterColumnPatch: {
@@ -18329,6 +18333,8 @@ export interface components {
             in_filter?: boolean;
             in_template?: boolean;
             in_export?: boolean;
+            /** @description 0.15.520 (migration 0640). Other names of the column that the data upload accepts as its header (sorted, distinct). In a patch the list replaces the old one. */
+            import_aliases?: string[];
             reason: components["schemas"]["Reason"];
         };
         RegisterColumnResult: {
@@ -19222,7 +19228,7 @@ export interface components {
              */
             inbox_anchor?: "end-top" | "end-bottom" | "start-top" | "start-bottom";
             /**
-             * @description 0.15.530 (0581): the More menu of the table screens as a list (default) or an icon grid with search.
+             * @description 0.15.530 (0581): the More menu of the table screens as a list (default) or an icon grid with a search box.
              * @enum {string}
              */
             more_menu?: "list" | "grid";
