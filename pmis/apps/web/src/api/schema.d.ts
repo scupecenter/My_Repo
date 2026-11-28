@@ -19659,7 +19659,7 @@ export interface components {
             /** @description Whether withdrawn and rejected items can be listed (they are never deleted). */
             show_withdrawn: boolean;
             page_size: number;
-            /** @description Size cap of an export of a selection (0.15.531). */
+            /** @description Size cap of an export of a selection (0.15.532). */
             export_max_mb: number;
             thumbnails: components["schemas"]["MediaThumbnails"];
             /** Format: date-time */

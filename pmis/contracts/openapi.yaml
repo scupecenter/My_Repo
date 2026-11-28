@@ -26439,7 +26439,7 @@ components:
         image_only: { type: boolean }
         show_withdrawn: { type: boolean, description: 'Whether withdrawn and rejected items can be listed (they are never deleted).' }
         page_size: { type: integer, minimum: 12, maximum: 200 }
-        export_max_mb: { type: integer, minimum: 10, maximum: 5000, description: 'Size cap of an export of a selection (0.15.531).' }
+        export_max_mb: { type: integer, minimum: 10, maximum: 5000, description: 'Size cap of an export of a selection (0.15.532).' }
         thumbnails: { $ref: '#/components/schemas/MediaThumbnails' }
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
