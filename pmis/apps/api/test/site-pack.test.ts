@@ -61,7 +61,7 @@ describe('POST /exports/master with site_pack', () => {
     const book = new ExcelJS.Workbook();
     await book.xlsx.load(Buffer.from(files['sites.xlsx']!) as unknown as ExcelJS.Buffer);
     const codes: string[] = [];
-    book.worksheets[0]!.eachRow((row) => { const v = row.getCell(2).value; if (typeof v === 'string' && v.startsWith(`SP${TAG}`)) codes.push(v); });
+    book.worksheets[0]!.eachRow((row) => row.eachCell((cell) => { const v = cell.value; if (typeof v === 'string' && v.startsWith(`SP${TAG}`) && !codes.includes(v)) codes.push(v); })); // the column of the site code depends on the columns the caller may export
     expect(codes).toEqual([sebha.code]);
   });
 
