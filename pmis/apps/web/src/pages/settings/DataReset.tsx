@@ -11,6 +11,7 @@ import {
 } from '@/api/dataReset';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
+import { CategoryPicker, ConfirmDialog, ResultDialog, categoryRows, resultSeen } from './DataResetCategories';
 
 type Dialog = 'approve' | 'cancel' | 'run' | 'retry' | 'settings' | null;
 
@@ -40,6 +41,8 @@ export function DataReset() {
   const retry = useRetryDataResetFiles(), setCfg = useSetDataResetSettings(), makeArchive = useMakeDataResetArchive();
   const [archive, setArchive] = useState<ArchiveMode>('download');
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [resultClosed, setResultClosed] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [typed, setTyped] = useState('');
   const [runTyped, setRunTyped] = useState('');
@@ -77,6 +80,7 @@ export function DataReset() {
   const noBackupOk = requireBackup || noBackupTyped === noBackupPhrase;
   const needBackup = requiresBackup(req);
   const last = s.last_request;
+  const resultReq = req && (req.status === 'completed' || req.status === 'files_pending') ? req : (!req && last?.status === 'completed' ? last : null);
 
   return (
     <div className="space-y-4" data-testid="page-data-reset" data-status={req?.status ?? 'none'}>
@@ -173,11 +177,17 @@ export function DataReset() {
           </label>
           {ask.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-form-error">{errText(ask.error, t)}</p>}
           <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || !scopeOk || !noBackupOk || ask.isPending}
-            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}), ...(nb ? { narrow: nb } : {}), archive,
-              ...(requireBackup ? {} : { require_backup: false, no_backup_confirm: noBackupTyped }) },
-              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); setNarrow({}); setRequireBackup(true); setNoBackupTyped(''); setArchive('download'); } })}>
+            onClick={() => { ask.reset(); setConfirming(true); }}>
             {t('dr.submit')}
           </button>
+          {confirming && (
+            <ConfirmDialog everything={mode === 'everything'} catalogue={catalogue} busy={ask.isPending} error={ask.isError ? errText(ask.error, t) : null}
+              rows={categoryRows((mode === 'custom' ? dry.data?.parts : s.plan.parts) ?? [], mode === 'everything' ? (s.everything ?? []) : (dry.data?.scope.parts ?? closureOf(chosen, catalogue)), catalogue)}
+              onClose={() => setConfirming(false)}
+              onConfirm={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}), ...(nb ? { narrow: nb } : {}), archive,
+                ...(requireBackup ? {} : { require_backup: false, no_backup_confirm: noBackupTyped }) },
+                { onSuccess: () => { setConfirming(false); toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); setNarrow({}); setRequireBackup(true); setNoBackupTyped(''); setArchive('download'); } })} />
+          )}
         </section>
       )}
 
@@ -192,6 +202,8 @@ export function DataReset() {
         <p className="text-sm" data-testid="dr-settings-values">{t('dr.settings_values', { minutes: s.settings.request_expiry_minutes, hours: s.settings.backup_max_age_hours })} <span data-testid="dr-settings-cooloff">{t('dr.cooloff_value', { wait: waitText(t, s.settings.cooloff_minutes) })}</span></p>
         <button className="btn" data-testid="dr-settings-edit" disabled={!!req} onClick={() => { setCfg.reset(); setCfgForm(cfgFormOf(s.settings)); setDialog('settings'); }}>{t('common.edit')}</button>
       </section>
+
+      {resultReq && resultClosed !== resultReq.id && !resultSeen(resultReq.id) && <ResultDialog r={resultReq} catalogue={catalogue} onClose={() => setResultClosed(resultReq.id)} />}
 
       {dialog === 'approve' && req && (
         <ReasonDialog testid="dr-approve-dialog" title={t('dr.approve_title')} hint={`${t('dr.approve_hint')} ${t('dr.approve_scope')}`} min={10} busy={approve.isPending} error={approve.isError ? errText(approve.error, t) : null} onClose={close}
@@ -382,8 +394,11 @@ function ScopePicker({ catalogue, mode, setMode, chosen, setChosen, closure, dis
         <input type="radio" name="dr-scope-mode" data-testid="dr-scope-custom" checked={mode === 'custom'} onChange={() => setMode('custom')} />
         <span className="font-semibold">{t('dr.custom')}</span>
       </label>
+      {mode === 'custom' && <div className="ps-6"><CategoryPicker catalogue={catalogue} chosen={chosen} setChosen={setChosen} /></div>}
       {mode === 'custom' && (
-        <div className="grid gap-3 ps-6 md:grid-cols-3">
+        <details className="ps-6" data-testid="dr-by-part">
+        <summary className="cursor-pointer text-sm font-semibold">{t('dr.by_part')}</summary>
+        <div className="mt-2 grid gap-3 md:grid-cols-3">
           {GROUPS.map((g) => (
             <div key={g} className={`space-y-1 rounded-md p-2 ${g === 'identity' ? 'border border-lateInk/40 bg-lateBg' : 'bg-card2'}`} data-testid={`dr-scope-group-${g}`}>
               <h4 className={`text-sm font-semibold ${g === 'identity' ? 'text-lateInk' : ''}`}>{t(`dr.group_${g}`)}</h4>
@@ -403,6 +418,7 @@ function ScopePicker({ catalogue, mode, setMode, chosen, setChosen, closure, dis
             </div>
           ))}
         </div>
+        </details>
       )}
       {mode === 'custom' && chosen.length === 0 && <p className="text-sm text-lateInk" data-testid="dr-scope-none">{t('dr.none_chosen')}</p>}
       {added.length > 0 && (

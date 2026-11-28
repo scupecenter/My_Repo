@@ -33,6 +33,7 @@ describe('Settings, data reset', () => {
     await u.type(screen.getByTestId('dr-phrase'), 'is');
     expect(submit).toBeEnabled();
     await u.click(submit);
+    await u.click(await screen.findByTestId('dr-confirm-go'));
     expect(await screen.findByTestId('dr-request')).toHaveAttribute('data-status', 'requested');
     expect(screen.getByTestId('dr-request-status')).toHaveTextContent('Waiting for approval');
     expect(screen.getByTestId('dr-wait-other')).toBeInTheDocument();
@@ -148,6 +149,7 @@ describe('Settings, data reset', () => {
     await waitFor(() => expect(screen.getByTestId('dr-plan-accounts')).toHaveTextContent('23 accounts would be deactivated'));
     expect(screen.getByTestId('dr-submit')).toBeEnabled();
     await u.click(screen.getByTestId('dr-submit'));
+    await u.click(await screen.findByTestId('dr-confirm-go'));
     expect(await screen.findByTestId('dr-request-scope')).toHaveAttribute('data-everything', 'false');
     expect(screen.getByTestId('dr-request-scope-part-procurement')).toHaveTextContent('Procurement');
     expect(screen.getByTestId('dr-request-scope-part-car_dispatcher')).toHaveTextContent(en.dr.added_badge);
@@ -192,6 +194,7 @@ describe('Settings, data reset', () => {
     await u.type(screen.getByTestId('dr-no-backup-phrase'), 'P');
     expect(screen.getByTestId('dr-submit')).toBeEnabled();
     await u.click(screen.getByTestId('dr-submit'));
+    await u.click(await screen.findByTestId('dr-confirm-go'));
     const view = await screen.findByTestId('dr-request-backup');
     expect(view).toHaveAttribute('data-require', 'false');
     expect(view).toHaveTextContent(en.dr.no_backup_warning);
@@ -305,11 +308,68 @@ describe('Settings, data reset', () => {
     await u.type(screen.getByTestId('dr-reason'), 'Owner decision: only Tripoli orders');
     await u.type(screen.getByTestId('dr-phrase'), 'RESET pmis');
     await u.click(screen.getByTestId('dr-submit'));
+    await u.click(await screen.findByTestId('dr-confirm-go'));
     await screen.findByTestId('dr-request-narrow');
     await waitFor(() => expect(screen.getByTestId('dr-request-narrow')).toHaveTextContent('Tripoli'));
   });
 
   it('the narrowing strings exist in English and Arabic', () => {
     for (const k of Object.keys(en.dr).filter((x) => x.startsWith('narrow_'))) expect((ar.dr as Record<string, string>)[k]).toBeTruthy();
+  });
+});
+
+describe('Settings, data reset, categories (owner request 2026-11-28)', () => {
+  it('categories tick the existing parts, the audit log is a locked row, the confirm screen shows rows per category, and the result is a dialog closed only by Close', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-scope-custom'));
+    expect(screen.getByTestId('dr-cat-audit')).toHaveTextContent(en.dr.cat_audit_locked);
+    expect(screen.queryByTestId('dr-cat-audit')?.querySelector('input')).toBeNull();   // never a choice
+    await u.click(screen.getByTestId('dr-cat-all'));
+    expect(screen.getByTestId('dr-cat-daily_status')).toBeChecked();
+    expect(screen.getByTestId('dr-cat-reg-issues')).toBeChecked();
+    await u.click(screen.getByTestId('dr-cat-all'));
+    expect(screen.getByTestId('dr-cat-daily_status')).not.toBeChecked();
+    await u.click(screen.getByTestId('dr-cat-daily_status'));
+    expect(screen.getByTestId('dr-part-daily_plan')).toBeChecked();
+    expect(screen.getByTestId('dr-part-kpi')).toBeChecked();
+    await u.click(screen.getByTestId('dr-cat-reg-issues'));
+    expect(screen.getByTestId('dr-part-issues')).toBeChecked();
+    expect(screen.getByTestId('dr-cat-registers-summary')).toHaveTextContent('1 chosen');
+    await u.type(screen.getByTestId('dr-reason'), 'Owner decision: reset the plan and issues');
+    await u.type(screen.getByTestId('dr-phrase'), 'RESET pmis');
+    await u.click(screen.getByTestId('dr-submit'));
+    const dlg = await screen.findByTestId('dr-confirm');
+    expect(within(dlg).getByTestId('dr-confirm-permanent')).toHaveTextContent(en.dr.confirm_permanent);
+    expect(within(dlg).getByTestId('dr-cat-count-daily_status')).toBeInTheDocument();
+    expect(within(dlg).getByTestId('dr-cat-count-registers')).toHaveTextContent('Issue Log');
+    await u.click(within(dlg).getByTestId('dr-confirm-back'));
+    expect(screen.queryByTestId('dr-confirm')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dr-request')).not.toBeInTheDocument();    // nothing was requested
+    cleanup();
+    expect(en.dr.cat_audit).not.toEqual(ar.dr.cat_audit);
+  });
+
+  it('the result dialog is centered, shows the total, and stays until Close', async () => {
+    localStorage.removeItem('dr-result-seen');
+    await signIn('pm'); await stepUpDone();
+    await api.post('/__mock/data-reset/request-by-other');
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-approve'));
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+    await u.click(screen.getByTestId('dr-run'));
+    await u.type(screen.getByTestId('dr-run-phrase'), 'RESET pmis');
+    await u.click(screen.getByTestId('dr-run-dialog-submit'));
+    const dlg = await screen.findByTestId('dr-result-dialog');
+    expect(within(dlg).getByTestId('dr-result-check')).toBeInTheDocument();
+    expect(within(dlg).getByTestId('dr-result-total')).toHaveTextContent('12 rows deleted in total.');
+    await u.keyboard('{Escape}');
+    expect(screen.getByTestId('dr-result-dialog')).toBeInTheDocument();      // Esc does not close it
+    await u.click(within(dlg).getByTestId('dr-result-close'));
+    await waitFor(() => expect(screen.queryByTestId('dr-result-dialog')).not.toBeInTheDocument());
   });
 });
