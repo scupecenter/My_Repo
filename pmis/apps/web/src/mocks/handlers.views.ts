@@ -11,13 +11,13 @@ import { uid } from './ids';
 
 const B = API_BASE;
 type Row = SavedView & { owner_key: string; audience_in: SavedViewAudience };
-type State = { views: Row[]; pins: string[]; drafts: Map<string, Draft & { owner: string; payload: Record<string, unknown> }> };
+type State = { views: Row[]; pins: string[]; defaults: Record<string, string>; drafts: Map<string, Draft & { owner: string; payload: Record<string, unknown> }> };
 const states = new WeakMap<Db, State>();
 const omit = <T extends object>(o: T, ...keys: string[]) => Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k)));
 const S = (): State => {
   const d = db();
   let s = states.get(d);
-  if (!s) { s = { views: [], pins: [], drafts: new Map() }; states.set(d, s); }
+  if (!s) { s = { views: [], pins: [], defaults: {}, drafts: new Map() }; states.set(d, s); }
   return s;
 };
 const me = () => viewer()!;
@@ -268,6 +268,27 @@ export const viewsHandlers = [
   }),
 
   // ---- drafts (Q115): the caller's own; never a submission
+  // 0.15.582: a default view per screen. Personal, one per screen, the read check of the view applies; inactive views drop out.
+  http.get(`${B}/me/default-views`, () => {
+    const g = guard(); if (g) return g;
+    const items = Object.entries(S().defaults).map(([sk, id]) => ({ sk, v: S().views.find((x) => x.id === id) })).filter((x): x is { sk: string; v: Row } => !!x.v && x.v.is_active && canRead(x.v))
+      .map((x) => ({ screen_key: x.sk, view_id: x.v.id, name: x.v.name }));
+    return HttpResponse.json({ items });
+  }),
+  http.post(`${B}/saved-views/:id/set-default`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const v = S().views.find((x) => x.id === String(params.id));
+    if (!v || !v.is_active || !canRead(v)) return problem(404, 'not_found', 'Not found');
+    S().defaults[v.screen_key] = v.id;
+    return HttpResponse.json({ view_id: v.id, screen_key: v.screen_key, is_default: true });
+  }),
+  http.post(`${B}/saved-views/:id/clear-default`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const id = String(params.id);
+    const sk = Object.keys(S().defaults).find((k) => S().defaults[k] === id) ?? null;
+    if (sk) delete S().defaults[sk];
+    return HttpResponse.json({ view_id: id, screen_key: sk, is_default: false });
+  }),
   // 0.15.245 (item 16): home pins. Personal, at most 12, the read check of the view applies; inactive views drop out.
   http.get(`${B}/me/home-pins`, () => {
     const g = guard(); if (g) return g;
