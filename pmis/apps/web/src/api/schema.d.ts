@@ -4563,6 +4563,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/unattended": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether scheduled exports may run unattended (export.unattended)
+         * @description 0.15.584 (migration 0659). Every signed-in user may read it. Default OFF. While it is OFF no schedule runs without its owner opening Exports. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getExportUnattended"];
+        /**
+         * Switch unattended scheduled exports on or off (reason, If-Match, audited)
+         * @description 0.15.584. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). A reason is required; If-Match is checked when sent. Saving the value in force is 409 `invalid_transition`. Audited as `export_unattended_update`.
+         */
+        put: operations["setExportUnattended"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules/{id}": {
         parameters: {
             query?: never;
@@ -12873,8 +12897,14 @@ export interface components {
             spec?: {
                 parts?: string[];
                 regions?: number[];
+                /** @description 0.15.584. One register or Master view, the body `view` of POST /exports/master (checked when the export starts). */
+                view?: Record<string, never>;
             };
             enabled?: boolean;
+            /** @description 0.15.584. Mail the owner when the export is done or failed. */
+            mail?: boolean;
+            /** @description 0.15.584. Start it when due without the owner signed in (only while the system switch is ON). */
+            unattended?: boolean;
         };
         ExportSchedule: {
             /** Format: uuid */
@@ -12887,8 +12917,13 @@ export interface components {
             spec: {
                 parts?: string[];
                 regions?: number[];
+                view?: Record<string, never>;
             };
             enabled: boolean;
+            /** @description 0.15.584. */
+            mail?: boolean;
+            /** @description 0.15.584. */
+            unattended?: boolean;
             created_at: string;
             last_started_at?: string | null;
             /** Format: uuid */
@@ -12897,6 +12932,21 @@ export interface components {
             /** Format: date-time */
             next_due_at: string;
             due: boolean;
+        };
+        /** @description 0.15.584. The system switch `export.unattended`. */
+        ExportUnattended: {
+            enabled: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            /** Format: uuid */
+            updated_by?: string | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        ExportUnattendedInput: {
+            enabled: boolean;
+            reason: string;
         };
         ExportScheduleList: {
             items: components["schemas"]["ExportSchedule"][];
@@ -32217,6 +32267,61 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getExportUnattended: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The switch. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportUnattended"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setExportUnattended: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportUnattendedInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportUnattended"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
         };
     };

@@ -16,6 +16,7 @@ import { DbService } from '../db/db.service';
 import { attachmentHeader } from '../documents/naming';
 import { StorageService, newObjectKey } from '../documents/storage.service';
 import { applyContext, jobContext } from '../logs/context';
+import { MailService } from '../mail/mail.service';
 import { loadRegisterMaps, type RegisterMap } from '../master-import/register-sheets';
 import { RegistersService } from '../registers/registers.service';
 import { SitesService } from '../sites/sites.service';
@@ -117,6 +118,7 @@ export class MasterExportService {
     private readonly sites: SitesService,
     private readonly registers: RegistersService,
     private readonly projectStatus: ProjectStatusService,
+    private readonly mail: MailService,
   ) {}
 
   /** Waits for the jobs started by this process (tests, shutdown). */
@@ -252,7 +254,8 @@ export class MasterExportService {
   }
 
   // ------------------------------------------------------------------ start
-  async start(auth: AuthContext, raw: unknown, idemKey: string | undefined, onStarted: (go: () => void) => void): Promise<Record<string, unknown>> {
+  /** `notify` (0659): the owner gets a mail (kind export_ready) when this export is done or failed; set only by a scheduled export whose `mail` flag is on. */
+  async start(auth: AuthContext, raw: unknown, idemKey: string | undefined, onStarted: (go: () => void) => void, notify?: { name: string }): Promise<Record<string, unknown>> {
     const body: Body = parse(bodySchema, raw ?? {});
     if (body.parts?.length && body.view) {
       throw problems.validation([{ path: '/view', code: 'parts_and_view_exclusive', message: 'Send parts or view, not both.' }]);
@@ -315,7 +318,7 @@ export class MasterExportService {
       const id = (r[0] as { id: string }).id;
       await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('master_export.start', 'master_export', ${id}::text, NULL,
         ${JSON.stringify({ kind: exportKind, parts, view, regions: scope.regions, as_of: scope.as_of })}::jsonb, NULL)`);
-      onStarted(() => this.schedule(id, auth, scope));
+      onStarted(() => this.schedule(id, auth, scope, notify));
       return { id, kind: 'master_export', status: 'queued', progress: 0, result_file_id: null, created_at: new Date(), finished_at: null };
     });
   }
@@ -386,15 +389,15 @@ export class MasterExportService {
   }
 
   // ------------------------------------------------------------------ the worker
-  private schedule(id: string, auth: AuthContext, scope: Scope): void {
-    const p = this.work(id, auth, scope).catch((e) => this.log.warn(`master export ${id}: ${e instanceof Error ? e.message : String(e)}`)).finally(() => this.running.delete(p));
+  private schedule(id: string, auth: AuthContext, scope: Scope, notify?: { name: string }): void {
+    const p = this.work(id, auth, scope, notify).catch((e) => this.log.warn(`master export ${id}: ${e instanceof Error ? e.message : String(e)}`)).finally(() => this.running.delete(p));
     this.running.add(p);
   }
 
   /** A transaction that carries the requester's verified context, exactly like a request (via = job). */
   private inContext<T>(auth: AuthContext, fn: () => Promise<T>, timeout = 30_000): Promise<T> {
     return this.db.client.$transaction(async (tx) => {
-      await applyContext(tx, { ...jobContext('master_export'), userId: auth.user.id, sessionId: auth.session.id });
+      await applyContext(tx, { ...jobContext('master_export'), userId: auth.user.id, sessionId: auth.session?.id });
       return this.db.runIn(tx, fn);
     }, { maxWait: 10_000, timeout });
   }
@@ -402,12 +405,12 @@ export class MasterExportService {
   /** Progress in its own short transaction, so the dialog sees it while the long read runs. */
   private async progress(id: string, auth: AuthContext, value: number): Promise<void> {
     await this.db.client.$transaction(async (tx) => {
-      await applyContext(tx, { ...jobContext('master_export'), userId: auth.user.id, sessionId: auth.session.id });
+      await applyContext(tx, { ...jobContext('master_export'), userId: auth.user.id, sessionId: auth.session?.id });
       await tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${id}::uuid, 'running', ${Math.min(0.99, value)}::numeric, NULL, NULL, NULL, NULL)`);
     }, { maxWait: 10_000, timeout: 10_000 }).catch(() => undefined);
   }
 
-  private async work(id: string, auth: AuthContext, scope: Scope): Promise<void> {
+  private async work(id: string, auth: AuthContext, scope: Scope, notify?: { name: string }): Promise<void> {
     await new Promise((r) => setTimeout(r, 25)); // the request transaction that created the job commits first
     const tmp = join(tmpdir(), `pmis-master-${id}.xlsx`);
     let key: string | null = null;
@@ -426,14 +429,33 @@ export class MasterExportService {
         await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${id}::uuid, 'done', 1, ${rowCount}::int, ${size}::bigint, ${key}::text, NULL)`);
         await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('master_export.done', 'master_export', ${id}::text, NULL,
           ${JSON.stringify({ kind: scope.export_kind, parts: scope.parts, view: scope.view, regions: scope.regions, row_count: rowCount, sheets: counts, size_bytes: size })}::jsonb, NULL)`);
+        if (notify) await this.notifyOwner(auth, id, notify.name, true, rowCount, null);
       }, 600_000);
     } catch (e) {
       const msg = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
       if (key) await this.storage.store.remove(key).catch(() => undefined);
       await this.inContext(auth, () => this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${id}::uuid, 'failed', NULL, NULL, NULL, NULL, ${msg.slice(0, 300)}::text)`)).catch(() => undefined);
+      if (notify) await this.inContext(auth, () => this.notifyOwner(auth, id, notify.name, false, 0, msg)).catch(() => undefined);
       await this.syslog.write('error', 'master export failed', { job_id: id, error: msg });
     } finally {
       await fs.rm(tmp, { force: true }).catch(() => undefined);
+    }
+  }
+
+  /**
+   * The mail of a scheduled export (0659): plain text, English and Arabic, no file attached and no data in it, only the schedule name, the outcome and the link to
+   * Exports (the file stays behind the owner's sign-in). Queued in the worker transaction, so a failed export does not claim success. Never throws.
+   */
+  private async notifyOwner(auth: AuthContext, id: string, name: string, ok: boolean, rows: number, error: string | null): Promise<void> {
+    await this.db.tx.$executeRaw`SAVEPOINT pmis_export_mail`;
+    try {
+      const nm = name.replace(/[\r\n]+/g, ' ').slice(0, 80);
+      const en = ok ? `Your scheduled export "${nm}" is ready (${rows} rows). Open Exports to download it: {{app_url}}/exports` : `Your scheduled export "${nm}" failed: ${error ?? 'unknown error'}. Open Exports to see it: {{app_url}}/exports`;
+      const ar = ok ? `التصدير المجدول "${nm}" جاهز (${rows} صفًا). افتح التصدير لتنزيله: {{app_url}}/exports` : `فشل التصدير المجدول "${nm}": ${error ?? 'خطأ غير معروف'}. افتح التصدير للاطلاع عليه: {{app_url}}/exports`;
+      await this.mail.sendToUser(auth.user.id, { kind: 'export_ready', subject: ok ? `GSDN Workspace: export ready, ${nm}` : `GSDN Workspace: export failed, ${nm}`, text: `${en}\n\n${ar}`, dedupKey: `export_ready:${id}` });
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT pmis_export_mail`;
+    } catch {
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT pmis_export_mail`;
     }
   }
 
