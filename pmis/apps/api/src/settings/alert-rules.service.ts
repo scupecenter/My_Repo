@@ -58,6 +58,9 @@ export class AlertRulesService {
     const rules = (await this.db.tx.$queryRaw<{ j: RuleRow[] }[]>(Prisma.sql`SELECT alert_rules_json() AS j`))[0]!.j;
     const registers = await this.db.tx.$queryRaw<{ register_key: string; name_en: string; name_ar: string | null; module_key: string }[]>(Prisma.sql`
       SELECT register_key, name_en, name_ar, module_key FROM register_definitions WHERE is_active ORDER BY sort_order`);
+    const date_fields = await this.db.tx.$queryRaw<{ register_key: string; code: string; label_en: string; label_ar: string | null }[]>(Prisma.sql`
+      SELECT f.register_key, f.code, f.label_en, f.label_ar FROM register_fields f JOIN register_definitions d ON d.register_key = f.register_key
+       WHERE d.is_active AND f.field_type = 'date' ORDER BY d.sort_order, f.sort_order`);
     const kpis = (await this.db.tx.$queryRaw<{ k: { code: string; label_en: string; label_ar: string; unit: string; direction: string }[] }[]>(Prisma.sql`
       SELECT dashboard_settings_catalogue() -> 'kpis' AS k`))[0]!.k;
     return {
@@ -70,10 +73,12 @@ export class AlertRulesService {
           { kind: 'advance_unsettled', params: ['days'] },
           { kind: 'invoice_due_soon', params: ['days'] },
           { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] },
+          { kind: 'date_approaching', params: ['register_key', 'date_field', 'days_before'] },
         ],
         kpis,
         audiences: ['system_admin', 'module'],
         registers,
+        date_fields,
         modules: [...MODULES, ...(await customModuleDefs(this.db, true))].map((m) => ({ key: m.key, name_en: m.name_en })),
       },
     };
