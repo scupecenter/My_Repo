@@ -517,7 +517,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       const c = fieldCols.find((x) => `f:${x.code}` === id);
       if (!c) return <Empty />;
       const txt = showValue(c, r.data[c.code], i18n.language, t);
-      return txt === "-" ? <Empty /> : <FieldValue f={c} v={r.data[c.code]} testid={`reg-cell-${r.id}-${c.code}`} />;
+      return txt === "-" ? <Empty /> : <FieldValue f={c} v={r.data[c.code]} colors={tbl.display.colors} testid={`reg-cell-${r.id}-${c.code}`} />;
     }
     switch (id) {
       case "site":
