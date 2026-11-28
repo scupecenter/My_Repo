@@ -15,8 +15,8 @@ const probe = () => screen.getByTestId('probe').textContent;
 describe('F19: Settings tabs and old routes', () => {
   beforeEach(async () => { await signIn('pm'); });
 
-  it('has the 11 one-word tabs of the plan plus the F20 dashboard tab', () => {
-    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['sla', 'workflow', 'registers', 'documents', 'data', 'alerts', 'security', 'screens', 'identity']); // Settings merge 2026-11-25: 14 tabs became 9
+  it('has the 11 one-word tabs of the plan plus the F20 dashboard tab and the Access tab', () => {
+    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['sla', 'workflow', 'registers', 'documents', 'data', 'alerts', 'security', 'screens', 'access', 'identity']); // Settings merge 2026-11-25: 14 tabs became 9
   });
 
   it.each([

@@ -8,13 +8,15 @@ import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { server } from '@/mocks/server';
 import { renderApp, signIn } from '@/test/utils';
 import { ReconciliationPage } from './Reconciliation';
-import { TemplateMappingPage } from './TemplateMapping';
+import { MappingRedirect } from '@/App';
+import { SettingsRoutes } from './settings/Settings';
 
 /** Contract 0.12.8 (P3): the legacy Master import and the comparison report (Q1, Q211), the template mapping screen and the aliases (Q207, Q8, Q10), the upload mode (Q206). */
 const Routed = () => (
   <Routes>
     <Route path="/templates/master-import" element={<ReconciliationPage />} />
-    <Route path="/templates/mapping" element={<TemplateMappingPage />} />
+    <Route path="/templates/mapping" element={<MappingRedirect />} />
+    <Route path="/admin/settings/*" element={<SettingsRoutes />} />
   </Routes>
 );
 
