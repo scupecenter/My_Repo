@@ -4,6 +4,8 @@ Status: reference, generated from the database on 2026-11-26 (all migrations up 
 Where a link is missing or typed by hand, section 4 lists it as a proposal (the owner principle: registers feed each other, settings are editable, a value is typed once).
 The state of the GECOL and HLC links is the state on main when this was written; the build agent that owns the Procurement to GECOL / HLC flow may change it.
 
+2026-11-28 (0.15.590, migration 0593): the progress engine also reads (derived, no constraint) `sites` × `task_instances` × the weight set in force to build the per-site complexity coefficient `_dscf`, which scales the cross-site Project Status figures; see `docs/spec/rules.md` §6.2.
+
 ## 1. Two kinds of link
 
 1. **Foreign keys.** A real `REFERENCES` constraint (appendix, section 5: 300 of them). The database refuses a dangling id.
