@@ -4760,6 +4760,7 @@
     "restore_note": "The register is available again with all its records."
   },
   "regcols": {
+    "import_aliases": "Import aliases",
     "inline_reason": "Reason for the changes made in the table (3+ characters)",
     "inline_hint": "Click a name, type or section to edit it here. The pencil still opens the full form. A column that already holds values changes type only in the form (it shows the conversion first).",
     "inline_need_reason": "Write the reason first (3+ characters).",
@@ -6574,6 +6575,13 @@
     "closing": "This task closes the milestone",
     "closing_chip": "Closing task"
   },
+  "handoverWarn": {
+    "title": "Open items on this site",
+    "counts": "Open snags: {{snags}}. Open issues: {{issues}}. Quality records not yet approved: {{quality}}.",
+    "ask": "You can still submit the handover. Do you want to continue?",
+    "cancel": "Go back",
+    "confirm": "Submit anyway"
+  },
   "studio": {
     "title": "Workflow Studio",
     "crumb_settings": "Settings",
@@ -7746,6 +7754,7 @@
     "status_reverted": "Undone",
     "status_approved": "Approved",
     "chg_add": "Add",
+    "chg_aliases": "Aliases",
     "chg_rename": "Rename",
     "chg_reorder": "Reorder",
     "chg_section": "Section",
