@@ -39,7 +39,8 @@ export function useRememberedView(screen: string, hasExplicit: boolean, valid: (
       // drafts expire (30 days, from the last save): a preference that is still in use is saved again once a week, so it does not run out
       if (Date.now() - Date.parse(p.saved_at) > TOUCH_AFTER_MS) void saveDraft(keyOf(screen), { layout: p.layout }, p.version).catch(() => undefined);
     }).catch(() => undefined);
-    return () => { live = false; };
+    // StrictMode runs effect, cleanup, effect: the cleanup cancels the read, so it must also release the guard or the second pass would return early
+    return () => { live = false; done.current = null; };
     // the preference is read once per screen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
