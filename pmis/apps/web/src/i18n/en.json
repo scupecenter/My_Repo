@@ -1761,6 +1761,15 @@
     "end_task_layout_submitted_date": "Layout Submitted Date"
   },
   "wtSet": {
+    "diffTitle": "Changes against the set in force",
+    "diffNone": "No item differs from the set in force.",
+    "diff_added": "Added",
+    "diff_removed": "Removed",
+    "diff_changed": "Changed",
+    "diffField_name": "Name",
+    "diffField_weight": "Weight",
+    "diffField_unit": "Unit",
+    "diffField_measure_rule": "Measure rule",
     "rule": {
       "method": "How the item is counted",
       "m_off": "Not counted automatically",
@@ -2265,6 +2274,10 @@
     "grid": "Grid"
   },
   "registers": {
+    "new_more": "More ways to add",
+    "new_blank": "New blank record",
+    "new_import": "Import rows from the template",
+    "new_import_off": "This register has no template yet, so there is nothing to import.",
     "tab_asb_cw": "BOQ CW (civil works)",
     "tab_asb_te": "BOQ TE (equipment)",
     "tab_dis_cw": "Dismantle CW",
@@ -5490,6 +5503,13 @@
     "range": "Numbers from {{min}} to {{max}}.",
     "order": "Green must not be below amber."
   },
+  "forecastMethod": {
+    "title": "Forecast method",
+    "note": "How the progress curve forecast takes the weekly pace from the saved weekly snapshots: the mean weekly gain of the last weeks (default), or the slope of a straight line fitted through the actual points of the same weeks, which is steadier when one week jumped. The forecast date and the dashed forecast line are drawn when the card opens, so nothing stored is recomputed or rewritten.",
+    "method": "Method",
+    "mean": "Mean weekly gain",
+    "linear": "Fitted straight line"
+  },
   "forecastWindow": {
     "title": "Forecast window",
     "note": "How many of the last real weeks the progress curve forecast averages the weekly gain over (2 to 12, default 4). A longer window smooths the forecast, a shorter one follows the recent pace. The forecast is drawn from the saved snapshots when the card opens, so nothing stored is recomputed. Own save, reason and audit row.",
@@ -7204,6 +7224,7 @@
     "display_wrap": "Wrap long text",
     "display_zebra": "Zebra rows",
     "display_groupbar": "Group summary: count and status bar on each group header",
+    "display_colors": "Value colours",
     "display_reset": "Back to the defaults",
     "display_settings": "Defaults in Settings",
     "size_sm": "Small",
@@ -7222,6 +7243,16 @@
     "display_pin": "Freeze the first columns"
   },
   "regviews": {
+    "board_drag_note": "Drag a card to another column to change its status. A refused drop says why.",
+    "drag_state": "The approval state moves only through the record's own actions.",
+    "drag_same": "Already in this column.",
+    "drag_locked": "This record is locked.",
+    "drag_field_locked": "This status field is locked.",
+    "drag_no_edit": "You cannot edit this record now.",
+    "drag_required": "This status cannot be empty.",
+    "moved": "Status changed.",
+    "preview_hint": "Space or Escape closes the preview.",
+    "preview_open": "Open the record",
     "group_record": "Record",
     "group_workflow": "Workflow",
     "record": "Record",
@@ -7910,10 +7941,14 @@
   },
   "gantt": {
     "title": "Timeline (read only)",
-    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. Dates change only through the normal change flow.",
+    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. A thin line joins each stage to the one it waits for (red when it is dated earlier). The vertical line is today. Dates change only through the normal change flow.",
     "baseline": "Baseline",
     "planned": "Planned",
-    "actual": "Actual"
+    "actual": "Actual",
+    "today": "Today",
+    "conflicts": "{{count}} order conflict(s)",
+    "dep_ok": "Waits for the stage before it",
+    "dep_conflict": "Dated before the stage it waits for"
   },
   "siteActivity": {
     "c_entity": "Entity",
@@ -8749,5 +8784,6 @@
     "note": "Note",
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
-  }
+  },
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
 }

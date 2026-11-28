@@ -20,6 +20,11 @@ describe('FieldValue', () => {
     expect(screen.getByTestId('fv')).not.toHaveAttribute('data-colour');
     expect(screen.getByTestId('fv')).toHaveTextContent('Open');
   });
+  it('V8: colours off draws the plain text, the stored colour untouched', () => {
+    render(<FieldValue f={list('#0e7490')} v="open" colors={false} testid="fv" />);
+    expect(screen.getByTestId('fv')).toHaveTextContent('Open');
+    expect(screen.getByTestId('fv')).not.toHaveAttribute('data-colour');
+  });
   it('draws a percentage as a number with one progress bar', () => {
     const f = { code: 'pct', label_en: 'Done', type: 'percentage' } as unknown as RegisterField;
     render(<FieldValue f={f} v={45} testid="fv" />);

@@ -494,6 +494,9 @@ const ragView = () => ({
 let fcState = { version: 0, weeks: 4, updated_at: null as string | null, updated_by: null as null };
 const fcView = () => ({ ...fcState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
+/** The method of the dashboard forecast (contract 0.15.474): the setting dashboard.forecast_method, default mean, version 0 until the first save. */
+let fmState = { version: 0, method: 'mean', updated_at: null as string | null, updated_by: null as null };
+const fmView = () => ({ ...fmState });
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
 
@@ -631,6 +634,20 @@ export const settingsHandlers = [
     return HttpResponse.json(snapView(), tag(snapState.version));
   }),
   // ------------------------------------------------------------------ progress figure colours (contract 0.15.432, settings review gap 5)
+  // ------------------------------------------------------------------ forecast method (contract 0.15.474, phase 5)
+  http.get(`${B}/settings/dashboard/forecast-method`, () => { const g = guard(); if (g) return g; return HttpResponse.json(fmView(), tag(fmState.version)); }),
+  http.put(`${B}/settings/dashboard/forecast-method`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, fmState.version); if (p) return p;
+    const b = (await request.json()) as { method?: string; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (b.method !== 'mean' && b.method !== 'linear') errs.push({ path: '/method', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    fmState = { ...fmState, version: fmState.version + 1, method: b.method!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(fmView(), tag(fmState.version));
+  }),
   http.get(`${B}/settings/dashboard/progress-rag`, () => { const g = guard(); if (g) return g; return HttpResponse.json(ragView(), tag(ragState.version)); }),
   http.put(`${B}/settings/dashboard/progress-rag`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
