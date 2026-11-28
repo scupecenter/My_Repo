@@ -1,6 +1,7 @@
-import { Lock, PanelRightOpen } from 'lucide-react';
-import { useState, type DragEvent, type KeyboardEvent } from 'react';
+import { Lock, PanelRightOpen, CalendarRange } from 'lucide-react';
+import { useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import type { RegisterDefinition, RegisterField, RegisterRecord } from '@/api/types';
 import { BoardGrid, type BoardColumn } from '@/components/Board';
 import { CalendarGrid } from '@/components/CalendarGrid';
@@ -10,6 +11,8 @@ import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { STATE_TONE } from '@/components/RegisterDrawer';
 import { SiteMap } from '@/components/SiteMap';
 import { ChartView, type ChartKind } from '@/components/ChartView';
+import { buildTimeline, posPct } from '@/lib/timeline';
+import { fmtDate } from '@/lib/time';
 import { StatusChip } from '@/components/TableKit';
 import { EmptyState } from '@/components/States';
 import { WideTable, type WideCell, type WideColumn, type WideInput, type WideTableRow } from '@/components/WideTable';
@@ -22,8 +25,8 @@ import type { Display } from '@/lib/tablePrefs';
  * the board and the map are the same shared components as Site Master (WideTable, BoardGrid, SiteMap), fed by the register's own list
  * (GET /registers/{key}/records with the same filters, so every layout shows the same records, with the caller's rights and field rules).
  */
-export type RegisterLayout = 'list' | 'wide' | 'board' | 'feed' | 'map' | 'calendar' | 'chart';
-export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'feed', 'map', 'calendar', 'chart'];
+export type RegisterLayout = 'list' | 'wide' | 'board' | 'feed' | 'map' | 'calendar' | 'timeline' | 'chart';
+export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'feed', 'map', 'calendar', 'timeline', 'chart'];
 
 /** The board's grouping on the approval state of the records (entry, in review, in approval, approved, voided), which every register has. */
 export const BY_STATE = 'state';
@@ -56,11 +59,11 @@ export const numericFields = (def: RegisterDefinition): RegisterField[] => def.f
 export const dateFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'date');
 
 /** The layouts a register offers: list, wide table, board and chart on every register; the map only where the records carry a site (and its coordinates);
-    the calendar (decision V2) where the definition has at least one date field. */
+    the calendar (decision V2) and the timeline (decision V3) where the definition has at least one date field. */
 export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => [
   'list', 'wide', 'board', 'feed',
   ...(def.site_scoped ? (['map'] as const) : []),
-  ...(dateFields(def).length ? (['calendar'] as const) : []),
+  ...(dateFields(def).length ? (['calendar', 'timeline'] as const) : []),
   'chart',
 ];
 
@@ -343,6 +346,92 @@ export function RegisterCalendar({ def, records, field, onOpen, partial }: {
       <CalendarGrid testid="register-calendar" items={items} onOpen={onOpen}
         head={partial ? <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-calendar-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span> : undefined} />
     </section>
+  );
+}
+
+const TL_TONES = ['#0f766e', '#b45309', '#1d4ed8', '#9333ea', '#be123c', '#4d7c0f', '#0e7490', '#a16207'];
+const TL_MAX = 8;
+const TL_DEFAULT = 4;
+
+/**
+ * Decision V3 (0.15.575): the cross-site timeline generalized to every register with a date field — one row per record of the current filters
+ * (the same records the list shows, up to ALL_CAP), one marker per chosen date field, a bar from the first to the last chosen date and a line for
+ * today. Read only: a date changes through its record. The fields are chosen in the URL (`tl`, the date-field codes) as checkboxes, up to eight;
+ * the picker stays inside the component (content like the filters, per V1), and `tl` rides the saved views like the other layout keys.
+ */
+export function RegisterTimeline({ def, records, onOpen, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; onOpen: (id: string) => void; partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const [sp, setSp] = useSearchParams();
+  const dates = dateFields(def);
+  const chosen = useMemo(() => {
+    const want = (sp.get('tl') ?? '').split(',').filter((c) => dates.some((f) => f.code === c));
+    return (want.length ? want : dates.slice(0, TL_DEFAULT).map((f) => f.code)).slice(0, TL_MAX);
+  }, [sp, dates]);
+  const today = new Date().toISOString().slice(0, 10);
+  const model = useMemo(() => buildTimeline(
+    records.map((r) => ({ id: r.id, code: r.site_code ?? r.id.slice(0, 8), values: r.data as Record<string, string | null> })),
+    chosen, today), [records, chosen, today]);
+  const name = (code: string) => { const f = dates.find((x) => x.code === code); return f ? fieldLabel(f, i18n.language) : code; };
+  const toggle = (code: string) => setSp((p) => {
+    const n = new URLSearchParams(p);
+    const next = chosen.includes(code) ? chosen.filter((x) => x !== code) : [...chosen, code].slice(0, TL_MAX);
+    if (next.length) n.set('tl', next.join(',')); else n.delete('tl');
+    return n;
+  }, { replace: true });
+
+  return (
+    <div className="card p-3" data-testid="register-timeline">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1 text-sm font-semibold"><CalendarRange size={16} aria-hidden />{t('timeline.title')}</span>
+        <span className="text-xs text-mute">{t('timeline.hint_records', { max: TL_MAX })}</span>
+        {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-timeline-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
+      </div>
+      <fieldset className="mb-3 flex max-h-28 flex-wrap gap-x-4 gap-y-1 overflow-auto border-0 p-0" data-testid="register-timeline-cols">
+        <legend className="sr-only">{t('timeline.columns')}</legend>
+        {dates.map((f) => {
+          const on = chosen.includes(f.code);
+          const i = chosen.indexOf(f.code);
+          return (
+            <label key={f.code} className="inline-flex items-center gap-1.5 text-xs">
+              <input type="checkbox" checked={on} disabled={!on && chosen.length >= TL_MAX} onChange={() => toggle(f.code)} data-testid={`timeline-col-${f.code}`} className="accent-[var(--accent)]" />
+              {on && <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: TL_TONES[i % TL_TONES.length] }} />}
+              {fieldLabel(f, i18n.language)}
+            </label>
+          );
+        })}
+        {!dates.length && <span className="text-sm text-mute">{t('timeline.no_columns')}</span>}
+      </fieldset>
+      {!model ? <EmptyState testid="register-timeline-empty" title={t('timeline.empty')} hint={t('timeline.empty_hint')} /> : (
+        <div dir="ltr" className="overflow-x-auto">
+          <div className="min-w-[640px]">
+            <div className="relative ms-[12.5rem] me-2 h-6 border-b border-line text-[11px] text-mute" aria-hidden>
+              {model.months.map((m) => <span key={m.day} className="absolute -translate-x-1/2" style={{ left: `${posPct(model, m.day)}%` }}>{m.label}</span>)}
+            </div>
+            <div className="relative">
+            <span aria-hidden data-testid="register-timeline-today" title={t('timeline.today')} className="pointer-events-none absolute inset-y-0 z-10 w-px bg-late"
+              style={{ left: `calc(12.5rem + (100% - 13rem) * ${posPct(model, Math.floor(Date.parse(`${today}T00:00:00Z`) / 86_400_000)) / 100})` }} />
+            <ul data-testid="register-timeline-rows">
+              {model.rows.map((r) => (
+                <li key={r.id} className="flex items-center border-b border-line/60 py-1" data-testid={`register-timeline-row-${r.id}`}>
+                  <button type="button" onClick={() => onOpen(r.id)} className="w-48 shrink-0 truncate pe-2 text-start text-sm text-ink hover:underline" data-testid={`register-timeline-open-${r.id}`}><b className="mono">{r.code}</b></button>
+                  <div className="relative mx-2 h-5 flex-1">
+                    <span className="absolute top-1/2 h-1 -translate-y-1/2 rounded bg-line" style={{ left: `${posPct(model, r.from)}%`, width: `${Math.max(posPct(model, r.to) - posPct(model, r.from), 0.4)}%` }} />
+                    {r.points.map((p) => (
+                      <span key={p.key} role="img" aria-label={`${name(p.key)}: ${fmtDate(p.iso, i18n.language)}`} title={`${name(p.key)}: ${fmtDate(p.iso, i18n.language)}`}
+                        className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card" style={{ left: `${posPct(model, p.day)}%`, background: TL_TONES[chosen.indexOf(p.key) % TL_TONES.length] }} />
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            </div>
+          </div>
+        </div>
+      )}
+      <p className="mt-2 text-xs text-mute" data-testid="register-timeline-note">{t('timeline.note_records', { shown: model?.rows.length ?? 0, total: records.length })}</p>
+    </div>
   );
 }
 

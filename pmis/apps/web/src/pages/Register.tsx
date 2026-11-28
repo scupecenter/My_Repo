@@ -2,6 +2,7 @@ import {
   ArrowRightLeft,
   BarChart3,
   CalendarDays,
+  CalendarRange,
   Columns3,
   Download,
   Grid3x3,
@@ -79,6 +80,7 @@ import {
   RegisterFeed,
   RegisterCalendar,
   RegisterMap,
+  RegisterTimeline,
   RegisterWide,
   statusFields,
   type RegisterLane,
@@ -119,7 +121,7 @@ import { isCustomKey, isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
-const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf", "chx", "chm", "chk"] as const;
+const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf", "chx", "chm", "chk", "tl"] as const;
 type RegisterView = RecordFilters & {
   advanced?: FilterTree;
   layout?: string;
@@ -129,6 +131,7 @@ type RegisterView = RecordFilters & {
   chx?: string;
   chm?: string;
   chk?: string;
+  tl?: string;
 };
 const VIEW_EMPTY: RegisterView = {
   q: "",
@@ -278,7 +281,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   ];
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   // the board and the map show every record of the filters (their column counts and sites must not depend on paging), up to ALL_CAP records
-  const needAll = view === "vertical" && (layout === "board" || layout === "map" || layout === "feed");
+  const needAll = view === "vertical" && (layout === "board" || layout === "map" || layout === "timeline" || layout === "feed");
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
   useEffect(() => {
     if (needAll && hasNextPage && !isFetchingNextPage && items.length < ALL_CAP)
@@ -342,6 +345,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
     { id: "chart", label: t("chartv.title"), hint: t("view.chart_hint"), icon: <BarChart3 size={14} />, testid: "register-layout-chart" },
     ...(layouts.includes("calendar") ? [{ id: "calendar", label: t("calview.title"), hint: t("view.calendar_hint"), icon: <CalendarDays size={14} />, testid: "register-layout-calendar" }] : []),
+    ...(layouts.includes("timeline") ? [{ id: "timeline", label: t("timeline.title"), hint: t("view.timeline_hint"), icon: <CalendarRange size={14} />, testid: "register-layout-timeline" }] : []),
   ];
   const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
   const remember = useRememberedView(
@@ -709,6 +713,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 chm: layout === "chart" ? (sp.get("chm") ?? "") : "",
                 chk: layout === "chart" ? (sp.get("chk") ?? "") : "",
                 calf: layout === "calendar" ? (sp.get("calf") ?? "") : "",
+                tl: layout === "timeline" ? (sp.get("tl") ?? "") : "",
                 ...(advTree ? { advanced: advTree } : {}),
               }}
               empty={VIEW_EMPTY}
@@ -1124,6 +1129,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           )}
           {layout === "calendar" && (
             <RegisterCalendar def={def} records={real} field={calField} onOpen={setRecord} partial={partial} />
+          )}
+          {layout === "timeline" && (
+            <RegisterTimeline def={def} records={real} onOpen={setRecord} partial={partial} />
           )}
           {layout === "list" && (
           <div className="card gx overflow-hidden" {...displayAttrs(tbl.display)} data-testid="register-list-card">
