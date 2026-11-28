@@ -24,7 +24,7 @@ export type ViewOption = { id: string; label: string; hint?: string; icon: React
  * The keyboard model is the one the view menu had: Enter or Space opens, the arrows, Home and End move over the view items, Enter picks, Escape
  * closes and the focus returns to the button. Every view item keeps the test id its layout button had.
  */
-export function LayoutPanel({ testid, views, options, table }: {
+export function LayoutPanel({ testid, views, options, table, grouped }: {
   testid: string;
   /** the layouts of the screen (list, wide table, grid, board, timeline, map) */
   views?: { value: string; options: ViewOption[]; onChange: (id: string) => void };
@@ -32,6 +32,8 @@ export function LayoutPanel({ testid, views, options, table }: {
   options?: ReactNode;
   /** the table's prefs api; the Display section shows only when it is passed (the current view is a table) */
   table?: TableApi;
+  /** the table has group header rows: the Display section then offers the group summary (count and status bar) */
+  grouped?: boolean;
 }) {
   const { t } = useTranslation();
   const me = useMe(true).data;
@@ -105,6 +107,7 @@ export function LayoutPanel({ testid, views, options, table }: {
               <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-wrap" checked={table.display.wrap} onChange={(e) => table.setDisplay({ wrap: e.target.checked })} />{t('tstd.display_wrap')}</label>
               <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-pin" checked={!table.prefs.unpinned} onChange={(e) => table.setPinned(e.target.checked)} />{t('tstd.display_pin')}</label>
               <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-zebra" checked={table.display.zebra} onChange={(e) => table.setDisplay({ zebra: e.target.checked })} />{t('tstd.display_zebra')}</label>
+              {grouped && <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-groupbar" checked={table.display.groupbar} onChange={(e) => table.setDisplay({ groupbar: e.target.checked })} />{t('tstd.display_groupbar')}</label>}
               <div className="flex items-center gap-2 border-t border-line pt-2">
                 <button type="button" className="btn px-2 py-1 text-xs" data-testid="display-reset" onClick={table.resetDisplay}>{t('tstd.display_reset')}</button>
                 {canEditDisplayDefaults(me) && <Link to="/admin/settings/screens/tables" className="ms-auto text-xs text-link" data-testid="display-settings-link">{t('tstd.display_settings')}</Link>}

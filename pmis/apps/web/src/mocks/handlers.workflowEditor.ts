@@ -19,10 +19,14 @@ const seed = (): Ver[] => [{
   tasks: [t('A1', 'MS1', 1, 'SAR', 'تقرير المسح'), t('A2', 'MS1', 2, 'TSSR', 'تقرير TSSR', ['A1']), t('A4', 'MS1', 3, 'LLD', 'التصميم المنخفض المستوى', ['A2']), t('B1', 'MS2', 1, 'PR email', 'بريد طلب الشراء'), t('B2', 'MS2', 2, 'PO email', 'بريد أمر الشراء', ['B1'])],
 }];
 let state = seed();
+/** The archive of deleted versions (contract 0.15.436): the version object itself, so a restore puts it back as it was. */
+const archive: { id: string; at: string; reason: string; v: (typeof state)[number]; restored: boolean }[] = [];
 interface Mig { id: string; site_id: string; site_code: string; from_version: number; to_version: number; reason: string; migrated_at: string; reverted_at: string | null; revertible: boolean }
 let migrations: Mig[] = [];
 type SlaWeightMock = { counts: boolean; value: number; group: string | null; sla: Record<string, unknown> | null };
 const slaW = new Map<string, SlaWeightMock>();
+/** Test hook: set the lock mode of the live (published) version. */
+export const setLiveLockModeMock = (m: 'strict' | 'open') => { for (const v of state) if (v.status === 'published') { v.lock_mode = m; v.etag += 1; } };
 export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; slaW.clear(); resetSiteColumnsMock(); };
 /** Until someone drafts a version, the reads fall through to the settings mock that the matrix and the rules screens already use. */
 const untouched = () => state.length === 1 && state[0]!.etag === 1;
@@ -82,7 +86,7 @@ export const workflowEditorHandlers = [
     if (untouched()) return undefined;
     const g = guard(); if (g) return g;
     const cur = Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version));
-    return HttpResponse.json({ items: [...state].sort((a, b) => b.version - a.version).map((v) => ({ version: v.version, status: v.status, is_current: v.version === cur && v.status === 'published', light_revision: 0, parent_version: v.parent, site_count: v.version === 1 ? 12 : 0, reason: v.reason, version_etag: v.etag })) });
+    return HttpResponse.json({ items: [...state].sort((a, b) => b.version - a.version).map((v) => ({ version: v.version, status: v.status, is_current: v.version === cur && v.status === 'published', light_revision: 0, parent_version: v.parent, site_count: v.version === 1 ? 12 : 0, reason: v.reason, version_etag: v.etag, lock_mode: v.lock_mode ?? 'strict' })) });
   }),
   http.post(`${B}/workflow/versions`, async ({ request }) => {
     const g = guard(); if (g) return g;
@@ -353,6 +357,35 @@ export const workflowEditorHandlers = [
     else { if (!v.gates.some((x) => x.code === b.code)) return problem(404, 'not_found', 'The item does not exist in this version.'); v.gates = why.length ? v.gates.map((x) => x.code === b.code ? { ...x, is_active: false } : x) : v.gates.filter((x) => x.code !== b.code); }
     v.etag += 1;
     return HttpResponse.json({ outcome: why.length ? 'deactivated' : 'deleted', why, version: json(v) });
+  }),
+  http.post(`${B}/workflow/versions/:version/delete`, async ({ params, request }) => {
+    const b = (await request.json()) as { reason?: string; confirm_text?: string };
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    if (b.confirm_text !== `v${String(params.version)}`) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match', { errors: [{ path: '/confirm_text', code: 'confirmation_mismatch' }] });
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    const cur = Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version));
+    const reasons = [...(w.v.status !== 'published' ? ['not_published'] : []), ...(w.v.version === cur ? ['current'] : []), ...(w.v.version === 1 ? ['sites'] : [])];
+    if (reasons.length) return problem(409, 'invalid_transition', `This version cannot be deleted: ${reasons.join(', ')}.`);
+    const archiveId = crypto.randomUUID();
+    archive.push({ id: archiveId, at: new Date().toISOString(), reason: b.reason ?? '', v: w.v, restored: false });
+    state = state.filter((x) => x !== w.v);
+    return HttpResponse.json({ version: w.v.version, deleted: true, archive_id: archiveId });
+  }),
+  http.get(`${B}/workflow/version-archive`, () => {
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    return HttpResponse.json({ items: [...archive].reverse().map((a) => ({ id: a.id, version: a.v.version, archived_at: a.at, reason: a.reason, effective_from: null, stages: a.v.milestones.length, tasks: a.v.tasks.length, restored_at: a.restored ? a.at : null })) });
+  }),
+  http.post(`${B}/workflow/version-archive/:id/restore`, async ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    const a = archive.find((x) => x.id === params.id);
+    if (!a) return problem(404, 'not_found', 'The archived version does not exist.');
+    if (a.restored) return problem(409, 'invalid_transition', 'This archived version was already restored.');
+    if (state.some((x) => x.version === a.v.version)) return problem(409, 'invalid_transition', 'Cannot restore: the version number exists again.');
+    state = [...state, a.v]; a.restored = true;
+    return HttpResponse.json({ version: a.v.version, restored: true, archive_id: a.id });
   }),
   http.post(`${B}/workflow/versions/:version/discard`, async ({ params, request }) => {
     const b = (await request.json()) as { reason?: string };

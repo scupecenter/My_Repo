@@ -797,6 +797,25 @@ case $CSP_MODE in
   off)         CSP_DIRECTIVE='' ;;
 esac
 if (( HTTPS_PORT == 443 )); then REDIRECT_HOST='$host'; else REDIRECT_HOST="\$host:$HTTPS_PORT"; fi
+# Map tiles (contract 0.15.341, off unless TILES_DIR is set): the site map can draw real map tiles, served from this server only (same address as the app, so the
+# page security policy is unchanged). Put the tiles in TILES_DIR as {z}/{x}/{y}.png and set the address /tiles/{z}/{x}/{y}.png in Settings > Screens > Map.
+TILES_LOCATION=''
+if [[ -n "${TILES_DIR:-}" ]]; then
+  TILES_LOCATION=$(cat <<TILES_EOF
+  location /tiles/ {
+    alias ${TILES_DIR%/}/;
+    expires 7d;
+    add_header Cache-Control "public";
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    $CSP_DIRECTIVE
+    try_files \$uri =404;
+  }
+TILES_EOF
+)
+fi
 # the site as it is now, put back if nginx rejects the new one (nothing is reloaded in that case)
 SITE_BEFORE=$(mktemp)
 if [[ -f $SITE ]]; then cp -f "$SITE" "$SITE_BEFORE"; else rm -f "$SITE_BEFORE"; fi

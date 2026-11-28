@@ -30,6 +30,7 @@ import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
+import { SequenceSettings } from './SequenceSettings';
 import { DataReset } from './DataReset';
 import { StructureByTemplate } from './StructureByTemplate';
 import { Imports, TemplateNoticeCard } from './Imports';
@@ -58,6 +59,7 @@ import { LoginPageSettings } from './LoginPage';
 import { MediaSettingsScreen } from './MediaSettings';
 import { DataHubSettings } from './DataHubSettings';
 import { FieldPwaSettings } from './FieldPwaSettings';
+import { MapSettings } from './MapSettings';
 import { FinanceHubSettings } from './FinanceHubSettings';
 import { InterfaceSettings } from './InterfaceSettings';
 import { OpenRecordSettings } from './OpenRecordSettings';
@@ -69,7 +71,7 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Settings merge (owner approved 2026-11-25): Calendar + SLA rules + Weights all feed the SLA clock
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
-  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }, { key: 'simulate', adminOnly: true }] },
+  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'sequence' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }, { key: 'simulate', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
@@ -80,7 +82,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'alerts' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }, { key: 'field-mode' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }, { key: 'field-mode' }, { key: 'map' }] },
   // People and access: Users, Assignments, Roles, Permission profiles, Groups, Delegation and the Responsibility Matrix stay their own screens; Settings lists them so there is one place to start
   { key: 'access', sections: [] },
   { key: 'identity', sections: [] },
@@ -222,6 +224,7 @@ export function SettingsRoutes() {
           <Route path="interface" element={<InterfaceSettings />} />
           <Route path="data-hub" element={<DataHubSettings />} />
           <Route path="field-mode" element={<FieldPwaSettings />} />
+          <Route path="map" element={<MapSettings />} />
           <Route path="finance-hub" element={<FinanceHubSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
@@ -235,6 +238,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Studio />} />
           <Route path="columns" element={<SiteMasterColumns />} />
+          <Route path="sequence" element={<SequenceSettings />} />
           <Route path="freeze" element={<Freeze />} />
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />
