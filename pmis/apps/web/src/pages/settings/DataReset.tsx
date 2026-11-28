@@ -39,8 +39,7 @@ export function DataReset() {
 
   // a run started on this screen: when it commits, the result opens as a centered dialog (closed only by its button)
   const [watch, setWatch] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-  useEffect(() => { if (watch && req && req.id === watch && (req.status === 'completed' || req.status === 'files_pending')) { setDone(watch); setWatch(null); } }, [watch, req]);
+  const done = watch && req && req.id === watch && (req.status === 'completed' || req.status === 'files_pending') ? watch : null;
   const ask = useRequestDataReset(), approve = useApproveDataReset(), cancel = useCancelDataReset(), run = useRunDataReset();
   const retry = useRetryDataResetFiles(), setCfg = useSetDataResetSettings(), makeArchive = useMakeDataResetArchive();
   const [archive, setArchive] = useState<ArchiveMode>('download');
@@ -259,7 +258,7 @@ export function DataReset() {
         const byCode = new Map((s.plan.parts ?? []).map((p) => [p.code, p]));
         const parts = Object.entries(planRows.parts ?? {}).map(([code, rows]) => ({ code, label: label(byCode.get(code), code, i18n.language), rows }));
         const sessions = ((req.result ?? {}) as { sessions_ended?: number }).sessions_ended ?? 0;
-        return <ResetResultDialog open summary={{ rows: planRows.delete_rows ?? parts.reduce((n, p) => n + p.rows, 0), parts, sessions, files: { moved: req.files.moved, total: req.files.total, pending: req.files.pending } }} onClose={() => setDone(null)} />;
+        return <ResetResultDialog open summary={{ rows: planRows.delete_rows ?? parts.reduce((n, p) => n + p.rows, 0), parts, sessions, files: { moved: req.files.moved, total: req.files.total, pending: req.files.pending } }} onClose={() => setWatch(null)} />;
       })()}
     </div>
   );
