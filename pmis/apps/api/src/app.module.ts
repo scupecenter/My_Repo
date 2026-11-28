@@ -227,6 +227,8 @@ import { FinanceHubService } from './finance-hub/finance-hub.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
+import { DuplicateRowsSettingsController } from './settings/duplicate-rows-settings.controller';
+import { DuplicateRowsSettingsService } from './settings/duplicate-rows-settings.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -241,6 +243,7 @@ export function appModuleFor(config: AppConfig) {
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
       CspReportController, // SEC-3
+      DuplicateRowsSettingsController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
@@ -269,6 +272,7 @@ export function appModuleFor(config: AppConfig) {
       DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
       MediaService, // 0.15.292
       PasskeyService, // S4
+      DuplicateRowsSettingsService,
       TemplateNoticeSettingsService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
