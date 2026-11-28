@@ -179,3 +179,32 @@ describe('GET /sites?site_codes=', () => {
     expect(ids).toEqual([a.id, b.id].sort());
   });
 });
+
+describe('GET /search: risks, issues, invoices and linked records', () => {
+  const word = `zqrisk${Date.now().toString(36)}`;
+  it('gives risks, issues and invoices their own group, opens the record, and finds a record through its link', async () => {
+    const site = await makeSite(db, R, { prefix: 'SRL' });
+    const adminId = (await db.query('SELECT id FROM users ORDER BY id LIMIT 1')).rows[0].id as string;
+    const ins = (key: string, data: Record<string, unknown>) => db.query(
+      `INSERT INTO register_records (entity_id, register_key, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, created_by, data)
+       VALUES (gen_random_uuid(), $1, $2, $3, false, true, 'approved', 1, 3, 0, $4, $5::jsonb) RETURNING id, entity_id`,
+      [key, site.id, R, adminId, JSON.stringify(data)]);
+    const risk = (await ins('risks', { title: `${word} flooding` })).rows[0];
+    const issue = (await ins('issues', { title: 'plain issue', risk_entity_id: risk.entity_id })).rows[0];
+    const inv = (await ins('invoices', { invoice_no: `${word}-INV` })).rows[0];
+    try {
+      const res = await admin.api.call('get', `/search?q=${word}&types=risks,issues,invoices,linked,registers&limit=10`);
+      expect(res.status).toBe(200);
+      const g = (t: string) => res.body.groups.find((x: { type: string }) => x.type === t);
+      const ids = (t: string) => ((g(t)?.items ?? []) as { id: string }[]).map((i) => i.id);
+      expect(ids('risks')).toContain(String(risk.id));
+      expect(ids('invoices')).toContain(String(inv.id));
+      expect(ids('issues')).not.toContain(String(issue.id));
+      expect(ids('linked')).toContain(String(issue.id));
+      expect(ids('registers')).not.toContain(String(risk.id));
+      expect((g('risks').items as { id: string; href: string }[]).find((i) => i.id === String(risk.id))?.href).toBe(`/registers/risks?record=${risk.id}`);
+    } finally {
+      await db.query('DELETE FROM register_records WHERE id = ANY($1::uuid[])', [[risk.id, issue.id, inv.id]]);
+    }
+  });
+});

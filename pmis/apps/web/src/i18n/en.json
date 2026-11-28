@@ -353,7 +353,11 @@
       "contractors": "Contractors",
       "tasks": "Tasks",
       "warehouse_items": "Warehouse items",
-      "snags": "QC snags"
+      "snags": "QC snags",
+      "risks": "Risks",
+      "issues": "Issues",
+      "invoices": "Invoices",
+      "linked": "Linked records"
     },
     "site_list": "Site ID in list",
     "site_list_found": "{{count}} found",

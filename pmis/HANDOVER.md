@@ -34,6 +34,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 | Design | `design/tokens.*`, `design/GSDN_Workspace_Prototype_v2.html`, `design/screens/` | Clickable prototype, 120 Playwright checks passing |
 | CW forms | `design/forms/` | DN, RN, PAC, FAC as HTML templates rendered to A4 PDF |
 | Agents | `../.claude/agents/*.md`, `ORCHESTRATION.md` | 9 agents with their models and folders |
+| Global search coverage | `apps/api/src/search/search.service.ts`, spec `docs/plans/specs/gap-2-search-coverage.md` | Ctrl+K groups for risks, issues, invoices and linked records (through Register links); hits open the record |
 | References | `docs/reference/` | Blueprint v1.1, decisions D1–D88, the Master user manual, and the previous standalone dashboard (`legacy-dashboard/`, read-only, the KPI reference for P3) |
 
 **Not verified in this refresh:** the number of operations in the contract, the current model count, and the state of every web screen. Check them in the code before quoting them. No server URL is recorded here: ask the owner or IT for the deployment address.
