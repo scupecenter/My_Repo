@@ -247,7 +247,7 @@
   --hover:var(--surface-gray-2);
   --ink:var(--ink-gray-8);
   --mute:var(--ink-gray-6);
-  --faint:var(--ink-gray-5);
+  --faint:oklch(0.5 0 0); /* 4.5:1 on the page and card surfaces (was ink-gray-5, 3.9:1) */
   --line:var(--outline-gray-2);
   --line2:var(--outline-gray-1);
   --side:var(--surface-sidebar);
@@ -622,7 +622,7 @@
   --hover:var(--surface-gray-2);
   --ink:var(--ink-gray-8);
   --mute:var(--ink-gray-6);
-  --faint:var(--ink-gray-5);
+  --faint:oklch(0.7 0 0); /* 4.5:1 on the dark surfaces (was ink-gray-5, 2.7:1) */
   --line:var(--outline-gray-2);
   --line2:var(--outline-gray-1);
   --side:var(--surface-sidebar);
