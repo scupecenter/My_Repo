@@ -151,7 +151,8 @@
     "link_adv_all": "All advance records",
     "link_adv_open": "Advances",
     "link_adv_expenses": "Expenses",
-    "link_adv_settlements": "Settlements", "link_adv_triage": "Advances waiting for triage",
+    "link_adv_settlements": "Settlements",
+    "link_adv_triage": "Advances waiting for triage",
     "link_inv_all": "All invoices",
     "link_inv_triage": "Invoices waiting for triage",
     "templates_title": "Templates",
@@ -4151,7 +4152,9 @@
       "contrast": "Contrast",
       "inbox_panel": "Notification panel",
       "inbox_anchor": "Floating panel corner",
-      "more_menu": "More menu"
+      "more_menu": "More menu",
+      "app_banner": "App banner (small screens)",
+      "first_use_tour": "First-use tour"
     },
     "opt": {
       "density": {
@@ -4211,6 +4214,14 @@
       "more_menu": {
         "list": "List (default)",
         "grid": "Icon grid with search"
+      },
+      "app_banner": {
+        "show": "Show",
+        "hide": "Hide"
+      },
+      "first_use_tour": {
+        "auto": "Open once by itself",
+        "manual": "Only when I replay it"
       }
     }
   },
@@ -8330,7 +8341,12 @@
     "kind_invoice_due_soon_help": "Fires once per invoice and due date for every approved invoice that is not paid or cancelled and is due within the days (7 when empty) or already late. Placeholders: {{record}}, {{due}}, {{days}}.",
     "days_hub": "Hub value",
     "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}.",
-    "col_locked": "Locked", "kpi": "KPI", "op": "Comparison", "op_above": "above", "op_below": "below", "value": "Threshold",
+    "col_locked": "Locked",
+    "kpi": "KPI",
+    "op": "Comparison",
+    "op_above": "above",
+    "op_below": "below",
+    "value": "Threshold",
     "locked": "Locked (no edits until unlocked)",
     "kind_kpi_threshold": "KPI crosses a threshold",
     "kind_kpi_threshold_help": "Fires when the live KPI of the dashboard crosses the rule's own threshold. Placeholders: {{kpi}}, {{value}}, {{threshold}}."
@@ -8535,5 +8551,16 @@
     "stop": "Stop",
     "use_video": "Upload video",
     "annotate": "Annotate"
+  },
+  "mobile": {
+    "bar": "Main places",
+    "more": "More",
+    "banner_label": "Install the app",
+    "banner_install": "Add this app to your home screen for quicker access.",
+    "banner_hint": "For quicker access, add this page to your home screen from your browser menu.",
+    "install": "Install",
+    "banner_dismiss": "Dismiss the banner",
+    "replay": "Replay the tour",
+    "replay_hint": "Shows the short first-use tour again"
   }
 }

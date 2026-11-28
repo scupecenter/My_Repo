@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Eye, EyeOff, KeyRound, Lock, Mail, Palette, PanelLeft, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Tip } from '@/components/Tip';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -230,7 +231,7 @@ function AppearanceSection({ p }: { p: MyProfile }) {
   const preset = (name: keyof typeof APPEARANCE_PRESETS) => {
     const pr = APPEARANCE_PRESETS[name];
     // a look does not move the notification panel: the personal inbox_* choices stay
-    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}), ...(draft.more_menu ? { more_menu: draft.more_menu } : {}) });
+    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}), ...(draft.more_menu ? { more_menu: draft.more_menu } : {}), ...(draft.app_banner ? { app_banner: draft.app_banner } : {}), ...(draft.first_use_tour ? { first_use_tour: draft.first_use_tour } : {}) });
     setTheme(pr.theme);
   };
   const dimLabel = (k: AppearanceKey) => t(`appearance.dim.${k}`);
@@ -262,7 +263,8 @@ function AppearanceSection({ p }: { p: MyProfile }) {
         </div>
         <p className="text-xs text-mute" data-testid="pf-appearance-preview-note">{t('appearance.preview_note')}</p>
         <Err id="pf-ap-error" msg={save.isError ? (save.error.status === 412 ? t('profile.err_stale') : errText(save.error, t)) : null} />
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Tip text={t('mobile.replay_hint')}><button type="button" className="btn me-auto" data-testid="pf-ap-replay-tour" onClick={() => window.dispatchEvent(new Event('gsdn:tour'))}>{t('mobile.replay')}</button></Tip>
           <button type="button" className="btn" data-testid="pf-ap-revert" disabled={!dirty || save.isPending} onClick={revert}>{t('appearance.revert')}</button>
           <button type="submit" className="btn btn-accent" data-testid="pf-ap-apply" disabled={!dirty || !choice || save.isPending}>{t('appearance.apply')}</button>
         </div>
