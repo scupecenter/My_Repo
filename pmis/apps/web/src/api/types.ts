@@ -118,6 +118,7 @@ export type PasskeySignInOptions = S['PasskeySignInOptions'];
 export type UiIdentity = S['UiIdentity'];
 export type UiAsset = S['UiAsset'];
 export type UiPublicIdentity = S['UiPublicIdentity'];
+export type DashboardFinanceReaders = S['DashboardFinanceReaders'];
 export type UiBrand = S['UiBrand'];
 export type LoginPage = S['LoginPage'];
 export type LoginPagePublic = S['LoginPagePublic'];

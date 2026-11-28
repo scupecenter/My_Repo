@@ -10,6 +10,7 @@ import { LogFilters } from '@/components/logs/LogFilters';
 import { LogTable } from '@/components/logs/LogTable';
 import { SavedViews } from '@/components/logs/SavedViews';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { ColumnMenu, useTablePrefs } from '@/components/TableKit';
 import type { ColDef } from '@/lib/tablePrefs';
 
@@ -75,7 +76,7 @@ export function FieldChanges() {
     <div data-testid="page-field-changes">
       <PageHeader title={t('nav.logs.field_changes')} subtitle={t('logs.fc_subtitle')} />
       <Toolbar filters={<SavedViews screen="field-changes" value={f} onApply={setF} empty={EMPTY_FILTER} table={tbl} />}
-        count={<span className="text-sm text-mute" data-testid="fc-count">{t('logs.shown', { count: q.items.length })}</span>} tools={<ColumnMenu api={tbl} label={(id) => t(`logs.c_${id}`)} />} />
+        count={<span className="text-sm text-mute" data-testid="fc-count">{t('logs.shown', { count: q.items.length })}</span>} tools={<><LayoutPanel testid="field-changes-layout" table={tbl} /><ColumnMenu density={false} api={tbl} label={(id) => t(`logs.c_${id}`)} /></>} />
       <LogFilters kind="field" f={f} set={setF} />
       <LogTable tbl={tbl} label={(id) => t(`logs.c_${id}`)} rows={q.items} rowId={(r) => r.id} cell={cell} onOpen={setSel} activeId={sel?.id} testid="fc-table"
         loading={q.isLoading} error={q.isError} onRetry={() => void q.refetch()} hasMore={q.hasNextPage} onMore={() => void q.fetchNextPage()} loadingMore={q.isFetchingNextPage} />

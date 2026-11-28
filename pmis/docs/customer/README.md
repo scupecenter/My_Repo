@@ -14,6 +14,7 @@
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
 | [09-handover-open-items-warning.md](09-handover-open-items-warning.md) | تحذير البنود المفتوحة عند تسليم الجاهزية | Readiness handover: open items warning |
 | [07-reorder-limits-and-supplier-returns.md](07-reorder-limits-and-supplier-returns.md) | حدود إعادة الطلب ومرتجعات الموردين | Reorder limits and supplier returns (tracking only, no stock effect) |
+| [06-site-map-tiles.md](06-site-map-tiles.md) | خريطة المواقع على بلاطات من خادمك | Site map on map tiles served from your own server (off by default) |
 | [08-workflow-studio-lists.md](08-workflow-studio-lists.md) | استوديو مسار العمل: القوائم والتعديل داخل الجدول | Workflow Studio: lists and editing in the table |
 
 ## وثائق مخططة لاحقاً | Planned later
@@ -26,3 +27,4 @@
 
 المصادر: `CLAUDE.md`، `CHANGELOG.md`، `docs/adr/`، `docs/spec/`، `db/erd.md`، `contracts/openapi.yaml`، `HANDOVER.md`. الإضافات المقترحة غير المؤكدة مكتوبة فيها «يُؤكَّد لاحقاً».
 | [shortage-draft-purchase-request.md](shortage-draft-purchase-request.md) | Draft purchase request from a material shortage line |
+| [site-acceptance-pack.md](site-acceptance-pack.md) | One archive of the approved PAC, FAC and HOTO files of a site |
