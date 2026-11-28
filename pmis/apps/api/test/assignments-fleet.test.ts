@@ -374,7 +374,9 @@ describe('Financial Advances', () => {
     // The search matches the digits anywhere in the masked record text, opaque IDs included, so a 4-digit amount can hit an unrelated
     // record by chance. What must hold: this advance is never returned for its amount, and no hit exposes an amount field.
     const hits = JSON.stringify(search.body.items);
-    expect(hits).not.toContain(ap.id);
+    // The masked record itself can carry the digits by chance (random ids, site code). Then a hit is not a leak by amount, so the id check
+    // only runs when the viewer's masked record does not contain the digits anywhere. The no-amount-field check below always runs.
+    if (!JSON.stringify(seen.body).includes(String(AMOUNT))) expect(hits).not.toContain(ap.id);
     expect(hits).not.toMatch(/"(requested|approved|disbursed)_amount"/);
     const own = await c.fin.entry.api.call('get', `${recPath('financial_advances')}?q=${AMOUNT}`);
     expect((own.body.items as unknown[]).length).toBeGreaterThan(0);
