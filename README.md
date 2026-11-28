@@ -29,6 +29,7 @@ The system models the standard telecom site-delivery pipeline:
 - **Generic register framework**: typed records with validation, child lists, file references, list catalogues, and governed import/export templates — new registers are defined by configuration, not new code.
 - **Bilingual UI (English/Arabic) with full RTL support**, light and dark themes, and switchable view modes (list, wide, board, map) with saved views.
 - **Dashboards and reporting**: operational KPIs, workload, status updates, and scheduled exports.
+- **Report Center**: a library of ready reports (by region, company and period, with grouping, totals and an as-of stamp) that reads through the same grants as the register screens.
 - **Collaboration**: inbox, approvals queue, messages, announcements, and notifications.
 - **Auditability**: a full audit log of data and configuration changes.
 - **Operations**: installer and update scripts, automated database and file backups, and a tested disaster-recovery procedure.
