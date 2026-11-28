@@ -38,3 +38,6 @@
 }
 html[data-motion='reduced'] *, html[data-motion='reduced'] *::before, html[data-motion='reduced'] *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 html[data-motion='reduced'] .motion-lift:hover { transform: none; }
+
+/* Cards that take a finger swipe (item 17): vertical scrolling stays with the browser, horizontal moves reach the swipe handler. */
+[data-swipe] { touch-action: pan-y; }

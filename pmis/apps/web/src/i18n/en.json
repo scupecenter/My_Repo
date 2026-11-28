@@ -4243,7 +4243,9 @@
         "list": "List (default)",
         "grid": "Icon grid with search"
       }
-    }
+    },
+    "swipe_label": "Swipe on cards (phones and tablets)",
+    "swipe_note": "Swipe a board card toward the end of the line to run its main action, toward the start to open its menu. Touch screens only; saved in this browser."
   },
   "nav_side": {
     "mode": "Menu mode",
