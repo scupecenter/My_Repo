@@ -25,7 +25,7 @@ export function ExportLog({ canSchedule }: { canSchedule: boolean }) {
   const partLabel = (k: string) => { const p = parts.data?.find((x) => x.key === k); return p ? (lang === 'ar' ? p.label_ar : p.label_en) : k; };
   const regionLabel = (id: number) => { const r = (regions.data ?? []).find((x) => x.id === id); return r ? ((lang === 'ar' && r.name_ar) || r.name_en) : String(id); };
   const when = (iso: string | null | undefined) => (iso ? fmtDateTime(iso, lang) || '—' : '—');
-  const scope = (e: MasterExport) => (e.kind === 'partial' ? (e.parts ?? []).map(partLabel).join(', ') : e.kind === 'view' ? partLabel(e.view?.source ?? '') : t('exlog.whole'));
+  const scope = (e: MasterExport) => (e.kind === 'partial' ? (e.parts ?? []).map(partLabel).join(', ') : e.kind === 'view' ? partLabel(e.view?.source ?? '') : e.kind === 'site_pack' ? t('export.kind_site_pack') : t('exlog.whole'));
   const dl = (e: MasterExport) => downloadExport(e.id).catch((x) => toast(x instanceof ApiError && x.code === 'export_expired' ? t('errors.export_expired') : t('errors.generic'), 'err'));
   return (
     <section aria-labelledby="exlog-title" data-testid="export-log">
