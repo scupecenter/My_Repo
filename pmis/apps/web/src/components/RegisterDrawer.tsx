@@ -30,6 +30,7 @@ import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { AdvanceChildren, Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
 import { LegacyConversion } from './LegacyConversion';
+import { LabelPicker } from './LabelPicker';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
@@ -330,6 +331,7 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
           </ol>
         )}
 
+        {record && <LabelPicker kind="register_record" refId={record.id} context={rk} />}
         <form onSubmit={(e) => e.preventDefault()} className="space-y-5" noValidate>
           {def.site_scoped && (
             <section aria-labelledby="rs-site" className="space-y-2">

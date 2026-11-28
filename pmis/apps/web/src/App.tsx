@@ -50,6 +50,7 @@ import { Announcements } from '@/pages/Announcements';
 import { Messages } from '@/pages/Messages';
 import { Delegation } from '@/pages/Delegation';
 import { Groups } from '@/pages/Groups';
+import { MyLabels } from '@/pages/MyLabels';
 import { Assignments } from '@/pages/Assignments';
 import { Profiles } from '@/pages/Profiles';
 import { Roles } from '@/pages/Roles';
@@ -164,6 +165,7 @@ function gated(session: Session) {
           <Route path="admin/delegation" element={<Delegation />} />
           <Route path="admin/matrix" element={<MatrixPage />} />
         </Route>
+        <Route path="my-labels" element={<MyLabels />} />
         <Route path="admin/settings/*" element={<SettingsRoutes />} />
         <Route path="admin/security-log" element={<SecurityLog />} />
         <Route path="audit" element={<AuditLog />} />
