@@ -176,6 +176,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/tasks/:id/time-in-state'],
   ['get', '/tasks/:id/blocked-by'],
   ['get', '/reports/time-in-state'],
+  ['get', '/sites/:siteId/stage-times'],
+  ['get', '/reports/stage-times'],
   ['get', '/reports/workload'],
   ['get', '/status-updates'],
   ['get', '/status-updates/region-health'], // 0.15.241, item 12

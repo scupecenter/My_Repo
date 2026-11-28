@@ -278,7 +278,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.247: a reaction and a resolved flag on any comment
       'PUT /comments/:id/reactions', 'DELETE /comments/:id/reactions', 'PUT /comments/:id/resolved', 'DELETE /comments/:id/resolved',
       'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
-      'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'GET /status-updates/region-health', 'POST /status-updates', 'PATCH /status-updates/:id',
+      'GET /reports/time-in-state', 'GET /sites/:siteId/stage-times', 'GET /reports/stage-times', 'GET /reports/workload', 'GET /status-updates', 'GET /status-updates/region-health', 'POST /status-updates', 'PATCH /status-updates/:id',
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
       'GET /settings/weight-sets', 'POST /settings/weight-sets', 'GET /settings/weight-sets/:id', 'PUT /settings/weight-sets/:id', 'POST /settings/weight-sets/:id/preview', 'POST /settings/weight-sets/:id/publish',

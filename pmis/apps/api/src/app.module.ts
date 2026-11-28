@@ -40,6 +40,8 @@ import { SavedViewsService } from './views/saved-views.service';
 import { FilterCatalogService } from './views/filter-catalog.service';
 import { InsightsController } from './insights/insights.controller';
 import { InsightsService } from './insights/insights.service';
+import { StageTimesController } from './insights/stage-times.controller';
+import { StageTimesService } from './insights/stage-times.service';
 import { NotificationsController } from './notifications/notifications.controller';
 import { NotificationPersonalController } from './notifications/notification-personal.controller';
 import { NotificationPersonalService } from './notifications/notification-personal.service';
@@ -265,6 +267,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       DashboardFinanceController, // 0.15.206 (own line: the restricted financial summary)
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       SnapshotWeekdayController, // 0.15.430 (own line)
+      StageTimesController, // 0.15.482 (own line)
       ProgressRagController, // 0.15.432 (own line)
       ForecastWindowController, // 0.15.431 (own line)
       PasskeySettingController, PasskeyController, // S4
@@ -303,6 +306,7 @@ DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, Si
       DashboardFinanceService, // 0.15.206 (own line)
       MediaService, // 0.15.292
       SnapshotWeekdayService, // 0.15.430 (own line)
+      StageTimesService, // 0.15.482 (own line)
       ProgressRagService, // 0.15.432 (own line)
       ForecastWindowService, // 0.15.431 (own line)
       PasskeyService, // S4

@@ -98,3 +98,7 @@ export function useStatusOps() {
       mutationFn: ({ u, health, summary }) => api.patch<StatusUpdate>(`/status-updates/${u.id}`, { version: u.version, body: { ...(health ? { health } : {}), ...(summary !== undefined ? { summary } : {}) } }), onSuccess: settle }),
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------------- time in stage (0.15.482)
+export const useSiteStageTimes = (siteId: string) => useQuery({ queryKey: ['stage-times', 'site', siteId], queryFn: () => api.get<import('./types').SiteStageTimes>(`/sites/${siteId}/stage-times`) });
+export const useStageTimesReport = (region: string) => useQuery({ queryKey: ['stage-times', 'report', region], queryFn: () => api.get<import('./types').StageTimesReport>('/reports/stage-times', { query: { region_id: region || undefined } }) });

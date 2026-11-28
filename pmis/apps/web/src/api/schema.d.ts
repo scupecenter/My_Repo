@@ -11901,6 +11901,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sites/{site_id}/stage-times": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Time in each stage of a site, slowest first (0.15.482)
+         * @description 0.15.482 (migration 0623). Needs `view` on `sites`; a site outside the caller's regions answers 404. Per stage the first start, the finish (only when every counted task that applies is approved), the calendar days (an open stage counts up to today), the planned days and the rank, slowest first. Nothing is written.
+         */
+        get: operations["getSiteStageTimes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/stage-times": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The slowest stages across sites, ranked (0.15.482)
+         * @description 0.15.482 (migration 0623). Needs `view` on `sites`, limited to the caller's regions. Per stage the finished stages (count, average, 85th percentile, worst), the open ones (count, average age) and the rank by the average of the finished ones, plus the 25 slowest site and stage pairs.
+         */
+        get: operations["getStageTimesReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/workload": {
         parameters: {
             query?: never;
@@ -23387,6 +23429,60 @@ export interface components {
                 seconds: number;
                 working_days: number;
                 handled_by?: components["schemas"]["UserRef"];
+            }[];
+        };
+        SiteStageTimes: {
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            /** Format: date */
+            as_of: string;
+            stages: {
+                code: string;
+                seq: number;
+                name_en: string;
+                name_ar?: string | null;
+                /** @enum {string} */
+                state: "done" | "open" | "not_started";
+                /** Format: date */
+                started?: string | null;
+                /** Format: date */
+                finished?: string | null;
+                days?: number | null;
+                planned_days?: number | null;
+                over_plan_days?: number | null;
+                tasks: number;
+                done: number;
+                rank?: number | null;
+            }[];
+        };
+        StageTimesReport: {
+            /** Format: date */
+            as_of: string;
+            region_id?: number | null;
+            stages: {
+                code: string;
+                seq: number;
+                name_en: string;
+                name_ar?: string | null;
+                finished: number;
+                avg_days?: number | null;
+                p85_days?: number | null;
+                worst_days?: number | null;
+                open: number;
+                open_avg_days?: number | null;
+                rank?: number | null;
+            }[];
+            slowest_sites: {
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                region_id: number;
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                days: number;
+                open: boolean;
             }[];
         };
         TimeInStateReport: {
@@ -46065,6 +46161,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TimeInStateReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSiteStageTimes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stages of the site. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteStageTimes"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStageTimesReport: {
+        parameters: {
+            query?: {
+                region_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The ranking. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageTimesReport"];
                 };
             };
             401: components["responses"]["Unauthorized"];

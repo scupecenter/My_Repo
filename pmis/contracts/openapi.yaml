@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.482 (2026-11-28) time in stage per site (migration 0623, mirror `db/sql/622_stage_times.sql`). Additive, read only, no table. `GET /sites/{site_id}/stage-times` and `GET /reports/stage-times` (needs `view` on `sites`, caller's regions). A stage runs from its first start to the approval of its last counted task that applies (days are calendar days; an open stage counts up to today). Per site the stages are ranked slowest first with the planned days and the days over plan; across sites each stage has its finished count, average, 85th percentile and worst, its open count and average age, and the rank by average, plus the 25 slowest site and stage pairs. No grant, role or permission change.
     - 0.15.472 (2026-11-28): the consolidated site acceptance pack (field mode phase 4; no migration, no new path). Additive. `ZipExportRequest` gains the optional `pack` (`acceptance`): with `site_id` and no other filter, `POST /exports/zip` packs the approved current files of the PAC, FAC and HOTO document types of the site into one archive, one folder per document type, with `INDEX.txt` in English and Arabic and the usual `manifest.csv`. Same background job, region scope, virus-scan rule, audit and export lock (`disable_export`) as every zip; no public link. Errors: 422 `/pack` `pack_scope` (no site, or another filter), 422 `no_files` (nothing approved to pack).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
@@ -18474,6 +18475,42 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /sites/{site_id}/stage-times:
+    parameters:
+    - {name: site_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [insights]
+      operationId: getSiteStageTimes
+      summary: Time in each stage of a site, slowest first (0.15.482)
+      description: 0.15.482 (migration 0623). Needs `view` on `sites`; a site outside the caller's regions answers 404. Per stage the first start, the finish (only when every counted task that applies is approved), the calendar days (an open stage counts up to today), the planned days and the rank, slowest first. Nothing is written.
+      x-db-path: site_stage_times
+      responses:
+        '200':
+          description: The stages of the site.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteStageTimes'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /reports/stage-times:
+    get:
+      tags: [insights]
+      operationId: getStageTimesReport
+      summary: The slowest stages across sites, ranked (0.15.482)
+      description: 0.15.482 (migration 0623). Needs `view` on `sites`, limited to the caller's regions. Per stage the finished stages (count, average, 85th percentile, worst), the open ones (count, average age) and the rank by the average of the finished ones, plus the 25 slowest site and stage pairs.
+      x-db-path: stage_times_report
+      parameters:
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1, maximum: 7}}
+      responses:
+        '200':
+          description: The ranking.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StageTimesReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /reports/workload:
     get:
       tags: [insights]
@@ -30351,6 +30388,69 @@ components:
               seconds: {type: integer}
               working_days: {type: integer}
               handled_by: {$ref: '#/components/schemas/UserRef'}
+    SiteStageTimes:
+      type: object
+      required: [site_id, site_code, as_of, stages]
+      properties:
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        as_of: { type: string, format: date }
+        stages:
+          type: array
+          items:
+            type: object
+            required: [code, seq, name_en, state, tasks, done]
+            properties:
+              code: { type: string }
+              seq: { type: integer }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              state: { type: string, enum: [done, open, not_started] }
+              started: { type: [string, 'null'], format: date }
+              finished: { type: [string, 'null'], format: date }
+              days: { type: [integer, 'null'] }
+              planned_days: { type: [integer, 'null'] }
+              over_plan_days: { type: [integer, 'null'] }
+              tasks: { type: integer }
+              done: { type: integer }
+              rank: { type: [integer, 'null'] }
+    StageTimesReport:
+      type: object
+      required: [as_of, stages, slowest_sites]
+      properties:
+        as_of: { type: string, format: date }
+        region_id: { type: [integer, 'null'] }
+        stages:
+          type: array
+          items:
+            type: object
+            required: [code, seq, name_en, finished, open]
+            properties:
+              code: { type: string }
+              seq: { type: integer }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              finished: { type: integer }
+              avg_days: { type: [number, 'null'] }
+              p85_days: { type: [number, 'null'] }
+              worst_days: { type: [integer, 'null'] }
+              open: { type: integer }
+              open_avg_days: { type: [number, 'null'] }
+              rank: { type: [integer, 'null'] }
+        slowest_sites:
+          type: array
+          items:
+            type: object
+            required: [site_id, site_code, region_id, code, name_en, days, open]
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              region_id: { type: integer }
+              code: { type: string }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              days: { type: integer }
+              open: { type: boolean }
     TimeInStateReport:
       type: object
       required: [group_by, items]
