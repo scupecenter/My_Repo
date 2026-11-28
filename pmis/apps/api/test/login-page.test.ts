@@ -113,7 +113,7 @@ describe('Settings, Screens, Login page: GET and PUT /settings/login-page', () =
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ ...SAMPLE, updated_by: { id: admin.user.id }, can_edit: true });
     expect(etag(ok)).not.toBe(etag(cur));
-    expect(await value()).toEqual(SAMPLE);
+    expect(await value()).toEqual({ ...SAMPLE, ...CARD }); // the stored value now carries the card fields (0658)
     const a = await audits();
     expect(a).toHaveLength(1);
     expect(a[0]).toMatchObject({ actor_id: admin.user.id, reason: REASON, before: DEFAULT, after: SAMPLE });
