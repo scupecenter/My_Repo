@@ -82,7 +82,7 @@ describe('Media geotag', () => {
 
   it('reads the point, the distance to the site and the far flag, and marks panoramas and drone files', async () => {
     const all = await items(viewer);
-    const by = (id: string) => all.find((x) => x.id === id)!;
+    const by = (id: string | undefined) => all.find((x) => x.id === id)!;
     expect(by(ids.near).geo).toMatchObject({ source: 'exif', far: false });
     expect(by(ids.near).geo!.distance_m).toBeLessThan(50);
     expect(by(ids.far).geo!.far).toBe(true);
