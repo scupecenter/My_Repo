@@ -122,6 +122,11 @@ export type RegisterLink = { field: string; target_register: string; target_reco
 export const useRegisterLinks = (key: string) =>
   useQuery({ queryKey: ['register-links', key], staleTime: 5 * 60_000, queryFn: () => api.get<{ items: RegisterLink[] }>(`/registers/${key}/links`).then((r) => r.items) });
 
+/** D60 follow-up: orphan counts per declared link (GET /registers/links/orphans, System Admin only). */
+export type RegisterLinkOrphan = { register_key: string; field_code: string; target_register: string; rows_with_value: number; orphan_rows: number };
+export const useRegisterLinkOrphans = (enabled = true) =>
+  useQuery({ queryKey: ['register-link-orphans'], enabled, staleTime: 60_000, retry: false, queryFn: () => api.get<{ items: RegisterLinkOrphan[] }>('/registers/links/orphans').then((r) => r.items) });
+
 /** D60: the generic picker of one declared link field (GET /registers/{key}/link-options/{field}). */
 export const useRegisterLinkOptions = (key: string, field: string, siteId: string | null | undefined, enabled: boolean) =>
   useQuery({

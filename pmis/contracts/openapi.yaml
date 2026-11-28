@@ -207,6 +207,7 @@ info:
     - 0.15.461 (2026-11-28): the site pack (D5, spec #521; no migration, the reserved 0601 stays unused). Additive. `POST /exports/master` takes `site_pack: { site_id, parts? }` (alone): the job writes a zip with one workbook per part for that site and a README, `kind` = `site_pack`, downloaded with `GET /exports/master/{id}/download` (`application/zip`). Same export lock, same per part and per region export grant, same column rules as the other exports (a hidden site custom field and a column of a part the caller may not export are left out); voided records, project-wide figures and the dismantle part are not in the pack. Start, completion and download are audited with the site id. Settings: no new setting; which columns a register exports is the existing Settings > Registers > columns (`in_export`), and who may export is the export grant of the Matrix.
     - 0.15.457 (2026-11-28): the Tools & Equipment register (C4, spec #517; migration 0597, mirror `db/sql/596_tools_equipment_register.sql`): the tools and equipment of the project, with the custodian (a user column) and the next calibration or inspection due date. Register key and module `tools_equipment` (`RegisterKey`, export parts); site-scoped, several per site, two levels; its Matrix row is empty in the seed (the admin names the holders; no permission is granted); lists EquipmentCategory, EquipmentStatus and EquipmentDueKind; template TPL-TOOLS-EQUIPMENT; one data reset part; the due date `next_due_date` is added to the expiry radar setting (30, 14 and 7 days). No new endpoint. Additive.
     - 0.15.571 (2026-11-28): the data upload validates link fields (L7; migration 0642, mirror `db/sql/641_import_link_validation.sql`). No path or field changes. A link cell that is not an id, or is the id of no record, is now a row error on its own column in the error report: the Procurement link of HLC, Car Dispatcher and Financial Advances, the vehicle and the booking to extend of Car Dispatcher, and the advance to extend of Financial Advances (codes `invalid`, `link_not_found`). An error that a rule of the register raises on the probe record (the links of invoices, issues, quality, change control, dismantle, risks) now keeps its own column and message instead of one generic line under Record ID. Blank cells are not errors. Additive.
+    - 0.15.512 (2026-11-28): the orphan counts of the declared links for the Settings links editor (D60 follow-up; migration 0660, mirror `db/sql/659_link_orphans_report.sql`). Additive. New `GET /registers/links/orphans` (`listRegisterLinkOrphans`, System Admin only): per active link, `rows_with_value` and `orphan_rows`; read only, from `register_link_orphans()`. One new read function, no table, no change to an existing grant.
     - 0.15.572 (2026-11-28): the register rules screen lists the rules keys of every register (L9; migration 0643, mirror `db/sql/642_register_rules_screen.sql`). `GET /settings/register-rules`: the catalogue also offers `currency` of Financial Advances and `master_export` (yes or no) of Car Dispatcher, Financial Advances and Daily Plan (changing `master_export` changes the Master template, which has to be downloaded again); `items` now lists every active register that has rules, each with `other`: the keys that are not editable here (scope maps, scopes, field lists, Daily Plan levels), read only. `PUT` is unchanged (catalogue keys only). Additive.
     - 0.15.15 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 139). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
     - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
@@ -12125,6 +12126,35 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/links/orphans:
+    get:
+      tags: [registers]
+      operationId: listRegisterLinkOrphans
+      summary: Orphan counts of the declared links (0.15.512)
+      description: |
+        0.15.512 (D60 follow-up). For each active link of `register_links`: how many current rows hold an id (`rows_with_value`) and how many of those are not a current record of the target register (`orphan_rows`). Read only. System Admin only (the database refuses anyone else with 403). The Settings links editor shows it as a badge beside each link, so an admin sees whether the check (`enforce`) can be switched on.
+      responses:
+        '200':
+          description: One item per active link.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, field_code, target_register, rows_with_value, orphan_rows]
+                      properties:
+                        register_key: {type: string}
+                        field_code: {type: string}
+                        target_register: {type: string}
+                        rows_with_value: {type: integer}
+                        orphan_rows: {type: integer}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /registers/{key}/links:
     get:
       tags: [registers]

@@ -8849,5 +8849,11 @@
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
   },
+  "linkOrphans": {
+    "badge_clean": "No orphans",
+    "badge_orphans": "{{n}} orphan(s)",
+    "badge_title": "{{n}} of {{total}} rows hold an id that is not a current record of {{target}}. Switch the check on only when this is 0.",
+    "badge_none": "No rows use this link yet"
+  },
   "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
 }

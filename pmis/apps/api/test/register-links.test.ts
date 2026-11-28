@@ -92,6 +92,22 @@ describe('register links (migration 0409)', () => {
   });
 });
 
+describe('orphan report of the links (migration 0660)', () => {
+  it('lists every active link with its counts for a System Admin, and refuses a call without an actor', async () => {
+    await db.query('BEGIN');
+    let none: unknown = null;
+    await db.query('SAVEPOINT s');
+    try { await db.query(`SELECT register_link_orphans_report() AS j`); none = 'ran'; } catch (e) { none = (e as { code?: string }).code; }
+    await db.query('ROLLBACK TO SAVEPOINT s');
+    expect(none).toBe('42501');
+    await beginAs(db, adminId);
+    const r = await db.query(`SELECT register_link_orphans_report() AS j`);
+    const items = (r.rows[0].j as { items: { register_key: string; field_code: string; rows_with_value: number; orphan_rows: number }[] }).items;
+    expect(items.some((x) => x.register_key === 'issues' && x.field_code === 'risk_entity_id')).toBe(true);
+    expect(items.every((x) => Number(x.orphan_rows) <= Number(x.rows_with_value))).toBe(true);
+  });
+});
+
 describe('extra register links (migration 0596, L10)', () => {
   it('declares the lesson and permit links with their optional fields, no check yet, and the migration runs again without error', async () => {
     const sql = readFileSync(join(__dirname, '..', '..', '..', 'db', 'sql', '595_extra_register_links.sql'), 'utf8');
