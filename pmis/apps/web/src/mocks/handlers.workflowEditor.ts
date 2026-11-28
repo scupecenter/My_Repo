@@ -9,7 +9,7 @@ import { resetSiteColumnsMock } from './handlers.siteColumns';
  * at most one draft. Only the System Admin (account `pm`) edits, with a reason and a step-up; every write checks If-Match like the server.
  */
 interface Task { task_code: string; stage_code: string; sort_order: number; name_en: string; name_ar: string | null; is_active: boolean; counts_toward_milestone: boolean; is_milestone_task: boolean; has_documents: boolean; task_version: number; predecessors: string[] }
-interface Ver { version: number; status: 'draft' | 'published'; etag: number; reason: string | null; parent: number | null; milestones: { code: string; seq: number; name_en: string; name_ar: string | null; is_active: boolean; formula_kind: 'master'; counts_in_project_status: boolean }[]; gates: { code: string; from_milestone: string; to_milestone: string; name_en: string; name_ar: string | null; conditions: unknown[]; sla_min_wd: number | null; sla_max_wd: number | null }[]; tasks: Task[] }
+interface Ver { lock_mode?: 'strict' | 'open'; version: number; status: 'draft' | 'published'; etag: number; reason: string | null; parent: number | null; milestones: { code: string; seq: number; name_en: string; name_ar: string | null; is_active: boolean; formula_kind: 'master'; counts_in_project_status: boolean }[]; gates: { code: string; from_milestone: string; to_milestone: string; name_en: string; name_ar: string | null; conditions: unknown[]; sla_min_wd: number | null; sla_max_wd: number | null }[]; tasks: Task[] }
 
 const t = (code: string, stage: string, n: number, en: string, ar: string, preds: string[] = []): Task => ({ task_code: code, stage_code: stage, sort_order: n * 10, name_en: en, name_ar: ar, is_active: true, counts_toward_milestone: true, is_milestone_task: false, has_documents: true, task_version: 1, predecessors: preds });
 const seed = (): Ver[] => [{
@@ -23,13 +23,15 @@ interface Mig { id: string; site_id: string; site_code: string; from_version: nu
 let migrations: Mig[] = [];
 type SlaWeightMock = { counts: boolean; value: number; group: string | null; sla: Record<string, unknown> | null };
 const slaW = new Map<string, SlaWeightMock>();
+/** Test hook: set the lock mode of the live (published) version. */
+export const setLiveLockModeMock = (m: 'strict' | 'open') => { for (const v of state) if (v.status === 'published') { v.lock_mode = m; v.etag += 1; } };
 export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; slaW.clear(); resetSiteColumnsMock(); };
 /** Until someone drafts a version, the reads fall through to the settings mock that the matrix and the rules screens already use. */
 const untouched = () => state.length === 1 && state[0]!.etag === 1;
 
 const canEdit = () => viewer()?.key === 'pm';
 const json = (v: Ver) => ({
-  version: v.version, status: v.status, is_current: v.status === 'published' && v.version === Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version)), light_revision: 0, parent_version: v.parent,
+  version: v.version, status: v.status, is_current: v.status === 'published' && v.version === Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version)), light_revision: 0, lock_mode: v.lock_mode ?? 'strict', parent_version: v.parent,
   site_count: v.version === 1 ? 12 : 0, reason: v.reason, published_at: null, version_etag: v.etag, can_edit: canEdit(), can_publish: canEdit(),
   milestones: v.milestones, gates: v.gates, placements: [...v.tasks].sort((a, b) => a.stage_code.localeCompare(b.stage_code) || a.sort_order - b.sort_order),
   validation: { valid: true, problems: [], warnings: [], master_impact: { affected_columns: [], parallel_run_active: false, confirmation_phrase: null } },
@@ -82,7 +84,7 @@ export const workflowEditorHandlers = [
     if (untouched()) return undefined;
     const g = guard(); if (g) return g;
     const cur = Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version));
-    return HttpResponse.json({ items: [...state].sort((a, b) => b.version - a.version).map((v) => ({ version: v.version, status: v.status, is_current: v.version === cur && v.status === 'published', light_revision: 0, parent_version: v.parent, site_count: v.version === 1 ? 12 : 0, reason: v.reason, version_etag: v.etag })) });
+    return HttpResponse.json({ items: [...state].sort((a, b) => b.version - a.version).map((v) => ({ version: v.version, status: v.status, is_current: v.version === cur && v.status === 'published', light_revision: 0, parent_version: v.parent, site_count: v.version === 1 ? 12 : 0, reason: v.reason, version_etag: v.etag, lock_mode: v.lock_mode ?? 'strict' })) });
   }),
   http.post(`${B}/workflow/versions`, async ({ request }) => {
     const g = guard(); if (g) return g;
@@ -231,6 +233,14 @@ export const workflowEditorHandlers = [
     slaW.set(params.task as string, { ...prev, counts: b.counts_in_weight === true, value: b.counts_in_weight ? (b.weight_value ?? 0) : 0, group: b.counts_in_weight ? (b.weight_group ?? null) : null });
     w.v.etag += 1;
     return HttpResponse.json({ version: json(w.v) }, { headers: { ETag: `"${w.v.etag}"` } });
+  }),
+  http.put(`${B}/workflow/versions/:version/lock-mode`, async ({ params, request }) => {
+    const b = (await request.json()) as { lock_mode?: 'strict' | 'open'; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    if (w.v.status !== 'draft') return problem(409, 'invalid_transition', 'The lock mode is changed in a draft version.');
+    if (b.lock_mode !== 'strict' && b.lock_mode !== 'open') return fieldErr('/lock_mode', 'invalid');
+    w.v.lock_mode = b.lock_mode; w.v.etag += 1;
+    return reply(w.v);
   }),
   http.put(`${B}/workflow/versions/:version/tasks/:task/closing`, async ({ params, request }) => {
     const b = (await request.json()) as { closing?: boolean; reason?: string };
