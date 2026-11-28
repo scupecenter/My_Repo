@@ -1761,6 +1761,15 @@
     "end_task_layout_submitted_date": "Layout Submitted Date"
   },
   "wtSet": {
+    "diffTitle": "Changes against the set in force",
+    "diffNone": "No item differs from the set in force.",
+    "diff_added": "Added",
+    "diff_removed": "Removed",
+    "diff_changed": "Changed",
+    "diffField_name": "Name",
+    "diffField_weight": "Weight",
+    "diffField_unit": "Unit",
+    "diffField_measure_rule": "Measure rule",
     "rule": {
       "method": "How the item is counted",
       "m_off": "Not counted automatically",
