@@ -57,6 +57,8 @@ import { UserDetailPage } from '@/pages/UserDetail';
 import { Users } from '@/pages/Users';
 import { Pending } from '@/pages/Pending';
 import { Profile } from '@/pages/Profile';
+import { WhatsNew } from '@/pages/WhatsNew';
+import { Guide } from '@/pages/Guide';
 import { SecurityLog } from '@/pages/SecurityLog';
 import { ActivityReport } from '@/pages/logs/ActivityReport';
 import { AuditLog } from '@/pages/logs/AuditLog';
@@ -115,6 +117,8 @@ function gated(session: Session) {
         <Route index element={<Home />} />
         <Route path="change-password" element={<ChangePassword />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="whats-new" element={<WhatsNew />} />
+        <Route path="guide" element={<Guide />} />
         <Route path="my-work" element={<MyWork />} />
         <Route path="my-work/daily-plan" element={<DailyPlan />} />
         <Route path="approvals" element={<Approvals />} />

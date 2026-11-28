@@ -1,7 +1,8 @@
 import * as Popover from '@radix-ui/react-popover';
 import { AutoHints } from './AutoHints';
 import { useQueryClient } from '@tanstack/react-query';
-import { Download, Palette, Plus, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
+import { WhatsNewDot } from '@/pages/WhatsNew';
+import { BookOpen, Download, Palette, Sparkles, Plus, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -267,6 +268,8 @@ function ShellFrame() {
             <Popover.Portal>
               <Popover.Content align="end" sideOffset={6} data-testid="user-menu" className="card z-50 w-56 p-2">
                 <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-profile" onClick={() => nav('/profile')}><UserRound size={14} />{t('top.my_profile')}</button></Popover.Close>
+                <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-whats-new" onClick={() => nav('/whats-new')}><Sparkles size={14} />{t('top.whats_new')}<WhatsNewDot /></button></Popover.Close>
+                <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-guide" onClick={() => nav('/guide')}><BookOpen size={14} />{t('top.guide')}</button></Popover.Close>
                 <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-appearance" onClick={() => nav('/profile#pf-brand')}><Palette size={14} />{t('top.appearance')}</button></Popover.Close>
                 {session.data?.auth_method === 'local'
                   ? <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-change-password" onClick={() => nav('/change-password')}><Lock size={14} />{t('top.change_password')}</button></Popover.Close>

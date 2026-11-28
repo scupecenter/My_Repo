@@ -318,6 +318,9 @@
     "close": "Close the message"
   },
   "top": {
+    "whats_new": "What's new",
+    "whats_new_unseen": "New notes",
+    "guide": "Short guide",
     "search": "Search or jump to…",
     "language": "Switch language",
     "theme": "Switch theme",
@@ -8849,5 +8852,48 @@
     "title": "Review of the plan, {{region}}, {{date}}",
     "done": "Saved."
   },
-  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."}
+  "whatsnew": {"title": "New:", "dismiss": "Got it", "register_traits": "drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to import rows from the template."},
+  "whatsNewPage": {
+    "title": "What's new",
+    "note": "What changed in the Telecom Site Delivery Workspace, newest first.",
+    "open": "Open the screen"
+  },
+  "whatsNewItems": {
+    "register_board_preview": {
+      "title": "Registers: board, preview and a faster New",
+      "text": "Drag a card on the board to change its status, press Space on a row or card for a quick preview, and use the arrow next to New to add a blank record or import rows from the template."
+    }
+  },
+  "guide": {
+    "title": "Short guide",
+    "note": "What each part of the Telecom Site Delivery Workspace is for and where to find it.",
+    "start": {
+      "title": "Signing in",
+      "text": "Sign in with your work account. The menu on the side shows only the screens your role may open. Your name at the top has your profile, appearance, this guide and the release notes."
+    },
+    "work": {
+      "title": "My work",
+      "text": "The inbox and the dashboard show what waits for you: tasks to enter, review or approve, with the site and the date. Open an item, fill the fields, attach the required documents and send it on."
+    },
+    "registers": {
+      "title": "Registers",
+      "text": "A register is a list of records of one kind, such as orders, permits or issues. Add a record, open it for its details and history, change a status on the board, and filter or save a view. A record that was approved is locked: ask the person with the right to open it again."
+    },
+    "templates": {
+      "title": "Templates and import",
+      "text": "Download the blank template of a screen, fill it in Excel and upload it. One refused row refuses the whole file and tells you which row and why. A blank cell changes nothing."
+    },
+    "alerts": {
+      "title": "Notifications and alerts",
+      "text": "The bell lists what needs your attention. Alert rules in Settings decide who is told, and when, about dates that are close and records that stand still."
+    },
+    "settings": {
+      "title": "Settings",
+      "text": "Administrators set the lists, the rules, the people and the permissions in Settings. Every change needs a reason and is recorded in the audit log. Nothing is deleted: an item that is no longer needed is hidden."
+    },
+    "help": {
+      "title": "Help",
+      "text": "If you cannot see a site or cannot change a record, the cause is usually a region or a right that was not given to you. Ask your administrator. The release notes show what changed recently."
+    }
+  }
 }
