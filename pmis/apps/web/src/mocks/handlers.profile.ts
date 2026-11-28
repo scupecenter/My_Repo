@@ -119,7 +119,66 @@ let MY_SESSIONS = [
   { session_id: '00000000-0000-4000-8000-0000000000c1', signed_in_at: '2026-11-27T08:00:00Z', last_activity_at: '2026-11-27T09:00:00Z', ip: '10.0.0.5', device: { browser: 'Chrome', os: 'Windows', type: 'desktop' }, auth_method: 'local', is_current: true },
   { session_id: '00000000-0000-4000-8000-0000000000c2', signed_in_at: '2026-11-26T08:00:00Z', last_activity_at: '2026-11-26T18:00:00Z', ip: '10.0.0.9', device: { browser: 'Safari', os: 'iOS', type: 'mobile' }, auth_method: 'local', is_current: false },
 ];
+
+// Contract 0.15.531: personal notification settings (the real check is the database, migration 0583). Synthetic: a small catalogue, one in-memory row.
+const NP_TYPES = [
+  { code: 'task_assigned', label_en: 'Task assigned to me', label_ar: 'إسناد مهمة إليّ', kind: 'task_assigned', category: 'tasks', mandatory: false },
+  { code: 'approval_due', label_en: 'Approval waiting', label_ar: 'اعتماد بانتظار الإجراء', kind: 'approval_due', category: 'approvals', mandatory: false },
+  { code: 'security_alert', label_en: 'Security alert', label_ar: 'تنبيه أمني', kind: 'security_alert', category: 'security', mandatory: true },
+];
+const npState = { version: 0, types: {} as Record<string, { in_app: boolean; email: boolean }>, dnd: { enabled: false, start: 1320, end: 420, days: [0, 1, 2, 3, 4, 5, 6], timezone: null as string | null }, snooze_until: null as string | null,
+  org: { allow_personal: true, allow_dnd: true, dedupe_minutes: 10, decision_retention_days: 30, version: 0 }, decisions: [] as { id: number; kind: string; channel: string; reason: string; title: string | null; link: string | null; created_at: string }[] };
+const npBody = () => ({
+  version: npState.version,
+  types: NP_TYPES.map((x) => ({ ...x, in_app: x.mandatory ? true : (npState.types[x.code]?.in_app ?? true), email: x.mandatory ? true : (npState.types[x.code]?.email ?? true) })),
+  dnd: { ...npState.dnd, effective_timezone: 'Africa/Tripoli' },
+  snooze_until: npState.snooze_until, quiet_now: !!npState.snooze_until && new Date(npState.snooze_until) > new Date(),
+  org: { allow_personal: npState.org.allow_personal, allow_dnd: npState.org.allow_dnd, dedupe_minutes: npState.org.dedupe_minutes },
+});
+let npLastTest = 0;
+const npHandlers = [
+  http.get(`${B}/me/notification-prefs`, () => { const g = guard(); if (g) return g; return HttpResponse.json(npBody()); }),
+  http.put(`${B}/me/notification-prefs`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!npState.org.allow_personal) return problem(403, 'field_read_only', 'Switched off');
+    if (request.headers.get('if-match') !== `"${npState.version}"`) return problem(412, 'precondition_failed', 'Changed since read');
+    const b = (await request.json()) as { types?: Record<string, { in_app?: boolean; email?: boolean }>; dnd?: Partial<typeof npState.dnd> };
+    if (b.types) {
+      npState.types = {};
+      for (const [k, v] of Object.entries(b.types)) {
+        const t = NP_TYPES.find((x) => x.code === k);
+        if (!t) return problem(422, 'validation_failed', 'Unknown type');
+        if (!t.mandatory && (v.in_app === false || v.email === false)) npState.types[k] = { in_app: v.in_app ?? true, email: v.email ?? true };
+      }
+    }
+    if (b.dnd) npState.dnd = { ...npState.dnd, ...b.dnd } as typeof npState.dnd;
+    npState.version += 1;
+    return HttpResponse.json(npBody());
+  }),
+  http.post(`${B}/me/notification-prefs/snooze`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    npState.snooze_until = ((await request.json()) as { until: string | null }).until; npState.version += 1;
+    return HttpResponse.json(npBody());
+  }),
+  http.post(`${B}/me/notification-prefs/test`, () => {
+    const g = guard(); if (g) return g;
+    if (Date.now() - npLastTest < 30_000) return problem(429, 'rate_limited', 'Wait 30 seconds');
+    npLastTest = Date.now();
+    return HttpResponse.json({ notification_id: '00000000-0000-4000-8000-0000000000d1', quiet_now: npBody().quiet_now });
+  }),
+  http.get(`${B}/me/notification-prefs/decisions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: npState.decisions }); }),
+  http.get(`${B}/admin/notification-personal`, () => { const g = guard(); if (g) return g; return HttpResponse.json(npState.org); }),
+  http.put(`${B}/admin/notification-personal`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (request.headers.get('if-match') !== `"${npState.org.version}"`) return problem(412, 'precondition_failed', 'Changed since read');
+    const b = { ...((await request.json()) as Record<string, unknown>) };
+    delete b.reason;
+    npState.org = { ...npState.org, ...b, version: npState.org.version + 1 } as typeof npState.org;
+    return HttpResponse.json(npState.org);
+  }),
+];
 export const profileHandlers = [
+  ...npHandlers,
   http.get(`${B}/me/sessions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: MY_SESSIONS }); }),
   http.post(`${B}/me/sessions/revoke-others`, () => { const g = guard(); if (g) return g; const n = MY_SESSIONS.filter((s) => !s.is_current).length; MY_SESSIONS = MY_SESSIONS.filter((s) => s.is_current); return HttpResponse.json({ revoked_count: n }); }),
   http.post(`${B}/me/sessions/:id/revoke`, ({ params }) => { const g = guard(); if (g) return g; MY_SESSIONS = MY_SESSIONS.filter((s) => s.session_id !== params.id || s.is_current); return HttpResponse.json({ revoked_count: 1 }); }),

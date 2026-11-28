@@ -30,7 +30,7 @@ const CR = () => (C().contractorRules ??= initCfg().contractorRules);
 /** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 interface AlertRuleRow {
-  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold'; params: Record<string, unknown>; audience: Record<string, unknown>;
+  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon'; params: Record<string, unknown>; audience: Record<string, unknown>;
   title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; locked: boolean; version: number;
   created_at: string; updated_at: string;
 }
@@ -78,6 +78,9 @@ export function validateContractorRules(b: Record<string, unknown>) {
   return errs;
 }
 const isAdmin = () => viewer()?.key === 'pm';
+const targetPolicy: { manual_override: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { manual_override: false, version: 1, updated_at: null, updated_by: null };
+const targetPolicyView = () => ({ ...targetPolicy, can_edit: isAdmin() });
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 const reasonErr = (r?: string) => ((r ?? '').trim().length < 3 || (r ?? '').length > 1000 ? fields({ path: '/reason', code: 'required' }) : null);
@@ -277,6 +280,12 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'prefill.max_sites', group: 'rows', unit: 'sites', default: 5000, min: 100, max: 50000 },
   { key: 'export.max_rows', group: 'exports', unit: 'rows', default: 100000, min: 1000, max: 1000000 },
   { key: 'idempotency.max_entries', group: 'exports', unit: 'entries', default: 5000, min: 500, max: 100000 },
+  { key: 'login.ip_attempts', group: 'sessions', unit: 'attempts', default: 10, min: 3, max: 100 },
+  { key: 'login.ip_window_seconds', group: 'sessions', unit: 'seconds', default: 900, min: 60, max: 86400 },
+  { key: 'login.ip_base_seconds', group: 'sessions', unit: 'seconds', default: 2, min: 1, max: 60 },
+  { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
+  { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
+  { key: 'media.thumbnails_per_minute', group: 'media', unit: 'per_minute', default: 120, min: 0, max: 6000 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
@@ -442,6 +451,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_contractors', label_en: 'Contractor and supplier scorecard: levels, delay and quality', label_ar: 'بطاقة أداء المقاولين والموردين: المستويات والتأخير والجودة' },
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
+    { code: 'ops_phase', label_en: 'Phase scope: sites per project phase, progress and derived targets', label_ar: 'نطاق المراحل: المواقع لكل مرحلة والتقدم والمستهدفات المشتقة' },
     { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
   ],
 };
@@ -455,6 +465,12 @@ let dashState = {
   updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+/** The weekday of the weekly dashboard snapshot (contract 0.15.430): the setting dashboard.snapshot_weekday, default 4 (Thursday), version 0 until the first save. */
+let snapState = { version: 0, weekday: 4, updated_at: null as string | null, updated_by: null as null };
+const snapView = () => ({ ...snapState });
+/** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
+let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
+const bandsView = () => ({ ...bandsState });
 
 /** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
@@ -511,6 +527,8 @@ let pmState = { version: 0, schedules: [] as MockPm[], updated_at: null as strin
 const PM_CATALOGUE = { registers: [{ key: 'procurement', name_en: 'Procurement', name_ar: 'المشتريات', site_scoped: false }], units: ['week', 'month'] };
 const pmView = () => ({ ...pmState, today: tripoliToday(), catalogue: PM_CATALOGUE });
 
+const DR = { default: 'first' as 'first' | 'last', registers: {} as Record<string, 'first' | 'last'>, version: 1, updated_at: null as string | null };
+const dupRowsView = () => ({ default: DR.default, registers: DR.registers, updated_at: DR.updated_at, updated_by: null, version: DR.version, can_edit: viewer()?.key === 'admin' || !!viewer()?.nav.includes('settings') });
 export const settingsHandlers = [
   http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
   http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
@@ -547,12 +565,61 @@ export const settingsHandlers = [
     return HttpResponse.json({ record_id: x.last_record_id, register_key: x.register_key, next_due: x.next_due }, { status: 201 });
   }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
+  // ------------------------------------------------------------------ 0.15.367: the target policy (manual override of the typed dashboard targets, off by default)
+  http.get(`${B}/settings/dashboard-target-policy`, () => { const g = guard(); if (g) return g; const j = targetPolicyView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/dashboard-target-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ manual_override?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['manual_override', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.manual_override !== 'boolean') errs.push({ path: '/manual_override', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, targetPolicy.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (targetPolicy.manual_override === b.manual_override) return problem(409, 'invalid_transition', 'This is already the target policy.');
+    const v = viewer()!;
+    Object.assign(targetPolicy, { manual_override: b.manual_override as boolean, version: targetPolicy.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = targetPolicyView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     const b = (await request.json()) as { targets: typeof dashState.targets; thresholds: typeof dashState.thresholds; tabs: typeof dashState.tabs };
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
+  }),
+  // ------------------------------------------------------------------ weekly snapshot day (contract 0.15.430, settings review gap 3)
+  http.get(`${B}/settings/dashboard/snapshot-schedule`, () => { const g = guard(); if (g) return g; return HttpResponse.json(snapView(), tag(snapState.version)); }),
+  http.put(`${B}/settings/dashboard/snapshot-schedule`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, snapState.version); if (p) return p;
+    const b = (await request.json()) as { weekday?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weekday) || b.weekday! < 0 || b.weekday! > 6) errs.push({ path: '/weekday', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    snapState = { ...snapState, version: snapState.version + 1, weekday: b.weekday!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(snapView(), tag(snapState.version));
+  }),
+  // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
+  http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
+  http.put(`${B}/settings/dashboard/health-bands`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, bandsState.version); if (p) return p;
+    const b = (await request.json()) as { green?: number; amber?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.green) || b.green! < 1 || b.green! > 100) errs.push({ path: '/green', code: 'invalid' });
+    if (!Number.isInteger(b.amber) || b.amber! < 0 || b.amber! > 99) errs.push({ path: '/amber', code: 'invalid' });
+    if (!errs.length && b.green! <= b.amber!) errs.push({ path: '/green', code: 'invalid_order' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    bandsState = { ...bandsState, version: bandsState.version + 1, green: b.green!, amber: b.amber!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(bandsView(), tag(bandsState.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),
@@ -675,6 +742,23 @@ export const settingsHandlers = [
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.345 (0432): duplicate rows in one file (Settings, Imports)
+  http.get(`${B}/settings/duplicate-rows`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dupRowsView(), tag(DR.version)); }),
+  http.put(`${B}/settings/duplicate-rows`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, DR.version); if (p) return p;
+    const b = await body<{ default?: string; registers?: Record<string, string>; reason?: string }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (b.default !== 'first' && b.default !== 'last') errs.push({ path: '/default', code: 'invalid' });
+    Object.entries(b.registers ?? {}).forEach(([k, v]) => { if (v !== 'first' && v !== 'last') errs.push({ path: `/registers/${k}`, code: 'invalid' }); });
+    if (errs.length) return fields(...errs);
+    if (DR.default === b.default && JSON.stringify(DR.registers) === JSON.stringify(b.registers ?? {})) return problem(409, 'invalid_transition', 'These values are already set.');
+    Object.assign(DR, { default: b.default as 'first' | 'last', registers: (b.registers ?? {}) as Record<string, 'first' | 'last'>, version: DR.version + 1, updated_at: new Date().toISOString() });
+    return HttpResponse.json(dupRowsView(), tag(DR.version));
   }),
 
   // ------------------------------------------------------------------ 0.15.322: the upload policy of the imports (D49 part 3)
@@ -1434,6 +1518,18 @@ export const settingsHandlers = [
           if (!['templates', 'uploads', 'exports', 'master_import'].includes(k)) errs.push({ path: `${path}/default_view/${k}`, code: 'unknown_key' });
           else if (!['cards', 'rows', 'table', 'compact'].includes(String(v[k]))) errs.push({ path: `${path}/default_view/${k}`, code: 'invalid' });
         }
+      } else if (name === 'finance_hub') {
+        for (const k of Object.keys(o)) if (!['widgets', 'settle_warn_days', 'aging_days'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        const w = o.widgets as Record<string, unknown> | undefined;
+        if (!w || typeof w !== 'object') errs.push({ path: `${path}/widgets`, code: 'invalid' });
+        else for (const k of Object.keys(w)) {
+          if (!['advances', 'invoices', 'quick_links', 'templates'].includes(k)) errs.push({ path: `${path}/widgets/${k}`, code: 'unknown_key' });
+          else if (typeof w[k] !== 'boolean') errs.push({ path: `${path}/widgets/${k}`, code: 'invalid' });
+        }
+        if (!Number.isInteger(o.settle_warn_days)) errs.push({ path: `${path}/settle_warn_days`, code: 'invalid' });
+        else if ((o.settle_warn_days as number) < 1 || (o.settle_warn_days as number) > 365) errs.push({ path: `${path}/settle_warn_days`, code: 'out_of_range' });
+        const a = o.aging_days;
+        if (!Array.isArray(a) || a.length !== 2 || !a.every((x) => Number.isInteger(x) && x >= 1 && x <= 365) || (a[0] as number) >= (a[1] as number)) errs.push({ path: `${path}/aging_days`, code: 'invalid' });
       } else errs.push({ path, code: 'unknown_key' });
     }
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
@@ -1524,7 +1620,7 @@ export const settingsHandlers = [
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }],
         kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
@@ -1536,11 +1632,11 @@ export const settingsHandlers = [
     const g = needAdmin(); if (g) return g;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
-    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
+    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
     if (ALERT_RULES.some((x) => x.code === b.code)) return fields({ path: '/code', code: 'conflict' });
     const row = {
       id: `00000000-0000-4000-8000-${String(ALERT_RULES.length + 1).padStart(12, '0')}`,
-      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold',
+      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon',
       params: (b.params ?? {}) as Record<string, unknown>, audience: (b.audience ?? { type: 'system_admin' }) as Record<string, unknown>,
       title_en: String(b.title_en ?? ''), title_ar: String(b.title_ar ?? ''), body_en: String(b.body_en ?? ''), body_ar: String(b.body_ar ?? ''),
       link: (b.link ?? null) as string | null, enabled: b.enabled !== false, locked: b.locked === true, version: 1,

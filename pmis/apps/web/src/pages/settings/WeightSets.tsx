@@ -18,7 +18,10 @@ import { tripoliToday } from "@/lib/today";
 import { sumOf, weightIssues } from "@/lib/weights";
 import { FieldErr } from "./Calendar";
 import { QueryError, QueryFallback } from "@/components/States";
+import { MissingArabicHint } from '@/components/MissingArabicHint';
 import { DateInput } from '@/components/DateInput';
+import { MeasureRuleEditor } from "./MeasureRuleEditor";
+import { ruleErrors } from "@/lib/measureRule";
 
 const CODES: WeightSetCode[] = [
   "project_status",
@@ -212,7 +215,7 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
     (a) =>
       !okWeight(a.weight) ||
       !a.name_en.trim() ||
-      a.items.some((i) => !okWeight(i.weight) || !i.name_en.trim()),
+      a.items.some((i) => !okWeight(i.weight) || !i.name_en.trim() || ruleErrors(i.measure_rule).some((e) => e !== 'unknown_task' && e !== 'legacy')),
   );
   const setAct = (ai: number, patch: Partial<Act>) =>
     setActs(view.map((a, k) => (k === ai ? { ...a, ...patch } : a)));
@@ -353,14 +356,17 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
                       value={a.name_en}
                       onChange={(e) => setAct(ai, { name_en: e.target.value })}
                     />
-                    <input
-                      className="input min-w-40 flex-1"
-                      dir="rtl"
-                      aria-label={t("wtSet.name_ar")}
-                      data-testid={`weights-name-ar-${a.code}`}
-                      value={a.name_ar ?? ""}
-                      onChange={(e) => setAct(ai, { name_ar: e.target.value })}
-                    />
+                    <span className="min-w-40 flex-1">
+                      <input
+                        className="input w-full"
+                        dir="rtl"
+                        aria-label={t("wtSet.name_ar")}
+                        data-testid={`weights-name-ar-${a.code}`}
+                        value={a.name_ar ?? ""}
+                        onChange={(e) => setAct(ai, { name_ar: e.target.value })}
+                      />
+                      <MissingArabicHint en={a.name_en} ar={a.name_ar} testid={`weights-name-ar-warn-${a.code}`} />
+                    </span>
                     <input
                       type="number"
                       min={0}
@@ -404,16 +410,19 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
                               setItem(ai, ii, { name_en: e.target.value })
                             }
                           />
-                          <input
-                            className="input min-w-32 flex-1"
-                            dir="rtl"
-                            aria-label={t("wtSet.name_ar")}
-                            data-testid={`weights-item-name-ar-${it.code}`}
-                            value={it.name_ar ?? ""}
-                            onChange={(e) =>
-                              setItem(ai, ii, { name_ar: e.target.value })
-                            }
-                          />
+                          <span className="min-w-32 flex-1">
+                            <input
+                              className="input w-full"
+                              dir="rtl"
+                              aria-label={t("wtSet.name_ar")}
+                              data-testid={`weights-item-name-ar-${it.code}`}
+                              value={it.name_ar ?? ""}
+                              onChange={(e) =>
+                                setItem(ai, ii, { name_ar: e.target.value })
+                              }
+                            />
+                            <MissingArabicHint en={it.name_en} ar={it.name_ar} testid={`weights-item-name-ar-warn-${it.code}`} />
+                          </span>
                           <input
                             className="input w-24"
                             aria-label={t("wtSet.unit")}
@@ -424,15 +433,10 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
                               setItem(ai, ii, { unit: e.target.value })
                             }
                           />
-                          <input
-                            className="input min-w-40 flex-1"
-                            aria-label={t("wtSet.measure")}
-                            placeholder={t("wtSet.measure")}
-                            data-testid={`weights-item-measure-${it.code}`}
-                            value={it.measure_rule ?? ""}
-                            onChange={(e) =>
-                              setItem(ai, ii, { measure_rule: e.target.value })
-                            }
+                          <MeasureRuleEditor
+                            code={it.code}
+                            value={it.measure_rule}
+                            onChange={(text) => setItem(ai, ii, { measure_rule: text })}
                           />
                           <input
                             type="number"

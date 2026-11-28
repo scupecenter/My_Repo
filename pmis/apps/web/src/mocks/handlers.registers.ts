@@ -496,6 +496,10 @@ export const registerHandlers = [
   // waiting for L2); L2 approves rows, returns them with a note, or approves all; a row whose record has an open version is held.
   // Data hub landing (contract 0.15.311): nothing waits in the demo store until a batch is uploaded; the downloads list stays empty.
   http.get(`${B}/data-hub/summary`, () => HttpResponse.json({ batches: { count: 0, items: [] }, template_changes: [], my_downloads: [] })),
+  http.get(`${B}/finance-hub/summary`, () => HttpResponse.json({
+    advances: { open_count: 3, overdue_count: 1, open_amount: 12500, currency: 'LYD' },
+    invoices: { open_count: 4, by_state: { Received: 2, UnderReview: 1, Approved: 1, Disputed: 0 }, aging: { first: 2, second: 1, third: 1 }, overdue_count: 1 },
+  })),
   http.get(`${B}/import-batches`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;
