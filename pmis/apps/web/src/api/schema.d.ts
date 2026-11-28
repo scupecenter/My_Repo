@@ -5959,6 +5959,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/company-document-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document types of the companies (label EN/AR, required for company types, alert lead days)
+         * @description 0.15.625 (migration 0745, Companies K3). Needs the Settings screen (`admin.settings` view). The ETag is the version of the whole list.
+         */
+        get: operations["getCompanyDocumentTypes"];
+        /**
+         * Save the document types (reason, If-Match, audited)
+         * @description 0.15.625. System Admin, or a delegation of `admin.settings` edit for all regions. A type is added or changed, hidden with `is_active` false, and never deleted (a type missing from the list stays as it is).
+         *     `required_for` lists company types (`cw_contractor`, `te_vendor`, `gecol`, `hlc`, `supplier`, `landlord`, `other`); it is empty until the owner sets it. Audited as `company_doc_types_update`.
+         *     Field errors: `invalid`, `duplicate`, `out_of_range`, `unknown_type`.
+         */
+        put: operations["setCompanyDocumentTypes"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The document status of every active company (the red chip of the company list)
+         * @description 0.15.625 (Companies K3). Needs the Contractors or Procurement view. `status` is `expired`, `missing`, `expiring` or `ok`; information only, nothing is blocked.
+         */
+        get: operations["listCompanyCompliance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The document status of one company
+         * @description 0.15.625 (Companies K3). Needs the Contractors or Procurement view.
+         */
+        get: operations["getCompanyCompliance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The contacts of a company (hidden ones included)
+         * @description 0.15.625 (Companies K3). Needs the Contractors or Procurement view.
+         */
+        get: operations["listCompanyContacts"];
+        put?: never;
+        /**
+         * Add a contact to a company
+         * @description 0.15.625. Needs an edit right on Contractors or Procurement. One contact is primary; setting a new primary clears the old one. Audited as `company_contact_save`.
+         *     Field errors: `required`, `invalid`, `too_long`, `unknown_key`.
+         */
+        post: operations["createCompanyContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/contacts/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change or hide a contact (If-Match)
+         * @description 0.15.625. A contact is hidden with `is_active` false, never deleted. Audited as `company_contact_save` with before and after.
+         */
+        patch: operations["updateCompanyContact"];
+        trace?: never;
+    };
+    "/companies/{id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The documents and certificates of a company (hidden ones included)
+         * @description 0.15.625 (Companies K3). Needs the Contractors or Procurement view. `status` is `expired`, `expiring` (inside the lead days of its type), `valid` or `no_expiry`.
+         */
+        get: operations["listCompanyDocuments"];
+        put?: never;
+        /**
+         * Add a document or certificate (multipart, the file is optional)
+         * @description 0.15.625. Needs an edit right on Contractors or Procurement. The file goes through the same type check, size cap (25 MB), virus scan and encryption as every document.
+         *     A renewed certificate is a new row; the older one stays as history. Audited as `company_document_save`. Field errors: `unknown_type`, `before_issue`, `invalid`, `too_long`, `unknown_key`; file errors `file_rejected`, `file_too_large`.
+         */
+        post: operations["createCompanyDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/documents/{doc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change or hide a document (If-Match; a new file replaces the file of this row)
+         * @description 0.15.625. A document is hidden with `is_active` false, never deleted. Audited as `company_document_save` with before and after.
+         */
+        patch: operations["updateCompanyDocument"];
+        trace?: never;
+    };
+    "/companies/{id}/documents/{doc_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the file of a company document (audited, covered by the uploaded files download lock)
+         * @description 0.15.625. Needs the Contractors or Procurement view. `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`. The audit row `company_document_download` is written first.
+         */
+        get: operations["downloadCompanyDocumentFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/team-scope-mismatch": {
         parameters: {
             query?: never;
@@ -17949,6 +18125,105 @@ export interface components {
             internal_team_types: string[];
             /** @description Q145: the order statuses that end an order (default Closed, Cancelled, Completed). */
             closed_order_statuses: string[];
+        };
+        CompanyDocumentType: {
+            code: string;
+            label_en: string;
+            label_ar: string | null;
+            required_for: string[];
+            lead_days: number;
+            has_expiry: boolean;
+            is_active: boolean;
+        };
+        CompanyDocumentTypes: {
+            types: components["schemas"]["CompanyDocumentType"][];
+            party_types: string[];
+            version: number;
+            can_edit: boolean;
+        };
+        CompanyDocumentTypesInput: {
+            reason: string;
+            types: {
+                code: string;
+                label_en: string;
+                label_ar?: string | null;
+                required_for?: string[];
+                lead_days?: number;
+                has_expiry?: boolean;
+                is_active?: boolean;
+            }[];
+        };
+        CompanyCompliance: {
+            /** Format: uuid */
+            party_id: string;
+            /** @enum {string} */
+            status: "expired" | "missing" | "expiring" | "ok";
+            expired: number;
+            expiring: number;
+            missing: number;
+            valid: number;
+        };
+        CompanyContact: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            party_id: string;
+            name: string;
+            role: string | null;
+            phone: string | null;
+            email: string | null;
+            is_primary: boolean;
+            is_active: boolean;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CompanyContactInput: {
+            name?: string;
+            role?: string | null;
+            phone?: string | null;
+            email?: string | null;
+            is_primary?: boolean;
+            is_active?: boolean;
+        };
+        CompanyDocument: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            party_id: string;
+            type_code: string;
+            type_label_en?: string | null;
+            type_label_ar?: string | null;
+            title: string | null;
+            doc_number: string | null;
+            /** Format: date */
+            issued_on: string | null;
+            /** Format: date */
+            expires_on: string | null;
+            notes: string | null;
+            has_file: boolean;
+            original_name: string | null;
+            mime_type: string | null;
+            size_bytes: number | null;
+            /** @enum {string} */
+            status: "expired" | "expiring" | "valid" | "no_expiry";
+            is_active: boolean;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CompanyDocumentInput: {
+            type_code?: string;
+            title?: string | null;
+            doc_number?: string | null;
+            /** Format: date */
+            issued_on?: string | null;
+            /** Format: date */
+            expires_on?: string | null;
+            notes?: string | null;
+            is_active?: boolean;
+            /** Format: binary */
+            file?: string;
         };
         ContractorRules: components["schemas"]["ContractorRulesInput"] & {
             version: number;
@@ -35281,6 +35556,342 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getCompanyDocumentTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The types. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDocumentTypes"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setCompanyDocumentTypes: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyDocumentTypesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDocumentTypes"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listCompanyCompliance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One row per active company. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CompanyCompliance"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getCompanyCompliance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyCompliance"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listCompanyContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The contacts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CompanyContact"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createCompanyContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyContactInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyContact"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateCompanyContact: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyContactInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyContact"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listCompanyDocuments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The documents. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CompanyDocument"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createCompanyDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CompanyDocumentInput"];
+                "application/json": components["schemas"]["CompanyDocumentInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDocument"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The file is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateCompanyDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CompanyDocumentInput"];
+                "application/json": components["schemas"]["CompanyDocumentInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDocument"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    downloadCompanyDocumentFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getTeamScopeMismatchReport: {

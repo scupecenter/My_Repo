@@ -26,6 +26,7 @@ const CATEGORY_ROUTES: [file: string, route: string, category: string][] = [
   ['documents/documents.controller.ts', "@Get('files/:id/download')", 'uploaded_files'],
   ['library/library.controller.ts', "@Get('library/generated/:id/download')", 'generated_documents'],
   ['master-import/master-import.controller.ts', "@Get('runs/:id/file')", 'uploaded_files'],
+  ['contractors/company-records.controller.ts', "@Get('companies/:id/documents/:doc_id/file')", 'uploaded_files'],
 ];
 
 describe('download category routes carry @ExportAction({ category })', () => {

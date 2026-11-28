@@ -401,6 +401,9 @@ describe('hybrid mode list', () => {
       // contract 0.15.403: the rules of structure changes
       'GET /settings/structure-policy', 'PUT /settings/structure-policy',
       'GET /structure-proposals', 'POST /structure-proposals', 'POST /structure-proposals/upload', 'GET /structure-proposals/:id', 'GET /structure-proposals/:id/differences', 'POST /structure-proposals/:id/decision', 'POST /structure-proposals/:id/revert',
+      // contract 0.15.625 (migration 0745): company contacts, documents with expiry, compliance and the document types
+      'GET /settings/company-document-types', 'PUT /settings/company-document-types', 'GET /companies/compliance', 'GET /companies/:id/compliance', 'GET /companies/:id/contacts', 'POST /companies/:id/contacts', 'PATCH /companies/:id/contacts/:contact_id',
+      'GET /companies/:id/documents', 'POST /companies/:id/documents', 'PATCH /companies/:id/documents/:doc_id', 'GET /companies/:id/documents/:doc_id/file',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

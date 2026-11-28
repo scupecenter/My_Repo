@@ -231,7 +231,9 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (!lock[0]?.ok) return 0;
         await this.runs.context(tx, 'contractor_alerts');
         const r = await tx.$queryRaw<{ n: number }[]>`SELECT contractors_daily_alerts() AS n`;
-        return Number(r[0]?.n ?? 0);
+        // 0745: the same alert for the documents and certificates of a company (company_documents_daily_alerts)
+        const d = await tx.$queryRaw<{ n: number }[]>`SELECT company_documents_daily_alerts() AS n`;
+        return Number(r[0]?.n ?? 0) + Number(d[0]?.n ?? 0);
       }, { maxWait: 10_000, timeout: 60_000 });
     } catch (e) {
       const message = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';

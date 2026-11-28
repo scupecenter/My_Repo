@@ -803,6 +803,18 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/structure-proposals/:id/differences'],
   ['post', '/structure-proposals/:id/decision'],
   ['post', '/structure-proposals/:id/revert'],
+  // Contract 0.15.625 (migration 0745, Companies K3): contacts, documents with expiry, compliance and the document types.
+  ['get', '/settings/company-document-types'],
+  ['put', '/settings/company-document-types'],
+  ['get', '/companies/compliance'],
+  ['get', '/companies/:id/compliance'],
+  ['get', '/companies/:id/contacts'],
+  ['post', '/companies/:id/contacts'],
+  ['patch', '/companies/:id/contacts/:contact_id'],
+  ['get', '/companies/:id/documents'],
+  ['post', '/companies/:id/documents'],
+  ['patch', '/companies/:id/documents/:doc_id'],
+  ['get', '/companies/:id/documents/:doc_id/file'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
