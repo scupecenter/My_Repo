@@ -4674,6 +4674,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalogue of the links between registers
+         * @description 0.15.586 (migration 0713). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+         */
+        get: operations["listRegisterLinkCatalogue"];
+        /**
+         * Save the catalogue (the whole list)
+         * @description 0.15.586 (migration 0713). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+         */
+        put: operations["saveRegisterLinkCatalogue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/register-rules": {
         parameters: {
             query?: never;
@@ -8468,6 +8492,32 @@ export interface paths {
          *     (`weekday` is a whole number from 0 to 6). One audit row with before and after values and the reason. Applies from the next snapshot; stored snapshots are not moved.
          */
         put: operations["setSnapshotSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/dashboard/forecast-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The number of weeks the dashboard forecast averages (0.15.431)
+         * @description 0.15.431. The setting `dashboard.forecast_window_weeks`: the progress curve card forecasts the date the actual curve reaches 100 % from the mean weekly gain over the last
+         *     N real weeks of the saved snapshots. Default 4, range 2 to 12. `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getForecastWindow"];
+        /**
+         * Save the number of weeks the dashboard forecast averages (reason, If-Match, audited)
+         * @description 0.15.431. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+         *     (`weeks` is a whole number from 2 to 12). One audit row with before and after values and the reason. Nothing stored is recomputed: the forecast is drawn from the saved snapshots when the card opens.
+         */
+        put: operations["setForecastWindow"];
         post?: never;
         delete?: never;
         options?: never;
@@ -14016,6 +14066,25 @@ export interface components {
             /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
             conflicts?: string[];
         };
+        RegisterLinkEntry: {
+            from_register: string;
+            field: string;
+            to_register: string;
+            /** @description Read only. */
+            target_record_type?: string | null;
+            /** @description Read only: the state a record must have to be picked or accepted. */
+            target_state?: string;
+            same_site?: boolean;
+            /** @description Check the id in entry (D60). */
+            enforce?: boolean;
+            /** @description Declared and active (register_links.is_active). */
+            enabled?: boolean;
+        };
+        RegisterLinkCatalogue: {
+            links: components["schemas"]["RegisterLinkEntry"][];
+            version: number;
+            can_edit: boolean;
+        };
         RegisterState: {
             register_key: string;
             name_en: string;
@@ -14073,7 +14142,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -19126,7 +19195,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "tools_equipment";
         RegisterField: {
             code: string;
             label_en: string;
@@ -20968,6 +21037,17 @@ export interface components {
             /** @description The suggested amber (not stored). */
             default_amber: number;
         };
+        /** @description 0.15.431. The setting dashboard.forecast_window_weeks (default 4). */
+        ForecastWindow: components["schemas"]["ForecastWindowInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ForecastWindowInput: {
+            /** @description How many of the last real weeks the forecast averages the weekly gain over. */
+            weeks: number;
+        };
         /** @description 0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity. */
         ProgressRag: {
             items: components["schemas"]["ProgressRagItem"][];
@@ -21244,6 +21324,11 @@ export interface components {
             slot_status?: "uploaded" | "in_review" | "approved" | "rejected";
             /** @default false */
             include_superseded: boolean;
+            /**
+             * @description 0.15.472 (phase 4). The consolidated site acceptance pack: needs `site_id` and no other filter (422 `/pack` `pack_scope`); carries the approved current files of the PAC, FAC and HOTO document types, one folder per document type, with `INDEX.txt` (English and Arabic) and `manifest.csv`. Same job, same rights, same export lock.
+             * @enum {string}
+             */
+            pack?: "acceptance";
         };
         /** @description Common publish body (ADR 0007 §1). */
         PublishRequest: components["schemas"]["WithReason"] & {
@@ -32681,6 +32766,60 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    listRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    links: components["schemas"]["RegisterLinkEntry"][];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The saved catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listRegisterRules: {
         parameters: {
             query?: never;
@@ -39423,6 +39562,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnapshotSchedule"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getForecastWindow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The number of weeks. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastWindow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setForecastWindow: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["ForecastWindowInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForecastWindow"];
                 };
             };
             401: components["responses"]["Unauthorized"];
