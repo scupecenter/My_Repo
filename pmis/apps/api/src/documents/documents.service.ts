@@ -38,6 +38,9 @@ export interface DocumentFileDto {
   capture_date: Date | null;
   unknown_capture_date: boolean;
   superseded_by: string | null;
+  /** 0555: this version is the signed and the stamped copy (markers set by the person who uploaded it); absent when never marked. */
+  signed?: boolean;
+  stamped?: boolean;
 }
 
 export interface DocumentSlotDto {
@@ -69,6 +72,10 @@ export interface DocumentSlotDto {
   /** Q227: the same requirement on the task or on the source record; a current file there fills this slot too. */
   shared_with: Record<string, unknown> | null;
   files: DocumentFileDto[];
+  /** 0555: the document type needs a signed copy and a stamped copy (setting documents.marks); awaiting = no current version carries what it needs yet. */
+  needs_signature: boolean;
+  needs_stamp: boolean;
+  awaiting_signed_copy: boolean;
 }
 
 interface TaskCtx {
@@ -295,6 +302,25 @@ export class DocumentsService {
 
   /** The slots of a task or of a register record (keyed on its logical record), as the screens show them. */
   async slotDtos(owner: SlotOwner): Promise<DocumentSlotDto[]> {
+    return this.withMarks(await this.slotDtosBase(owner));
+  }
+
+  /** 0555: the signed and stamped markers of the versions and what each slot's type needs. Never blocks anything: it only informs. */
+  private async withMarks(slots: Omit<DocumentSlotDto, 'needs_signature' | 'needs_stamp' | 'awaiting_signed_copy'>[]): Promise<DocumentSlotDto[]> {
+    if (slots.length === 0) return [];
+    const ids = slots.flatMap((s) => s.files.map((f) => f.id));
+    const cfg = (await this.db.tx.$queryRaw<{ j: { types: Record<string, { signature?: boolean; stamp?: boolean }> } }[]>(Prisma.sql`SELECT doc_marks_cfg() AS j`))[0]?.j.types ?? {};
+    const marks = ids.length ? ((await this.db.tx.$queryRaw<{ j: Record<string, { signed: boolean; stamped: boolean }> }[]>(Prisma.sql`SELECT doc_file_marks(${ids}::uuid[]) AS j`))[0]?.j ?? {}) : {};
+    return slots.map((s) => {
+      const need = cfg[s.doc_code] ?? {};
+      const needs_signature = need.signature === true, needs_stamp = need.stamp === true;
+      const files = s.files.map((f) => (marks[f.id] ? { ...f, signed: marks[f.id]!.signed, stamped: marks[f.id]!.stamped } : f));
+      const ok = (f: DocumentFileDto) => f.is_current && !f.superseded_by && (!needs_signature || f.signed === true) && (!needs_stamp || f.stamped === true);
+      return { ...s, files, needs_signature, needs_stamp, awaiting_signed_copy: (needs_signature || needs_stamp) && !files.some(ok) };
+    });
+  }
+
+  private async slotDtosBase(owner: SlotOwner): Promise<Omit<DocumentSlotDto, 'needs_signature' | 'needs_stamp' | 'awaiting_signed_copy'>[]> {
     const where = owner.kind === 'task' ? Prisma.sql`ds.task_id = ${owner.key}::uuid` : Prisma.sql`ds.register_entity_id = ${owner.key}::uuid`;
     const slots = await this.db.tx.$queryRaw<SlotRow[]>(Prisma.sql`
       SELECT ds.id::text AS id, ds.doc_type_id::text AS doc_type_id, dt.code AS doc_code, dt.name_en, dt.name_ar, dt.kind::text AS kind, dt.form_kind, ds.status::text AS status, ds.reject_reason,
@@ -612,6 +638,11 @@ export class DocumentsService {
     } catch (e) {
       await this.storage.store.remove(key).catch(() => undefined);
       throw e;
+    }
+    // 0555: the uploader may mark this version as the signed and the stamped copy (form fields signed and stamped)
+    const flag = (v: unknown) => v === true || v === 'true' || v === '1';
+    if (body && (body.signed !== undefined || body.stamped !== undefined)) {
+      await this.call(() => this.db.tx.$queryRaw(Prisma.sql`SELECT doc_mark_file(${fileId}::uuid, ${flag(body.signed)}::boolean, ${flag(body.stamped)}::boolean)`));
     }
     const after = (await reload()).find((s) => s.id === slotId);
     const dto = after?.files.find((f) => f.id === fileId);
