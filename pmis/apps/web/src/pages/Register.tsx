@@ -943,6 +943,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             { id: "ball", label: label("ball") },
           ]}
           cell={cell}
+          totals={{ storeKey: key, numeric: (cid) => inlineField(cid)?.type === 'number', value: (cid, r) => { const f = inlineField(cid); const v = f ? r.data[f.code] : null; return typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null; } }}
           onOpen={setRecord}
           canEdit={(cid, r) => {
             const fc = inlineField(cid);

@@ -8251,6 +8251,7 @@
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   },
   "reldue": {"title": "Due"},
+  "totals": {"label": "Totals", "sum": "Sum", "avg": "Average", "count": "Count", "min": "Min", "max": "Max", "of_rows": "Total of {{count}} loaded rows", "fn_for": "Function for the total of {{col}}"},
   "lu": {"updated": "Updated {{when}}", "now": "just now", "refresh": "Refresh the data on this page"},
   "chart": {"png": "Download chart as PNG", "png_failed": "Could not make the image"},
   "ui": {
@@ -8264,6 +8265,8 @@
     "extra_last_updated_hint": "Shows a note like Updated 3 min ago with a refresh button in the page header.",
     "extra_relative_due": "Due dates in words",
     "extra_relative_due_hint": "Shows the due date as tomorrow or 2 days ago, coloured, next to the exact date.",
+    "extra_totals_row": "Totals row in grids",
+    "extra_totals_row_hint": "Shows a totals row (sum, average, count, min or max, your choice per column) at the foot of a register grid with number columns.",
     "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
     "guard_enabled": "Ask before leaving unsaved changes",
     "guard_comment": "A comment you typed",

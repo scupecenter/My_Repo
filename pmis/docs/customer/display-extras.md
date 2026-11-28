@@ -7,6 +7,7 @@ Settings > Screens > Interface > "On this device" holds personal switches for sm
 - Chart download: a small button on each chart saves it as a PNG picture (twice the screen size, on the page background, named after the chart and the day). Chart text in the picture uses the system font.
 - Last updated: a note "Updated 3 min ago" and a refresh button in the page header of the dashboard, the lists and the registers. It dates the data the page shows (not background items such as notifications) and the button reloads that data.
 - Due dates in words: next to the exact due date of a task (in the task grid and the task drawer) a coloured chip says "tomorrow", "2 days ago", "in 3 weeks". Overdue is red, today to 2 days amber, within a week blue, later quiet. A finished task shows no chip.
+- Totals row: at the foot of a register grid that has number columns, one figure per number column. Pick sum, average, count, min or max for each column (your choice is remembered per register and column). It totals the rows loaded in the grid, skipping empty cells.
 
 ## بالعربية
 في الإعدادات > الشاشات > الواجهة > «على هذا الجهاز» مفاتيح شخصية للميزات الصغيرة. تخص متصفحك فقط ولا يُحفظ شيء على الخادم.
@@ -15,3 +16,4 @@ Settings > Screens > Interface > "On this device" holds personal switches for sm
 - تنزيل الرسم: زر صغير على كل رسم يحفظه كصورة PNG (بضعف حجم الشاشة وعلى خلفية الصفحة، واسم الملف من اسم الرسم واليوم). نص الرسم في الصورة بخط النظام.
 - آخر تحديث: ملاحظة «آخر تحديث: قبل 3 د» وزر تحديث في رأس لوحة المعلومات والقوائم والسجلات. تؤرّخ بيانات الصفحة (لا العناصر الخلفية كالإشعارات) والزر يعيد تحميلها.
 - تواريخ الاستحقاق بالكلمات: بجانب تاريخ استحقاق المهمة (في شبكة المهام ولوحة المهمة) شارة ملونة تقول «غدًا» أو «قبل يومين» أو «خلال 3 أسابيع». المتأخر أحمر، من اليوم إلى يومين كهرماني، خلال أسبوع أزرق، وما بعده هادئ. المهمة المنجزة بلا شارة.
+- صف الإجماليات: أسفل شبكة السجل التي فيها أعمدة رقمية رقم واحد لكل عمود رقمي. اختر المجموع أو المتوسط أو العدد أو الأدنى أو الأعلى لكل عمود (يُحفظ اختيارك لكل سجل وعمود). يحسب الصفوف المحمّلة في الشبكة ويتجاهل الخلايا الفارغة.
