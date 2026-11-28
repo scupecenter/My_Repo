@@ -70,7 +70,7 @@ describe('Dashboard unified filter', () => {
     page('/dashboard', 'ar');
     await screen.findByTestId('dash-progress-value');
     const add = await screen.findByTestId('filter-add');
-    expect(add).toHaveTextContent('فلتر');
+    expect(add).toHaveTextContent('تصفية');
     await u.click(add);
     expect(await screen.findByRole('group', { name: 'الحالة والمرحلة' })).toBeInTheDocument();
   }, 30_000);
