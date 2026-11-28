@@ -30,7 +30,7 @@ export function AutomationCentre() {
     const p = r.params as Record<string, unknown>;
     return t(`automation.when_${r.kind}`, {
       register: regName(String(p.register_key ?? '')), state: String(p.state ?? ''), days: String(p.days ?? ''), kpi: kpiName(String(p.kpi ?? '')),
-      op: t(`alertRules.op_${String(p.op ?? 'above')}`), value: String(p.value ?? ''), min: String(p.min_rows ?? 1), defaultValue: t(`alertRules.kind_${r.kind}`),
+      op: t(`alertRules.op_${String(p.op ?? 'above')}`), value: String(p.value ?? ''), min: String(p.min_rows ?? p.min_sites ?? 1), defaultValue: t(`alertRules.kind_${r.kind}`),
     });
   };
   const then = (r: AlertRule) => r.audience.type === 'module'

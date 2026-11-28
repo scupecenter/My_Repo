@@ -50,6 +50,9 @@ interface RuleRow {
  * The closed list lives here (no table); `params` and `audience` are exactly what admin_alert_rule_save accepts.
  */
 const TEMPLATES = [
+  { id: 'data-completeness', kind: 'data_gaps', params: { min_sites: 1 }, audience: { type: 'module', module: 'sites' }, link: '/sites?data_gaps=with',
+    title_en: 'Data to complete: {{region}}', title_ar: 'بيانات تحتاج استكمالاً: {{region}}',
+    body_en: '{{count}} site(s) in {{region}} have missing data for the week of {{week}}. Open the sites with data gaps and complete them.', body_ar: '{{count}} موقعاً في {{region}} ينقصها بيانات لأسبوع {{week}}. افتح المواقع ذات النواقص واستكملها.' },
   { id: 'weekly-status', kind: 'weekly_status_missing', params: {}, audience: { type: 'system_admin' }, link: '/status-updates',
     title_en: 'Weekly status missing: {{region}}', title_ar: 'التحديث الأسبوعي غير مسلّم: {{region}}',
     body_en: 'No weekly status update for {{region}} for the week of {{week}}.', body_ar: 'لا يوجد تحديث أسبوعي للمنطقة {{region}} لأسبوع {{week}}.' },
@@ -93,6 +96,7 @@ export class AlertRulesService {
           { kind: 'advance_unsettled', params: ['days'] },
           { kind: 'invoice_due_soon', params: ['days'] },
           { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] },
+          { kind: 'data_gaps', params: ['min_sites'] },
         ],
         kpis,
         audiences: ['system_admin', 'module'],
