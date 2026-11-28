@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Layout } from './navLayout';
-import { applySidebarOverlay, sanitizeUiNav } from './sidebarPrefs';
+import { applySidebarOverlay, isHideable, sanitizeUiNav, withoutHidden } from './sidebarPrefs';
 
 /** 0242 (owner approval 2026-11-27, the improvement proposal item 4): the personal sidebar overlay. */
 
@@ -52,5 +52,17 @@ describe('applySidebarOverlay', () => {
   it('no prefs: the organization layout as it is', () => {
     expect(applySidebarOverlay(layout(), null)).toEqual(layout());
     expect(applySidebarOverlay(layout(), {})).toEqual(layout());
+  });
+});
+
+describe('Dashboard is never hideable, and the search follows the personal hide', () => {
+  it('drops dashboard from a stored hidden list', () => {
+    expect(isHideable('dashboard')).toBe(false);
+    expect(sanitizeUiNav({ hidden: ['dashboard', 'warehouse'] }).hidden).toEqual(['warehouse']);
+  });
+  it('withoutHidden leaves out the hidden screens', () => {
+    const items = [{ key: 'dashboard' }, { key: 'warehouse' }];
+    expect(withoutHidden(items, { hidden: ['warehouse', 'dashboard'] }).map((i) => i.key)).toEqual(['dashboard']);
+    expect(withoutHidden(items, null)).toHaveLength(2);
   });
 });
