@@ -31,6 +31,7 @@ The system models the standard telecom site-delivery pipeline:
 - **Dashboards and reporting**: operational KPIs, workload, status updates, and scheduled exports.
 - **Collaboration**: inbox, approvals queue, messages, announcements, and notifications.
 - **Auditability**: a full audit log of data and configuration changes.
+- **Field mode forms**: admin-defined offline forms with a signature, filled on site and sent once with the field queue (customer text `pmis/docs/customer/05-field-mode.md`).
 - **Operations**: installer and update scripts, automated database and file backups, and a tested disaster-recovery procedure.
 
 ## Modules and Records
