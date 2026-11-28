@@ -263,7 +263,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, views, l
         filter={<UnifiedFilter screen="site-tasks" value={advTree} onChange={(tree) => setParam('tadv', encodeFilter(tree))} onClearAll={clearAll} />}
         count={<TableCount testid="task-grid-count" noun="tasks" total={totalTasks} filtered={shownTasks.length} active={!!(tq || tadv || quick.length || holder)} selected={picked.size} onClear={clearAll} />}
         layout={<LayoutPanel testid={layoutTestid ?? 'task-grid-layout'} views={views} table={api2} />}
-        columns={<ColumnMenu api={api2} label={label} />}
+        columns={<ColumnMenu density={false} api={api2} label={label} />}
         exporter={exporter}
         more={<MoreMenu items={[{ id: 'reset', label: t('table.reset'), testid: 'more-reset-cols', onSelect: api2.reset }]} />} />
       <div role="toolbar" aria-label={t('table.quick')} className="mb-2 flex flex-wrap items-center gap-2" data-testid="task-grid-tools">

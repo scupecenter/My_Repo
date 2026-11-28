@@ -142,7 +142,7 @@ export function DailyPlan() {
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
           <LayoutPanel testid="daily-plan-layout" table={table} />
-          <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
+          <ColumnMenu density={false} api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
           <MoreMenu
             settings="daily_plan"
             items={[
