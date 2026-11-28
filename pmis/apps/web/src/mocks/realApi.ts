@@ -129,6 +129,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
+  ['get', '/finance-hub/summary'],
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
@@ -405,6 +406,11 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
   ['get', '/settings/imports'],
   ['put', '/settings/imports'],
+  ['get', '/settings/duplicate-rows'],
+  ['put', '/settings/duplicate-rows'],
+  // Contract 0.15.322 (migration 0492; apps/api: settings): the upload policy of the imports (D49 part 3).
+  ['get', '/settings/imports/upload-policy'],
+  ['put', '/settings/imports/upload-policy'],
   ['get', '/settings/template-change-notice'],
   ['put', '/settings/template-change-notice'],
   // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
@@ -724,6 +730,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/library/form-templates/:id/retire'],
   ['get', '/settings/library-archive'],
   ['put', '/settings/library-archive'],
+  ['get', '/settings/document-marks'],
+  ['put', '/settings/document-marks/:code'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
