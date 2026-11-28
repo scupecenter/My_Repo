@@ -12021,6 +12021,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/warehouse-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Warehouse stock per item group, received, issued, returned, on hand (0.15.593)
+         * @description 0.15.593. Per item group: `received` (posted receipts, packing lists and opening balances), `issued` (posted delivery notes) and `returned` (posted return notes) with a posting date
+         *     (Africa/Tripoli) in the period, and `on_hand`, `reserved`, `available` today, the same figures as `GET /warehouse/stock` (the period never changes them). Issues and returns of sites are
+         *     limited to the caller's `warehouse` regions; receipts and the central stock are shown to every reader of the module. There is one central stock, so `by_region` splits only issued and returned.
+         *     `mixed_units` is true when a group holds items of more than one unit: its quantities are then sums of numbers in different units. Needs `dashboard.view` and `warehouse.view` (403 `module_forbidden`).
+         *     422 `invalid_range` when `from` is after `to`.
+         */
+        get: operations["getDashboardWarehouseStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/ops": {
         parameters: {
             query?: never;
@@ -20935,6 +20959,33 @@ export interface components {
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        DashboardWarehouseStockTotals: {
+            received: number;
+            issued: number;
+            returned: number;
+            on_hand: number;
+            reserved: number;
+            available: number;
+        };
+        DashboardWarehouseStock: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            totals: components["schemas"]["DashboardWarehouseStockTotals"];
+            groups: (components["schemas"]["DashboardWarehouseStockTotals"] & {
+                /** @description The item group of the item master. */
+                group: string;
+                /** @description Items of the group. */
+                items: number;
+                mixed_units: boolean;
+                by_region: {
+                    region_id: number;
+                    issued: number;
+                    returned: number;
+                }[];
+            })[];
         };
         SnapshotScheduleInput: {
             /** @description The weekday of the weekly snapshot: 0 = Sunday ... 6 = Saturday. */
@@ -46230,6 +46281,34 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getDashboardWarehouseStock: {
+        parameters: {
+            query?: {
+                /** @description First day of the period (Africa/Tripoli date). Default 29 days before `to`. */
+                from?: string;
+                /** @description Last day of the period. Default today. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardWarehouseStock"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getDashboardOps: {

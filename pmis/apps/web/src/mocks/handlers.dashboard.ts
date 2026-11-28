@@ -155,6 +155,23 @@ export const dashboardHandlers = [
       },
     });
   }),
+  // 0.15.593: warehouse stock per item group, a fixed demo set (flows scale with the period)
+  http.get(`${B}/dashboard/warehouse-stock`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const u = new URL(request.url);
+    const to = u.searchParams.get('to') ?? tripoliToday(), from = u.searchParams.get('from') ?? to;
+    if (from > to) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/from', code: 'invalid_range' }] });
+    const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+    const k = days / 30;
+    const mk = (group: string, items: number, mixed: boolean, rec: number, iss: number, ret: number, oh: number, res: number) => ({
+      group, items, mixed_units: mixed, received: Math.round(rec * k), issued: Math.round(iss * k), returned: Math.round(ret * k), on_hand: oh, reserved: res, available: oh - res,
+      by_region: [{ region_id: 1, issued: Math.round(iss * k * 0.6), returned: Math.round(ret * k * 0.5) }, { region_id: 5, issued: Math.round(iss * k * 0.4), returned: Math.round(ret * k * 0.5) }],
+    });
+    const groups = [mk('Antennas', 6, false, 120, 80, 6, 340, 20), mk('Cables', 12, true, 4000, 2500, 120, 9200, 300), mk('Power', 9, false, 60, 45, 3, 150, 10)];
+    const sum = (f: 'received' | 'issued' | 'returned' | 'on_hand' | 'reserved' | 'available') => groups.reduce((n, x) => n + x[f], 0);
+    return HttpResponse.json({ from, to, totals: { received: sum('received'), issued: sum('issued'), returned: sum('returned'), on_hand: sum('on_hand'), reserved: sum('reserved'), available: sum('available') }, groups });
+  }),
   // 0.15.96: the follow-up sections (procurement and materials), synthetic figures
   http.get(`${B}/dashboard/ops`, () => {
     const g = guard(); if (g) return g;
