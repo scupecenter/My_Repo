@@ -52,6 +52,8 @@ import { OpsQualityCard } from "./dashboardQuality";
 import { OpsApprovalsCard } from "./dashboardApprovals";
 import { OpsChangesCard } from "./dashboardChanges";
 import { OpsFinanceCard } from "./dashboardFinance";
+import { OpsCompareCard } from "./dashboardCompare";
+import { QuickSiteFilters } from "./dashboardQuickFilters";
 import { useDashboardSettings, useProgressRag } from "@/api/dashboardSettings";
 import { RAG_CLASS, ragTone } from "@/lib/progressRag";
 import { GoalsPanel } from "@/components/GoalsPanel";
@@ -1230,6 +1232,7 @@ export function Dashboard() {
             ))}
           </select>
         </label>
+        <QuickSiteFilters tree={advTree} onChange={(tree) => setParam({ adv: encodeFilter(tree) })} />
         <label className="text-sm font-semibold">
           {t("dash.ref_date")}
           <DateInput
@@ -1518,6 +1521,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.206 (owner approval 2026-11-26, item 9): restricted financial summary; renders nothing unless the caller is a configured reader */}
                   <OpsFinanceCard ops={ops.data} />
+                </>
+              ),
+
+              ops_compare: (
+                <>
+                  {/* 0.15.207 (owner approval 2026-11-26, item 10): regions and contractors side by side */}
+                  <OpsCompareCard ops={ops.data} regions={d.regions.items} />
                 </>
               ),
 

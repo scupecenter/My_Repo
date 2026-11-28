@@ -81,6 +81,9 @@ const SITE_FIELDS: FF[] = [
   { key: 'workflow_locks', label_en: 'Workflow locks on', label_ar: 'أقفال التسلسل مفعّلة', type: 'bool' },
   // 0.15.45: a Master column with its real distinct values
   { key: 'delivery_batch', label_en: 'Delivery batch', label_ar: 'دفعة التسليم', type: 'enum', options: ['B1', 'B2', 'B3', 'B4'].map((x) => ({ value: x, label_en: x })) },
+  { key: 'project_phase', label_en: 'Project phase', label_ar: 'مرحلة المشروع', type: 'enum', options: ['Phase 1', 'Phase 2'].map((x) => ({ value: x, label_en: x })) },
+  { key: 'site_type', label_en: 'Site type', label_ar: 'نوع الموقع', type: 'enum', options: ['Macro', 'Micro', 'Rooftop'].map((x) => ({ value: x, label_en: x })) },
+  { key: 'tower_owner', label_en: 'Tower owner', label_ar: 'مالك البرج', type: 'enum', options: ['LibyaTowers', 'Own'].map((x) => ({ value: x, label_en: x })) },
 ];
 /** 0.15.45: the groups the server sends (Site, Status and stage, Dates, Menu columns / Register fields). */
 const GROUP_OF: Record<string, string> = { site_code: 'site', name: 'site', region_id: 'site', delivery_scenario: 'site', overall_status: 'status', state: 'status', stage_code: 'status', rf_survey_date: 'dates', created_at: 'dates', due_date: 'dates', tower_height_m: 'columns', delivery_batch: 'columns', workflow_locks: 'columns', task_code: 'fields' };
