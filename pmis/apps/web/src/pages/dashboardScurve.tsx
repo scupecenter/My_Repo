@@ -5,6 +5,7 @@ import type { ProjectStatusSnapshot } from "@/api/dashboard";
 import { EChart, type Palette } from "@/components/EChart";
 import { useForecastWindow, useProgressRag } from "@/api/dashboardSettings";
 import { RAG_CLASS, ragTone } from "@/lib/progressRag";
+import { AGILE_MODES, AgileView, type AgileMode } from "./dashboardAgile";
 import { burndownSeries, forecastFull, scurveSeries, VELOCITY_WINDOW, weeklyVelocity } from "@/lib/scurve";
 import { Card, pct, signed } from "./dashboardBits";
 
@@ -34,7 +35,7 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
   // contract 0.15.432: the velocity is coloured only when an admin turned it on in Settings > Dashboard
   const velTone = ragTone(useProgressRag().data?.items, "velocity", velocity);
   const forecast = useMemo(() => forecastFull(points, velocity), [points, velocity]);
-  const [mode, setMode] = useState<"progress" | "burndown">("progress");
+  const [mode, setMode] = useState<"progress" | "burndown" | AgileMode>("progress");
   const burn = useMemo(() => burndownSeries(points, forecast), [points, forecast]);
   const last = series[series.length - 1];
   const lastSnap = (snaps?.items ?? []).filter((s) => s.scope !== "region").sort((a, b) => (a.taken_on < b.taken_on ? 1 : -1))[0];
@@ -109,7 +110,7 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
 
   return (
     <Card
-      title={t(mode === "burndown" ? "dash.scurve.burndown_title" : "dash.scurve.title")}
+      title={t(mode === "burndown" ? "dash.scurve.burndown_title" : AGILE_MODES.includes(mode as AgileMode) ? "dash.agile.title" : "dash.scurve.title")}
       testid="dash-scurve"
       aside={
         <Link to="/settings/weight-sets" className="text-sm text-accent hover:underline">
@@ -119,16 +120,18 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
       className="print:break-inside-avoid"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-mute">{t(mode === "burndown" ? "dash.scurve.burndown_hint" : "dash.scurve.hint")}</p>
-        <div role="group" aria-label={t("dash.scurve.view_label")} className="inline-flex overflow-hidden rounded-md border border-line text-sm" data-testid="dash-scurve-mode">
-          {(["progress", "burndown"] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={mode === m} title={t(`dash.scurve.mode_${m}_hint`)} data-testid={`dash-scurve-mode-${m}`} className={`px-3 py-1 ${mode === m ? "bg-accent text-white" : "bg-card"}`} onClick={() => setMode(m)}>
-              {t(`dash.scurve.mode_${m}`)}
+        <p className="text-sm text-mute">{t(mode === "burndown" ? "dash.scurve.burndown_hint" : AGILE_MODES.includes(mode as AgileMode) ? `dash.agile.hint_${mode}` : "dash.scurve.hint")}</p>
+        <div role="group" aria-label={t("dash.scurve.view_label")} className="inline-flex flex-wrap overflow-hidden rounded-md border border-line text-sm" data-testid="dash-scurve-mode">
+          {(["progress", "burndown", ...AGILE_MODES] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} title={t(m === "progress" || m === "burndown" ? `dash.scurve.mode_${m}_hint` : `dash.agile.mode_${m}_hint`)} data-testid={`dash-scurve-mode-${m}`} className={`px-3 py-1 ${mode === m ? "bg-accent text-white" : "bg-card"}`} onClick={() => setMode(m)}>
+              {t(m === "progress" || m === "burndown" ? `dash.scurve.mode_${m}` : `dash.agile.mode_${m}`)}
             </button>
           ))}
         </div>
       </div>
-      {series.length === 0 ? (
+      {AGILE_MODES.includes(mode as AgileMode) ? (
+        <AgileView mode={mode as AgileMode} windowWeeks={windowWeeks} />
+      ) : series.length === 0 ? (
         <p className="py-6 text-center text-sm text-mute" data-testid="dash-scurve-empty">
           {t("dash.scurve.empty")}
         </p>

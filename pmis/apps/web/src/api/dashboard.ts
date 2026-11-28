@@ -86,6 +86,16 @@ export const useProjectStatusSnapshots = (enabled = true) =>
     queryFn: () => api.get<PageEnvelope & { items?: ProjectStatusSnapshot[] }>('/project-status/snapshots'),
   });
 
+/** The counts behind the agile indicators per saved weekly snapshot (read only, frozen values; needs `dashboard.view`). Fetched when an agile view is open. */
+export type AgileTrendRow = { taken_on: string; sites: number; by_status: Record<string, number>; items_done: number; items_applicable: number; items_planned: number };
+export const useAgileTrend = (enabled = true) =>
+  useQuery({
+    queryKey: ['project-status-agile-trend'],
+    staleTime: 60_000,
+    enabled,
+    queryFn: () => api.get<{ items: AgileTrendRow[] }>('/project-status/agile-trend'),
+  });
+
 // ---------------------------------------------------------------- 0.14.5: the site map (OV-12, SC-10)
 export type SiteMap = S['SiteMap'];
 export type SiteMapItem = S['SiteMapItem'];

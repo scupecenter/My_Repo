@@ -12325,6 +12325,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/project-status/agile-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The counts behind the agile indicators, per saved weekly snapshot (burn-up, cumulative flow, velocity, cone of uncertainty)
+         * @description One row per snapshot date, read from the frozen per-site snapshots and never recomputed: the number of sites, the sites by overall status, and the Project Status item counts (done, applicable, planned) summed over the sites. Counts are unweighted; the weighted completion percentage stays in the snapshots of `/project-status/snapshots`. A caller limited to some regions sees the sites of those regions only. Needs `dashboard` view.
+         */
+        get: operations["getProjectStatusAgileTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/project-status/manual-items": {
         parameters: {
             query?: never;
@@ -46620,6 +46640,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ProjectStatusSnapshot"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getProjectStatusAgileTrend: {
+        parameters: {
+            query?: {
+                region_id?: components["schemas"]["RegionId"];
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rows, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: date */
+                            taken_on: string;
+                            sites: number;
+                            by_status: {
+                                [key: string]: number;
+                            };
+                            items_done: number;
+                            items_applicable: number;
+                            items_planned: number;
+                            /** Format: uuid */
+                            weight_set_id?: string | null;
+                        }[];
                     };
                 };
             };

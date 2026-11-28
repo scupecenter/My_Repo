@@ -251,4 +251,45 @@ export class ProjectStatusService {
       page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.taken_on, last.id]) : null },
     };
   }
+
+  // ------------------------------------------------------------------ GET /project-status/agile-trend
+  /**
+   * The agile indicators of the dashboard (burn-up, cumulative flow, velocity, cone of uncertainty) read the same frozen weekly
+   * snapshots as the progress curve: per snapshot date the number of sites by overall status and the Project Status item counts
+   * (done, applicable, planned) of every site. Nothing is recomputed; a date is one frozen row set (the snapshot is never rewritten).
+   */
+  async agileTrend(_auth: AuthContext, q: Query): Promise<Json> {
+    const regions = await this.access.requireRegions('dashboard', 'view');
+    await this.access.requireDashboardTab(undefined);
+    const from = oneParam(q, 'from');
+    const to = oneParam(q, 'to');
+    const regionRaw = oneParam(q, 'region_id');
+    if (regionRaw !== undefined && !/^[1-7]$/.test(regionRaw)) throw problems.validation([{ path: '/region_id', code: 'invalid', message: 'region_id is 1 to 7.' }]);
+    for (const [k, v] of [['from', from], ['to', to]] as const) {
+      if (v !== undefined && (!DATE_RE.test(v) || Number.isNaN(Date.parse(`${v}T00:00:00Z`)))) throw problems.validation([{ path: `/${k}`, code: 'invalid', message: `${k} is a date, YYYY-MM-DD.` }]);
+    }
+    const rows = await this.db.tx.$queryRaw<{ d: string; st: string; n: number; done: number; app: number; planned: number; ws: string | null }[]>(Prisma.sql`
+      SELECT s.snapshot_date::text AS d, s.overall_status AS st, count(*)::int AS n, coalesce(sum(x.done), 0)::float8 AS done, coalesce(sum(x.app), 0)::float8 AS app,
+        coalesce(sum(x.planned), 0)::float8 AS planned, min(s.weight_set_id::text) AS ws
+      FROM site_snapshots s
+      LEFT JOIN LATERAL (SELECT sum((e.v ->> 0)::numeric) AS done, sum((e.v ->> 1)::numeric) AS app, sum((e.v ->> 2)::numeric) AS planned
+                         FROM jsonb_each(s.items) e(k, v) WHERE jsonb_typeof(e.v) = 'array') x ON true
+      WHERE true
+        ${regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`}
+        ${regionRaw ? Prisma.sql`AND s.region_id = ${Number(regionRaw)}` : Prisma.empty}
+        ${from ? Prisma.sql`AND s.snapshot_date >= ${from}::date` : Prisma.empty} ${to ? Prisma.sql`AND s.snapshot_date <= ${to}::date` : Prisma.empty}
+      GROUP BY s.snapshot_date, s.overall_status
+      ORDER BY s.snapshot_date, s.overall_status`);
+    const byDate = new Map<string, { taken_on: string; sites: number; by_status: Record<string, number>; items_done: number; items_applicable: number; items_planned: number; weight_set_id: string | null }>();
+    for (const r of rows) {
+      const d = byDate.get(r.d) ?? { taken_on: r.d, sites: 0, by_status: {}, items_done: 0, items_applicable: 0, items_planned: 0, weight_set_id: r.ws };
+      d.sites += r.n;
+      d.by_status[r.st] = (d.by_status[r.st] ?? 0) + r.n;
+      d.items_done += r.done;
+      d.items_applicable += r.app;
+      d.items_planned += r.planned;
+      byDate.set(r.d, d);
+    }
+    return { items: [...byDate.values()] };
+  }
 }

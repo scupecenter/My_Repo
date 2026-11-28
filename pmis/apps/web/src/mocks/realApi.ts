@@ -186,6 +186,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/dashboard/export'],
   ['get', '/project-status'],
   ['get', '/project-status/snapshots'],
+  ['get', '/project-status/agile-trend'],
   ['get', '/settings/weight-sets'],
   ['post', '/settings/weight-sets'],
   ['get', '/settings/weight-sets/:id'],
