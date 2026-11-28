@@ -8205,7 +8205,17 @@
     "select": "Select",
     "unselect": "Unselect",
     "copy": "Copy row",
-    "copied": "Row copied"
+    "copied": "Row copied",
+    "copy_link": "Copy link",
+    "link_copied": "Link copied",
+    "copy_value": "Copy value",
+    "value_copied": "Value copied",
+    "act_edit": "Edit",
+    "act_assign": "Assign",
+    "act_status": "Change status",
+    "act_duplicate": "Duplicate",
+    "act_delete": "Delete",
+    "confirm_delete": "Confirm delete"
   },
   "records": {
     "pin": "Pin",

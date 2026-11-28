@@ -102,7 +102,7 @@ export function DocumentsGrid() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.site_id} className="border-t border-line" data-testid={`docs-grid-row-${r.site_code}`}>
+                <tr key={r.site_id} data-ctx className="border-t border-line" data-testid={`docs-grid-row-${r.site_code}`}>
                   <th scope="row" className="sticky start-0 bg-card p-2 text-start font-mono">{r.site_code}{r.site_name ? <span className="ms-2 font-sans text-mute">{r.site_name}</span> : null}</th>
                   {visible.map((c) => {
                     const cell = r.cells[c.doc_code];

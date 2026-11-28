@@ -27,8 +27,8 @@ function Card({ c, region, column, onOpenAction }: { c: SiteBoardCard; region: s
   const { t, i18n } = useTranslation();
   const name = (i18n.language === 'ar' && c.name_ar) || c.name;
   return (
-    <div draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: c.id, column })); e.dataTransfer.effectAllowed = 'move'; }}>
-    <Link to={`/sites/${c.id}`} data-testid={`board-site-${c.site_code}`} data-ageing={c.ageing_wd}
+    <div draggable data-ctx data-ctx-link={`/sites/${c.id}`} onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: c.id, column })); e.dataTransfer.effectAllowed = 'move'; }}>
+    <Link to={`/sites/${c.id}`} data-ctx-open data-testid={`board-site-${c.site_code}`} data-ageing={c.ageing_wd}
         className="block rounded-md border border-line bg-card p-2 text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         aria-label={t('board.site_card', { code: c.site_code, name, days: c.ageing_wd })}>
         <div className="flex items-baseline gap-2"><b className="mono" dir="ltr">{c.site_code}</b><span className="truncate">{name}</span></div>
