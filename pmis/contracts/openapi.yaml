@@ -59,6 +59,7 @@ info:
 
     - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (owner approval 2026-11-27, item 18 of the 2026-11-27 batch; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
     - 0.15.245 (2026-11-27): pin a saved view as a personal card on the home dashboard (owner request 2026-11-27, item 16 of the 2026-11-27 batch; migration 0344; CHANGELOG HomeViewPins). Additive. `POST /saved-views/{view_id}/pin` and `POST /saved-views/{view_id}/unpin` manage the caller's pins (at most 12, position kept; a view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`) and `GET /me/home-pins` (`HomeViewPin`) lists them in order (inactive views drop out). The card shows each pin with a counter the screen's own list endpoint computes for the caller, so the counts stay inside the caller's permissions; the dashboard settings catalogue gains the card `pinned_views` (Settings > Dashboard, shown by default). Personal display preference: no grant, role, permission, visibility or audit change.
+    - 0.15.533 (2026-11-28): admin-defined custom registers (migration 0592, mirror `db/sql/591_custom_registers.sql`): `GET/POST /custom-registers`, `GET/PATCH /custom-registers/{key}` and `POST /custom-registers/{key}/enable`. System Admin or an all-regions delegate of the custom fields; step-up on create, enable, hide and show; reason; If-Match on PATCH and enable. A new register is created disabled; its columns use the existing `/registers/{register_key}/fields`; enable adds the menu key, the upload and download template and the permission module. Nothing is deleted (hide only). New ops limit `registers.custom_max`.
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.266 (2026-11-27): an archive before the project data reset deletes (Data entry proposal P2, approved by the owner 2026-11-27; migration 0371, mirror `db/sql/370_data_reset_archive.sql`). Additive and backward compatible: a request without `archive` is mode none as before. `POST /settings/data-reset/requests` takes optional `archive` (none, download, keep_90), stored and immutable with the request (not part of `scope_hash`). New `POST .../requests/{request_id}/archive` (make, async) and `GET .../archive/download` (System Admin, step-up, a security-log entry per download). `DataResetRequest.archive` (`DataResetArchiveInfo`). `POST .../run` is 409 `archive_required` until the archive is ready (download, and downloaded once). Kept 7 days at most (download) or 90 days (keep_90), then removed. New `ErrorCode` `archive_required`, `archive_expired`.
     - 0.15.267 (2026-11-27): `POST /custom-fields` and `PATCH /custom-fields/{field_id}` now have an implementation (migration 0405, mirror `db/sql/404_custom_fields_door.sql`; the function `admin_save_field`, additive, no table). System Admin or an all-regions delegate of the custom fields, step-up, reason, If-Match on PATCH, audited (`custom_field_create`, `custom_field_update`). Entity, code, type and task are set at create only. Options are switched off, never removed; nothing is deleted (`is_active=false`). `visible_to_role_ids` and `editable_by_role_ids` write the field rules for every active role.
@@ -136,6 +137,7 @@ info:
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
+    - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
     - 0.15.436 (2026-11-28): an old published workflow version can be deleted after a full snapshot is archived (owner request relayed 2026-11-27; migration 0575, mirror `db/sql/574_workflow_version_delete.sql`). Additive. `POST /workflow/versions/{version}/delete` (`deleteWorkflowVersion`): `workflow_versions` administer for all regions (the publish right), a reason, `If-Match`, a password step-up and the typed confirmation `v<version>`; audited as `workflow_version_delete`. Allowed only for a published version that is not the one in force, has started, has no site, no site task and no site migration (409 `invalid_transition` with `reasons`: `current`, `not_started`, `sites`, `site_tasks`, `migrations`). The version and all its milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views are written first as one snapshot (`workflow_version_archive`, kept on a data reset); the delete runs in the same transaction. `GET /workflow/version-archive` (`listWorkflowVersionArchive`, `administer`) lists the archived versions (no snapshot body); `POST /workflow/version-archive/{id}/restore` (`restoreWorkflowVersion`, `administer`, reason, step-up) puts one back as it was (published, same version number, same ids) in one transaction and answers 409 `invalid_transition` without changing anything when the version number or an id exists again, it was already restored, or a row it points to is gone. Drafts are still discarded with `/discard`; a published version stays immutable and tasks are still deactivated, not deleted.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
@@ -152,6 +154,7 @@ info:
     - 0.15.71 (2026-11-24): the project data reset becomes selectable (owner decision 2026-11-24; migration 0152, mirror `db/sql/151_data_reset_scope.sql`; CHANGELOG 207). Additive and backward compatible: a request without `parts` is everything as before. New path `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`): the counts of a chosen scope per part and per table, the closure and its hash. `POST /settings/data-reset/requests` takes optional `parts` (codes of the catalogue `DataResetPart`); the database adds every dependent part (`depends_on`) and stores the normalised closure and its SHA-256 on the request (`DataResetRequest.scope`, `scope_hash`). `POST .../approve` takes optional `scope_hash` (the scope the approver saw): a different hash, or a request whose closure would be different today, is 409 `scope_changed`; the approval stores `approved_scope_hash`, and start and execute check it again. `DataResetState.plan` is a `DataResetPlan` (now with `parts`, the catalogue with labels EN/AR, `depends_on`, `dependents` and rows, `scope`, `accounts_to_deactivate`) and `everything` (the parts of "everything"). Three optional identity parts, never in everything: `users` (deactivate every account but the System Admins, the break-glass account, the requester, the approver and the runner), `roles` (assignments, groups but the System Admins group, delegations), `staff` (staff registry, absences). `DataResetPlanTable` gains `part` and the action `optional`. New `ErrorCode` `scope_changed`.
     - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
     - 0.15.69 (2026-11-24): W2 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 204; 0.15.62 to 0.15.68 are used by the work merged before it). Documentation only, no path, schema or rule changes. A saved view of a register screen (`register-<register key>`) keeps the layout of the screen's view switcher as quick parameters of `filters`, as `site360-<menu>` does since 0.15.49: `layout` = empty (the list), `wide`, `board` or `map`; `board_by` = the code of the register field the board's columns follow, or `state` (the approval state); `lane` = empty, `region` or `type`. They are stored as given, like any other quick parameter; the filter tree in `filters.advanced` keeps its validation. `RegisterDefinition.site_scoped` also decides whether the screen offers the map. Inline edits of the wide table use `PATCH /registers/{register_key}/records/{record_id}` with `If-Match`, the same route, rights, field rules and locks as the record form.
+    - 0.15.582 (2026-11-28): a default saved view per screen, chosen by each person (migration 0655, table `user_default_views`). Additive. `POST /saved-views/{view_id}/set-default` makes the view the caller's default for its screen (one per screen; a view the caller may not read answers 404, like `GET /saved-views/{view_id}`), `POST /saved-views/{view_id}/clear-default` clears it (a missing default is a no-op) and `GET /me/default-views` lists the caller's defaults (a deactivated or unreadable view drops out, and the screen then opens on its built-in view). Personal display preference: no grant, role, permission, visibility or audit change.
     - 0.15.68 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; renumbered from 0.15.64 at the merge with main, which holds 0.15.62 to 0.15.67). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site-master/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site-master/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
     - 0.15.561 (2026-11-28): item 9, the group summary row of grouped tables. Additive. `TableDisplay` (GET/PUT `/settings/table-display`, the `display` of a saved view) gains the optional boolean `groupbar` (default true): the count and a status distribution bar on every group header of a grouped table, on the same framework as text size, wrap and zebra rows (organization default in Settings > Screens > Tables, personal choice per screen in the Layout panel). Migration 0652 (mirror `db/sql/651_group_summary_display.sql`) changes `table_display_seed()` and `admin_set_table_display` in place; no table, no new route, no permission change.
     - 0.15.67 (2026-11-24): My Work > Daily Plan, the daily progress and the plan of the next working day (plan W7, owner decisions 2026-11-23; migration 0149, mirror `db/sql/148_daily_plan.sql`; CHANGELOG 203; 0.15.62 to 0.15.66 are used by other branches). Additive. New tag `daily-plan`: (1) `GET /daily-plans?date=&region_id=` returns one plan per region per day for the regions the caller sees (the Project Manager and the System Admins see all), with the auto-filled rows (Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW; the Procurement assignment of the day: Vendor / Contractor and AAT SE; a CW permit or B3: Access Valid; tasks and field work of the day: Planned Work and Actual Work), the manual values over them, Reason and Remark, the counts and the flags `below_target` and `reason_missing`, plus `next_working_day` (weekend Friday and Saturday, holidays of the calendar). (2) `PATCH`, `POST` and `DELETE` under `/daily-plans/{date}/regions/{region_id}/sites` change a row, add a site or remove one: `view` on `daily_plan` or `sites` for the region and L1 of the new Matrix row `daily_plan` (or a System Admin), `If-Match` = the plan version (`0` before the first change), a row below target without a reason is 422 (`/reason` `required`), a locked day is 409 `plan_locked`, every change audited with before and after. (3) `POST .../lock` (L2 of the row or a System Admin; 422 with the sites that lack a reason) freezes the day; `POST .../unlock` is an admin override (System Admin or a delegate of `overrides.unlock` for the region, reason, step-up, flagged). (4) `GET /daily-plans/export` downloads both tables as one Excel sheet in the exact column order of the owner's sheet (`export` on `daily_plan` or `sites` per region, audited). Reading needs `view` on `daily_plan` or `sites` for the region, as the menu does. (5) `GET`/`PUT /settings/daily-plan`: visible columns and their order per tab, default region scope, automatic lock time, reminder hour (System Admin or an all-regions `admin.settings` delegate, reason, `If-Match`, closed body). The automatic lock and the reminder (notification kind `daily_plan_reminder`) run in the background job.
@@ -197,6 +200,7 @@ info:
     - 0.15.403 (2026-11-27): the rules of structure-change proposals (Data entry proposals S1 to S9, slice 2; owner decision 2026-11-27 09:55 "the settings are complete"; migration 0562, mirror `db/sql/561_structure_policy.sql`). Additive. New paths `GET|PUT /settings/structure-policy` (setting `registers.structure_change`: who proposes, who approves, the second person for every proposal or only for a type change or a hide, the most items in one proposal 1 to 500, the notice to the approvers and to the proposer; PUT needs a reason, If-Match and the step-up, audited). The doors of 0560 follow the setting; a proposal over the limit is 422 `too_many`. Two notification kinds, `structure_proposal` and `structure_decision`, join the mail catalogue (never mailed until an admin lists them).
     - 0.15.520 (2026-11-27): alternative names of a register column (Data entry proposals S1, owner decision 2026-11-27 21:29 "build what remains"; migration 0640, mirror `db/sql/639_structure_aliases.sql`). `import_aliases` (up to 20 names of up to 200 characters) is read and written with the column (`RegisterColumn`, `RegisterColumnCreate`, `RegisterColumnPatch`), travels in the Structure sheet (column "Import aliases") and in structure proposals and their undo, and the data upload accepts a header that equals the label or one of the aliases of its column (case and spaces ignored). The order of the columns, the typed values and the version rules (D112) are unchanged. Additive.
     - 0.15.571 (2026-11-28): the data upload validates link fields (L7; migration 0642, mirror `db/sql/641_import_link_validation.sql`). No path or field changes. A link cell that is not an id, or is the id of no record, is now a row error on its own column in the error report: the Procurement link of HLC, Car Dispatcher and Financial Advances, the vehicle and the booking to extend of Car Dispatcher, and the advance to extend of Financial Advances (codes `invalid`, `link_not_found`). An error that a rule of the register raises on the probe record (the links of invoices, issues, quality, change control, dismantle, risks) now keeps its own column and message instead of one generic line under Record ID. Blank cells are not errors. Additive.
+    - 0.15.572 (2026-11-28): the register rules screen lists the rules keys of every register (L9; migration 0643, mirror `db/sql/642_register_rules_screen.sql`). `GET /settings/register-rules`: the catalogue also offers `currency` of Financial Advances and `master_export` (yes or no) of Car Dispatcher, Financial Advances and Daily Plan (changing `master_export` changes the Master template, which has to be downloaded again); `items` now lists every active register that has rules, each with `other`: the keys that are not editable here (scope maps, scopes, field lists, Daily Plan levels), read only. `PUT` is unchanged (catalogue keys only). Additive.
     - 0.15.15 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 139). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
     - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
     - 0.15.11 (2026-11-13): the historical Master load approved directly, with the register sheets of the same file (two owner decisions of 2026-11-12; migrations 0092 and 0093; CHANGELOG 134 and 135; renumbered after the merge with main). Additive. Part A, the historical load of the Master approved directly (owner decision 2026-11-12 "Direct approval"; migration 0087; CHANGELOG 129). Additive. (1) `MasterImportApplyRequest.historical_load.approve_directly` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason) and `mode` submit (422 `validation_failed` otherwise; outside `historical_load` the field is unknown, 422). Every task row of the run's batches that is submitted (a row with an actual date) is then approved at once as an admin override, with no L2 step: state `approved`, approved date, a workflow step `approve` with the note "historical load: approved directly (admin override)", the level actors, the SLA closed, the successors unlocked, milestones and gates recalculated; the documents are treated as the historical waiver treats them. Rows without an actual date stay saved; a refused row stays an error of its own. The batches and their rows read approved. It works the same for an apply in the background (0.15.5) and for a batch sent in chunks (0.14.6): the choice is stored with the run and the batch, never taken from a later call. Every normal task keeps L1 then L2. (2) `TaskSummary.historical_direct_approved`: the "Admin override" badge, an audit row `task_historical_direct_approval` per task (`is_admin_override`, the reason of the load); cleared when the task leaves the approved state. (3) KPIs: counted in `KpiMeta.override_flagged_count` and in the new `KpiMeta.historical_direct_flagged_count`; treated like the other overrides in the SLA and on-time figures (left out when `exclude_overrides` is on) and in the health factors D and F; counted in progress, Project Status, milestones and site status like any approved task. (4) `MasterImportOutcome.approve_directly` and `MasterImportOutcome.batches[].approved`. Part B, the register sheets of the historical Master load, from the same file (owner decision 2026-11-12 "Everything from the one file"; migration 0088; CHANGELOG 130). Additive. (1) `MasterImportApplyRequest.historical_load.registers` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason, `mode` submit; 422 / 403 otherwise). The API reads the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register; its SHA-256 checked) and maps them onto the register templates (TPL-RF ... TPL-RISKS) with the maps of `tools/master-import` (one source of truth, shipped with the API): mechanical normalisation only (spaces, Site IDs, dates and numbers typed as text, list case, N/A / Pending / Cancelled in a date or number cell to blank, an ambiguous dd/mm read day first and noted). Personal columns (landlord, contact person, phone, e-mail; Q469) are never read. Each sheet becomes a register batch of the run's `group_id` (`source` `master_import`, the historical mark), sent after the Master batches, in chunks when big (0.14.6) and in the background with the apply (0.15.5); a row the register cannot read is an error row of its batch; a sheet that is missing or cannot be read is listed in `outcome.skipped` with its reason; nothing stops the apply. Site-scoped registers check the Site ID against GSDN Workspace sites; the Risk Register is keyed by its Risk ID. A record from a register sheet of the historical load is approved on its register row only (it never closes its source task: the task dates come from the Master sheet). (2) With `approve_directly` the register rows are approved at once like the tasks (admin override, no L2): the data effects of an L2 approval (the version in force, the typed table, the register's own approval effects), `RegisterRecord.historical_direct_approved`, an audit row `register_record_historical_direct_approval` per record with `is_admin_override`, no notice; a Procurement record approved this way opens no booking or advance request. Without it the register rows wait for L2 like any register batch. (3) `MasterImportOutcome`: `registers`, `register_notes`, and per batch `kind`, `sheet`, `rows` (all its rows) and `skipped` (rows that change nothing).
@@ -220,6 +224,7 @@ info:
     - 0.14.5 (2026-11-05): the site map of the dashboard (OV-12, SC-10; gap G-D05; owner request 2026-11-05 and the technical decision "site map" in `docs/spec/technical-decisions-2026-11-04.md`; no migration; CHANGELOG 107). Additive. (1) `GET /dashboard/site-map` (`getDashboardSiteMap`): one compact row per visible active site (`SiteMapItem`: id, Site ID, names EN/AR, region, sub-region, cluster, latitude and longitude with `has_coordinates` (lat 18 to 34.5, lon 8 to 26, as OV-12), overall status, delivery scenario, tower owner, the current stream and milestone (the first milestone of the site's own workflow version that is neither reached nor N/A), the last milestone reached, `on_air_reached` (the On-Air milestone MS6 reached), `late_task_count`, `behind_baseline` and `late`, `task_progress_pct`), the stream and milestone names of the workflow versions in use, the regions of the list and `counts` (total, cancelled, with and without valid coordinates). The sites are those of the caller's `dashboard.view` regions that are also in the caller's `sites.view` regions (B3; the row-level filter as for `GET /sites`); a caller without `sites.view` anywhere is 403 `module_forbidden`. Cancelled sites are listed (the map hides them unless asked). No custom field, no landlord or contact data. Not audited (a read, like `GET /dashboard`). (2) `GET /sites` takes `coordinates=missing` (sites not cancelled without valid coordinates, the link of the map) and `coordinates=valid`. (3) `SiteDetail` adds `tower_owner`, `tower_type` and `tower_height_m` (the site card of the map).
     - 0.14.4 (2026-11-05): big New sites batches run in the background (technical decision of 2026-11-05, `docs/spec/technical-decisions-2026-11-04.md`; migration 0074; CHANGELOG 106). Additive. (1) `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (action `approve`) of a New sites batch (`entity` = `site`) with more rows to send or to approve than the setting `imports.async_rows` (default 50) answer **202** with the batch in the new status `processing` and its `progress` (`ImportBatchProgress`: rows done of rows total, percent, sites created); every check of the request is made before the 202 (uploader, If-Match, state, note, L1 / L2 of the Matrix row with the grid right, the step-up of a final approval or a self-approval: 401 `step_up_required`, nothing is queued). The rows are then done in chunks of 25, each committed on its own under the same person (the step-up verified at the request counts; nobody else can continue the run), so the counts and the rows move while the page polls; a row that fails gets its error and the others go on; at the end the batch has its usual status (`approved`, `partially_approved`, `in_approval`) and its usual audit row and notices. A run left behind by a restart is resumed by the API. While `processing`, a second send, a decision or a discard answers 409 `batch_processing` (new `ErrorCode`). Smaller batches, returns and the other templates answer 200 as before. (2) `ImportBatch.status` adds `processing`; `ImportBatch.progress` (null when the batch never ran in the background). (3) No request changes; a client that only reads 200 keeps working for small batches and sees 202 + `processing` for big ones.
     - 0.14.3 (2026-11-05): the one-time historical-load document waiver (decision on owner question Q462, `docs/spec/technical-decisions-2026-11-04.md`; migration 0073; CHANGELOG 102). Additive. (1) `GET /settings/historical-waiver` (`getHistoricalWaiver`, any signed-in user: open or closed, cutoff date, expiry, whether the caller may manage it) and `PUT /settings/historical-waiver` (`setHistoricalWaiver`: a System Admin only, never a delegate, 403 `action_forbidden`; step-up; a reason; opening needs a cutoff date that is not in the future, 422 `validation_failed`; it closes itself after 30 days or by hand; every change is audited with the admin-override flag; the setting `load.historical_waiver` is written by no other path). (2) While it is open, a System Admin may mark a batch "historical load: accept without documents": `POST /import-batches` (a Site Register stream template) takes the form field `historical_load_reason`, and `POST /master-import/runs/{run_id}/apply` takes `historical_load: {reason}`; both need a step-up (401 `step_up_required`) and the open waiver (409 `invalid_transition`). For the rows of that batch the mandatory-document check is skipped only when the task's actual date is on or before the cutoff date; every other check runs; rows after the cutoff and every other batch are unchanged (the preview row carries the warning `historical_no_documents`). `ImportBatch.historical_load` shows the mark. (3) A task submitted that way has `TaskSummary.historical_no_documents` = true (the "Admin override" badge in the task and in the task grid; `TaskDetail.historical_load` has the batch, the cutoff and the missing document codes) and an audit row `task_historical_no_documents` (before and after values, the batch reference, `is_admin_override`). (4) Reversible: uploading the missing documents later is allowed on a flagged task even after its approval (`POST /tasks/{task_id}/slots/{slot_id}/files`) and, when no mandatory slot is missing any more, clears the flag by itself (audited `task_historical_no_documents_cleared`); a task that goes back to Data Entry loses the flag too. (5) KPIs: a flagged task is treated like an admin override. It is left out of the SLA and on-time figures when `exclude_overrides` is on (the default), counted otherwise; `KpiMeta.override_flagged_count` includes it and the new `KpiMeta.historical_flagged_count` counts only these; the health index leaves it out of documentation completeness and first-time approval; Project Status progress is unchanged.
+    - 0.15.536 (2026-11-28): signed and stamped copies in the Archive (migration 0474, mirror `db/sql/473_archive_marks.sql`). Additive. `LibraryArchiveRow` gains `signed`, `stamped`, `needs_signature`, `needs_stamp`; the Archive filter catalog gains the boolean fields `signed` and `stamped` (the existing `filter` parameter of `GET /library/archive/rows` and `POST /library/archive/zip`); `default_columns` of the Archive setting accepts `signed` and `stamped` (off for a project that already saved its list). The zip `manifest.csv` gets two last columns, `signed` and `stamped` (yes or no). No new table, no permission change; nothing is blocked by the markers.
     - 0.14.2 (2026-11-05): the settings screens of Q440 and Q441 and the decisions Q476 and Q477 (`docs/spec/technical-decisions-2026-11-04.md`, "Decided 2026-11-05 (2)"; migration 0072; CHANGELOG 101). Additive. (1) Q440: the official calendar is confirmed in Settings, Work calendar. `GET /settings/calendar-confirmation` and `PUT /settings/calendar-confirmation` (`CalendarConfirmation`, `CalendarConfirmationInput`: `confirmed` true or false and a `reason`; If-Match; audited as `calendar_official_confirmed` or `calendar_official_unconfirmed`; a System Admin, or a delegate of `settings` edit for all regions). Confirming is refused (422 `validation_failed`, path `/confirmed`) while the current or the next year has no holiday (`no_holidays`) or a holiday of those years is still tentative (`tentative_remaining`); the same blockers are in `CalendarConfirmation.blockers`. Unconfirming is always allowed. `HolidaySummary` gains `official_confirmed_at` and `official_confirmed_by` (who and when); `official_calendar_pending` is false while the setting is true, so the banner disappears. (2) Q441: the mail notification kinds are set in Settings. `GET /settings/mail-notification-kinds` and `PUT /settings/mail-notification-kinds` (`MailNotificationKinds`, `MailNotificationKindsInput`: `kinds` and a `reason`; If-Match; step-up; audited as `mail_notification_kinds_update`; System Admin only, a delegate gets 403 `action_forbidden`). The catalogue lists the kinds the code writes, with the six go-live kinds marked `recommended`; an unknown kind is refused (`unknown_kind`), and so is a kind reserved for security (`reserved_kind`: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`) and a duplicate (`duplicate`). (3) Q476: no HTTP change. The approved RF & Design feed fills `latitude` and `longitude` of the site only while the site has no coordinates (audited as `site_coordinates_fed`); afterwards they change only through a Change Control proposal (0.14.1). (4) Q477: no HTTP change. When an approved region move takes a site to another region, its open tasks keep their holders and SLA (B12b) and the holders of the `reassign` grant of the new region get an in-app notice of the new kind `site_region_moved` that lists the site and its open tasks; `NotificationKind` gains `site_region_moved`.
     - 0.14.1 (2026-11-05): technical decision Q473 (`docs/spec/technical-decisions-2026-11-04.md`, "Site creation"; migration 0071; CHANGELOG 100). Additive: no new path. The identity of a site changes only through a Change Control proposal (L1 proposes, L2 approves, audited with before and after values), never by a direct edit. `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`) gains the optional `identity` object (`SiteIdentityProposal`: `name`, `name_ar`, `latitude` with `longitude` as one pair, `region_id`, `cluster_code`, and `site_code`, which is always refused); `custom` becomes optional (send `custom`, `identity` or both; a reason is still required). One Change Control draft (Data Correction, Field) is opened per item (`field_item` `site.name`, `site.name_ar`, `site.coordinates`, `site.region` with the cluster, `site.cluster`); the result items carry `field` `name`, `name_ar`, `coordinates`, `region` or `cluster`. Field codes: `/identity/site_code` `immutable` (the Site ID never changes; also at submit of a hand-made Change Control record that names `site.site_code`), `unknown_field`, `required`, `too_long`, `invalid` (ranges of the site creation: latitude -90..90, longitude -180..180), `pair_required`, `unchanged`, `unknown_region`, `unknown_cluster`, `cluster_other_region` (a cluster must belong to the target region or be global; a region change names a cluster of the new region or none when the site's cluster would not fit). Region and cluster change who can see the site, so only a System Admin proposes or approves them: a Team Lead or a delegate gets 403 `action_forbidden` at the proposal, at submit and at the approval. On approval the site moves (its tasks and records follow), it is recalculated and the change is audited (`site_change_applied`, plus `site_region_moved_out` for the old region). Direct writes are closed: `pmis_app` can no longer update `sites.site_code`, `name`, `name_ar`, `region_id`, `cluster_id`, `latitude` or `longitude`, and the function `admin_transfer_site_region` is dropped. `PATCH /sites/{site_id}` writes custom values only (unchanged). `SiteDetail` and `GET /sites/{site_id}` are unchanged.
     - 0.14.0 (2026-11-05): site creation, bulk and manual (gap G1 of `docs/plans/2026-11-04-master-template-data-load.md`, owner question Q460 answered by the technical decisions; migration 0070; CHANGELOG 98), plus the load fixes G8 and G9 (G2 is API-only). Additive. (1) Two entry ways, both ending at L2; a site exists only when L2 approves. Manual: `POST /sites` (`createSite`) creates a site draft (`SiteDraft`, state `entry`) from `SiteDraftInput` (Site ID, region by id or by name, code or alias, English and Arabic name, cluster, delivery scenario, the six scope flags, Overall Status `Not Started` or `Cancelled`, coordinates, dates; unknown fields such as landlord, phone or e-mail are refused: those data are not loaded, Q469); `GET /site-drafts`, `GET/PATCH/DELETE /site-drafts/{draft_id}` (edit and discard while in `entry`), `POST /site-drafts/{draft_id}/submit` (L1 sends it to L2) and `POST /site-drafts/{draft_id}/decide` (L2: `approve` creates the site and needs step-up, `reject` returns it to L1 with a note). Bulk: the approved template `TPL-NEW-SITES` ("New sites", `template_kind` `sites`, issued with a hidden `_tpl` sheet) through the existing `GET /templates/{template_id}/download`, `POST /import-batches`, `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (L2 approves row by row or all at once; a return needs a note); `ImportBatch.entity` is `site` and an approved row carries the new site in `ImportRow.site_id`. A batch of this template is not a task batch (`task_id` on upload is refused with 422 `wrong_template`). (2) Who: the Responsibility Matrix gets the row `site_creation` (`MatrixRowKey`; L1 and L2 seeded to the System Admins, editable like any row, decision B11); creating needs `create` on `sites` in the region and L1 of that row, approving needs `approve` on `sites` in the region and L2 of that row (403 `action_forbidden` or `not_eligible_holder`). A person who holds both levels approves their own submission at once (B5: step-up, `SiteDraft.self_approval`, flagged in the audit row). (3) Validation (422 `validation_failed`, `errors[]` with `path` `/site_code`, `/region`, `/delivery_scenario` and so on): the Site ID is unique and never reused (a cancelled or voided site keeps it; a draft waiting for approval holds it too: `duplicate`), the region is resolved through the region aliases (`unknown_region`), the delivery scenario is one of the DeliveryScenario list, Site Scenario and Site Type are values of their lists, scope flags are Yes, No (N/A) or blank, dates are `yyyy-mm-dd` and not in the future, coordinates are in range and come in pairs; a Hot or Cold Swap with a scope flag Yes is refused at entry (`scope_scenario_conflict`). A cluster that does not exist yet is created in the site's region when L2 approves (`SiteDraft.warnings` `cluster_will_be_created`); a cluster of another region is refused (`cluster_other_region`). (4) On approval the site is created on the workflow version in force with all its task instances, the first tasks are opened, the scenario applicability of P1 runs, the site is recalculated and the creation is audited (`site_create`, with the draft, batch and batch row; `self_approval`); a row with Overall Status `Cancelled` creates the site and then sets it cancelled (Q466, audited `site_cancelled`). (5) G9 (Q469): `SiteListItem.name_ar` and `SiteDetail.name_ar`, the Arabic site name. (6) G8: the RF & Design field `site_scenario` reads its own list `SiteScenario` (Indoor, Outdoor; pending the owner's confirmation), no longer `DeliveryScenario`; saved values that are unambiguously Indoor or Outdoor were mapped, every other saved value stays as an inactive value of the list. (7) G2: the legacy Master import (`POST /master-import/runs`) accepts a known header alias for a typed column (CL3 `IP Router` for `Indoor IP Router`); any other renamed header is still refused (`structure_mismatch`).
@@ -280,8 +285,8 @@ info:
     - 0.15.564 (2026-11-28): the missing photo indicator (D6, no migration, no table). Additive and read only. `DocumentSlot` gains `photo_min_count` and `photos_missing`, from the `photo_rules.min_count` of the document type (set in Settings > Documents) and the current image files of the slot. They inform only; nothing is blocked. No new right: the slots are shown to whoever can already see the task.
     - 0.15.410 (2026-11-27): hardening layer 1c, History and Restore for the Warehouse item master and the Daily Plan, and Claim and Triage of a Daily Plan day (migration 0567). Additive. `GET /warehouse/items/{id}/history` and `GET /daily-plans/{date}/regions/{region_id}/history` return the audit trail with the field changes; Restore of an item is a PATCH of the old values through the normal item writer. A plan day (region and date) can be claimed and released (`POST` and `DELETE` on `/daily-plans/{date}/regions/{region_id}/claim`) and accepted or deferred with a note (`POST /daily-plans/{date}/regions/{region_id}/triage`, `GET` for the state), by the L2 holder of the Daily Plan in the region or a System Admin, as for the registers (0340). New plan days start `pending`; existing days stay untriaged. Reject and merge do not apply to a plan day. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
+    - 0.15.206 (2026-11-27): the dashboard follow-up sections, restricted financial summary (owner approval 2026-11-26, dashboard proposals item 9; migration 0307). Additive. `GET /dashboard/ops` gains the section `finance` (`DashboardOpsFinance`): the advances (counts, amounts of the records whose amounts are not hidden, age of the open ones since disbursement) and the disbursed amount against the completion of the assignments the advances belong to. It is OFF by default and only a holder of a role listed by the new setting `dashboard.finance_readers` (default Project Manager and Finance Officer) who also has the financial advances view receives figures; everyone else gets `available: false` with null figures, and the card stays hidden. It is never part of a share link or an export. New `GET/PUT /settings/dashboard-finance-readers` (`getDashboardFinanceReaders`, `setDashboardFinanceReaders`) to switch it on and choose the roles (System Admin or an all-regions delegate of settings edit, reason, step-up, If-Match, audited). Invoice ages are not part of the summary: the system holds no invoice data yet.
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
-
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
     - **Staff registry** (`staff-registry`): search, hover card with visibility applied, create, update, deactivate, reactivate, template import, field-visibility settings.
@@ -7279,6 +7284,7 @@ paths:
                         name_en: { type: string }
                         name_ar: { type: [string, 'null'] }
                         rules: { type: object, additionalProperties: true }
+                        other: { type: object, additionalProperties: true, description: '0.15.572 (migration 0643). The rules keys that are not in the catalogue: shown read only.' }
                         version: { type: integer }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -8520,6 +8526,37 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /settings/alert-rules/link-orphans:
+    get:
+      tags: [settings]
+      operationId: getLinkOrphans
+      summary: The register links that leave records dangling, with example ids (0.15.510)
+      description: |
+        0.15.510 (migration 0650): System Admin. Per declared link (register_links): `rows_with_value`, `orphan_rows` (current rows whose id is no current record of the target) and up to 20 `examples` (record ids). The same count feeds the alert kind `link_orphans`.
+      x-db-path: register_link_orphans_json
+      responses:
+        '200':
+          description: The links.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [links]
+                properties:
+                  links:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, field_code, target_register, rows_with_value, orphan_rows, examples]
+                      properties:
+                        register_key: {type: string}
+                        field_code: {type: string}
+                        target_register: {type: string}
+                        rows_with_value: {type: integer}
+                        orphan_rows: {type: integer}
+                        examples: {type: array, items: {type: string, format: uuid}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /settings/alert-rules/{id}:
     put:
       tags: [settings]
@@ -11563,6 +11600,53 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /settings/dashboard-finance-readers:
+    get:
+      tags: [settings]
+      operationId: getDashboardFinanceReaders
+      summary: Who sees the restricted financial summary card of the dashboard (0.15.206)
+      description: Every signed-in user may read it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+      x-db-path: dashboard_finance_readers_state
+      responses:
+        '200':
+          description: The readers setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardFinanceReaders'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setDashboardFinanceReaders
+      summary: Switch the financial summary on or off and choose its roles (reason, step-up, If-Match, audited) (0.15.206)
+      description: |
+        A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason (3+ characters), a step-up (401
+        `step_up_required`) and `If-Match` (428 / 412) are required. A role code that is not an active role is 422. Saving the values in force is 409
+        `invalid_transition`. Audited `dashboard_finance_readers_update` with `{enabled, role_codes}` before and after.
+      x-step-up: true
+      x-db-path: admin_set_dashboard_finance_readers
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DashboardFinanceReadersInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardFinanceReaders'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/ops-limits:
     get:
       tags: [settings]
@@ -17715,6 +17799,145 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /custom-registers:
+    get:
+      tags: [registers]
+      operationId: listCustomRegisters
+      summary: The custom registers (hidden ones too) with their usage and the limit
+      description: 0.15.533. System Admin or an all-regions delegate of the custom fields.
+      x-db-path: register_definitions (is_custom)
+      responses:
+        '200':
+          description: The custom registers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, limit]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/CustomRegister'}
+                  limit:
+                    type: object
+                    required: [max, active]
+                    properties:
+                      max: {type: integer, description: The setting registers.custom_max.}
+                      active: {type: integer}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [registers]
+      operationId: createCustomRegister
+      x-step-up: true
+      summary: Create a custom register (disabled until it has columns and is enabled)
+      description: 0.15.533. The key is generated from the English name (`custom_` and letters). Fails when the limit registers.custom_max is reached.
+      x-db-path: admin_register_create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomRegisterInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /custom-registers/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string, pattern: '^custom_[a-z_]{2,24}$'}
+    get:
+      tags: [registers]
+      operationId: getCustomRegister
+      summary: One custom register
+      x-db-path: register_definitions (is_custom)
+      responses:
+        '200':
+          description: The register.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [registers]
+      operationId: updateCustomRegister
+      x-step-up: 'when is_active changes'
+      summary: Rename, hide or show a custom register
+      description: 0.15.533. The key never changes. Hiding removes the menu entry and the module from the grid editor; records and grants stay.
+      x-db-path: admin_register_update
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomRegisterPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /custom-registers/{key}/enable:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string, pattern: '^custom_[a-z_]{2,24}$'}
+    post:
+      tags: [registers]
+      operationId: enableCustomRegister
+      x-step-up: true
+      summary: Enable a custom register (menu key, template, permission module)
+      description: 0.15.533. Needs at least one active column and one required column. Adds the menu key, the upload and download template and refreshes the templates.
+      x-db-path: admin_register_enable
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 3, maxLength: 1000}
+      responses:
+        '200':
+          description: Enabled.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomRegister'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /custom-fields:
     get:
       tags: [custom-fields]
@@ -19480,6 +19703,75 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /me/default-views:
+    get:
+      tags: [saved-views]
+      operationId: getDefaultViews
+      summary: The caller's default saved view per screen (0.15.582)
+      description: 0.15.582 (migration 0655). One default view per screen, personal. A view that was deactivated or became unreadable drops out of the list.
+      responses:
+        '200':
+          description: The caller's defaults.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [screen_key, view_id, name]
+                      additionalProperties: false
+                      properties:
+                        screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+                        view_id: {type: string, format: uuid}
+                        name: {type: string, maxLength: 120}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /saved-views/{view_id}/set-default:
+    post:
+      tags: [saved-views]
+      operationId: setDefaultSavedView
+      summary: Make a saved view my default for its screen (0.15.582)
+      description: 0.15.582 (migration 0655). Personal. Replaces the caller's earlier default for the same screen. A view the caller may not read answers 404.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Set.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, screen_key, is_default]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+                  is_default: {type: boolean, enum: [true]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /saved-views/{view_id}/clear-default:
+    post:
+      tags: [saved-views]
+      operationId: clearDefaultSavedView
+      summary: Clear my default view of a screen (0.15.582)
+      description: 0.15.582 (migration 0655). Removes the caller's default when it is this view; otherwise a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Cleared.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, is_default]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  screen_key: {type: [string, 'null']}
+                  is_default: {type: boolean, enum: [false]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
   /me/home-pins:
     get:
       tags: [saved-views]
@@ -20429,6 +20721,10 @@ components:
         uploaded_at: {type: [string, 'null'], format: date-time}
         approved_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
         approved_at: {type: [string, 'null'], format: date}
+        signed: {type: [boolean, 'null'], description: '0.15.536: the current version is marked as the signed copy (0555); null when the row has no file.'}
+        stamped: {type: [boolean, 'null'], description: '0.15.536: the current version is marked as the stamped copy; null when the row has no file.'}
+        needs_signature: {type: boolean, description: '0.15.536: the document type needs a signed copy (Settings > Documents > Archive marks). Informs only.'}
+        needs_stamp: {type: boolean, description: '0.15.536: the document type needs a stamped copy. Informs only.'}
         generated_at: {type: [string, 'null'], format: date-time}
         form_id: {type: [string, 'null'], format: uuid, description: 'The approved form that produces this document type on this task, if any.'}
     LibraryArchiveConfig:
@@ -20441,7 +20737,7 @@ components:
         default_columns:
           type: array
           minItems: 1
-          items: {type: string, enum: [site, site_name, region, cluster, doc_type, doc_number, version, status, task, uploaded_by, uploaded_at, approved_by, approved_at]}
+          items: {type: string, enum: [site, site_name, region, cluster, doc_type, doc_number, version, status, task, uploaded_by, uploaded_at, approved_by, approved_at, signed, stamped]}
         zip_limit: {type: integer, minimum: 1, maximum: 5000}
     LibraryArchiveSetting:
       allOf:
@@ -25128,7 +25424,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, stock_below_reorder] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, link_orphans, stock_below_reorder] }
         params: { type: object, additionalProperties: true, description: 'Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}.' }
         audience: { type: object, additionalProperties: true, description: '{"type":"system_admin"} or {"type":"module","module":"<module key>"}.' }
         title_en: { type: string, maxLength: 200 }
@@ -25146,7 +25442,7 @@ components:
       required: [code, kind, params, audience, title_en, title_ar, body_en, body_ar]
       properties:
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, stock_below_reorder] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, link_orphans, stock_below_reorder] }
         params: { type: object, additionalProperties: true }
         audience: { type: object, additionalProperties: true }
         title_en: { type: string, maxLength: 200 }
@@ -27250,7 +27546,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings, phase_scope]
+      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings, finance, phase_scope]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -27264,6 +27560,7 @@ components:
         quality: {$ref: '#/components/schemas/DashboardOpsQuality'}
         approvals: {$ref: '#/components/schemas/DashboardOpsApprovals'}
         changes_meetings: {$ref: '#/components/schemas/DashboardOpsChangesMeetings'}
+        finance: {$ref: '#/components/schemas/DashboardOpsFinance'}
         phase_scope: {$ref: '#/components/schemas/DashboardOpsPhaseScope'}
     DashboardOpsProcurement:
       type: object
@@ -27508,6 +27805,69 @@ components:
               anyOf:
                 - $ref: '#/components/schemas/DashboardOpsAging'
                 - type: 'null'
+    DashboardOpsFinance:
+      type: object
+      description: "0.15.206 (item 9): the restricted financial summary. Only for a configured reader (setting dashboard.finance_readers); never in an export or a share link. Invoice ages are not included: no invoice data exists."
+      required: [available, advances, amounts, open_aging, achievement]
+      properties:
+        available: {type: boolean, description: "False unless the card is switched on, the caller holds a listed role and has the financial advances view; every figure is then null."}
+        advances:
+          type: [object, 'null']
+          required: [total, open, hidden_amounts]
+          properties:
+            total: {type: integer}
+            open: {type: integer, description: "States approved_for_disbursement, disbursed and settlement_in_progress."}
+            hidden_amounts: {type: integer, description: "Records whose amounts are hidden: counted, but no amount is added."}
+        amounts:
+          type: [object, 'null']
+          required: [approved, disbursed, returned, open_disbursed]
+          properties:
+            approved: {type: number, description: "LYD."}
+            disbursed: {type: number, description: "LYD."}
+            returned: {type: number, description: "LYD."}
+            open_disbursed: {type: number, description: "LYD disbursed on advances still open."}
+        open_aging:
+          anyOf:
+                - $ref: '#/components/schemas/DashboardOpsAging'
+                - type: 'null'
+        achievement:
+          type: [object, 'null']
+          required: [assignments, completed, completion_pct, disbursed_on_completed, disbursed_on_open_work]
+          properties:
+            assignments: {type: integer, description: "Assignments (procurement records) that have an advance."}
+            completed: {type: integer, description: "Of them, those with an actual end."}
+            completion_pct: {type: [number, 'null']}
+            disbursed_on_completed: {type: number, description: "LYD."}
+            disbursed_on_open_work: {type: number, description: "LYD."}
+    DashboardFinanceReaders:
+      type: object
+      description: '0.15.206. Who sees the restricted financial summary card (setting `dashboard.finance_readers`, migration 0307).'
+      required: [enabled, role_codes, roles, version, can_edit]
+      properties:
+        enabled: {type: boolean, description: "Off by default."}
+        role_codes: {type: array, items: {type: string}, description: "Active roles whose holders see the card; default PM and FIN_OFFICER."}
+        roles:
+          type: array
+          description: "Every active role, to choose from."
+          items:
+            type: object
+            required: [code, name_en, name_ar]
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+        updated_at: {type: [string, 'null'], format: date-time}
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: {type: integer, description: The ETag value.}
+        can_edit: {type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.'}
+    DashboardFinanceReadersInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [enabled, role_codes]
+          properties:
+            enabled: {type: boolean}
+            role_codes: {type: array, items: {type: string}}
     DashboardOpsQuality:
       type: object
       description: "0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate."
@@ -28885,6 +29245,43 @@ components:
         description: { type: string, maxLength: 2000 }
         severity: { type: string, minLength: 1, maxLength: 40 }
     # ---------------------------------------------------------- custom fields
+    CustomRegister:
+      type: object
+      required: [register_key, module_key, name_en, name_ar, site_scoped, multiple_per_site, enabled, is_active, version, created_at, field_count, required_count, record_count, template_id]
+      properties:
+        register_key: {type: string}
+        module_key: {type: string, description: Same as register_key; the permission module.}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        site_scoped: {type: boolean}
+        multiple_per_site: {type: boolean}
+        enabled: {type: boolean, description: False until enabled; a disabled register has no menu entry or template.}
+        is_active: {type: boolean, description: False when hidden.}
+        version: {type: integer}
+        created_at: {type: [string, 'null'], format: date-time}
+        field_count: {type: integer}
+        required_count: {type: integer}
+        record_count: {type: integer}
+        template_id: {type: [string, 'null']}
+    CustomRegisterInput:
+      type: object
+      additionalProperties: false
+      required: [name_en, site_scoped, reason]
+      properties:
+        name_en: {type: string, minLength: 2, maxLength: 80}
+        name_ar: {type: [string, 'null'], minLength: 2, maxLength: 80}
+        site_scoped: {type: boolean}
+        multiple_per_site: {type: boolean, default: true}
+        reason: {type: string, minLength: 3, maxLength: 1000}
+    CustomRegisterPatch:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        name_en: {type: string, minLength: 2, maxLength: 80}
+        name_ar: {type: [string, 'null'], minLength: 2, maxLength: 80}
+        is_active: {type: boolean}
+        reason: {type: string, minLength: 3, maxLength: 1000}
     CustomFieldEntity:
       type: string
       enum: [site, milestone, gate, task, rf_design, acquisition, procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle]
