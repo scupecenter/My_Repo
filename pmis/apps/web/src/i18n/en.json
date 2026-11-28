@@ -5290,6 +5290,11 @@
       "weekly_digest": "Weekly digest"
     }
   },
+  "snapshotSchedule": {
+    "title": "Weekly snapshot day",
+    "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
+    "weekday": "Day of the week"
+  },
   "dashSettings": {
     "title": "Dashboard",
     "note": "Global settings of the dashboard: targets, KPI thresholds, and the cards each tab shows and their order. Every save needs a reason, is audited and is versioned. Each user's own layout and saved filters stay in the browser.",

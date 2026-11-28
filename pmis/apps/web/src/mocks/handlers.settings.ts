@@ -460,6 +460,9 @@ let dashState = {
   updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+/** The weekday of the weekly dashboard snapshot (contract 0.15.430): the setting dashboard.snapshot_weekday, default 4 (Thursday), version 0 until the first save. */
+let snapState = { version: 0, weekday: 4, updated_at: null as string | null, updated_by: null as null };
+const snapView = () => ({ ...snapState });
 
 /** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
@@ -560,6 +563,20 @@ export const settingsHandlers = [
     const b = (await request.json()) as { targets: typeof dashState.targets; thresholds: typeof dashState.thresholds; tabs: typeof dashState.tabs };
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
+  }),
+  // ------------------------------------------------------------------ weekly snapshot day (contract 0.15.430, settings review gap 3)
+  http.get(`${B}/settings/dashboard/snapshot-schedule`, () => { const g = guard(); if (g) return g; return HttpResponse.json(snapView(), tag(snapState.version)); }),
+  http.put(`${B}/settings/dashboard/snapshot-schedule`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, snapState.version); if (p) return p;
+    const b = (await request.json()) as { weekday?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weekday) || b.weekday! < 0 || b.weekday! > 6) errs.push({ path: '/weekday', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    snapState = { ...snapState, version: snapState.version + 1, weekday: b.weekday!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(snapView(), tag(snapState.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),
