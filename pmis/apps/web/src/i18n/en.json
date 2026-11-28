@@ -3911,6 +3911,8 @@
     "zip_picked_one": "Download {{count}} selected (zip)",
     "zip_picked_other": "Download {{count}} selected (zip)",
     "zip_all": "Download all shown (zip)",
+    "zip_acceptance": "Acceptance pack (zip)",
+    "zip_acceptance_hint": "Approved PAC, FAC and HOTO files of this site, one folder per document type, with an index.",
     "zip_scope_needed": "Choose a stage or a document code first, or stay on this site.",
     "zip_running": "Preparing the zip…",
     "zip_done": "Downloaded {{name}}",
