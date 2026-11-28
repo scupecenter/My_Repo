@@ -15,6 +15,10 @@ export function SiteGantt({ site, today }: { site: SiteDetail; today?: string })
   );
   const conflicts = m.deps.filter((d) => d.conflict).length;
   const depOf = (code: string) => m.deps.find((d) => d.to === code);
+  const crit = m.critical;
+  const isCrit = (code: string) => crit.codes.includes(code);
+  const iso = (d: number) => new Date(d * 86_400_000).toISOString().slice(0, 10);
+  const driverRow = crit.driver ? m.rows.find((r) => r.code === crit.driver) : null;
   return (
     <details className="card my-3 p-3" data-testid="site-gantt">
       <summary className="cursor-pointer text-sm font-semibold">
@@ -22,6 +26,14 @@ export function SiteGantt({ site, today }: { site: SiteDetail; today?: string })
         {conflicts > 0 && <span className="ms-2 rounded bg-late/10 px-1.5 py-0.5 text-xs font-normal text-late" data-testid="gantt-conflicts">{t('gantt.conflicts', { count: conflicts })}</span>}
       </summary>
       <p className="mb-2 mt-1 text-xs text-mute">{t('gantt.legend')}</p>
+      {crit.finish !== null && crit.codes.length > 0 && (
+        <p className="mb-2 rounded border border-line bg-card2 px-2 py-1 text-xs" data-testid="gantt-critical-summary" title={t('gantt.critical_tip')}>
+          <span className="font-semibold">{t('gantt.critical')}</span>{' '}
+          {t('gantt.critical_finish', { date: iso(crit.finish), count: crit.codes.length })}
+          {crit.varianceDays !== null && <> {t(crit.varianceDays > 0 ? 'gantt.critical_late' : 'gantt.critical_ontime', { days: Math.abs(crit.varianceDays) })}</>}
+          {driverRow && <> {t('gantt.critical_driver', { name: nm(driverRow.node), days: crit.added[driverRow.code] })}</>}
+        </p>
+      )}
       <div className="relative">
         <ul className="space-y-1">
           {m.rows.map((r) => {
@@ -29,8 +41,8 @@ export function SiteGantt({ site, today }: { site: SiteDetail; today?: string })
             const lo = dep ? Math.min(pos(m, dep.fromDay), pos(m, dep.toDay)) : 0;
             const hi = dep ? Math.max(pos(m, dep.fromDay), pos(m, dep.toDay)) : 0;
             return (
-              <li key={r.code} className="flex items-center gap-2 text-sm" data-testid={`gantt-row-${r.code}`}>
-                <span className="w-40 shrink-0 truncate">{nm(r.node)}</span>
+              <li key={r.code} className="flex items-center gap-2 text-sm" data-testid={`gantt-row-${r.code}`} data-critical={isCrit(r.code) ? 'true' : 'false'}>
+                <span className={`w-40 shrink-0 truncate ${isCrit(r.code) ? 'border-s-2 border-late ps-1 font-semibold' : ''}`} title={isCrit(r.code) ? t('gantt.critical_row') : undefined}>{nm(r.node)}</span>
                 <span className="relative h-5 flex-1 rounded bg-card2" dir="ltr">
                   {dep && (
                     <span

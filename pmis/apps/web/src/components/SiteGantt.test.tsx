@@ -18,4 +18,12 @@ describe('SiteGantt', () => {
     const { container } = render(<SiteGantt site={{ pipeline: [node('A')] } as never} />);
     expect(container.innerHTML).toBe('');
   });
+  it('marks the open stages as the critical path and says which one added the most delay', () => {
+    const site = { pipeline: [{ ...node('A', undefined, '2026-02-10'), baseline_date: '2026-02-01' }, { ...node('B', '2026-03-20'), baseline_date: '2026-03-01' }, { ...node('C', '2026-04-01'), baseline_date: '2026-03-25' }] } as never;
+    render(<SiteGantt site={site} today="2026-02-25" />);
+    expect(screen.getByTestId('gantt-row-A').getAttribute('data-critical')).toBe('false');
+    expect(screen.getByTestId('gantt-row-B').getAttribute('data-critical')).toBe('true');
+    expect(screen.getByTestId('gantt-row-C').getAttribute('data-critical')).toBe('true');
+    expect(screen.getByTestId('gantt-critical-summary')).toBeTruthy();
+  });
 });
