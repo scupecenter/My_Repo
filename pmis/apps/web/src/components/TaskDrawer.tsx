@@ -88,6 +88,17 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
   // Q115: unsaved dates are kept as a server-side draft of this user (never a save of the task), with a last-saved time and an optional restore
   const dr = useDraft(`task.${task.id}`, draft, dirty.length > 0, edit);
   const save = () => date.mutate({ task, patch: { ...Object.fromEntries(dirty.map((k) => [k, draft[k] || null])), ...(layoutDirty ? { values: { layout_submitted_date: layout || null } } : {}) } }, { onSuccess: () => { dr.clear(); toast(t('drawer.saved')); }, onError: fail });
+  /* A5: the actual date is mandatory to submit, so a task that has none shows today (the submit date) as the default, editable, until a date is typed or saved. Nothing is saved until Submit. */
+  const d0 = new Date();
+  const todayIso = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}`;
+  const suggestActual = !!submit && edit && !msAuto && task.actual_date === null && !draft.actual_date;
+  const missingFields = (task.missing_for_submit ?? []).filter((f) => !(suggestActual && f === 'actual_date'));
+  const submitNow = () => {
+    const patch = { ...Object.fromEntries(dirty.map((k) => [k, draft[k] || null])), ...(suggestActual ? { actual_date: todayIso } : {}) };
+    if (!Object.keys(patch).length) { run('submit'); return; }
+    // the dates are saved first, then the submit goes with the new version of the task
+    date.mutate({ task, patch }, { onSuccess: (d) => { dr.clear(); op.mutate({ task: d, op: 'submit' }, { onSuccess: () => toast(t('approvals.done')), onError: fail }); }, onError: fail });
+  };
   const name = (i18n.language === 'ar' && task.name_ar) || task.name_en;
   const final = (a?: { final?: boolean }) => !!a?.final;
   const review = act('review'), approve = act('approve'), start = act('start'), claim = act('claim'), release = act('release');
@@ -134,7 +145,8 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
           {([['planned_date', 'plan', 'grid.plan'], ['actual_start', 'start', 'drawer.actual_start'], ['actual_date', 'actual', 'grid.actual']] as const).map(([f, id, label]) => (
             <div key={f}>
               <label className="block"><span className="text-mute">{t(label)}</span>
-                <DateInput className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit || (f === 'actual_date' && msAuto)} value={f === 'actual_date' && msAuto ? (task.actual_date ?? '') : draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                <DateInput className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit || (f === 'actual_date' && msAuto)} value={f === 'actual_date' && msAuto ? (task.actual_date ?? '') : f === 'actual_date' && suggestActual ? todayIso : draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                {f === 'actual_date' && suggestActual && <span className="mt-1 block rounded-md bg-openBg px-2 py-1 text-xs font-semibold text-openInk" data-testid="drawer-actual-default">{t('drawer.actual_default')}</span>}
                 {f === 'actual_date' && msAuto && <span className="block text-xs text-mute" data-testid="drawer-ms-auto-date">{t('drawer.ms_auto_date')}</span>}
               </label>
               <FieldHistory entityType="task" entityId={task.id} field={f} label={t(label)} />
@@ -175,13 +187,13 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
       <footer className="space-y-2 border-t border-line p-4">
         {intended && <p role="status" className="rounded-md bg-accentSoft p-2 text-sm" data-testid="drawer-intent">{t('board.intent', { action: t(`board.action_${intended}`) })}</p>}
         {submit && (final(submit) || submit.will_skip_to) && <p className="text-sm text-waitInk" data-testid="drawer-skip-note">{final(submit) ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: submit.will_skip_to })}</p>}
-        {submit && (missing || !!task.missing_for_submit?.length) && <p className="text-sm text-mute" data-testid="drawer-missing">{missing ? t('drawer.slots_missing') : t('taskErrors.mandatory_fields_missing_list', { list: task.missing_for_submit?.join(', ') })}</p>}
+        {submit && (missing || !!missingFields.length) && <p className="text-sm text-mute" data-testid="drawer-missing">{missing ? t('drawer.slots_missing') : t('taskErrors.mandatory_fields_missing_list', { list: missingFields.join(', ') })}</p>}
         <div className="flex gap-2">
           {start && <button className="btn" data-testid="drawer-start" disabled={op.isPending} onClick={() => run('start')}><Play size={16} />{t('drawer.start')}</button>}
           {claim && <button className="btn" data-testid="drawer-claim" disabled={op.isPending} onClick={() => run('claim')}><HandMetal size={16} />{t('drawer.claim')}</button>}
           {release && <button className="btn" data-testid="drawer-release" disabled={op.isPending} onClick={() => run('release')}><UserMinus size={16} />{t('drawer.release')}</button>}
           {(act('reject')) && <button className="btn btn-danger" data-testid="drawer-reject" disabled={op.isPending} onClick={() => setRejecting(true)}><Undo2 size={16} />{t('approvals.reject')}</button>}
-          {submit && <button className="btn btn-primary ms-auto" ref={intended === 'submit' ? intentBtn : undefined} data-testid="drawer-submit" disabled={missing || !!submit.disabled_reason || op.isPending} onClick={() => run('submit')}><Check size={16} />{final(submit) ? t('drawer.submit_final') : t('drawer.submit')}</button>}
+          {submit && <button className="btn btn-primary ms-auto" ref={intended === 'submit' ? intentBtn : undefined} data-testid="drawer-submit" disabled={missing || !!submit.disabled_reason || op.isPending || date.isPending} onClick={submitNow}><Check size={16} />{final(submit) ? t('drawer.submit_final') : t('drawer.submit')}</button>}
           {review && <button className="btn btn-primary ms-auto" ref={intended === 'review' ? intentBtn : undefined} data-testid="drawer-review" disabled={op.isPending} onClick={() => run('review')}><Check size={16} />{t('approvals.pass')}</button>}
           {approve && <button className="btn btn-primary ms-auto" ref={intended === 'approve' ? intentBtn : undefined} data-testid="drawer-approve" disabled={op.isPending} onClick={() => run('approve')}><Check size={16} />{t('approvals.approve')}</button>}
         </div>
