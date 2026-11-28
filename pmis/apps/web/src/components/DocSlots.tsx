@@ -54,12 +54,12 @@ function GenerateButton({ slot, generate }: { slot: DocumentSlot; generate: Gene
   const { t } = useTranslation();
   const forms = useLibraryForms();
   const [open, setOpen] = useState(false);
-  const form = (forms.data?.items ?? []).find((f) => f.kind === 'html' && f.doc_code === slot.doc_code && f.trigger_task_code === generate.taskCode);
+  const form = (forms.data?.items ?? []).find((f) => f.kind === 'html' && f.doc_code === slot.doc_code && (generate.recordId ? true : f.trigger_task_code === generate.taskCode));
   if (!form) return null;
   return (
     <>
       <button type="button" className="btn mt-2 text-sm" data-testid={`slot-generate-${slot.id}`} onClick={() => setOpen(true)}><FilePlus2 size={14} />{t('docs.generate')}</button>
-      {open && <GenerateDialog form={form} initialSite={{ id: generate.siteId, site_code: generate.siteCode, name: null }} onClose={() => setOpen(false)} />}
+      {open && <GenerateDialog form={form} initialSite={{ id: generate.siteId, site_code: generate.siteCode, name: null }} recordId={generate.recordId} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -85,7 +85,7 @@ function GeneratedCopy({ slot, generate }: { slot: DocumentSlot; generate: Gener
   );
 }
 
-export interface GenerateContext { siteId: string; siteCode: string; taskCode: string }
+export interface GenerateContext { siteId: string; siteCode: string; taskCode: string; /** a register record: the document is generated from this approved record (0711) */ recordId?: string }
 
 function SlotCard({ slot, canUpload, onFile, onReplace, onWithdraw, onDeclare, onAddCandidate, busy, generate }: {
   slot: DocumentSlot; canUpload: boolean; generate?: GenerateContext; onReplace?: (f: File, group: string) => void; onFile: (f: File, marks?: { signed: boolean; stamped: boolean }) => void; onWithdraw: (fileId: string) => void; onDeclare: () => void; onAddCandidate: (label: string) => void; busy: boolean;

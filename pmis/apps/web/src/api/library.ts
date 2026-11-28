@@ -27,14 +27,14 @@ export const ARCHIVE_COLUMNS = ['site', 'site_name', 'region', 'cluster', 'doc_t
 export const useLibraryForms = () => useQuery({ queryKey: ['library-forms'], queryFn: () => api.get<{ items: LibraryForm[]; can_configure: boolean }>('/library/forms') });
 
 export const usePreviewForm = () =>
-  useMutation<{ html: string; task_id: string | null; warnings: string[] }, ApiError, { templateId: string; siteId: string }>({
-    mutationFn: ({ templateId, siteId }) => api.post(`/library/forms/${templateId}/preview`, { body: { site_id: siteId } }),
+  useMutation<{ html: string; task_id: string | null; warnings: string[] }, ApiError, { templateId: string; siteId?: string; recordId?: string }>({
+    mutationFn: ({ templateId, siteId, recordId }) => api.post(`/library/forms/${templateId}/preview`, { body: recordId ? { record_id: recordId } : { site_id: siteId } }),
   });
 
 export function useGenerateDocument() {
   const qc = useQueryClient();
-  return useMutation<LibraryGeneratedDocument, ApiError, { templateId: string; siteId: string; remarks?: string }>({
-    mutationFn: ({ templateId, siteId, remarks }) => api.post(`/library/forms/${templateId}/generate`, { body: { site_id: siteId, ...(remarks ? { remarks } : {}) }, idempotencyKey: crypto.randomUUID() }),
+  return useMutation<LibraryGeneratedDocument, ApiError, { templateId: string; siteId?: string; recordId?: string; remarks?: string }>({
+    mutationFn: ({ templateId, siteId, recordId, remarks }) => api.post(`/library/forms/${templateId}/generate`, { body: { ...(recordId ? { record_id: recordId } : { site_id: siteId }), ...(remarks ? { remarks } : {}) }, idempotencyKey: crypto.randomUUID() }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['library-archive'] }); void qc.invalidateQueries({ queryKey: ['library-rows'] }); },
   });
 }

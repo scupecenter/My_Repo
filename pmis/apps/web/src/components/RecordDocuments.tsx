@@ -30,7 +30,8 @@ export function RecordDocuments({ record }: { record: RegisterRecord }) {
       )}
       <section aria-labelledby="rec-docs-own">
         <h3 id="rec-docs-own" className="mb-2 font-semibold">{t('recDocs.own')}</h3>
-        {items.length ? <SlotList slots={items} target={recordTarget(key, record.id)} edit={record.state === 'entry'} />
+        {items.length ? <SlotList slots={items} target={recordTarget(key, record.id)} edit={record.state === 'entry'}
+          generate={record.state === 'approved' ? { siteId: record.site_id, siteCode: record.site_code ?? '', taskCode: '', recordId: record.id } : undefined} />
           : <p className="text-mute" data-testid="rec-docs-none">{t('recDocs.none')}</p>}
       </section>
       {taskId && (

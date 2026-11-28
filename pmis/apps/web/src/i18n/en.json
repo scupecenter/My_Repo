@@ -7383,6 +7383,7 @@
     "defaults": "Columns of the owner sheet"
   },
   "lib": {
+    "from_record": "Filled from this approved record and its site. The copy is unsigned; upload the signed copy in the record documents.",
     "forms_title": "Forms",
     "forms_sub": "Every approved document form. Pick a form and a site to see it filled, then download or print it.",
     "archive_title": "Archive",

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import type { DocumentSlot } from '@/api/documents';
@@ -15,7 +16,8 @@ vi.mock('@/api/library', () => ({
   useArchiveRows: () => ({ data: { pages: [{ items: [{ slot_id: 's1', generated_id: 'g1', doc_number: 'SSR-2026-0001', status: 'generated' }] }] } }),
   generatedHtml: vi.fn(), downloadGenerated: vi.fn(), printHtml: vi.fn(),
 }));
-vi.mock('@/pages/library/Forms', () => ({ GenerateDialog: () => null }));
+const dialog = vi.fn((_p: { recordId?: string }) => null);
+vi.mock('@/pages/library/Forms', () => ({ GenerateDialog: (p: { recordId?: string }) => dialog(p) }));
 vi.mock('./Toast', () => ({ useToast: () => vi.fn() }));
 vi.mock('@/api/admin', () => ({ usePicker: () => ({ data: [] }) }));
 
@@ -29,5 +31,11 @@ describe('generated copy inside the task document', () => {
     expect(screen.getByTestId('slot-s1')).toHaveAttribute('data-status', 'missing');
     expect(screen.getByTestId('slot-input-s1')).toBeInTheDocument();
     expect(screen.getByTestId('slot-generate-s1')).toBeInTheDocument();
+  });
+  it('a record slot: Generate takes the record id, any approved form of the document type, and the slot status stays', async () => {
+    render(<SlotList slots={[slot]} target={{ target: 'record', ref: 'R1' } as never} edit={false} generate={{ siteId: 'site1', siteCode: 'S1', taskCode: '', recordId: 'rec1' }} />);
+    expect(screen.getByTestId('slot-s1')).toHaveAttribute('data-status', 'missing');
+    await userEvent.setup().click(screen.getByTestId('slot-generate-s1'));
+    expect(dialog).toHaveBeenCalledWith(expect.objectContaining({ recordId: 'rec1' }));
   });
 });
