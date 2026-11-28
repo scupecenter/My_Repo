@@ -49,6 +49,8 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'wor
   { key: 'admin.roles', to: '/admin/roles', icon: 'role', group: 'admin' },
   { key: 'admin.groups', to: '/admin/groups', icon: 'group', group: 'admin' },
   { key: 'admin.delegation', to: '/admin/delegation', icon: 'delegation', group: 'admin' },
+  // 0666: resource capacity planning (crews and skills against the planned tasks)
+  { key: 'capacity', to: '/capacity', icon: 'capacity', group: 'work' },
   { key: 'absence', to: '/absence', icon: 'absence', group: 'work' },
   { key: 'admin.matrix', to: '/admin/matrix', icon: 'matrix', group: 'admin' },
   { key: 'admin.settings', to: '/admin/settings', icon: 'settings', group: 'admin' },

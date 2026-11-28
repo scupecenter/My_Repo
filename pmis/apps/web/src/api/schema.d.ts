@@ -7062,6 +7062,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/capacity/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The weekly capacity against the planned tasks, per region and skill (0.15.595)
+         * @description Capacity = crew size x days per week x utilization, split evenly over the crew skills. Demand = open tasks (locked, open, entry, in review, in approval; not N/A) by planned date, else due date (late ones count in the first week), times the person-days entered for the task definition. Tasks without an effort entry are counted per week in `unestimated`. A cell is `ok` up to 85 %, `tight` up to 100 %, `over` above, `none` when empty. Region scoped like the reports.
+         */
+        get: operations["getCapacityPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/capacity-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The capacity planning settings (skills, crews, efforts) (0.15.595)
+         * @description Every signed-in user may read it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getCapacityPlanSettings"];
+        /**
+         * Set the capacity planning settings (reason, step-up, If-Match, audited) (0.15.595)
+         * @description A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and invalid values are 422 (a crew skill or an effort skill must be in the skills list, crew ids and task codes are unique); saving the values in force is 409 `invalid_transition`. Audited `capacity_plan_update`.
+         */
+        put: operations["setCapacityPlanSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/login-page": {
         parameters: {
             query?: never;
@@ -20167,6 +20211,79 @@ export interface components {
                 limit: number;
                 next_cursor: string | null;
             };
+        };
+        CapacitySkill: {
+            code: string;
+            name_en: string;
+            name_ar: string;
+        };
+        CapacityCrew: {
+            id: string;
+            region_id: components["schemas"]["RegionId"];
+            name: string;
+            /** @description People in the crew. */
+            size: number;
+            /** @description Codes from the skills list. */
+            skills: string[];
+        };
+        CapacityEffort: {
+            /** @description The task definition code. */
+            task_code: string;
+            skill: string;
+            person_days: number;
+        };
+        /** @description 0.15.595. Setting `capacity.plan` (migration 0666). */
+        CapacityPlanSettings: {
+            skills: components["schemas"]["CapacitySkill"][];
+            crews: components["schemas"]["CapacityCrew"][];
+            efforts: components["schemas"]["CapacityEffort"][];
+            days_per_week: number;
+            utilization_pct: number;
+            horizon_weeks: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        CapacityPlanInput: components["schemas"]["WithReason"] & {
+            skills: components["schemas"]["CapacitySkill"][];
+            crews: components["schemas"]["CapacityCrew"][];
+            efforts: components["schemas"]["CapacityEffort"][];
+            days_per_week: number;
+            utilization_pct: number;
+            horizon_weeks: number;
+        };
+        CapacityCell: {
+            capacity_days: number;
+            demand_days: number;
+            /** @description Null when there is no capacity. */
+            load_pct: number | null;
+            /** @enum {string} */
+            status: "none" | "ok" | "tight" | "over";
+        };
+        CapacityPlan: {
+            horizon_weeks: number;
+            /** @description The Monday of each week. */
+            weeks: string[];
+            /** @description Open tasks with neither planned nor due date; not in any week. */
+            undated_tasks: number;
+            regions: {
+                region_id: components["schemas"]["RegionId"];
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+                crews: number;
+                /** @description Per week: tasks with no effort entry. */
+                unestimated: number[];
+                skills: {
+                    skill: string;
+                    name_en: string;
+                    name_ar: string;
+                    cells: components["schemas"]["CapacityCell"][];
+                }[];
+            }[];
         };
         /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197). */
         LoginPage: {
@@ -37151,6 +37268,87 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getCapacityPlan: {
+        parameters: {
+            query?: {
+                region_id?: components["schemas"]["RegionId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapacityPlan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getCapacityPlanSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapacityPlanSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setCapacityPlanSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CapacityPlanInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapacityPlanSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getLoginPage: {

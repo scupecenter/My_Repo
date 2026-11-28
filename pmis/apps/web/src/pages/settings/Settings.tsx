@@ -57,6 +57,7 @@ import { AlertSettingsPanel } from './AlertSettings';
 import { PEOPLE_TABS, peopleTabAllowed } from '@/components/PeopleAdmin';
 import { TemplateMappingPanel } from '../TemplateMapping';
 import { LoginPageSettings } from './LoginPage';
+import { CapacitySettings } from './CapacitySettings';
 import { MediaSettingsScreen } from './MediaSettings';
 import { DataHubSettings } from './DataHubSettings';
 import { MapSettings } from './MapSettings';
@@ -82,7 +83,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'alerts' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }, { key: 'map' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'capacity' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }, { key: 'map' }] },
   // People and access: Users, Assignments, Roles, Permission profiles, Groups, Delegation and the Responsibility Matrix stay their own screens; Settings lists them so there is one place to start
   { key: 'access', sections: [] },
   { key: 'identity', sections: [] },
@@ -221,6 +222,7 @@ export function SettingsRoutes() {
           <Route path="pm-schedules" element={<PmSchedulesSettings />} />
           <Route path="motion" element={<MotionSettings />} />
           <Route path="login" element={<LoginPageSettings />} />
+          <Route path="capacity" element={<CapacitySettings />} />
           <Route path="interface" element={<InterfaceSettings />} />
           <Route path="data-hub" element={<DataHubSettings />} />
           <Route path="map" element={<MapSettings />} />

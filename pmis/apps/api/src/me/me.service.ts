@@ -18,6 +18,8 @@ export const NAV_KEYS = [
   'daily_plan',
   // 0592: the hub of the custom registers (the menu entry opens the list of the enabled custom registers the caller may view)
   'registers.custom',
+  // 0666: resource capacity planning (derived like the workload: Site Register and Reports view)
+  'capacity',
 ] as const;
 
 /** Every action of the contract's PermissionAction (a System Admin holds all of them on every module). */
@@ -158,7 +160,7 @@ export class MeService {
     if (nav.has('sites')) nav.add('daily_plan');
     // 0592: view on any custom register opens its hub entry in the menu
     if ([...nav].some((k) => k.startsWith('custom_'))) nav.add('registers.custom');
-    if (nav.has('sites') && nav.has('reports')) nav.add('workload');
+    if (nav.has('sites') && nav.has('reports')) { nav.add('workload'); nav.add('capacity'); }
     if (await this.access.canSendAnnouncements()) nav.add('announcements');
     // 0163: a role can hide Messages and Inbox from the menu (menu only: the pages and the API are unchanged) and limit the Dashboard tabs.
     const access = await this.db.tx.$queryRaw<{ tabs: string[]; hidden: boolean }[]>(Prisma.sql`SELECT app_dashboard_tabs(${auth.user.id}::uuid) AS tabs, app_nav_hidden(${auth.user.id}::uuid) AS hidden`);

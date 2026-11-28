@@ -15,6 +15,7 @@ import { Inbox } from '@/pages/Inbox';
 import { StatusUpdates } from '@/pages/StatusUpdates';
 import { ContractorsReports } from '@/pages/ContractorsReports';
 import { Workload } from '@/pages/Workload';
+import { Capacity } from '@/pages/Capacity';
 import { Dashboard } from '@/pages/Dashboard';
 import { ManualItems } from '@/pages/ManualItems';
 import { ChangePassword } from '@/pages/ChangePassword';
@@ -120,6 +121,7 @@ function gated(session: Session) {
         <Route path="approvals" element={<Approvals />} />
         <Route path="inbox" element={<Inbox />} />
         <Route path="workload" element={<Workload />} />
+        <Route path="capacity" element={<Capacity />} />
         <Route path="reports/contractors" element={<ContractorsReports />} />
         <Route path="status-updates" element={<StatusUpdates />} />
         <Route path="dashboard" element={<Dashboard />} />
