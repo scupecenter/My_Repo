@@ -11424,7 +11424,7 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '429': {$ref: '#/components/responses/RateLimited'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
   /guests/{user_id}/expiry:
     post:
       tags: [users]

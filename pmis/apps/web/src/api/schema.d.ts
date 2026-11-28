@@ -7214,6 +7214,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/guest-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The guest access setting (System Admin only) (0.15.730)
+         * @description System Admin only (403 `action_forbidden` otherwise). `enabled` is `false` until a System Admin turns it on. `modules` lists the modules a guest may ever view.
+         */
+        get: operations["getGuestAccess"];
+        /**
+         * Turn guest access on or off and set its limits (System Admin, reason, step-up, If-Match, audited) (0.15.730)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. `max_days` is 1 to 365, `default_days` is 1 to `max_days`.
+         *     Saving the values already in force is 409 `invalid_transition`. Audited `guest_access_update` with before and after. Turning it off does not end guests already made.
+         */
+        put: operations["setGuestAccess"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The guest accounts, newest first, with their state (System Admin only) (0.15.730)
+         * @description `state` is active, expired (by itself at `expires_at`) or ended (an admin ended it). At most 200.
+         */
+        get: operations["listGuests"];
+        put?: never;
+        /**
+         * Create a view-only guest account with an end date (System Admin, step-up, reason, rate limited) (0.15.730)
+         * @description Creates a local account (like `POST /users`) and makes it a guest in the same transaction; a refused request creates no account. The temporary password is returned once and the guest must change it at the first sign-in.
+         *     Needs the switch on (409 `invalid_transition` while it is off), at least one region and one module from the setting's list (422), an end date that is at least one hour away and at most `max_days` from now (`expires_at`, or `days`; omitted = `default_days`), and a new email. At most 10 a minute (429 `rate_limited`).
+         *     The guest holds the role GUEST at level view with the profile guest_view, for the chosen regions and modules, ending at `expires_at`. Audited `guest_created`.
+         */
+        post: operations["createGuest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guests/{user_id}/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change the end date of a guest (System Admin, step-up, reason) (0.15.730)
+         * @description The new date is at least one hour away and at most `max_days` from now (422). An ended guest is not reopened (409 `invalid_transition`). Audited `guest_extended`.
+         */
+        post: operations["extendGuest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guests/{user_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a guest account now (System Admin, step-up, reason) (0.15.730)
+         * @description The guest is signed out at once and cannot sign in again. The account and its history stay. 409 `invalid_transition` when it is already ended. Audited `guest_ended`.
+         */
+        post: operations["endGuest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/support-access": {
         parameters: {
             query?: never;
@@ -13998,7 +14089,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "archive_required" | "archive_expired" | "cooloff_active" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "guest_read_only" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "archive_required" | "archive_expired" | "cooloff_active" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -20312,6 +20403,61 @@ export interface components {
             enabled: boolean;
             max_hours: number;
             default_hours: number;
+        };
+        /** @description 0.15.730. The guest access setting (`security.guest_access`, migration 0731). */
+        GuestAccessSetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            max_days: number;
+            default_days: number;
+            /** @description The modules a guest may view. */
+            modules: string[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        GuestAccessSettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            max_days: number;
+            default_days: number;
+        };
+        GuestInput: components["schemas"]["WithReason"] & {
+            /** Format: email */
+            email: string;
+            display_name: string;
+            note?: string;
+            regions: number[];
+            modules: string[];
+            /**
+             * Format: date-time
+             * @description Or days. Omitted both = default_days from now.
+             */
+            expires_at?: string;
+            days?: number;
+            temporary_password?: string;
+        };
+        /** @description 0.15.730. A guest account. */
+        Guest: {
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            email: string;
+            note?: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            ended_at?: string | null;
+            end_reason?: string | null;
+            /** @enum {string} */
+            state: "active" | "expired" | "ended";
+            regions: number[];
+            modules: string[];
         };
         SupportAccessGrantInput: components["schemas"]["WithReason"] & {
             /** Format: uuid */
@@ -37494,6 +37640,185 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getGuestAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestAccessSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setGuestAccess: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuestAccessSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestAccessSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listGuests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Guests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Guest"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuestInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        guest: components["schemas"]["Guest"];
+                        /** @description Shown once. */
+                        temporary_password: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    extendGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    /** Format: date-time */
+                    expires_at: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Guest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    endGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Ended. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Guest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listSupportAccess: {

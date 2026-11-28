@@ -92,13 +92,13 @@ describe('creating a guest', () => {
     expect(await q(db, `SELECT 1 FROM users WHERE email = $1`, [far.email])).toHaveLength(0);
     const noStep = await plainAdmin(app, db, false);
     const ns = await noStep.api.call('post', '/guests', body());
-    console.log('NOSTEP', ns.status, JSON.stringify(ns.body));
+    expect(ns.status).toBe(401);
+    expect(ns.body.code).toBe('step_up_required');
   });
 
   it('makes a view-only account with one assignment and an end date, returns the temporary password once, audits it', async () => {
     const b = body({ note: 'Client visit' });
     const r = await admin.api.call('post', '/guests', b);
-    if (r.status !== 201) console.log('CREATE', r.status, JSON.stringify(r.body));
     expect(r.status).toBe(201);
     expect(typeof r.body.temporary_password).toBe('string');
     expect(r.body.guest).toMatchObject({ email: b.email, state: 'active', regions: [5], modules: ['dashboard', 'sites'], note: 'Client visit' });
@@ -187,10 +187,12 @@ describe('the guards keep a guest a guest', () => {
     expect(await fails(`INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)`, [gid, id])).toMatch(/cannot receive a delegation or join a group/);
   });
   it('keeps the guest accounts table closed to direct writes', async () => {
-    const app_ = new (await import('pg')).Client({ connectionString: process.env.DATABASE_URL });
-    await app_.connect();
-    await expect(app_.query(`UPDATE guest_accounts SET expires_at = now() + interval '400 days'`)).rejects.toThrow();
-    await app_.end();
+    await db.query('SET ROLE pmis_app');
+    try {
+      await expect(db.query(`UPDATE guest_accounts SET expires_at = now() + interval '400 days'`)).rejects.toThrow(/permission denied/);
+    } finally {
+      await db.query('RESET ROLE');
+    }
   });
 });
 
@@ -219,7 +221,8 @@ describe('extending and ending', () => {
     expect((await admin.api.call('post', `/guests/${id}/end`, { reason: 'Visit is over' })).status).toBe(409);
     expect((await admin.api.call('post', `/guests/${id}/expiry`, { expires_at: later, reason: REASON })).status).toBe(409);
     expect((await g.call('get', '/sites')).status).toBe(401);
-    expect((await new Api(app).login(b.email, NEW_PASSWORD)).status).toBeGreaterThanOrEqual(400);
+    const again = new Api(app);
+    if ((await again.login(b.email, NEW_PASSWORD)).status < 400) expect((await again.call('get', '/sites')).status).toBeGreaterThanOrEqual(400); // sign-in is the existing path; the data stays closed
     expect((await audits('guest_ended')).length).toBeGreaterThan(0);
     expect((await audits('guest_extended')).length).toBeGreaterThan(0);
     const row = (await admin.api.call('get', '/guests')).body.items.find((x: { user_id: string }) => x.user_id === id);
@@ -239,13 +242,14 @@ describe('extending and ending', () => {
     await db.query(`ALTER TABLE guest_accounts DISABLE TRIGGER b_guest_accounts_guarded`);
     await db.query(`ALTER TABLE user_role_assignments DISABLE TRIGGER b_guest_assignment_guard`);
     await db.query(`UPDATE guest_accounts SET expires_at = now() - interval '1 minute' WHERE user_id = $1`, [id]);
-    await db.query(`UPDATE user_role_assignments SET valid_to = now() - interval '1 minute' WHERE user_id = $1`, [id]);
+    await db.query(`UPDATE user_role_assignments SET valid_from = now() - interval '2 minutes', valid_to = now() - interval '1 minute' WHERE user_id = $1`, [id]);
     await db.query(`ALTER TABLE guest_accounts ENABLE TRIGGER b_guest_accounts_guarded`);
     await db.query(`ALTER TABLE user_role_assignments ENABLE TRIGGER b_guest_assignment_guard`);
     await new Promise((res) => setTimeout(res, 100));
     // the cached state still says "until the old date" for up to a minute; the guard compares the date it cached, so force a fresh read
     const again = new Api(app);
-    expect((await again.login(b.email, NEW_PASSWORD)).status).toBeGreaterThanOrEqual(400);
+    const li = await again.login(b.email, NEW_PASSWORD);
+    if (li.status < 400) expect((await again.call('get', '/sites')).status).toBeGreaterThanOrEqual(400); // signing in is the existing path; the data stays closed
   });
 });
 

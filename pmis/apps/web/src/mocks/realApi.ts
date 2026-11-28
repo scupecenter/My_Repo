@@ -474,6 +474,13 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/support-access'],
   ['post', '/support-access/revoke-all'],
   ['post', '/support-access/:id/revoke'],
+  // Contract 0.15.730 (migration 0731; apps/api: security): guest access (Settings, Security, Guest access).
+  ['get', '/settings/guest-access'],
+  ['put', '/settings/guest-access'],
+  ['get', '/guests'],
+  ['post', '/guests'],
+  ['post', '/guests/:user_id/expiry'],
+  ['post', '/guests/:user_id/end'],
   // Contract 0.15.192 (migration 0292; apps/api: security): the new-device email code (Settings, Security, New-device code).
   ['get', '/settings/new-device-code'],
   ['put', '/settings/new-device-code'],

@@ -46,6 +46,7 @@ import { Identity } from './Identity';
 import { SecurityLocks } from './SecurityLocks';
 import { OpsLimits } from './OpsLimits';
 import { SupportAccess } from './SupportAccess';
+import { GuestAccess } from './GuestAccess';
 import { NewDeviceCode } from './NewDeviceCode';
 import { Passkeys } from './Passkeys';
 import { DisplaySettings } from './DisplaySettings';
@@ -80,7 +81,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'alerts' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'alerts' }, { key: 'support' }, { key: 'guests' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
   { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }, { key: 'map' }] },
   // People and access: Users, Assignments, Roles, Permission profiles, Groups, Delegation and the Responsibility Matrix stay their own screens; Settings lists them so there is one place to start
@@ -291,6 +292,7 @@ export function SettingsRoutes() {
           <Route path="limits" element={<OpsLimits />} />
           <Route path="alerts" element={<AlertSettingsPanel />} />
           <Route path="support" element={<SupportAccess />} />
+          <Route path="guests" element={<GuestAccess />} />
           <Route path="newdevice" element={<NewDeviceCode />} />
           <Route path="passkeys" element={<Passkeys />} />
         </Route>

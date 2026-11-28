@@ -297,6 +297,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 
 | Table | Decision | Reason |
 |---|---|---|
+| guest_accounts | KEEP | The guest accounts of Settings > Security > Guest access (migration 0731): who may see what and until when. Access control and evidence, never deleted by a reset; the end of a guest is a flag, not a delete. |
 | local_credentials | KEEP | Passwords: users sign in as before. |
 | user_totp | KEEP | Two-factor secrets and the enforced flag. |
 | user_recovery_codes | KEEP | Two-factor recovery codes. |

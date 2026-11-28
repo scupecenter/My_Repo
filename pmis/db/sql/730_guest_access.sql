@@ -135,10 +135,10 @@ DECLARE uid uuid;
 BEGIN
   SELECT a.user_id INTO uid FROM public.user_role_assignments a WHERE a.id = NEW.assignment_id;
   IF uid IS NOT NULL AND EXISTS (SELECT 1 FROM public.guest_accounts g WHERE g.user_id = uid) THEN
-    IF TG_TABLE_NAME = 'user_role_assignment_modules' AND NOT (NEW.module_key = ANY (public.guest_access_modules())) THEN
-      RAISE EXCEPTION 'a guest may see only the guest modules, not %', NEW.module_key USING ERRCODE = 'insufficient_privilege';
+    IF TG_TABLE_NAME = 'user_role_assignment_modules' AND NOT ((to_jsonb(NEW) ->> 'module_key') = ANY (public.guest_access_modules())) THEN
+      RAISE EXCEPTION 'a guest may see only the guest modules, not %', to_jsonb(NEW) ->> 'module_key' USING ERRCODE = 'insufficient_privilege';
     END IF;
-    IF TG_TABLE_NAME = 'user_role_assignment_profiles' AND NOT EXISTS (SELECT 1 FROM public.permission_profiles p WHERE p.id = NEW.profile_id AND p.code = 'guest_view') THEN
+    IF TG_TABLE_NAME = 'user_role_assignment_profiles' AND NOT EXISTS (SELECT 1 FROM public.permission_profiles p WHERE p.id::text = (to_jsonb(NEW) ->> 'profile_id') AND p.code = 'guest_view') THEN
       RAISE EXCEPTION 'a guest holds only the guest_view profile' USING ERRCODE = 'insufficient_privilege';
     END IF;
   END IF;
@@ -308,7 +308,7 @@ BEGIN
   IF p_expires_at = g.expires_at THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'That is already the end date.')); END IF;
   -- the guest row first, then the assignment (the guard checks the assignment end against the guest row)
   UPDATE public.guest_accounts SET expires_at = p_expires_at WHERE user_id = p_user;
-  UPDATE public.user_role_assignments SET valid_to = p_expires_at WHERE user_id = p_user;
+  PERFORM public.idm_update_assignment((SELECT x.id FROM public.user_role_assignments x WHERE x.user_id = p_user), NULL, NULL, p_expires_at, NULL, NULL, NULL, NULL, NULL, '[guest] ' || btrim(p_reason));
   res := public.guest_access_row(p_user);
   PERFORM public.log_audit_write('guest_extended', 'user', p_user::text, jsonb_build_object('expires_at', g.expires_at), jsonb_build_object('expires_at', p_expires_at), btrim(p_reason));
   RETURN res;
@@ -324,8 +324,7 @@ BEGIN
   IF NOT FOUND THEN PERFORM public.wf_err('not_found'); END IF;
   IF g.ended_at IS NOT NULL THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The guest account is already ended.')); END IF;
   UPDATE public.guest_accounts SET ended_at = now(), ended_by = public.app_actor(), end_reason = btrim(p_reason) WHERE user_id = p_user;
-  UPDATE public.user_role_assignments SET valid_to = greatest(now(), valid_from + interval '1 millisecond'), is_primary = false
-   WHERE user_id = p_user AND (valid_to IS NULL OR valid_to > now());
+  PERFORM public.idm_end_assignment(x.id, '[guest] ' || btrim(p_reason)) FROM public.user_role_assignments x WHERE x.user_id = p_user AND (x.valid_to IS NULL OR x.valid_to > now());
   res := public.guest_access_row(p_user);
   PERFORM public.log_audit_write('guest_ended', 'user', p_user::text, jsonb_build_object('expires_at', g.expires_at), jsonb_build_object('ended', true), btrim(p_reason));
   RETURN res;
@@ -365,6 +364,8 @@ BEGIN
   -- admin_create_guest (owned by pmis_definer) hands the new account its role through the existing identity doors.
   GRANT EXECUTE ON FUNCTION idm_assign(uuid, uuid, "PermissionLevel", "TeamKind", timestamptz, timestamptz, boolean, boolean, integer[], boolean, text[], uuid[], text) TO pmis_definer;
   GRANT EXECUTE ON FUNCTION idm_set_user_status(uuid, "UserStatus", text) TO pmis_definer;
+  GRANT EXECUTE ON FUNCTION idm_update_assignment(uuid, "PermissionLevel", "TeamKind", timestamptz, boolean, integer[], boolean, text[], uuid[], text) TO pmis_definer;
+  GRANT EXECUTE ON FUNCTION idm_end_assignment(uuid, text) TO pmis_definer;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     GRANT EXECUTE ON FUNCTION guest_access_state(), admin_set_guest_access(boolean, integer, integer, text, integer), guest_access_list(),
       admin_create_guest(uuid, timestamptz, integer[], text[], text, text), admin_extend_guest(uuid, timestamptz, text), admin_end_guest(uuid, text),

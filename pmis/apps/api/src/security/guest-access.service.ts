@@ -85,6 +85,7 @@ export class GuestAccessService {
       await this.db.tx.$executeRaw(Prisma.sql`SELECT admin_create_guest(NULL::uuid, ${expires}::timestamptz, ARRAY[]::int[], ARRAY[]::text[], NULL::text, ${b.reason}::text)`);
     }
     const created = await this.users.create({ email: b.email, display_name: b.display_name, temporary_password: b.temporary_password, reason: `[guest] ${b.reason}` });
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL DEFERRED`; // users.create left them immediate; the assignment and its regions go in together
     const rows = await this.db.tx.$queryRaw<{ r: GuestDto }[]>(Prisma.sql`SELECT admin_create_guest(${created.user.id}::uuid, ${expires}::timestamptz,
       ${b.regions}::int[], ${b.modules}::text[], ${b.note ?? null}::text, ${b.reason}::text) AS r`);
     await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
