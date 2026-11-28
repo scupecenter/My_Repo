@@ -1,5 +1,5 @@
--- 0612_automation_centre: the run history of the alert rules for the Automation centre (contract 0.15.473). Notifications only, additive.
--- Mirror: db/sql/611_automation_centre.sql (kept identical to prisma/migrations/0612_automation_centre/migration.sql).
+-- 0614_automation_centre: the run history of the alert rules for the Automation centre (contract 0.15.473). Notifications only, additive.
+-- Mirror: db/sql/613_automation_centre.sql (kept identical to prisma/migrations/0614_automation_centre/migration.sql).
 --
 --   alert_rule_runs          one row per enabled rule per daily run: when it ran and for how many targets it fired (LOG table, like alert_rule_fires).
 --   alert_rules_runs_record() called by the daily job in the same transaction right after alert_rules_run() and alert_rules_kpi_run(). Counts the targets each

@@ -293,7 +293,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       // 0348: the kpi_threshold rules compare the live system-wide KPI values with each rule's own editable threshold.
       const values = await this.dash.kpiValuesForJob();
       const kpi = Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_kpi_run(${JSON.stringify(values)}::jsonb) AS n`)[0]?.n ?? 0);
-      // 0612: the run history and one audit row per rule that fired, written by the system (no actor), in the same transaction
+      // 0614: the run history and one audit row per rule that fired, written by the system (no actor), in the same transaction
       await tx.$queryRaw`SELECT alert_rules_runs_record() AS n`;
       return base + kpi;
     });
