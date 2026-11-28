@@ -605,3 +605,26 @@ describe('site map (OV-12, 0.14.5)', () => {
     expect(d.body).toMatchObject({ tower_owner: 'Synthetic TowerCo', tower_type: 'Monopole', tower_height_m: 30, latitude: 32.887 });
   });
 });
+
+// 0.15.368: the phase quick filter narrows the dashboard set, and Project Status groups by phase.
+describe('Dashboard phase filter and group_by=phase', () => {
+  it('narrows sites_total to the phase, lists the phases in filters and groups Project Status by phase', async () => {
+    await db.query(`UPDATE sites SET project_phase = 'Phase 1' WHERE site_code IN ('DASH-T1', 'DASH-T2', 'DASH-T3', 'DASH-T4', 'DASH-T6')`);
+    await db.query(`UPDATE sites SET project_phase = 'Phase 2' WHERE site_code IN ('DASH-B1', 'DASH-B2', 'DASH-B3')`);
+    const d = await get(admin, '?project_phase=Phase 1');
+    expect(d.headline.sites_total).toBe(5);
+    // Phase 1 is exactly the active Tripoli sites, so its figure equals the region-1 one: (12 + 17.5 + 0 + 3.0545 + 5.2 + 2) / 87
+    expect(d.headline.project_status.progress_pct).toBeCloseTo(45.695, 2);
+    expect(d.filters.phases).toEqual(['Phase 1', 'Phase 2']);
+    const byPhase = (await admin.api.call('get', '/project-status?group_by=phase')).body as J;
+    expect(byPhase.rows.map((r: J) => r.key)).toEqual(['Phase 1', 'Phase 2']);
+    expect(byPhase.rows[0].progress_pct).toBeCloseTo(45.695, 2);
+    const filtered = (await admin.api.call('get', '/project-status?project_phase=Phase 1')).body as J;
+    expect(filtered.progress_pct).toBeCloseTo(45.695, 2);
+  });
+
+  it('rejects a malformed project_phase and an unknown group_by', async () => {
+    expect((await admin.api.call('get', `${DASH}?project_phase=${'x'.repeat(61)}`)).status).toBe(422);
+    expect((await admin.api.call('get', '/project-status?group_by=weird')).status).toBe(422);
+  });
+});
