@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { beginAs, makeAdmin, superDb } from './helpers';
@@ -86,6 +88,27 @@ describe('register links (migration 0409)', () => {
     await insert('procurement', site.id, 'approved', { pr_no: `${PREFIX}-PR2`, order_status: 'Cancelled' });
     const opts = await db.query(`SELECT register_link_options('invoices', 'procurement_record_id', $1::uuid, $2) AS j`, [site.id, PREFIX]);
     expect((opts.rows[0].j as { label: string }[]).map((o) => o.label)).toEqual([`${PREFIX}-PO1`]);
+    await db.query('ROLLBACK');
+  });
+});
+
+describe('extra register links (migration 0596, L10)', () => {
+  it('declares the lesson and permit links with their optional fields, no check yet, and the migration runs again without error', async () => {
+    const sql = readFileSync(join(__dirname, '..', '..', '..', 'db', 'sql', '595_extra_register_links.sql'), 'utf8');
+    await db.query('BEGIN');
+    await db.query(sql);
+    await db.query(sql);
+    const links = await db.query(
+      `SELECT register_key || '.' || field_code AS k, target_register, same_site, enforce FROM register_links
+        WHERE (register_key, field_code) IN (('lessons_learned', 'incident_id'), ('lessons_learned', 'issue_id'), ('incidents', 'permit_id')) ORDER BY 1`);
+    expect(links.rows).toEqual([
+      { k: 'incidents.permit_id', target_register: 'permits_hse', same_site: true, enforce: false },
+      { k: 'lessons_learned.incident_id', target_register: 'incidents', same_site: true, enforce: false },
+      { k: 'lessons_learned.issue_id', target_register: 'issues', same_site: true, enforce: false },
+    ]);
+    const fields = await db.query(
+      `SELECT count(*)::int AS c FROM register_fields WHERE (register_key, code) IN (('lessons_learned', 'incident_id'), ('lessons_learned', 'issue_id'), ('incidents', 'permit_id')) AND required = false`);
+    expect(fields.rows[0].c).toBe(3);
     await db.query('ROLLBACK');
   });
 });
