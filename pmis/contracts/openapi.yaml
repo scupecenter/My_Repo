@@ -141,6 +141,7 @@ info:
     - 0.15.434 (2026-11-28): the weights preview lists the item level differences against the set in force (Settings review gap 7, approved by the owner 2026-11-27; no migration). Web only, no path or schema change: Settings > Weights > Preview now also shows, from the saved draft and the set in force (`GET /settings/weight-sets/{id}` and the list), which activities and items are added, removed or changed (name, weight, unit, measure rule). Nothing is written.
     - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
     - 0.15.436 (2026-11-28): an old published workflow version can be deleted after a full snapshot is archived (owner request relayed 2026-11-27; migration 0575, mirror `db/sql/574_workflow_version_delete.sql`). Additive. `POST /workflow/versions/{version}/delete` (`deleteWorkflowVersion`): `workflow_versions` administer for all regions (the publish right), a reason, `If-Match`, a password step-up and the typed confirmation `v<version>`; audited as `workflow_version_delete`. Allowed only for a published version that is not the one in force, has started, has no site, no site task and no site migration (409 `invalid_transition` with `reasons`: `current`, `not_started`, `sites`, `site_tasks`, `migrations`). The version and all its milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views are written first as one snapshot (`workflow_version_archive`, kept on a data reset); the delete runs in the same transaction. `GET /workflow/version-archive` (`listWorkflowVersionArchive`, `administer`) lists the archived versions (no snapshot body); `POST /workflow/version-archive/{id}/restore` (`restoreWorkflowVersion`, `administer`, reason, step-up) puts one back as it was (published, same version number, same ids) in one transaction and answers 409 `invalid_transition` without changing anything when the version number or an id exists again, it was already restored, or a row it points to is gone. Drafts are still discarded with `/discard`; a published version stays immutable and tasks are still deactivated, not deleted.
+    - 0.15.474 (2026-11-28): the method of the dashboard forecast is editable (phase 5, program progress curve and forecast; migration 0612, mirror `db/sql/611_forecast_method.sql`). Additive. `GET /settings/dashboard/forecast-method` (`getForecastMethod`, needs `dashboard.view`) and `PUT /settings/dashboard/forecast-method` (`setForecastMethod`, `admin.settings` edit for all regions, reason, If-Match, audited as `forecast_method_update` with before and after): the new setting `dashboard.forecast_method` (`mean`, the default and the former fixed behaviour, or `linear`, a straight line fitted through the actual points). The progress curve card reads it when it is drawn and now also draws the forecast as a dashed line to the forecast date. No forecast and no snapshot is stored, so nothing already stored is recomputed or rewritten. No new table.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.376 (2026-11-27): the daily delay log (migration 0554). Additive, data only. The Issues register gets the type value `Daily Delay` (list IssueCategory), the optional date field `delay_date`, and four more values of the list BlockerReason (Weather, Permit Pending, Delivery Delay, Safety Stop); no endpoint or schema changes. The delay reasons are edited in Settings > Registers > Lists and show in the dashboard issue breakdown (`by_category`, `by_reason`) and in the register export.
@@ -13124,6 +13125,54 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ForecastWindow'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard/forecast-method:
+    get:
+      tags: [settings]
+      operationId: getForecastMethod
+      summary: The method of the dashboard forecast (0.15.474)
+      description: |
+        0.15.474. The setting `dashboard.forecast_method`: how the progress curve card takes the weekly pace of the saved snapshots for the forecast date: `mean` (the mean weekly gain over the last weeks, the default and the former fixed behaviour) or `linear` (the slope of a straight line fitted through the actual points of the same weeks). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+      responses:
+        '200':
+          description: The method.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ForecastMethod'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setForecastMethod
+      summary: Save the method of the dashboard forecast (reason, If-Match, audited)
+      description: |
+        0.15.474. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+        (`method` is `mean` or `linear`). One audit row with before and after values and the reason. Nothing stored is recomputed: the forecast is drawn from the saved snapshots when the card opens.
+      x-db-path: admin_save_forecast_method
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/ForecastMethodInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ForecastMethod'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
@@ -28259,6 +28308,22 @@ components:
       additionalProperties: false
       properties:
         weeks: { type: integer, minimum: 2, maximum: 12, description: 'How many of the last real weeks the forecast averages the weekly gain over.' }
+    ForecastMethod:
+      description: '0.15.474. The setting dashboard.forecast_method (default mean).'
+      allOf:
+      - $ref: '#/components/schemas/ForecastMethodInput'
+      - type: object
+        required: [version]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    ForecastMethodInput:
+      type: object
+      required: [method]
+      additionalProperties: false
+      properties:
+        method: { type: string, enum: [mean, linear], description: 'How the forecast takes the weekly pace: the mean weekly gain or a fitted straight line.' }
     ProgressRag:
       description: '0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity.'
       type: object
