@@ -106,4 +106,17 @@ describe('Settings, alert rules', () => {
     await u.selectOptions(screen.getByTestId('ar-kind'), 'invoice_due_soon');
     expect(screen.getByTestId('ar-days')).toBeInTheDocument();
   });
+  it('date_approaching picks a register, one of its date fields and the days ahead, in English and Arabic', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    await u.click(await screen.findByTestId('ar-new'));
+    await u.selectOptions(screen.getByTestId('ar-kind'), 'date_approaching');
+    expect(screen.getByTestId('ar-date-field')).toBeInTheDocument();
+    await u.selectOptions(screen.getByTestId('ar-register'), 'issues');
+    expect(screen.getByRole('option', { name: 'Target Date' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Review Date' })).toBeNull();
+    await u.selectOptions(screen.getByTestId('ar-date-field'), 'target_date');
+    expect(screen.getByTestId('ar-days')).toBeInTheDocument();
+  });
 });

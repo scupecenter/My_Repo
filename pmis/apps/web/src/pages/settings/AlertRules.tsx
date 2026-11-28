@@ -18,6 +18,7 @@ interface Form {
   code: string;
   kind: string;
   register_key: string;
+  date_field: string;
   state: string;
   days: string;
   audience: string;
@@ -35,14 +36,14 @@ interface Form {
 }
 
 const EMPTY: Form = {
-  id: null, version: 0, code: '', kind: 'weekly_status_missing', register_key: '', state: '', days: '7',
+  id: null, version: 0, code: '', kind: 'weekly_status_missing', register_key: '', date_field: '', state: '', days: '7',
   audience: 'system_admin', module: '', title_en: '', title_ar: '', body_en: '', body_ar: '', link: '', enabled: true,
   kpi: '', op: 'above', value: '', locked: false,
 };
 
 const toForm = (r: AlertRule): Form => ({
   id: r.id, version: r.version, code: r.code, kind: r.kind,
-  register_key: String(r.params.register_key ?? ''), state: String(r.params.state ?? ''), days: String(r.params.days ?? '7'),
+  register_key: String(r.params.register_key ?? ''), date_field: String(r.params.date_field ?? ''), state: String(r.params.state ?? ''), days: String(r.kind === 'date_approaching' ? (r.params.days_before ?? '7') : (r.params.days ?? '7')),
   audience: String(r.audience.type ?? 'system_admin'), module: String(r.audience.module ?? ''),
   title_en: r.title_en, title_ar: r.title_ar, body_en: r.body_en, body_ar: r.body_ar, link: r.link ?? '', enabled: r.enabled,
   kpi: String(r.params.kpi ?? ''), op: String(r.params.op ?? 'above'), value: r.params.value === undefined ? '' : String(r.params.value), locked: r.locked,
@@ -52,6 +53,7 @@ const toBody = (f: Form): AlertRuleInput => ({
   code: f.code.trim(),
   kind: f.kind as AlertRuleInput['kind'],
   params: f.kind === 'record_idle' ? { register_key: f.register_key, state: f.state.trim(), days: Number(f.days) }
+    : f.kind === 'date_approaching' ? { register_key: f.register_key, date_field: f.date_field, days_before: Number(f.days) }
     : (f.kind === 'advance_unsettled' || f.kind === 'invoice_due_soon') && f.days.trim() !== '' ? { days: Number(f.days) }
     : f.kind === 'kpi_threshold' ? { kpi: f.kpi, op: f.op, value: Number(f.value) } : {},
   audience: f.audience === 'module' ? { type: 'module', module: f.module } : { type: 'system_admin' },
@@ -78,6 +80,7 @@ export function AlertRules() {
   const kindDef = catalogue.kinds.find((k) => k.kind === v?.kind);
   const bad = !v || v.code.trim().length < 2
     || (v.kind === 'record_idle' && (v.register_key === '' || v.state.trim() === '' || !/^[0-9]+$/.test(v.days) || Number(v.days) < 1 || Number(v.days) > 3650))
+    || (v.kind === 'date_approaching' && (v.register_key === '' || v.date_field === '' || !/^[0-9]+$/.test(v.days) || Number(v.days) > 365))
     || ((v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && v.days.trim() !== '' && (!/^[0-9]+$/.test(v.days) || Number(v.days) > 365 || (v.kind === 'advance_unsettled' && Number(v.days) < 1)))
     || (v.kind === 'kpi_threshold' && (v.kpi === '' || v.value.trim() === '' || isNaN(Number(v.value)) || Number(v.value) < 0 || Number(v.value) > 100000))
     || (v.audience === 'module' && v.module === '')
@@ -154,6 +157,22 @@ export function AlertRules() {
                 <input type="number" min={1} max={3650} className="input mt-1 w-28 font-normal" data-testid="ar-days" value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
             </div>
           )}
+          {v.kind === 'date_approaching' && (
+            <div className="flex flex-wrap gap-3">
+              <label className="text-sm font-semibold">{t('alertRules.register')}
+                <select className="input mt-1 font-normal" data-testid="ar-register" value={v.register_key} onChange={(e) => setF({ ...v, register_key: e.target.value, date_field: '' })}>
+                  <option value="">{t('registers.choose')}</option>
+                  {catalogue.registers.filter((r) => (catalogue.date_fields ?? []).some((d) => d.register_key === r.register_key)).map((r) => <option key={r.register_key} value={r.register_key}>{i18n.language === 'ar' && r.name_ar ? r.name_ar : r.name_en}</option>)}
+                </select></label>
+              <label className="text-sm font-semibold">{t('alertRules.date_field')}
+                <select className="input mt-1 font-normal" data-testid="ar-date-field" value={v.date_field} onChange={(e) => setF({ ...v, date_field: e.target.value })}>
+                  <option value="">{t('registers.choose')}</option>
+                  {(catalogue.date_fields ?? []).filter((d) => d.register_key === v.register_key).map((d) => <option key={d.code} value={d.code}>{i18n.language === 'ar' && d.label_ar ? d.label_ar : d.label_en}</option>)}
+                </select></label>
+              <label className="text-sm font-semibold">{t('alertRules.days_before')}
+                <input type="number" min={0} max={365} className="input mt-1 w-28 font-normal" data-testid="ar-days" value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
+            </div>
+          )}
           {(v.kind === 'advance_unsettled' || v.kind === 'invoice_due_soon') && (
             <label className="block text-sm font-semibold">{t('alertRules.days')}
               <input type="number" min={v.kind === 'advance_unsettled' ? 1 : 0} max={365} className="input mt-1 w-28 font-normal" data-testid="ar-days" placeholder={v.kind === 'advance_unsettled' ? t('alertRules.days_hub') : '7'} value={v.days} onChange={(e) => setF({ ...v, days: e.target.value })} /></label>
@@ -193,7 +212,7 @@ export function AlertRules() {
             <label className="mt-5 flex items-center gap-2 text-sm font-semibold">
               <input type="checkbox" data-testid="ar-locked" checked={v.locked} onChange={(e) => setF({ ...v, locked: e.target.checked })} />{t('alertRules.locked')}</label>
           </div>
-          {['/code', '/kind', '/params/register_key', '/params/state', '/params/days', '/params/kpi', '/params/op', '/params/value', '/audience', '/title_en', '/title_ar', '/body_en', '/body_ar', '/link', '/locked'].map((p) => <span key={p}>{fe(p)}</span>)}
+          {['/code', '/kind', '/params/register_key', '/params/date_field', '/params/days_before', '/params/state', '/params/days', '/params/kpi', '/params/op', '/params/value', '/audience', '/title_en', '/title_ar', '/body_en', '/body_ar', '/link', '/locked'].map((p) => <span key={p}>{fe(p)}</span>)}
           <div className="flex gap-2">
             <button className="btn btn-accent" data-testid="ar-save" disabled={bad || busy} onClick={() => setAskReason(true)}>{t('common.save')}</button>
             <button className="btn" data-testid="ar-cancel" onClick={() => setF(null)}>{t('common.cancel')}</button>

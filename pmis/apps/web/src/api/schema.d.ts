@@ -17862,7 +17862,7 @@ export interface components {
             id: string;
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon" | "date_approaching";
             /** @description Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}. */
             params: {
                 [key: string]: unknown;
@@ -17889,7 +17889,7 @@ export interface components {
         AlertRuleInput: {
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon" | "date_approaching";
             params: {
                 [key: string]: unknown;
             };
@@ -17932,6 +17932,13 @@ export interface components {
                     name_en: string;
                     name_ar: string | null;
                     module_key: string;
+                }[];
+                /** @description 0.15.560: the date fields of the active registers that date_approaching rules pick from. */
+                date_fields?: {
+                    register_key: string;
+                    code: string;
+                    label_en: string;
+                    label_ar: string | null;
                 }[];
                 modules: {
                     key: string;

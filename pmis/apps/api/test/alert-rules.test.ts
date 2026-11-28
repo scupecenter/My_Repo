@@ -267,3 +267,57 @@ describe('kpi_threshold alert rules (0348)', () => {
     await db.query('ROLLBACK');
   });
 });
+
+describe('date_approaching alert rules (0700)', () => {
+  const dateRule = (code: string, over: Record<string, unknown> = {}): Record<string, unknown> => rule(code, {
+    kind: 'date_approaching', params: { register_key: 'permits_hse', date_field: 'valid_to', days_before: 10 },
+    title_en: 'Permit {{record}} ends {{due}}', title_ar: 'ينتهي التصريح {{record}} في {{due}}',
+    body_en: '{{days}} days left on {{field}} of {{register}}', body_ar: 'بقي {{days}} يوما', ...over,
+  });
+
+  it('validates the params: an active register, one of its date fields, days_before 0..365, nothing else', async () => {
+    const fails = async (r: Record<string, unknown>, re: RegExp): Promise<void> => {
+      await db.query('BEGIN');
+      await beginAs(db, adminId);
+      await expect(save(r, 'try an invalid date rule')).rejects.toThrow(re);
+      await db.query('ROLLBACK');
+    };
+    await fails(dateRule(`${PREFIX}-da-reg`, { params: { register_key: 'nope', date_field: 'valid_to', days_before: 5 } }), /\/params\/register_key/);
+    await fails(dateRule(`${PREFIX}-da-fld`, { params: { register_key: 'permits_hse', date_field: 'nope', days_before: 5 } }), /\/params\/date_field/);
+    await fails(dateRule(`${PREFIX}-da-txt`, { params: { register_key: 'permits_hse', date_field: 'permit_no', days_before: 5 } }), /\/params\/date_field/);
+    await fails(dateRule(`${PREFIX}-da-days`, { params: { register_key: 'permits_hse', date_field: 'valid_to', days_before: 400 } }), /\/params\/days_before/);
+    await fails(dateRule(`${PREFIX}-da-extra`, { params: { register_key: 'permits_hse', date_field: 'valid_to', days_before: 5, more: 1 } }), /\/params/);
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    await save(dateRule(`${PREFIX}-da-ok`), 'add a valid date rule');
+    await save(dateRule(`${PREFIX}-da-c`, { params: { register_key: 'contractors', date_field: 'safety_cert_expiry', days_before: 30 } }), 'the contractor certificate rule');
+    await save(dateRule(`${PREFIX}-da-i`, { params: { register_key: 'invoices', date_field: 'due_date', days_before: 0 } }), 'the invoice due rule');
+    await db.query('ROLLBACK');
+  });
+
+  it('fires once per record and date for approved records from today to days_before ahead, never for past, far, other-state or malformed dates', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const r = await save(dateRule(`${PREFIX}-da-run`), 'add the rule');
+    const site = await makeSite(db, REGION, { prefix: PREFIX.toUpperCase() });
+    const ins = (state: string, data: Record<string, unknown>) => db.query(
+      `INSERT INTO register_records (entity_id, register_key, record_type, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, created_by, data)
+       VALUES (gen_random_uuid(), 'permits_hse', NULL, $1, $2, false, true, $3, 1, 3, 0, $4, $5::jsonb) RETURNING id`,
+      [site.id, REGION, state, adminId, JSON.stringify(data)]);
+    const soon = await ins('approved', { valid_to: '2031-03-28' });
+    const today = await ins('approved', { valid_to: '2031-03-21' });
+    const far = await ins('approved', { valid_to: '2031-04-30' });
+    const past = await ins('approved', { valid_to: '2031-03-20' });
+    const draft = await ins('entry', { valid_to: '2031-03-25' });
+    const bad = await ins('approved', { valid_to: 'soon' });
+    await db.query(`SELECT alert_rules_run('2031-03-21'::date)`);
+    expect(await targetFires(r.rows[0].j.id, 'due:2031-03-28', soon.rows[0].id)).toBe(1);
+    expect(await targetFires(r.rows[0].j.id, 'due:2031-03-21', today.rows[0].id)).toBe(1);
+    for (const x of [far, past, draft, bad]) {
+      expect((await db.query('SELECT count(*)::int AS c FROM alert_rule_fires WHERE rule_id = $1 AND target = $2', [r.rows[0].j.id, x.rows[0].id])).rows[0].c).toBe(0);
+    }
+    await db.query(`SELECT alert_rules_run('2031-03-22'::date)`);
+    expect(await targetFires(r.rows[0].j.id, 'due:2031-03-28', soon.rows[0].id)).toBe(1);
+    await db.query('ROLLBACK');
+  });
+});

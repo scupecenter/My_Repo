@@ -52,7 +52,12 @@ describe('alert-rules routes (0342)', () => {
     const res = await admin.api.call('get', PATH);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.rules)).toBe(true);
-    expect(res.body.catalogue.kinds.map((k: { kind: string }) => k.kind)).toEqual(['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon']);
+    expect(res.body.catalogue.kinds.map((k: { kind: string }) => k.kind)).toEqual(['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon', 'date_approaching']);
+    const dfs = res.body.catalogue.date_fields as { register_key: string; code: string }[];
+    expect(dfs.some((d) => d.register_key === 'permits_hse' && d.code === 'valid_to')).toBe(true);
+    expect(dfs.some((d) => d.register_key === 'contractors' && d.code === 'contract_end')).toBe(true);
+    expect(dfs.some((d) => d.register_key === 'contractors' && d.code === 'safety_cert_expiry')).toBe(true);
+    expect(dfs.some((d) => d.register_key === 'invoices' && d.code === 'due_date')).toBe(true);
     expect(res.body.catalogue.kpis.some((k: { code: string }) => k.code === 'sla_breach')).toBe(true);
     expect(res.body.catalogue.registers.some((r: { register_key: string }) => r.register_key === 'issues')).toBe(true);
 

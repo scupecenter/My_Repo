@@ -268,6 +268,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.560 (2026-11-28): a third generic alert kind `date_approaching` for the alert rules (L5; migration 0700, mirror `db/sql/699_alert_date_approaching.sql`). Params `{register_key, date_field, days_before 0..365}`: `register_key` is an active register and `date_field` a date-type field of it (422 `invalid` at `/params/register_key`, `/params/date_field` or `/params/days_before` otherwise). The daily run notifies for every current approved record whose date falls from today up to `days_before` days ahead, once per record and date, with the EN/AR template, closed audience and in-app delivery of 0342. Placeholders `{{record}}`, `{{due}}`, `{{days}}`, `{{field}}`, `{{register}}`. `GET /settings/alert-rules` lists the kind in `catalogue.kinds` and gains `catalogue.date_fields` (register_key, code, label_en, label_ar) for the form. Additive, no table, no grant or role change. Contractor team records are covered through the contractors field `safety_cert_expiry`; a date field added to any register later (for example a C4 calibration due date) is offered without a code change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
     - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; migration 0524, mirror `db/sql/523_dash_ops_phase.sql`). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts. `GET` and `PUT /settings/dashboard-target-policy` (`DashboardTargetPolicy`): the manual override of the typed dashboard targets, off by default, turned on only with a reason, a step-up and If-Match, audited `dashboard_target_policy_update`; while off the typed numbers are kept but not used and the targets are derived from the scope (`phase_scope.monthly_on_air_auto.source` says which). The `on_air_vs_target` figure uses the target in force.
 
@@ -24713,8 +24714,8 @@ components:
       properties:
         id: { type: string, format: uuid }
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon] }
-        params: { type: object, additionalProperties: true, description: 'Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}.' }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, date_approaching] }
+        params: { type: object, additionalProperties: true, description: 'Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, date_approaching {register_key, date_field (a date field of that register), days_before 0..365}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}.' }
         audience: { type: object, additionalProperties: true, description: '{"type":"system_admin"} or {"type":"module","module":"<module key>"}.' }
         title_en: { type: string, maxLength: 200 }
         title_ar: { type: string, maxLength: 200 }
@@ -24731,7 +24732,7 @@ components:
       required: [code, kind, params, audience, title_en, title_ar, body_en, body_ar]
       properties:
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon, date_approaching] }
         params: { type: object, additionalProperties: true }
         audience: { type: object, additionalProperties: true }
         title_en: { type: string, maxLength: 200 }
@@ -24789,6 +24790,17 @@ components:
                   name_en: { type: string }
                   name_ar: { type: [string, 'null'] }
                   module_key: { type: string }
+            date_fields:
+              type: array
+              description: '0.15.560: the date fields of the active registers that date_approaching rules pick from.'
+              items:
+                type: object
+                required: [register_key, code, label_en, label_ar]
+                properties:
+                  register_key: { type: string }
+                  code: { type: string }
+                  label_en: { type: string }
+                  label_ar: { type: [string, 'null'] }
             modules:
               type: array
               items:
