@@ -353,7 +353,11 @@
       "contractors": "المقاولون",
       "tasks": "المهام",
       "warehouse_items": "أصناف المخزن",
-      "snags": "ملاحظات الجودة"
+      "snags": "ملاحظات الجودة",
+      "risks": "المخاطر",
+      "issues": "المشكلات",
+      "invoices": "الفواتير",
+      "linked": "سجلات مرتبطة"
     },
     "site_list": "أرقام المواقع في القائمة",
     "site_list_found": "عُثر على {{count}}",

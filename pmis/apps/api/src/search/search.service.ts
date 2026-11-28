@@ -9,7 +9,9 @@ import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { matchRanges } from './search-text';
 
-export const SEARCH_TYPES = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors', 'tasks', 'warehouse_items', 'snags'] as const;
+export const SEARCH_TYPES = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors', 'tasks', 'warehouse_items', 'snags', 'risks', 'issues', 'invoices', 'linked'] as const;
+/** Registers that get their own group (so their hits are not crowded out by the others); the generic `registers` group leaves them out. */
+const OWN_GROUP_REGISTERS = ['risks', 'issues', 'invoices'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchHit {
@@ -129,6 +131,23 @@ export class SearchService {
     return [...new Set(values)] as SearchType[];
   }
 
+  /** The OR-clauses that say which register records the caller may read (module right and region, per register), or null when none; `alias` is the table alias. */
+  private async registerReach(only: string | null, alias = 'r'): Promise<Prisma.Sql[] | null> {
+    const defs = await this.db.tx.$queryRaw<{ register_key: string; module_key: string }[]>(
+      Prisma.sql`SELECT register_key, module_key FROM register_definitions WHERE is_active`);
+    const col = (c: string) => Prisma.raw(`${alias}.${c}`);
+    const clauses: Prisma.Sql[] = [];
+    for (const d of defs) {
+      if (only && d.register_key !== only) continue;
+      const regions = await this.access.regions(d.module_key, 'view');
+      if (regions !== null && regions.length === 0) continue;
+      clauses.push(regions === null
+        ? Prisma.sql`${col('register_key')} = ${d.register_key}`
+        : Prisma.sql`(${col('register_key')} = ${d.register_key} AND (${col('is_global')} OR ${col('region_id')} = ANY(${regions}::int[])))`);
+    }
+    return clauses.length === 0 ? null : clauses;
+  }
+
   /** The rows of one group, or null when the caller may not read it. */
   private async rowsFor(auth: AuthContext, type: SearchType, pattern: string, limit: number): Promise<Row[] | null> {
     const tx = this.db.tx;
@@ -141,23 +160,40 @@ export class SearchService {
         FROM sites s WHERE s.is_active AND search_sites_text(s.site_code, s.owner_site_id, s.name, s.name_ar) LIKE ${pattern} ${reach}
         ORDER BY s.site_code LIMIT ${limit}`);
     }
-    if (type === 'registers') {
-      const defs = await tx.$queryRaw<{ register_key: string; module_key: string }[]>(
-        Prisma.sql`SELECT register_key, module_key FROM register_definitions WHERE is_active`);
-      const clauses: Prisma.Sql[] = [];
-      for (const d of defs) {
-        const regions = await this.access.regions(d.module_key, 'view');
-        if (regions !== null && regions.length === 0) continue;
-        clauses.push(regions === null
-          ? Prisma.sql`r.register_key = ${d.register_key}`
-          : Prisma.sql`(r.register_key = ${d.register_key} AND (r.is_global OR r.region_id = ANY(${regions}::int[])))`);
-      }
-      if (clauses.length === 0) return null;
+    if (type === 'registers' || (OWN_GROUP_REGISTERS as readonly string[]).includes(type)) {
+      const only = type === 'registers' ? null : type;
+      const clauses = await this.registerReach(only);
+      if (clauses === null) return null;
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT r.id::text AS id,
           coalesce(nullif(r.data ->> 'title', ''), nullif(r.data ->> 'name', ''), r.record_type, rd.name_en) AS title,
-          rd.name_en AS subtitle, r.region_id, '/registers/' || r.register_key AS href, (COUNT(*) OVER())::int AS total
+          rd.name_en AS subtitle, r.region_id, '/registers/' || r.register_key || '?record=' || r.id::text AS href, (COUNT(*) OVER())::int AS total
         FROM register_records r JOIN register_definitions rd ON rd.register_key = r.register_key
         WHERE r.is_current AND r.voided_at IS NULL AND search_register_text(r.register_key, r.record_type, r.data) LIKE ${pattern} AND (${Prisma.join(clauses, ' OR ')})
+          ${only ? Prisma.empty : Prisma.sql`AND r.register_key <> ALL(${[...OWN_GROUP_REGISTERS]}::text[])`}
+        ORDER BY title LIMIT ${limit}`);
+    }
+    if (type === 'linked') {
+      // Link-aware search: records that point (through a Settings > Register links field, D60) at a record whose own text matches. Both ends must be readable
+      // by the caller (module right and region), so a hidden record never shows up through its neighbour.
+      const clauses = await this.registerReach(null);
+      if (clauses === null) return null;
+      const targetClauses = await this.registerReach(null, 'tg');
+      if (targetClauses === null) return null;
+      const match = Prisma.sql`SELECT tg.id, tg.register_key, tg.record_type, tg.data, td.name_en AS target_name
+          FROM register_links l
+          JOIN register_records tg ON tg.register_key = l.target_register AND (tg.entity_id::text = r.data ->> l.field_code OR tg.id::text = r.data ->> l.field_code) AND tg.is_current AND tg.voided_at IS NULL
+          JOIN register_definitions td ON td.register_key = tg.register_key
+          WHERE l.is_active AND l.register_key = r.register_key AND tg.id <> r.id
+            AND search_register_text(tg.register_key, tg.record_type, tg.data) LIKE ${pattern}
+            AND (${Prisma.join(targetClauses, ' OR ')})`;
+      return tx.$queryRaw<Row[]>(Prisma.sql`SELECT r.id::text AS id,
+          coalesce(nullif(r.data ->> 'title', ''), nullif(r.data ->> 'name', ''), r.record_type, rd.name_en) AS title,
+          rd.name_en || ' > ' || (SELECT m.target_name || ': ' || coalesce(nullif(m.data ->> 'title', ''), nullif(m.data ->> 'name', ''), m.record_type, '') FROM (${match}) m LIMIT 1) AS subtitle,
+          r.region_id, '/registers/' || r.register_key || '?record=' || r.id::text AS href, (COUNT(*) OVER())::int AS total
+        FROM register_records r JOIN register_definitions rd ON rd.register_key = r.register_key
+        WHERE r.is_current AND r.voided_at IS NULL
+          AND search_register_text(r.register_key, r.record_type, r.data) NOT LIKE ${pattern}
+          AND (${Prisma.join(clauses, ' OR ')}) AND EXISTS (${match})
         ORDER BY title LIMIT ${limit}`);
     }
     if (type === 'documents') {
