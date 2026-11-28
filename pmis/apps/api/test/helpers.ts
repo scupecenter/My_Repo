@@ -487,10 +487,19 @@ export function tokenFromSetCookie(res: request.Response): string | undefined {
 }
 
 export async function loggedIn(app: NestExpressApplication, u: TestUser, by: 'email' | 'employeeId' | 'phone' = 'email'): Promise<Api> {
-  const api = new Api(app);
-  const res = await api.login(u[by], u.password);
-  if (res.status !== 200) throw new Error(`login failed in test setup: ${res.status} ${JSON.stringify(res.body)}`);
-  return api;
+  // new-device.test.ts switches the global new-device code setting on for a few seconds in the shared database. A sign-in of another test
+  // file that straddles the switch gets 403 action_forbidden ("no recent new-device check") once. That answer is retried, a wrong password
+  // or any other status is not.
+  for (let attempt = 1; ; attempt++) {
+    const api = new Api(app);
+    const res = await api.login(u[by], u.password);
+    if (res.status === 200) return api;
+    if (res.status === 403 && res.body?.code === 'action_forbidden' && attempt < 4) {
+      await new Promise((r) => setTimeout(r, 400 * attempt));
+      continue;
+    }
+    throw new Error(`login failed in test setup: ${res.status} ${JSON.stringify(res.body)}`);
+  }
 }
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
