@@ -11,7 +11,12 @@ When a slot's type needs a copy, the upload shows "This file is the signed copy"
 ## What shows
 - Each version shows a "Signed" and "Stamped" chip.
 - A slot whose type needs a copy shows "Awaiting the signed and stamped copy" until a current version carries it.
+- Library > Archive has two columns, "Signed copy" and "Stamped copy" (0474): a chip when the current version carries the marker, "Needed" when the type asks for it and no version does. Both are switched on in Settings > Documents > Archive (default columns; a project that already saved its list keeps it until an administrator ticks them). They are saved with the view and in the CSV export.
+- The same two fields are in the Archive filter (+ Filter > Document: Signed copy, Stamped copy; yes or no), so a view can list what is still unsigned or unstamped, and the bulk zip of that view follows the filter.
+- The zip `manifest.csv` ends with two columns, `signed` and `stamped` (yes or no).
 - Nothing is blocked: no gate, approval or slot status depends on the markers.
 
 ## Technical notes
 Migration 0555 adds no table. The need per type is the setting `documents.marks`; a version's markers are append-only audit rows (`document_file_marked`), so the data reset plan is unchanged. API: `GET /settings/document-marks`, `PUT /settings/document-marks/{code}`, optional upload fields `signed` and `stamped`.
+
+Migration 0474 adds only `doc_file_marked(file, 'signed' | 'stamped')` (reads the latest marker) and lists the two columns for the Archive setting; no table.

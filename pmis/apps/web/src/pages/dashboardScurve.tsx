@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { ProjectStatusSnapshot } from "@/api/dashboard";
 import { EChart, type Palette } from "@/components/EChart";
-import { useForecastMethod, useProgressRag } from "@/api/dashboardSettings";
+import { useForecastMethod, useForecastWindow, useProgressRag } from "@/api/dashboardSettings";
 import { RAG_CLASS, ragTone } from "@/lib/progressRag";
 import { forecastFull, scurveSeries, VELOCITY_WINDOW, weeklyVelocity, type ForecastMethod } from "@/lib/scurve";
 import { Card, pct, signed } from "./dashboardBits";
@@ -28,10 +28,12 @@ export function OpsScurveCard({ snaps }: { snaps: { items?: ProjectStatusSnapsho
     [snaps],
   );
   const series = useMemo(() => scurveSeries(points), [points]);
+  // contract 0.15.431: the number of weeks is the setting dashboard.forecast_window_weeks (default 4); until it is read the old fixed value is used
+  const windowWeeks = useForecastWindow().data?.weeks ?? VELOCITY_WINDOW;
   // contract 0.15.474: the weekly pace is taken by the setting dashboard.forecast_method (mean, the default and the former behaviour, or a fitted straight line)
   const m = useForecastMethod().data?.method;
   const method: ForecastMethod = m === "linear" ? "linear" : "mean";
-  const velocity = useMemo(() => weeklyVelocity(points, VELOCITY_WINDOW, method), [points, method]);
+  const velocity = useMemo(() => weeklyVelocity(points, windowWeeks, method), [points, windowWeeks, method]);
   // contract 0.15.432: the velocity is coloured only when an admin turned it on in Settings > Dashboard
   const velTone = ragTone(useProgressRag().data?.items, "velocity", velocity);
   const forecast = useMemo(() => forecastFull(points, velocity), [points, velocity]);

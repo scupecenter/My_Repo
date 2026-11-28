@@ -23,6 +23,8 @@ import { RegisterColumnsController, RegisterStateController, StructurePolicyCont
 import { RegisterRulesController } from './registers/register-rules.controller';
 import { RegisterRulesService } from './registers/register-rules.service';
 import { RegisterColumnsService } from './registers/register-columns.service';
+import { CustomRegistersController } from './custom-registers/custom-registers.controller';
+import { CustomRegistersService } from './custom-registers/custom-registers.service';
 import { StructureProposalsService } from './registers/structure-proposals.service';
 import { RegistersService } from './registers/registers.service';
 // P5 (migration 0057): the list catalogue
@@ -94,6 +96,8 @@ import { ProgressRagController } from './dashboard/progress-rag.controller';
 import { ProgressRagService } from './dashboard/progress-rag.service';
 import { ForecastMethodController } from './dashboard/forecast-method.controller';
 import { ForecastMethodService } from './dashboard/forecast-method.service';
+import { ForecastWindowController } from './dashboard/forecast-window.controller';
+import { ForecastWindowService } from './dashboard/forecast-window.service';
 import { GoalsController } from './dashboard/goals.controller';
 import { GoalsService } from './dashboard/goals.service';
 import { SiteMapService } from './dashboard/site-map.service';
@@ -102,6 +106,8 @@ import { DashboardOpsController } from './dashboard/dashboard-ops.controller';
 import { DashboardTargetPolicyController } from './dashboard/dashboard-target-policy.controller';
 import { DashboardTargetPolicyService } from './dashboard/dashboard-target-policy.service';
 import { DashboardOpsService } from './dashboard/dashboard-ops.service';
+import { DashboardFinanceController } from './dashboard/dashboard-finance.controller';
+import { DashboardFinanceService } from './dashboard/dashboard-finance.service';
 import { DelayPeriodsController } from './dashboard/delay-periods.controller';
 import { DelayPeriodsService } from './dashboard/delay-periods.service';
 import { ProjectStatusService } from './dashboard/project-status.service';
@@ -247,6 +253,7 @@ import { DuplicateRowsSettingsService } from './settings/duplicate-rows-settings
 export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
+      CustomRegistersController,
       InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
@@ -255,10 +262,12 @@ export function appModuleFor(config: AppConfig) {
 DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, DashboardTargetPolicyController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
 DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController, OpsLimitsController,
       PartialCreditController, // 0.15.269 progress standards
+      DashboardFinanceController, // 0.15.206 (own line: the restricted financial summary)
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       SnapshotWeekdayController, // 0.15.430 (own line)
       ProgressRagController, // 0.15.432 (own line)
       ForecastMethodController, // 0.15.474 (own line)
+      ForecastWindowController, // 0.15.431 (own line)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
       CspReportController, // SEC-3
@@ -281,6 +290,7 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
       FinanceHubController, // 0.15.361 (0406): Finance hub landing page
     ],
     providers: [
+      CustomRegistersService,
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, PasswordResetService, RateLimiter, SessionService, UserStateService, StepUpService,
       InvitationsService, // 0091
@@ -291,10 +301,12 @@ DashboardController, DashboardSettingsController, GoalsController, PmSchedulesCo
 DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, DashboardTargetPolicyService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
 DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService, OpsLimitsService,
       PartialCreditService, // 0.15.269 progress standards
+      DashboardFinanceService, // 0.15.206 (own line)
       MediaService, // 0.15.292
       SnapshotWeekdayService, // 0.15.430 (own line)
       ProgressRagService, // 0.15.432 (own line)
       ForecastMethodService, // 0.15.474 (own line)
+      ForecastWindowService, // 0.15.431 (own line)
       PasskeyService, // S4
       DuplicateRowsSettingsService,
       TemplateNoticeSettingsService,

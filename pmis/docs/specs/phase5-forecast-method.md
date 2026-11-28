@@ -14,4 +14,4 @@ Status: built in this PR (migration 0612, contract 0.15.474). Source: the phase 
 
 ## Assumptions to confirm
 - Two methods only (mean, linear). More can be added in the same setting.
-- The forecast window (how many weeks) is the separate gap 4 setting; this PR keeps the fixed window of 4 until that PR merges.
+- The forecast window (how many weeks) is the gap 4 setting (merged); the card uses that window and this method together.
