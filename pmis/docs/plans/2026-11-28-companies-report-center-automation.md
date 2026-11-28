@@ -35,7 +35,7 @@ Arabic labels for outputs: عرض، تنزيل، طباعة، إرسال بال�
 - No link to an external BI tool and no CSV or JSON feed for one.
 - No public report links.
 - No drag-and-drop designer, no free computed fields, no per-recipient copies, no definition templates, no folders or tags (revisit only on request).
-- No AI features unless decided separately.
+- No AI features of any kind (company policy). Not a candidate for any list.
 
 ## 3. Automation (reuse of existing mechanisms)
 1. Company document or certificate expiry raises an alert through the alert rules.
