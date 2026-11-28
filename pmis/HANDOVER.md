@@ -101,3 +101,5 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 ## 7. Next
 
 There is no fixed list here any more. Open work is in the open pull requests and in the `open` (مفتوح) lines of the newest `CHANGELOG.md` entries. Still planned for a later phase: the CPE / end-user installation module and the mobile app.
+
+- 2026-11-28 (A2, migration 0780, contract 0.15.780): the Risks register shows a derived risk score (probability x impact) and level (bands of the dashboard risk matrix), computed on read, read-only. Source: `registers.service.ts` `withRiskScore`.

@@ -106,6 +106,7 @@ export function showValue(f: RegisterField, v: unknown, lang: string, t: ReturnT
   if (v === undefined || v === null || v === '') return '—';
   const typed = showTyped(f, v, lang, t, ctx);
   if (typed !== null) return typed;
+  if (f.code === 'risk_level' && typeof v === 'string') return t(`registers.risk_level_${v}`, { defaultValue: v });
   if (f.type === 'yes_no') return v ? t('common.yes') : t('common.no');
   if (f.type === 'user') return typeof v === 'string' ? (ctx?.refs?.users?.[v]?.display_name ?? v) : ((v as Person).display_name ?? '—');
   if (f.type === 'list' || f.type === 'external_party') { const o = f.options?.find((x) => x.value === v); return o ? ((lang === 'ar' && o.label_ar) || o.label_en) : String(v); }
