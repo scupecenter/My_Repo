@@ -3,7 +3,7 @@ import { AtSign, BellRing, CheckCheck, Clock3, ExternalLink, Eye, EyeOff, Flag, 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { notificationTitle } from '@/lib/notificationTitle';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Notification } from '@/api/types';
 import { useInbox, useNotificationOps, type InboxFilter } from '@/api/x';
 import { errText } from '@/components/FormDialog';
@@ -90,7 +90,7 @@ export function Inbox() {
 
   return (
     <div data-testid="page-inbox">
-      <PageHeader title={t('inbox.title')} subtitle={t('inbox.subtitle')} context={<span className="chip bg-accentSoft text-accentText" data-testid="inbox-unread">{t('inbox.unread_n', { count: unread })}</span>} />
+      <PageHeader title={t('inbox.title')} subtitle={t('inbox.subtitle')} context={<><span className="chip bg-accentSoft text-accentText" data-testid="inbox-unread">{t('inbox.unread_n', { count: unread })}</span><Link to="/follow-up" className="btn px-2 py-1 text-xs" data-testid="inbox-go-followup">{t('fup.open')}</Link></>} />
       {cfg.tabs_enabled && (
         <div role="group" aria-label={t('inbox.tabs')} className="mb-2 flex flex-wrap gap-1" data-testid="inbox-tabs">
           {INBOX_TABS.map((x) => {

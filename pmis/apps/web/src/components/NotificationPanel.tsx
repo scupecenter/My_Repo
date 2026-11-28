@@ -123,6 +123,7 @@ export function NotificationBell({ count }: { count: number }) {
             <button className="btn mb-2 w-full" onClick={() => void readAll()}><Check size={14} />{t('top.mark_all_read')}</button>
             {list}
             <Link to="/inbox" data-testid="bell-open-inbox" onClick={() => setOpen(false)} className="mt-1 block rounded-md p-2 text-center text-sm font-semibold text-link hover:bg-hover">{t('top.open_inbox')}</Link>
+            <Link to="/follow-up" data-testid="bell-open-followup" onClick={() => setOpen(false)} className="block rounded-md p-2 text-center text-xs text-link hover:bg-hover">{t('fup.open')}</Link>
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
@@ -158,6 +159,7 @@ export function NotificationBell({ count }: { count: number }) {
             )}
             <div className="min-h-0 flex-1 overflow-y-auto">{list}</div>
             <Link to="/inbox" data-testid="bell-open-inbox" onClick={() => { if (!isDocked) setOpen(false); }} className="block rounded-md p-2 text-center text-sm font-semibold text-link hover:bg-hover">{t('top.open_inbox')}</Link>
+            <Link to="/follow-up" data-testid="bell-open-followup" onClick={() => setOpen(false)} className="block rounded-md p-2 text-center text-xs text-link hover:bg-hover">{t('fup.open')}</Link>
             <span className="sr-only" role="status" aria-live="polite" data-testid="bell-live">{live}</span>
           </div>
         )}
@@ -186,6 +188,7 @@ export function NotificationBell({ count }: { count: number }) {
           )}
           <div className="min-h-0 flex-1 overflow-y-auto">{list}</div>
           <Link to="/inbox" data-testid="bell-open-inbox" onClick={() => setOpen(false)} className="block rounded-md p-2 text-center text-sm font-semibold text-link hover:bg-hover">{t('top.open_inbox')}</Link>
+            <Link to="/follow-up" data-testid="bell-open-followup" onClick={() => setOpen(false)} className="block rounded-md p-2 text-center text-xs text-link hover:bg-hover">{t('fup.open')}</Link>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
