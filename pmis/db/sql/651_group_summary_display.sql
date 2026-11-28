@@ -1,4 +1,4 @@
--- Item 9 (0.15.533): the group summary row of grouped tables (a count and a status distribution bar on every group header) is one more Display option,
+-- Item 9 (0.15.561): the group summary row of grouped tables (a count and a status distribution bar on every group header) is one more Display option,
 -- `groupbar`, on the same framework as text size, alignment, wrap and zebra rows: the organization default is Settings > Screens > Tables (setting
 -- `table.display`, audited), the person's own choice is per screen in the Layout panel (and kept by saved views). Additive: no table, no new
 -- function, no permission change. Both functions are changed in place and idempotently; the key is optional in the PUT body, so an older client that
@@ -24,4 +24,4 @@ END $$;
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('group_summary_display_applied', 'workflow', NULL,
         jsonb_build_object('table_display_key', 'groupbar', 'default', true),
-        'Group summary row on grouped tables, a Display option (migration 0652, contract 0.15.533).');
+        'Group summary row on grouped tables, a Display option (migration 0652, contract 0.15.561).');

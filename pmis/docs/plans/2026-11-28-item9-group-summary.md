@@ -25,7 +25,7 @@ Built on the framework of the Display options (W8 item 4): one more option, `gro
 `table_display_seed()` and `admin_set_table_display` (patched in place, idempotent, the key is optional in a PUT so an older client still works), `GET/PUT /settings/table-display`, saved views (`display.groupbar`), the contract schemas `TableDisplay` and `SavedViewColumns`, the mock door, `DisplaySettings` preview, `LayoutPanel`, `displayAttrs` (`data-tgroupbar`).
 
 ## Numbers
-db/sql 651 = prisma 0652 (byte-identical), contract 0.15.533. No table, no route, no permission change.
+db/sql 651 = prisma 0652 (byte-identical), contract 0.15.561. No table, no route, no permission change.
 
 ## Walkthrough
 `e2e/group-summary.spec.ts` (EN and AR): My Work shows the bar and the text alternative, a segment filters and clears, the Layout panel switch hides the bar and brings it back.
