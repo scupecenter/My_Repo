@@ -9,6 +9,8 @@ import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
 import { useItemColumns, type ItemColumn } from '@/api/warehouseColumns';
+import { HistoryDialog } from '@/components/HistoryDialog';
+import { useItemHistory } from '@/api/history';
 import { useConfigGaps, useRegionVendors, useSaveRegionVendor, type RegionVendor, useDeleteItem, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -43,6 +45,8 @@ function Items() {
   const list = useWhItems({ q, include_inactive: inactive });
   const save = useSaveItem<WarehouseItem>('/warehouse/items', 'wh-items');
   const del = useDeleteItem();
+  const [hist, setHist] = useState<WarehouseItem | null>(null);
+  const histQ = useItemHistory(hist?.id ?? null);
   const [dlg, setDlg] = useState<Dlg>(null);
   const [f, setF] = useState<Form>(EMPTY);
   const cols = useItemColumns().data ?? [];
@@ -118,10 +122,12 @@ function Items() {
     { id: 'serial', label: t('wh.serial'), w: 90, text: (x) => (x.serial_tracked ? t('wh.yes') : t('wh.no')), cell: (x) => (x.serial_tracked ? t('wh.yes') : t('wh.no')) },
     ...cols.map((c): StdCol<WarehouseItem> => ({ id: `cv_${c.code}`, label: colLabel(c), w: 140, text: (x) => showVal(c, (x.custom ?? {})[c.code]), cell: (x) => <span data-testid={`wh-cv-${x.code}-${c.code}`}>{showVal(c, (x.custom ?? {})[c.code])}</span> })),
     { id: 'status', label: t('wh.status'), w: 110, text: (x) => t(x.is_active ? 'wh.active' : 'wh.inactive'), cell: (x) => <span className={`chip ${x.is_active ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{t(x.is_active ? 'wh.active' : 'wh.inactive')}</span> },
-    { id: 'actions', label: '', w: 260, action: true, multi: true, text: () => '', cell: (x) => admin && x.is_active ? <span className="flex flex-wrap justify-end gap-1">
+    { id: 'actions', label: '', w: 260, action: true, multi: true, text: () => '', cell: (x) => admin ? <span className="flex flex-wrap justify-end gap-1">
+      <button className="btn" data-testid={`wh-history-${x.code}`} onClick={() => setHist(x)}>{t('history.open')}</button>
+      {x.is_active && <>
       <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>
       <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>
-      {x.deletable && <button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button>}</span> : null },
+      {x.deletable && <button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button>}</>}</span> : null },
   ];
   return (
     <div data-testid="wh-items">
@@ -131,6 +137,25 @@ function Items() {
         views={<SavedViews<Record<string, unknown>> screen="warehouse-items" value={{ q, inactive }} empty={{ q: '', inactive: false }} onApply={(v) => { setQ(String(v.q ?? '')); setInactive(v.inactive === true); }} />}
         extra={<label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="wh-show-inactive" checked={inactive} onChange={(e) => setInactive(e.target.checked)} />{t('wh.show_inactive')}</label>}
         primary={admin ? <button className="btn btn-primary" data-testid="wh-new" onClick={() => open({ mode: 'new' })}><Plus size={16} />{t('wh.new_item')}</button> : undefined} />
+      {hist && <HistoryDialog testid="wh-history-dialog" title={t('history.title_item', { code: hist.code })} entries={histQ.data} loading={histQ.isLoading} onClose={() => setHist(null)}
+        onRestore={(e) => {
+          // Restore = the old values through the normal writer (PATCH items/:id): rights, locks, reason and audit as for any edit
+          // every field the item writer accepts; the code (identity), version and timestamps are not restorable
+          const EDITABLE = ['name_en', 'name_ar', 'uom', 'category', 'serial_tracked', 'manufacturer', 'contract_qty', 'planned_delivery_date', 'progress_item_code', 'code_source', 'is_active'];
+          const body: Record<string, unknown> = Object.fromEntries(e.changes.filter((c) => EDITABLE.includes(c.field)).map((c) => [c.field, c.from ?? null]));
+          const cc = e.changes.find((c) => c.field === 'custom');
+          if (cc) {
+            // extra columns: the old values, and null for a column that had no value before
+            const was = (cc.from ?? {}) as Record<string, unknown>; const now = (cc.to ?? {}) as Record<string, unknown>;
+            const custom: Record<string, unknown> = {};
+            Object.keys({ ...was, ...now }).forEach((k) => { if (JSON.stringify(was[k] ?? null) !== JSON.stringify(now[k] ?? null)) custom[k] = was[k] ?? null; });
+            if (Object.keys(custom).length) body.custom = custom;
+          }
+          const nr = e.changes.find((c) => c.field === 'need_rules');
+          if (nr && Array.isArray(nr.from)) body.need_rules = nr.from;
+          if (!Object.keys(body).length) return;
+          save.mutate({ item: hist, body: { ...body, reason: `Restore ${e.action} ${e.at.slice(0, 10)}` } }, { onSuccess: () => { setHist(null); toast(t('history.restored')); }, onError: (er) => toast(registerErrorMessage(t, er), 'err') });
+        }} />}
       {dlg && (
         <FormDialog open onClose={close} testid="wh-dialog" busy={save.isPending || del.isPending} error={err} onSubmit={submit}
           title={t(dlg.mode === 'new' ? 'wh.new_title' : dlg.mode === 'edit' ? 'wh.edit_title' : dlg.mode === 'del' ? 'wh.delete_title' : 'wh.deactivate_title')}
