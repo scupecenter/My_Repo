@@ -73,6 +73,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 
 **Orphans alert (0650, D60 follow-up).** `register_link_orphans()` (0409) counts, per declared link, the current rows whose id is no current record of the target. The alert kind `link_orphans` of the generic alert rules (`Settings > Alerts > Rules`; params `register_key`, `field_code`, `min_rows`) sends one in-app notification per link at or above `min_rows`, once per working week while it keeps dangling, to the rule's audience. `GET /settings/alert-rules/link-orphans` (System Admin) returns the same counts with up to 20 example record ids per link. Nothing is changed or cleared by the alert (hide, never delete), and no `enforce` value moves: the report is what the owner checks before switching a link on. The Settings editor of the links (#359) is not on main yet, so the per-link badge and the warning when switching `enforce` on are for that editor to add.
 
+**Personal record templates (0741).** `user_record_templates` holds the caller's own templates (register key, name, record type, plain values). It links to `users` (owner) only. It holds no record, site, party or file id, so it creates no link between registers. Starting a record from a template or a previous record copies plain values into the form; the normal create still runs.
+
 ## 4. Gaps and proposals
 
 1. **Warehouse receipt to Procurement order.** A PL / OPEN receipt (stock coming in) names no order, so what arrived against a PO is not visible in
