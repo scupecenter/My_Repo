@@ -11,6 +11,9 @@
 --   2. wf_version_delete_open(wf): true only inside the transaction that archived that version. The three structural guards and the version guard let the delete
 --      through only then (patched in place, delete branch only).
 --   3. admin_wf_delete_version(version, etag, reason): the one door.
+--   4. admin_wf_restore_version(archive id, reason): the way back. It puts the snapshot back in one transaction (as a draft, then published again with its own
+--      dates) and refuses, without changing anything, when the version number or any id of the snapshot exists again or when a row it points to is gone.
+--      workflow_archive_json(): the list of archived versions (no snapshot body) for the Studio card.
 
 CREATE TABLE workflow_version_archive (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -20,7 +23,9 @@ CREATE TABLE workflow_version_archive (
   reason       text NOT NULL CHECK (btrim(reason) <> ''),
   archived_by  uuid,
   archived_at  timestamptz NOT NULL DEFAULT now(),
-  archived_xid xid8 NOT NULL DEFAULT pg_current_xact_id()
+  archived_xid xid8 NOT NULL DEFAULT pg_current_xact_id(),
+  restored_at  timestamptz,
+  restored_by  uuid
 );
 CREATE INDEX workflow_version_archive_version_idx ON workflow_version_archive (version, archived_at DESC);
 COMMENT ON TABLE workflow_version_archive IS 'Full snapshot of a published workflow version taken before it is deleted (0575). Restorable by hand from the jsonb; configuration, kept on a data reset.';
@@ -130,6 +135,67 @@ BEGIN
   RETURN jsonb_build_object('version', w.version, 'deleted', true, 'archive_id', aid);
 END $$;
 
+CREATE OR REPLACE FUNCTION workflow_archive_json() RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+BEGIN
+  PERFORM public.wfe_require('workflow_versions', 'administer');
+  RETURN coalesce((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'version', a.version, 'archived_at', a.archived_at, 'reason', a.reason,
+                     'archived_by', public.wfe_user_ref(a.archived_by), 'restored_at', a.restored_at,
+                     'effective_from', a.snapshot -> 'workflow' ->> 'effective_from',
+                     'stages', jsonb_array_length(a.snapshot -> 'stages'), 'tasks', jsonb_array_length(a.snapshot -> 'tasks'))
+                   ORDER BY a.archived_at DESC) FROM public.workflow_version_archive a), '[]'::jsonb);
+END $$;
+
+CREATE OR REPLACE FUNCTION admin_wf_restore_version(p_archive uuid, p_reason text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE a public.workflow_version_archive%ROWTYPE; snap jsonb; wid uuid; ver integer; clash text;
+BEGIN
+  PERFORM public.wfe_require('workflow_versions', 'administer');
+  PERFORM public.calc_require_reason(p_reason);
+  SELECT * INTO a FROM public.workflow_version_archive WHERE id = p_archive FOR UPDATE;
+  IF NOT FOUND THEN PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The archived version does not exist.')); END IF;
+  IF a.restored_at IS NOT NULL THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'This archived version was already restored.')); END IF;
+  snap := a.snapshot; wid := a.workflow_id; ver := a.version;
+  clash := CASE
+    WHEN EXISTS (SELECT 1 FROM public.workflow_definitions WHERE version = ver OR id = wid) THEN 'the version number or id exists again'
+    WHEN EXISTS (SELECT 1 FROM public.stage_definitions WHERE id IN (SELECT (x ->> 'id')::uuid FROM jsonb_array_elements(snap -> 'stages') x)) THEN 'a milestone id exists again'
+    WHEN EXISTS (SELECT 1 FROM public.task_definitions WHERE id IN (SELECT (x ->> 'id')::uuid FROM jsonb_array_elements(snap -> 'tasks') x)) THEN 'a task id exists again'
+    WHEN EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE id IN (SELECT (x ->> 'id')::uuid FROM jsonb_array_elements(snap -> 'gates') x)) THEN 'a gate id exists again'
+    ELSE NULL END;
+  IF clash IS NOT NULL THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Cannot restore: ' || clash || '.')); END IF;
+
+  BEGIN
+    -- as a draft first (a published version cannot be built row by row), then published again with its own dates, reason and author
+    INSERT INTO public.workflow_definitions SELECT * FROM jsonb_populate_record(NULL::public.workflow_definitions, (snap -> 'workflow') || '{"status":"draft"}'::jsonb);
+    -- the inherit triggers copied streams and views of the previous version: replace them by the snapshot's own
+    DELETE FROM public.workflow_view_members WHERE workflow_id = wid;
+    DELETE FROM public.workflow_views WHERE workflow_id = wid;
+    DELETE FROM public.workflow_streams WHERE workflow_id = wid;
+    INSERT INTO public.workflow_streams SELECT * FROM jsonb_populate_recordset(NULL::public.workflow_streams, snap -> 'streams');
+    INSERT INTO public.workflow_views SELECT * FROM jsonb_populate_recordset(NULL::public.workflow_views, snap -> 'views');
+    INSERT INTO public.workflow_view_members SELECT * FROM jsonb_populate_recordset(NULL::public.workflow_view_members, snap -> 'view_members');
+    INSERT INTO public.stage_definitions SELECT * FROM jsonb_populate_recordset(NULL::public.stage_definitions, snap -> 'stages');
+    INSERT INTO public.phase_gate_rules SELECT * FROM jsonb_populate_recordset(NULL::public.phase_gate_rules, snap -> 'gates');
+    INSERT INTO public.task_definitions SELECT * FROM jsonb_populate_recordset(NULL::public.task_definitions, snap -> 'tasks');
+    INSERT INTO public.task_predecessors SELECT * FROM jsonb_populate_recordset(NULL::public.task_predecessors, snap -> 'predecessors');
+    INSERT INTO public.matrix_cells SELECT * FROM jsonb_populate_recordset(NULL::public.matrix_cells, snap -> 'matrix_cells');
+    INSERT INTO public.sla_rules SELECT * FROM jsonb_populate_recordset(NULL::public.sla_rules, snap -> 'sla_rules');
+    INSERT INTO public.sla_rule_set_items SELECT * FROM jsonb_populate_recordset(NULL::public.sla_rule_set_items, snap -> 'sla_rule_set_items');
+    INSERT INTO public.document_type_placements SELECT * FROM jsonb_populate_recordset(NULL::public.document_type_placements, snap -> 'document_type_placements');
+    INSERT INTO public.scenario_task_rules SELECT * FROM jsonb_populate_recordset(NULL::public.scenario_task_rules, snap -> 'scenario_task_rules');
+    UPDATE public.workflow_definitions SET status = 'published', changed_by = coalesce(changed_by, public.app_actor()),
+           reason = coalesce(nullif(btrim(reason), ''), btrim(p_reason)), published_at = (snap -> 'workflow' ->> 'published_at')::timestamptz
+     WHERE id = wid;
+  EXCEPTION WHEN foreign_key_violation OR check_violation OR unique_violation THEN
+    PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Cannot restore: ' || SQLERRM));
+  END;
+
+  UPDATE public.workflow_version_archive SET restored_at = now(), restored_by = public.app_actor() WHERE id = a.id;
+  PERFORM public.wfe_audit('workflow_version_restore', 'workflow_definition', ver::text, jsonb_build_object('archive_id', a.id, 'version', ver),
+    jsonb_build_object('restored', true, 'version', ver), p_reason);
+  RETURN jsonb_build_object('version', ver, 'restored', true, 'archive_id', a.id);
+END $$;
+
 DO $$
 BEGIN
   ALTER FUNCTION wf_version_delete_open(uuid) OWNER TO pmis_definer;
@@ -138,9 +204,15 @@ BEGIN
   ALTER FUNCTION admin_wf_delete_version(integer, integer, text) OWNER TO pmis_definer;
   REVOKE ALL ON FUNCTION admin_wf_delete_version(integer, integer, text) FROM PUBLIC;
   GRANT EXECUTE ON FUNCTION admin_wf_delete_version(integer, integer, text) TO pmis_definer;
-  GRANT SELECT, INSERT ON workflow_version_archive TO pmis_definer;
+  ALTER FUNCTION workflow_archive_json() OWNER TO pmis_definer;
+  REVOKE ALL ON FUNCTION workflow_archive_json() FROM PUBLIC;
+  GRANT EXECUTE ON FUNCTION workflow_archive_json() TO pmis_definer;
+  ALTER FUNCTION admin_wf_restore_version(uuid, text) OWNER TO pmis_definer;
+  REVOKE ALL ON FUNCTION admin_wf_restore_version(uuid, text) FROM PUBLIC;
+  GRANT EXECUTE ON FUNCTION admin_wf_restore_version(uuid, text) TO pmis_definer;
+  GRANT SELECT, INSERT, UPDATE ON workflow_version_archive TO pmis_definer;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
-    GRANT EXECUTE ON FUNCTION admin_wf_delete_version(integer, integer, text) TO pmis_app;
+    GRANT EXECUTE ON FUNCTION admin_wf_delete_version(integer, integer, text), admin_wf_restore_version(uuid, text), workflow_archive_json() TO pmis_app;
     -- the guards run as the caller, so the caller may ask the helper (it only reports whether this transaction archived the version)
     GRANT EXECUTE ON FUNCTION wf_version_delete_open(uuid) TO pmis_app;
   END IF;

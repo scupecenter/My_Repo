@@ -538,10 +538,27 @@ describe('delete an old published version (migration 0575, contract 0.15.436)', 
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ version: free, deleted: true });
     expect((await db.query(`SELECT 1 FROM workflow_definitions WHERE version = $1`, [free])).rowCount).toBe(0);
-    const arch = await db.query(`SELECT snapshot, reason FROM workflow_version_archive WHERE version = $1`, [free]);
+    const arch = await db.query(`SELECT id, snapshot, reason FROM workflow_version_archive WHERE version = $1`, [free]);
     expect(arch.rowCount).toBe(1);
     expect(arch.rows[0].reason).toBe(REASON);
     expect(arch.rows[0].snapshot.stages.length).toBe(stages);
     expect((await db.query(`SELECT 1 FROM audit_log WHERE action = 'workflow_version_delete' AND entity_id = $1`, [String(free)])).rowCount).toBeGreaterThan(0);
+
+    // restore it from the archive: same number, same stage count, published, audited; a second restore is refused
+    const archId: string = arch.rows[0].id ?? (await db.query(`SELECT id FROM workflow_version_archive WHERE version = $1`, [free])).rows[0].id;
+    const listed = await admin.api.call('get', '/workflow/version-archive');
+    expect(listed.status).toBe(200);
+    expect(listed.body.items.some((x: { id: string }) => x.id === archId)).toBe(true);
+    const noReason = await admin.api.call('post', `/workflow/version-archive/${archId}/restore`, { reason: 'x' });
+    expect([400, 422]).toContain(noReason.status);
+    const back = await admin.api.call('post', `/workflow/version-archive/${archId}/restore`, { reason: REASON });
+    expect(back.status).toBe(200);
+    expect(back.body).toMatchObject({ version: free, restored: true });
+    const row = await db.query(`SELECT id, status FROM workflow_definitions WHERE version = $1`, [free]);
+    expect(row.rows[0].status).toBe('published');
+    expect((await db.query(`SELECT count(*)::int AS n FROM stage_definitions WHERE workflow_id = $1`, [row.rows[0].id])).rows[0].n).toBe(stages);
+    expect((await db.query(`SELECT 1 FROM audit_log WHERE action = 'workflow_version_restore' AND entity_id = $1`, [String(free)])).rowCount).toBeGreaterThan(0);
+    const again = await admin.api.call('post', `/workflow/version-archive/${archId}/restore`, { reason: REASON });
+    expect(again.status).toBe(409);
   });
 });

@@ -19,6 +19,8 @@ const seed = (): Ver[] => [{
   tasks: [t('A1', 'MS1', 1, 'SAR', 'تقرير المسح'), t('A2', 'MS1', 2, 'TSSR', 'تقرير TSSR', ['A1']), t('A4', 'MS1', 3, 'LLD', 'التصميم المنخفض المستوى', ['A2']), t('B1', 'MS2', 1, 'PR email', 'بريد طلب الشراء'), t('B2', 'MS2', 2, 'PO email', 'بريد أمر الشراء', ['B1'])],
 }];
 let state = seed();
+/** The archive of deleted versions (contract 0.15.436): the version object itself, so a restore puts it back as it was. */
+let archive: { id: string; at: string; reason: string; v: (typeof state)[number]; restored: boolean }[] = [];
 interface Mig { id: string; site_id: string; site_code: string; from_version: number; to_version: number; reason: string; migrated_at: string; reverted_at: string | null; revertible: boolean }
 let migrations: Mig[] = [];
 type SlaWeightMock = { counts: boolean; value: number; group: string | null; sla: Record<string, unknown> | null };
@@ -365,8 +367,25 @@ export const workflowEditorHandlers = [
     const cur = Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version));
     const reasons = [...(w.v.status !== 'published' ? ['not_published'] : []), ...(w.v.version === cur ? ['current'] : []), ...(w.v.version === 1 ? ['sites'] : [])];
     if (reasons.length) return problem(409, 'invalid_transition', `This version cannot be deleted: ${reasons.join(', ')}.`);
+    const archiveId = crypto.randomUUID();
+    archive.push({ id: archiveId, at: new Date().toISOString(), reason: b.reason ?? '', v: w.v, restored: false });
     state = state.filter((x) => x !== w.v);
-    return HttpResponse.json({ version: w.v.version, deleted: true, archive_id: crypto.randomUUID() });
+    return HttpResponse.json({ version: w.v.version, deleted: true, archive_id: archiveId });
+  }),
+  http.get(`${B}/workflow/version-archive`, () => {
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    return HttpResponse.json({ items: [...archive].reverse().map((a) => ({ id: a.id, version: a.v.version, archived_at: a.at, reason: a.reason, effective_from: null, stages: a.v.milestones.length, tasks: a.v.tasks.length, restored_at: a.restored ? a.at : null })) });
+  }),
+  http.post(`${B}/workflow/version-archive/:id/restore`, async ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    const a = archive.find((x) => x.id === params.id);
+    if (!a) return problem(404, 'not_found', 'The archived version does not exist.');
+    if (a.restored) return problem(409, 'invalid_transition', 'This archived version was already restored.');
+    if (state.some((x) => x.version === a.v.version)) return problem(409, 'invalid_transition', 'Cannot restore: the version number exists again.');
+    state = [...state, a.v]; a.restored = true;
+    return HttpResponse.json({ version: a.v.version, restored: true, archive_id: a.id });
   }),
   http.post(`${B}/workflow/versions/:version/discard`, async ({ params, request }) => {
     const b = (await request.json()) as { reason?: string };

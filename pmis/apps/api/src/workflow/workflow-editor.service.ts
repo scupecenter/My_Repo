@@ -83,6 +83,7 @@ const migrateBody = z.object({ preview_hash: z.string().min(8).max(100), selecti
 const revertBody = z.object({ reason }).strict();
 const removeBody = z.object({ kind: z.enum(['task', 'milestone', 'gate']), code, reason }).strict();
 const discardBody = z.object({ reason }).strict();
+const restoreBody = z.object({ reason }).strict();
 const deleteVersionBody = z.object({ reason, confirm_text: z.string().max(200) }).strict();
 const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
 const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
@@ -165,6 +166,23 @@ export class WorkflowEditorService {
     }
     const etag = await this.gate(auth, 'workflow_versions', 'administer', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_delete_version(${version}::int, ${etag}::int, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0575: the archived versions (no snapshot body). The publish right. */
+  async archiveList(): Promise<Json> {
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    return { items: (await this.one(Prisma.sql`SELECT workflow_archive_json() AS r`)) as unknown as Json[] };
+  }
+
+  /** Migration 0575: put an archived version back, as it was (published, same version number and ids), in one transaction. Same right, step-up and reason as the delete. */
+  async restoreVersion(auth: AuthContext, archiveId: string, raw: unknown): Promise<Json> {
+    const b = parse(restoreBody, raw);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(archiveId)) {
+      throw new ProblemException(404, 'not_found', { detail: 'The archived version does not exist.' });
+    }
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    await this.stepUp.require(auth);
+    return this.one(Prisma.sql`SELECT admin_wf_restore_version(${archiveId}::uuid, ${b.reason}::text) AS r`);
   }
 
   async updateTask(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

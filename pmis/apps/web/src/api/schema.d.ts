@@ -3465,6 +3465,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/version-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The archived (deleted) workflow versions (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions. No snapshot body: id, version, effective date, who archived it and why, counts, and when it was restored.
+         */
+        get: operations["listWorkflowVersionArchive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/version-archive/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived workflow version as it was (0.15.436)
+         * @description Migration 0575. Needs `workflow_versions.administer` for all regions, a reason and a step-up. One transaction: the version comes back published with its version number, ids, dates, milestones, gates, tasks, links, matrix cells, SLA rules, placements, scenario rules, streams and views. 409 `invalid_transition` (nothing changes) when the version number or an id exists again, it was already restored, or a row it points to is gone. Audited as `workflow_version_restore`.
+         */
+        post: operations["restoreWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/delete": {
         parameters: {
             query?: never;
@@ -29951,6 +29991,81 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listWorkflowVersionArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            version: number;
+                            /** Format: date-time */
+                            archived_at: string;
+                            reason?: string;
+                            effective_from?: string | null;
+                            stages?: number;
+                            tasks?: number;
+                            archived_by?: components["schemas"]["UserRef"] | null;
+                            /** Format: date-time */
+                            restored_at?: string | null;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    restoreWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        restored: boolean;
+                        /** Format: uuid */
+                        archive_id: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     deleteWorkflowVersion: {

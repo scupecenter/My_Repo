@@ -5385,6 +5385,12 @@
     }
   },
   "oldVersions": {
+    "archived_title": "Deleted versions (archived)",
+    "restore": "Restore version",
+    "restore_aria": "Restore version {{version}}",
+    "restore_title": "Restore version {{version}}",
+    "restore_hint": "The version comes back published, as it was (same number, milestones, gates, tasks, links and SLA rules), in one step. It is refused, and nothing changes, if the version number or an id exists again.",
+    "restored": "Version restored.",
     "title": "Old published versions",
     "note": "A published version that is not in force and that no site uses can be deleted. A full snapshot of it is archived first, so it can be restored. Needs the publish right, your password, a reason and the typed version number.",
     "sites": "{{count}} sites",

@@ -36,6 +36,12 @@ describe('delete an old published version', () => {
     await u.type(screen.getByRole('textbox', { name: /reason/i }), REASON);
     await u.click(screen.getByTestId('old-version-delete-dialog-submit'));
     await waitFor(() => expect(screen.queryByTestId('old-version-2')).not.toBeInTheDocument());
-    expect((await api.get<{ items: { version: number }[] }>('/workflow/versions')).items.map((x) => x.version)).not.toContain(2);
+    // restore it from the archive: same number again
+    await u.click(await screen.findByTestId('archived-restore-2'));
+    await u.type(screen.getByRole('textbox', { name: /reason/i }), REASON);
+    await u.click(screen.getByTestId('archived-restore-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('old-version-2')).toBeInTheDocument());
+    expect(screen.queryByTestId('archived-version-2')).not.toBeInTheDocument();
+    expect((await api.get<{ items: { version: number }[] }>('/workflow/versions')).items.map((x) => x.version)).toContain(2);
   });
 });

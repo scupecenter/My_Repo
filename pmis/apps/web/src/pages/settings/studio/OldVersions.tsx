@@ -1,7 +1,7 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useDeleteVersion, useWorkflowVersion, useWorkflowVersions, type WorkflowVersionSummary } from "@/api/workflowEditor";
+import { useDeleteVersion, useRestoreVersion, useVersionArchive, useWorkflowVersion, useWorkflowVersions, type ArchivedVersion, type WorkflowVersionSummary } from "@/api/workflowEditor";
 import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 
@@ -14,8 +14,11 @@ export function OldVersions() {
   const { t } = useTranslation();
   const q = useWorkflowVersions();
   const [target, setTarget] = useState<number | null>(null);
+  const arch = useVersionArchive();
+  const [restore, setRestore] = useState<ArchivedVersion | null>(null);
   const old = (q.data?.items ?? []).filter((v) => v.status === "published" && !v.is_current);
-  if (old.length === 0) return null;
+  const archived = (arch.data?.items ?? []).filter((a) => !a.restored_at);
+  if (old.length === 0 && archived.length === 0) return null;
   return (
     <section className="card space-y-2 p-3" data-testid="old-versions" aria-label={t("oldVersions.title")}>
       <h3 className="font-semibold">{t("oldVersions.title")}</h3>
@@ -40,8 +43,56 @@ export function OldVersions() {
           </li>
         ))}
       </ul>
+      {archived.length > 0 && (
+        <div className="space-y-1" data-testid="archived-versions">
+          <h4 className="text-sm font-semibold">{t("oldVersions.archived_title")}</h4>
+          <ul className="space-y-1">
+            {archived.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-2 text-sm" data-testid={`archived-version-${a.version}`}>
+                <span className="mono">v{a.version}</span>
+                <span className="text-mute">{new Date(a.archived_at).toLocaleDateString()}{a.reason ? ` · ${a.reason}` : ""}</span>
+                <button type="button" className="btn ms-auto min-h-11" data-testid={`archived-restore-${a.version}`} aria-label={t("oldVersions.restore_aria", { version: a.version })} onClick={() => setRestore(a)}>
+                  <Undo2 size={14} aria-hidden />
+                  {t("oldVersions.restore")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {target !== null && <DeleteDialog version={target} onClose={() => setTarget(null)} />}
+      {restore && <RestoreDialog item={restore} onClose={() => setRestore(null)} />}
     </section>
+  );
+}
+
+function RestoreDialog({ item, onClose }: { item: ArchivedVersion; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const res = useRestoreVersion();
+  return (
+    <FormDialog
+      open
+      onClose={onClose}
+      testid="archived-restore-dialog"
+      title={t("oldVersions.restore_title", { version: item.version })}
+      submitLabel={t("oldVersions.restore")}
+      busy={res.isPending}
+      error={res.isError ? errText(res.error, t) : null}
+      onSubmit={(reason) =>
+        res.mutate(
+          { id: item.id, reason },
+          {
+            onSuccess: () => {
+              toast(t("oldVersions.restored"));
+              onClose();
+            },
+          },
+        )
+      }
+    >
+      <p className="text-sm text-mute">{t("oldVersions.restore_hint")}</p>
+    </FormDialog>
   );
 }
 
