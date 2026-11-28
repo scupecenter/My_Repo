@@ -37,6 +37,8 @@ info:
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
     - 0.15.269 (2026-11-27): progress calculation standards (owner approval 2026-11-27; migrations 0540-0545; PR #458). Additive. (1) Register and LOE measure rules for weight items (0540): an item can be measured by a register record's state or as level-of-effort (excluded from plan figures). (2) Draft calibrated weight set v2 (0541, DRAFT, never auto-published). (3) Task estimated man-days and planned duration with a suggested weight in the editor (0542; `PUT /workflow/versions/{version}/tasks/{task_code}/estimate`; advice only, never auto-applied). (4) Partial credit for in-progress tasks, OFF by default (0543; `GET`/`PUT /settings/partial-credit`, System Admin). (5) Warehouse-linked central equipment items measured from central warehouse movements (0544). (6) Per-region forecast completion date on the dashboard regions card and project-status rows (0545; `DashboardRegion.forecast_date`, rows `forecast_date`). The Arabic names of all 45 weight items are backfilled (0546) and remain editable on draft sets in the weight-set editor.
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
+    - 0.15.332 (2026-11-27): the generic link declaration (D60, phase 1; migration 0409, mirror `db/sql/408_register_links.sql`). Additive. New table `register_links` (one row per link field), `GET /registers/{key}/links` (`listRegisterLinks`) and `GET /registers/{key}/link-options/{field}` (`listRegisterLinkOptions`); `record_related` also reads the declared links; links flagged `enforce` are checked in entry. Existing links are declared with the check off.
+    - 0.15.333 (2026-11-27): the link declaration learns the filters and labels of the hand-coded pickers (D60, phase 2; migration 0410, mirror `db/sql/409_register_links_filters.sql`). Additive, no new path. `GET /registers/{key}/link-options/{field}` applies the link's data filters (for example advances in disbursed or settlement, orders not cancelled) and labels items with the PO / WO No. and the contractor; the web register drawer uses it instead of the hand-coded order and advance pickers. Links stay declared with the check off.
     - 0.15.322 (2026-11-27): the upload policy of the imports, Enforce or Accept incomplete (owner decision D49 part 3, 2026-11-27; migration 0492, mirror `db/sql/491_upload_policy.sql`). Additive; the default is `enforce`, which is today's behaviour. (1) `GET /settings/imports/upload-policy` (every signed-in user) and `PUT /settings/imports/upload-policy` (a System Admin or an all-regions delegate of `settings` edit, a reason, If-Match, audited `imports_upload_policy_update` with before and after): the setting `imports.upload_policy`, `enforce` or `accept_incomplete`. (2) `POST /master-import/runs/{run_id}/apply` reads it. With `accept_incomplete` (and no historical-load option, which opens its sites itself) the sites of the file are opened first through the same door as `POST /sites/workflow-locks`: the unlock right of each region (403 `action_forbidden` otherwise), a step-up (401 `step_up_required`), an audit row per site; the tasks approved on an open site while a lock would have held them are flagged `lock_bypassed` (Admin override). Sites that a `create_sites` apply creates are not in the file yet and keep their locks. No right, role or grant changes. (3) `SiteImportStatus` (`GET /master-import/runs/{run_id}/sites`, `GET /import-batches/{batch_id}/sites`) gains `data_gap_items`: the items of `site_data_gaps` of each site, the per-row missing-data indicator. The third mode (valid rows only) is not part of this change.
     - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
     - 0.15.262 (2026-11-27): the unsaved-changes guard joins `ui.features` as the section `unsaved_guard` (migration 0401, mirror `db/sql/400_ui_unsaved_guard.sql`; CHANGELOG UnsavedGuard, Decision 11). Additive: `UiFeatures` and `UiFeaturesPatch` gain `unsaved_guard` (`UiUnsavedGuard`: `enabled` and one boolean per area); a stored value without the section takes the seed (guard on everywhere). No new path.
@@ -11694,6 +11696,64 @@ paths:
                   items: { type: array, items: { $ref: '#/components/schemas/WarehouseOrderOption' } }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{key}/links:
+    get:
+      tags: [registers]
+      operationId: listRegisterLinks
+      summary: The declared links of a register (0.15.332)
+      description: |
+        0.15.332 (D60). One row per link field of the register in the declaration table `register_links`: the field, the target register, the target record type when given, whether the target must be of the same site, and whether the database checks the id in entry (`enforce`). Needs the register view.
+      parameters:
+      - {name: key, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: The links.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [field, target_register, same_site, enforce]
+                      properties:
+                        field: {type: string}
+                        target_register: {type: string}
+                        target_record_type: {type: [string, 'null']}
+                        same_site: {type: boolean}
+                        enforce: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{key}/link-options/{field}:
+    get:
+      tags: [registers]
+      operationId: listRegisterLinkOptions
+      summary: The records a declared link field may name (0.15.332)
+      description: |
+        0.15.332 (D60). The current records of the target register in the state the link requires (approved by default), of the site `site_id` when the link is same-site and the site is given, filtered by `q` on the label, in the regions the caller may read. Needs the view of the register and of the target. Each item has `entity_id`, `record_id`, `label`, and `site_id` / `record_type` when set.
+      parameters:
+      - {name: key, in: path, required: true, schema: {type: string}}
+      - {name: field, in: path, required: true, schema: {type: string}}
+      - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
+      - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+      responses:
+        '200':
+          description: The options.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/financial_advances/advance-options:
     get:

@@ -7569,6 +7569,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{key}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The declared links of a register (0.15.332)
+         * @description 0.15.332 (D60). One row per link field of the register in the declaration table `register_links`: the field, the target register, the target record type when given, whether the target must be of the same site, and whether the database checks the id in entry (`enforce`). Needs the register view.
+         */
+        get: operations["listRegisterLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{key}/link-options/{field}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The records a declared link field may name (0.15.332)
+         * @description 0.15.332 (D60). The current records of the target register in the state the link requires (approved by default), of the site `site_id` when the link is same-site and the site is given, filtered by `q` on the label, in the regions the caller may read. Needs the view of the register and of the target. Each item has `entity_id`, `record_id`, `label`, and `site_id` / `record_type` when set.
+         */
+        get: operations["listRegisterLinkOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/financial_advances/advance-options": {
         parameters: {
             query?: never;
@@ -37346,6 +37386,73 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listRegisterLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            field: string;
+                            target_register: string;
+                            target_record_type?: string | null;
+                            same_site: boolean;
+                            enforce: boolean;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listRegisterLinkOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+                q?: string;
+            };
+            header?: never;
+            path: {
+                key: string;
+                field: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };
