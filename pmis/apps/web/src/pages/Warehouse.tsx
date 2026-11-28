@@ -1,4 +1,5 @@
 import { Lock, Pencil, Plus } from 'lucide-react';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -439,7 +440,7 @@ export function Warehouse() {
     <div data-testid="page-warehouse">
       <div className="mb-3 flex items-center gap-3">
         <h1 className="text-2xl font-bold">{t('wh.title')}</h1>
-        <Link className="btn ms-auto" data-testid="wh-register-link" to="/registers/warehouse">{t('wh.open_register')}</Link>
+        <span className="ms-auto flex items-center gap-2"><ScreenSettingsLink screen="warehouse" /><Link className="btn" data-testid="wh-register-link" to="/registers/warehouse">{t('wh.open_register')}</Link></span>
       </div>
       <div role="tablist" className="mb-3 flex gap-1 border-b border-line">
         {(['items', 'movements', 'stock', 'reorder', 'rma', 'dispatch', 'gaps'] as const).map((k) => (
