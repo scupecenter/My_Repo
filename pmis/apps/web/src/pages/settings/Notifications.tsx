@@ -10,6 +10,7 @@ import { fieldErrors } from '@/lib/fields';
 import { isLocked, LIMITS, thresholdErrors } from '@/lib/policy';
 import { FieldErr } from './Calendar';
 import { QueryFallback } from '@/components/States';
+import { NotificationPersonalCard } from '@/components/NotificationPersonalCard';
 
 type Draft = { enabled: boolean; timezone: string; digest_hour: number | ''; follow: boolean; work_days: number[]; thresholds: Record<keyof NotificationThresholds, number | ''>; matrix: NotificationPolicyRow[] };
 const fromPolicy = (p: NotificationPolicy): Draft => ({ enabled: p.enabled, timezone: p.timezone, digest_hour: p.digest_hour, follow: p.work_days_follow_calendar, work_days: p.work_days, thresholds: { ...p.thresholds }, matrix: p.matrix.map((r) => ({ ...r, channels: { ...r.channels }, cells: r.cells.map((c) => ({ ...c })) })) });
@@ -94,6 +95,7 @@ export function Notifications() {
         </table>
         <p className="mt-2 text-xs text-mute">{t('np.sensitive_note')}</p>
       </section>
+      <NotificationPersonalCard />
       <div className="flex gap-2">
         <button className="btn btn-accent" data-testid="np-save" disabled={Object.keys(local).length > 0} onClick={() => setOpen(true)}>{t('common.save')}</button>
         {draft && <button className="btn" onClick={() => setDraft(null)}>{t('common.cancel')}</button>}

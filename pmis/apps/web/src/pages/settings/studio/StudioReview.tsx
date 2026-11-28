@@ -80,6 +80,15 @@ export function StudioReview({ c, parent, parentSw, draftSw, frozen, onBack, onP
       {noClosing.length > 0 && <p role="status" className="text-sm text-waitInk" data-testid="studio-review-no-closing">{t('studio.no_closing_warning', { codes: noClosing.join(', ') })}</p>}
       {warnings.length > 0 && <ul className="list-disc ps-5 text-sm text-waitInk" data-testid="studio-review-warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
+      <StudioCard title={t('studio.lock_mode')} testid="studio-review-lock-mode">
+        <p className="text-sm text-mute">{t('studio.lock_mode_hint')}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select className="input min-h-11" data-testid="studio-lock-mode" disabled={!c.v.can_publish || frozen} value={(c.v as { lock_mode?: string }).lock_mode ?? 'strict'}
+            onChange={(e) => { const lock_mode = e.target.value as 'strict' | 'open'; c.askReason({ title: t('studio.lock_mode'), run: (reason, cb) => c.W.lockMode.mutate({ lock_mode, reason }, cb) }); }}>
+            <option value="strict">{t('studio.lock_strict')}</option><option value="open">{t('studio.lock_open')}</option>
+          </select>
+        </div>
+      </StudioCard>
       <StudioCard title={t('studio.changes_title', { count: changes.length })} testid="studio-review-changes">
         {!parentS && <p className="text-sm text-mute">{t('wfe.loading')}</p>}
         {parentS && changes.length === 0 && <p className="text-sm text-mute" data-testid="studio-review-none">{t('wfe.prev.none')}</p>}

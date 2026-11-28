@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  useCreateTask, useDiscardDraft, useGateLight, useInsertTask, useMilestoneLight, usePublish, useRemoveItem, useReorderTasks, useRemoveSlaRule, useReplaceStructure, useSaveSlaRule, useSetClosing, useSetWeight, useSetPredecessors, useSetSuccessors, useUpdateTask,
+  useCreateTask, useDiscardDraft, useGateLight, useInsertTask, useMilestoneLight, usePublish, useRemoveItem, useReorderTasks, useRemoveSlaRule, useReplaceStructure, useSaveSlaRule, useSetClosing, useSetWeight, useSetLockMode, useSetPredecessors, useSetSuccessors, useUpdateTask,
   type SlaWeightItem, type WeightTotal, type WorkflowVersion,
 } from '@/api/workflowEditor';
 import { useColumnSections, useCreateColumn, useDeactivateColumn, useDeleteColumn, useReactivateColumn, useUpdateColumn } from '@/api/siteMasterColumns';
@@ -17,7 +17,7 @@ export function useWrites(version: number, etag: number) {
   return {
     createTask: useCreateTask(version, etag), updateTask: useUpdateTask(version, etag), setPreds: useSetPredecessors(version, etag), setSuccs: useSetSuccessors(version, etag), setClosing: useSetClosing(version, etag),
     insertTask: useInsertTask(version, etag), replace: useReplaceStructure(version, etag), reorder: useReorderTasks(version, etag), msLight: useMilestoneLight(version, etag), gateLight: useGateLight(version, etag),
-    saveSla: useSaveSlaRule(version, etag), removeSla: useRemoveSlaRule(version, etag), setWeight: useSetWeight(version, etag), publish: usePublish(version, etag), removeItem: useRemoveItem(version, etag), discard: useDiscardDraft(version, etag),
+    saveSla: useSaveSlaRule(version, etag), removeSla: useRemoveSlaRule(version, etag), setWeight: useSetWeight(version, etag), lockMode: useSetLockMode(version, etag), publish: usePublish(version, etag), removeItem: useRemoveItem(version, etag), discard: useDiscardDraft(version, etag),
     // S3: the Site Master columns (contract 0.15.43); each write carries the column's own version as If-Match, not the workflow's
     colCreate: useCreateColumn(), colUpdate: useUpdateColumn(), colDeactivate: useDeactivateColumn(), colReactivate: useReactivateColumn(), colDelete: useDeleteColumn(), colSections: useColumnSections(),
   };
