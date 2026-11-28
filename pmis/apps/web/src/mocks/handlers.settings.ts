@@ -280,6 +280,11 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'prefill.max_sites', group: 'rows', unit: 'sites', default: 5000, min: 100, max: 50000 },
   { key: 'export.max_rows', group: 'exports', unit: 'rows', default: 100000, min: 1000, max: 1000000 },
   { key: 'idempotency.max_entries', group: 'exports', unit: 'entries', default: 5000, min: 500, max: 100000 },
+  { key: 'login.ip_attempts', group: 'sessions', unit: 'attempts', default: 10, min: 3, max: 100 },
+  { key: 'login.ip_window_seconds', group: 'sessions', unit: 'seconds', default: 900, min: 60, max: 86400 },
+  { key: 'login.ip_base_seconds', group: 'sessions', unit: 'seconds', default: 2, min: 1, max: 60 },
+  { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
+  { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
@@ -515,6 +520,8 @@ let pmState = { version: 0, schedules: [] as MockPm[], updated_at: null as strin
 const PM_CATALOGUE = { registers: [{ key: 'procurement', name_en: 'Procurement', name_ar: 'المشتريات', site_scoped: false }], units: ['week', 'month'] };
 const pmView = () => ({ ...pmState, today: tripoliToday(), catalogue: PM_CATALOGUE });
 
+const DR = { default: 'first' as 'first' | 'last', registers: {} as Record<string, 'first' | 'last'>, version: 1, updated_at: null as string | null };
+const dupRowsView = () => ({ default: DR.default, registers: DR.registers, updated_at: DR.updated_at, updated_by: null, version: DR.version, can_edit: viewer()?.key === 'admin' || !!viewer()?.nav.includes('settings') });
 export const settingsHandlers = [
   http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
   http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
@@ -698,6 +705,23 @@ export const settingsHandlers = [
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.345 (0432): duplicate rows in one file (Settings, Imports)
+  http.get(`${B}/settings/duplicate-rows`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dupRowsView(), tag(DR.version)); }),
+  http.put(`${B}/settings/duplicate-rows`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, DR.version); if (p) return p;
+    const b = await body<{ default?: string; registers?: Record<string, string>; reason?: string }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (b.default !== 'first' && b.default !== 'last') errs.push({ path: '/default', code: 'invalid' });
+    Object.entries(b.registers ?? {}).forEach(([k, v]) => { if (v !== 'first' && v !== 'last') errs.push({ path: `/registers/${k}`, code: 'invalid' }); });
+    if (errs.length) return fields(...errs);
+    if (DR.default === b.default && JSON.stringify(DR.registers) === JSON.stringify(b.registers ?? {})) return problem(409, 'invalid_transition', 'These values are already set.');
+    Object.assign(DR, { default: b.default as 'first' | 'last', registers: (b.registers ?? {}) as Record<string, 'first' | 'last'>, version: DR.version + 1, updated_at: new Date().toISOString() });
+    return HttpResponse.json(dupRowsView(), tag(DR.version));
   }),
 
   // ------------------------------------------------------------------ 0.15.322: the upload policy of the imports (D49 part 3)

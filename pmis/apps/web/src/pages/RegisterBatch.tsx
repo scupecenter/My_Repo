@@ -122,7 +122,7 @@ export function RegisterBatch() {
   const validN = c.valid, invalidN = c.error, heldN = c.held, decidableN = c.create + c.update, openN = c.pending;
   const held = filterRows(all, 'held');
   const shown = sortRows(searchRows(filterRows(all, show), query), sort);
-  const tabCounts: Record<BatchShow, number> = { all: totalRowsOf(c), valid: validN, invalid: Math.max(0, invalidN - (b?.counts.duplicate ?? 0)), duplicate: b?.counts.duplicate ?? 0, held: heldN, warnings: all.filter((r) => !!r.warnings?.length).length };
+  const tabCounts: Record<BatchShow, number> = { all: totalRowsOf(c), valid: validN, invalid: Math.max(0, invalidN - (b?.counts.duplicate ?? 0) - (b?.counts.overridden ?? 0)), duplicate: b?.counts.duplicate ?? 0, overridden: b?.counts.overridden ?? 0, held: heldN, warnings: all.filter((r) => !!r.warnings?.length).length };
   const sent = !!b && SENT.includes(b.status);
   // a big batch (a New sites file of ~500 rows) is windowed: only the rows in view are drawn
   const BIG = 300, ROW_H = 76, virtual = shown.length > BIG;

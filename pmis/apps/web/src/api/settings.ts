@@ -6,6 +6,8 @@ import type { DashboardTargetPolicy, OpsLimits, PasskeyItem, PasskeySetting, MyP
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
 
+import type { DuplicateRowsSettings } from './types';
+
 const refresh = (qc: QueryClient, ...ks: string[]) => ks.forEach((k) => void qc.invalidateQueries({ queryKey: [k] }));
 type Snap = { rollback: () => void };
 
@@ -604,5 +606,13 @@ export const useSetDashboardTargetPolicy = () => {
   return useMutation<DashboardTargetPolicy, ApiError, { version: number; manual_override: boolean; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/dashboard-target-policy', { version, body }),
     onSettled: () => refresh(qc, 'dash-target-policy', 'dashboard'),
+  });
+};
+/** 0.15.345 (migration 0432): how a record that is in an upload file twice is treated (imports.duplicate_rows). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+export const useDuplicateRowsSettings = () => useQuery({ queryKey: ['duplicate-rows-settings'], queryFn: () => api.get<DuplicateRowsSettings>('/settings/duplicate-rows') });
+export const useSetDuplicateRowsSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<DuplicateRowsSettings, ApiError, { version: number; default: 'first' | 'last'; registers: Record<string, 'first' | 'last'>; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/duplicate-rows', { version, body }), onSettled: () => refresh(qc, 'duplicate-rows-settings'),
   });
 };
