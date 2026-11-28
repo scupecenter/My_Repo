@@ -3264,6 +3264,7 @@
     "t_holiday_dates_are_tentative": "Holiday dates are tentative",
     "p_site_moved_region": "A site moved to your region: {{x}}",
     "p_absence_recorded": "Absence recorded: {{x}}",
+    "p_module_no_grants": "Module without permissions: {{x}}",
     "p_weekly_summary": "Weekly summary, week of {{x}}",
     "p_waits_approval": "{{x}} waits for your approval",
     "p_returned_note": "{{x}} was returned with a note",

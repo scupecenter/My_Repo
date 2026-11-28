@@ -3272,6 +3272,7 @@
     "t_holiday_dates_are_tentative": "تواريخ العطل مبدئية",
     "p_site_moved_region": "انتقل موقع إلى منطقتك: {{x}}",
     "p_absence_recorded": "سُجّل غياب: {{x}}",
+    "p_module_no_grants": "وحدة بلا صلاحيات: {{x}}",
     "p_weekly_summary": "الملخص الأسبوعي، أسبوع {{x}}",
     "p_waits_approval": "{{x}} بانتظار اعتمادك",
     "p_returned_note": "أُعيد {{x}} مع ملاحظة",
