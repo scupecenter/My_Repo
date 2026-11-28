@@ -53,6 +53,7 @@ import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
 import { AlertRules } from './AlertRules';
+import { AutomationCentre } from './AutomationCentre';
 import { AlertSettingsPanel } from './AlertSettings';
 import { PEOPLE_TABS, peopleTabAllowed } from '@/components/PeopleAdmin';
 import { TemplateMappingPanel } from '../TemplateMapping';
@@ -79,7 +80,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'media' }, { key: 'numbering' }, { key: 'search', adminOnly: true }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'mapping' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'structure', adminOnly: true }, { key: 'quality' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
-  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
+  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'automation', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'alerts' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
@@ -231,6 +232,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="policy" replace />} />
           <Route path="policy" element={<Notifications />} />
           <Route path="mail" element={<><MailPolicy /><MailKinds /></>} />
+          <Route path="automation" element={<AutomationCentre />} />
           <Route path="rules" element={<AlertRules />} />
           <Route path="push" element={<WebPushSettings />} />
         </Route>

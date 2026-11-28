@@ -278,5 +278,7 @@ export type AlertRule = S['AlertRule'];
 export type AlertRuleInput = S['AlertRuleInput'];
 export type AlertRuleSaved = S['AlertRuleSaved'];
 export type AlertRulesResponse = S['AlertRulesResponse'];
+export type AlertRuleRun = { id: number; rule_id: string; rule_code: string; kind: string; run_at: string; fired: number };
+export type AlertRuleTemplate = AlertRulesResponse['catalogue']['templates'][number];
 
 export type DashboardTargetPolicy = S['DashboardTargetPolicy'];
