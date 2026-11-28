@@ -198,7 +198,9 @@ describe('stock_below_reorder alert rule (0475)', () => {
     await db.query('BEGIN');
     await beginAs(db, adminId);
     const r = await save(rule(`${PREFIX}-stock`, { kind: 'stock_below_reorder', params: {}, title_en: 'Low {{item}}', body_en: '{{available}} of {{level}}' }), 'add the stock rule');
-    await fails(rule(`${PREFIX}-stock-bad`, { kind: 'stock_below_reorder', params: { days: 3 } }), /params/);
+    await db.query('SAVEPOINT s1');
+    await expect(save(rule(`${PREFIX}-stock-bad`, { kind: 'stock_below_reorder', params: { days: 3 } }), 'bad params')).rejects.toThrow(/params/);
+    await db.query('ROLLBACK TO s1');
     const item = async (code: string) => (await db.query(`INSERT INTO warehouse_items (item_code, item_group, name) VALUES ($1, 'WL', $1) RETURNING id`, [code])).rows[0].id as string;
     const low = await item(`${PREFIX.toUpperCase()}-LOW`);
     const none = await item(`${PREFIX.toUpperCase()}-NONE`);
