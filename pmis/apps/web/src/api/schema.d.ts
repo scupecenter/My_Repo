@@ -3647,6 +3647,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/lock-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The sequence lock mode of a draft version (strict or open)
+         * @description Migration 0491 (admin_wf_lock_mode). Needs workflow_versions.administer (the publish right), a step-up and If-Match. A draft only (a published version answers 409 `invalid_transition`; so does setting the value it already has). It changes no site: the per-site switch (`POST /sites/workflow-locks`) stays the override and the only way to open or lock a site.
+         */
+        put: operations["putWorkflowLockMode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/tasks/{task_code}/closing": {
         parameters: {
             query?: never;
@@ -14864,6 +14884,11 @@ export interface components {
             published_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             published_at?: string | null;
+            /**
+             * @description 0.15.321 (migration 0491). The default of the sequence locks for new sites of this version; the per-site switch overrides it. Strict (default) is the behaviour before this field existed.
+             * @enum {string}
+             */
+            lock_mode?: "strict" | "open";
         };
         WorkflowMilestone: {
             code: string;
@@ -18979,6 +19004,11 @@ export interface components {
              * @enum {string}
              */
             inbox_anchor?: "end-top" | "end-bottom" | "start-top" | "start-bottom";
+            /**
+             * @description 0.15.530 (0581): the More menu of the table screens as a list (default) or an icon grid with search.
+             * @enum {string}
+             */
+            more_menu?: "list" | "grid";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
@@ -29644,6 +29674,43 @@ export interface operations {
         };
         responses: {
             /** @description The version and the weight totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    putWorkflowLockMode: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    lock_mode: "strict" | "open";
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The version */
             200: {
                 headers: {
                     [name: string]: unknown;

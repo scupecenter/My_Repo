@@ -200,7 +200,7 @@
     "dismantle": "Dismantle",
     "group_registers": "Registers & Logs",
     "group_site_register": "Site Master",
-    "sites_all": "Site Master",
+    "sites_all": "Site 360°",
     "site_submenus": "Site Master sub-menus",
     "contractors": "Contractors",
     "car_dispatcher": "Car Dispatcher",
@@ -2824,6 +2824,8 @@
   "table": {
     "columns": "Columns",
     "more": "More",
+    "more_search": "Search the tools",
+    "more_none": "No tool matches",
     "resize": "Resize column {{col}}",
     "fit_hint": "Double-click the edge to fit the column to its content",
     "move_earlier": "Move {{col}} earlier",
@@ -4085,7 +4087,8 @@
       "accent": "Accent colour",
       "contrast": "Contrast",
       "inbox_panel": "Notification panel",
-      "inbox_anchor": "Floating panel corner"
+      "inbox_anchor": "Floating panel corner",
+      "more_menu": "More menu"
     },
     "opt": {
       "density": {
@@ -4141,6 +4144,10 @@
         "end-bottom": "End, bottom",
         "start-top": "Start, top",
         "start-bottom": "Start, bottom"
+      },
+      "more_menu": {
+        "list": "List (default)",
+        "grid": "Icon grid with search"
       }
     }
   },
@@ -6588,6 +6595,10 @@
     "rewire": "Rewire: remove the direct links that the new task replaces",
     "place_after": "Place after",
     "gate_after": "Gate after milestone",
+    "lock_mode": "Sequence lock mode for new sites",
+    "lock_mode_hint": "Strict (default): a task waits for its predecessors and for the gate before its milestone. Open: dates can be entered in any order. This is the default offered when a site is created; the lock switch of each site still decides, with its own right and reason.",
+    "lock_strict": "Strict (locks on)",
+    "lock_open": "Open (locks off)",
     "no_closing_warning": "Milestones with tasks but no closing task: {{codes}}. They are done only when every counting task is done. Publishing is still allowed.",
     "gate_move": "Move the gate",
     "gate_to": "Opens the milestone",
