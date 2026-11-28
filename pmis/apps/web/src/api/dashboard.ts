@@ -26,6 +26,8 @@ export interface DashboardQuery {
   scenario?: string;
   stream?: string;
   view?: string;
+  /** 0.15.368: the phase quick filter (comma-separated values of filters.phases); only narrows, like the filter tree */
+  project_phase?: string;
   /** 0.15.45: the unified filter tree (JSON of the sites tree, screen `dashboard`), applied by every dashboard endpoint beside the other filters */
   filter?: string;
 }
@@ -50,7 +52,7 @@ export type DashboardExtras = S['DashboardExtras'];
 export type DashboardRiskItem = S['DashboardRiskItem'];
 /** Read only. The same region, cluster and scenario filters as the dashboard; the sections are not dated. */
 export const useDashboardExtras = (q: DashboardQuery, enabled = true) => {
-  const query = clean({ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, filter: q.filter });
+  const query = clean({ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, project_phase: q.project_phase, filter: q.filter });
   return useQuery({
     queryKey: ['dashboard-extras', query],
     staleTime: 30_000,
@@ -64,7 +66,7 @@ export const useDashboardExtras = (q: DashboardQuery, enabled = true) => {
 export type DashboardOps = S['DashboardOps'];
 /** Read only. The same region filter and unified filter tree as the dashboard extras. */
 export const useDashboardOps = (q: DashboardQuery, enabled = true) => {
-  const query = clean({ region_id: q.region_id, filter: q.filter });
+  const query = clean({ region_id: q.region_id, project_phase: q.project_phase, filter: q.filter });
   return useQuery({
     queryKey: ['dashboard-ops', query],
     staleTime: 30_000,
@@ -85,6 +87,19 @@ export const useProjectStatusSnapshots = (enabled = true) =>
     enabled,
     queryFn: () => api.get<PageEnvelope & { items?: ProjectStatusSnapshot[] }>('/project-status/snapshots'),
   });
+
+// ---------------------------------------------------------------- 0.15.368: Project Status grouped by phase (the phase quick filter and tree still apply)
+export type ProjectStatus = S['ProjectStatus'];
+export const useProjectStatusByPhase = (q: DashboardQuery, enabled = true) => {
+  const query = clean({ group_by: 'phase', region_id: q.region_id, project_phase: q.project_phase, filter: q.filter } as Record<string, string>);
+  return useQuery({
+    queryKey: ['project-status-by-phase', query],
+    staleTime: 30_000,
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: () => api.get<ProjectStatus>('/project-status', { query }),
+  });
+};
 
 // ---------------------------------------------------------------- 0.14.5: the site map (OV-12, SC-10)
 export type SiteMap = S['SiteMap'];
