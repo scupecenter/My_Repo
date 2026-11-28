@@ -337,4 +337,33 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
         spi: { enabled: false, green: 0.95, amber: 0.85 }, progress_gap: { enabled: false, green: -2, amber: -5 }, velocity: { enabled: false, green: 1.5, amber: 0.75 } } }), { "If-Match": now.headers.etag as string });
     }
   });
+
+  it("outbound notifications (contract 0.15.475): off by default, admin-only, https and secret rules, audit without the secret, no delivery while off", async () => {
+    const admin = await plainAdmin(app, db);
+    const g: Team = await team(app, db, "gecol", "gecol", 7);
+    const cur = await admin.api.call("get", "/settings/integrations/outbound");
+    expect(cur.status).toBe(200);
+    expect(cur.body.enabled).toBe(false);
+    expect((await g.entry.api.call("get", "/settings/integrations/outbound")).status).toBe(403);
+    const dest = { kind: "email", label: "Ops mailbox", target: "ops@example.test", events: ["task_assigned"], active: true, reason: "Test destination" };
+    expect((await g.entry.api.call("post", "/settings/integrations/outbound/destinations", dest)).status).toBe(403);
+    expect((await admin.api.call("post", "/settings/integrations/outbound/destinations", { ...dest, kind: "webhook", target: "http://example.test/h", secret: "s".repeat(20) })).status).toBe(422);
+    expect((await admin.api.call("post", "/settings/integrations/outbound/destinations", { ...dest, kind: "webhook", target: "https://127.0.0.1/h", secret: "s".repeat(20) })).status).toBe(422);
+    expect((await admin.api.call("post", "/settings/integrations/outbound/destinations", { ...dest, events: ["not_a_kind"] })).status).toBe(422);
+    expect((await admin.api.call("post", "/settings/integrations/outbound/destinations", { ...dest, target: "not-an-address" })).status).toBe(422);
+    const added = await admin.api.call("post", "/settings/integrations/outbound/destinations", dest);
+    expect(added.status).toBe(201);
+    const id = (added.body.destinations as { id: string; label: string }[]).find((d) => d.label === "Ops mailbox")!.id;
+    try {
+      const before = await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM outbound_deliveries`);
+      await q(db, `INSERT INTO notifications (user_id, channel, kind, title) SELECT id, 'in_app', 'task_assigned', 'Outbound test' FROM users LIMIT 1`);
+      const off = await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM outbound_deliveries`);
+      expect(off[0]!.n).toBe(before[0]!.n);
+      const au = await q<{ a: unknown }>(db, `SELECT after AS a FROM audit_log WHERE action = 'outbound_destination_save' AND entity_id = '${id}'`);
+      expect(au.length).toBeGreaterThan(0);
+      expect(JSON.stringify(au[0]!.a)).not.toContain("secret_enc");
+    } finally {
+      await admin.api.call("post", `/settings/integrations/outbound/destinations/${id}/archive`, { reason: "test cleanup", archived: true });
+    }
+  });
 });

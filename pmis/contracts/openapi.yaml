@@ -134,6 +134,7 @@ info:
     - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
     - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.432 (2026-11-28): green and amber thresholds for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity are editable (Settings review gap 5, approved by the owner 2026-11-27; owner choice 2026-11-28: nothing changes on deploy; migration 0573, mirror `db/sql/572_progress_rag.sql`). Additive. `GET /settings/dashboard/progress-rag` (`getProgressRag`, needs `dashboard.view`) and `PUT /settings/dashboard/progress-rag` (`setProgressRag`, `admin.settings` edit for all regions, reason, If-Match, audited as `progress_rag_update` with before and after): the new setting `dashboard.progress_rag`. A figure is coloured only when an admin has turned it on and saved it, so no colour appears until then; the suggested numbers (`default_green`, `default_amber`) are shown in the editor and are not stored. The three figures are NOT rows of the 10-KPI catalogue of `GET /settings/dashboard`, because that catalogue also feeds the counters, the KPI alert rules and the rule that every catalogue KPI has a stored threshold. Higher is better for all three. No new table.
+    - 0.15.475 (2026-11-28): outbound notifications to a webhook or an email address (D8, approved by the owner as a Settings page, off by default; migration 0613, mirror `db/sql/612_outbound_integrations.sql`). Additive. `GET /settings/integrations/outbound` (`getOutbound`), `PUT .../enabled` (`setOutboundEnabled`, reason, If-Match), `POST .../destinations` (`createOutboundDestination`), `PUT .../destinations/{id}` (`updateOutboundDestination`), `POST .../destinations/{id}/archive` (`archiveOutboundDestination`) and `GET .../deliveries` (`listOutboundDeliveries`); all need `admin.settings` (view or edit, all regions); every change has a reason and an audit row. The switch `integrations.outbound_enabled` is OFF by default and nothing is sent while it is off or while the `disable_export` lock is on. A destination is an https webhook (signed with HMAC SHA-256 in `x-gsdn-signature` over `<x-gsdn-timestamp>.<body>`; the secret is encrypted with the existing key and never returned; private, loopback and link-local addresses are refused; redirects are not followed; 3 attempts) or an email address (sent through the existing mail outbox). The events are the existing notification kinds listed in `event_kinds`. The payload has the kind, the title, the notification id, the task id, the link and the time, never the recipient or the body. A destination is archived, never deleted. New tables `outbound_destinations` (configuration) and `outbound_deliveries` (a log), both classified in the data reset.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.376 (2026-11-27): the daily delay log (migration 0554). Additive, data only. The Issues register gets the type value `Daily Delay` (list IssueCategory), the optional date field `delay_date`, and four more values of the list BlockerReason (Weather, Permit Pending, Delivery Delay, Safety Stop); no endpoint or schema changes. The delay reasons are edited in Settings > Registers > Lists and show in the dashboard issue breakdown (`by_category`, `by_reason`) and in the register export.
@@ -12831,6 +12832,147 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/integrations/outbound:
+    get:
+      tags: [settings]
+      operationId: getOutbound
+      summary: Outbound notifications, the switch and the destinations (0.15.475)
+      description: 0.15.475. `admin.settings` view. The webhook secret is never returned (`has_secret` only).
+      responses:
+        '200':
+          description: OK.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/integrations/outbound/enabled:
+    put:
+      tags: [settings]
+      operationId: setOutboundEnabled
+      summary: Turn outbound sending on or off (reason, If-Match, audited)
+      description: 0.15.475. `admin.settings` edit. Off by default. Audited as `outbound_enabled_update`.
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [enabled]
+                additionalProperties: false
+                properties:
+                  enabled: {type: boolean}
+      responses:
+        '200':
+          description: OK.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/integrations/outbound/destinations:
+    post:
+      tags: [settings]
+      operationId: createOutboundDestination
+      summary: Add a destination (reason, audited)
+      description: 0.15.475. `admin.settings` edit. A webhook needs an https URL that resolves to public addresses and a secret of 16 to 200 characters (422 `validation_failed`). Audited as `outbound_destination_save`; the audit row never holds the secret.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/OutboundDestinationInput'}
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/integrations/outbound/destinations/{id}:
+    put:
+      tags: [settings]
+      operationId: updateOutboundDestination
+      summary: Change a destination (reason, audited)
+      description: 0.15.475. `admin.settings` edit. The kind cannot change. An absent `secret` keeps the saved one. An archived destination answers 409.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/OutboundDestinationInput'}
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /settings/integrations/outbound/destinations/{id}/archive:
+    post:
+      tags: [settings]
+      operationId: archiveOutboundDestination
+      summary: Archive a destination (hidden, never deleted)
+      description: 0.15.475. `admin.settings` edit. Audited as `outbound_destination_archive`. Queued deliveries of an archived destination are not sent.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                additionalProperties: false
+                properties:
+                  archived: {type: boolean, default: true}
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutboundOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /settings/integrations/outbound/deliveries:
+    get:
+      tags: [settings]
+      operationId: listOutboundDeliveries
+      summary: The latest 100 deliveries (the log)
+      description: 0.15.475. `admin.settings` view.
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/OutboundDelivery'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /settings/dashboard/progress-rag:
     get:
       tags: [settings]
@@ -27632,6 +27774,57 @@ components:
           max: { type: number }
           default_green: { type: number, description: 'The suggested green (not stored).' }
           default_amber: { type: number, description: 'The suggested amber (not stored).' }
+    OutboundOverview:
+      description: '0.15.475. The outbound switch and the destinations. `locked` is true while the disable_export lock is on.'
+      type: object
+      required: [enabled, locked, version, event_kinds, destinations]
+      properties:
+        enabled: {type: boolean}
+        locked: {type: boolean}
+        version: {type: integer, minimum: 0}
+        updated_at: {type: [string, 'null'], format: date-time}
+        event_kinds: {type: array, items: {type: string}}
+        destinations: {type: array, items: {$ref: '#/components/schemas/OutboundDestination'}}
+    OutboundDestination:
+      type: object
+      required: [id, kind, label, target, has_secret, events, active, archived_at, updated_at, queued, dead]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [webhook, email]}
+        label: {type: string}
+        target: {type: string, description: 'The https URL or the email address.'}
+        has_secret: {type: boolean}
+        events: {type: array, items: {type: string}}
+        active: {type: boolean}
+        archived_at: {type: [string, 'null'], format: date-time}
+        updated_at: {type: string, format: date-time}
+        queued: {type: integer}
+        dead: {type: integer}
+    OutboundDestinationInput:
+      type: object
+      required: [kind, label, target, events]
+      additionalProperties: false
+      properties:
+        kind: {type: string, enum: [webhook, email]}
+        label: {type: string, minLength: 1, maxLength: 120}
+        target: {type: string, minLength: 5, maxLength: 500}
+        secret: {type: string, minLength: 16, maxLength: 200, description: 'Webhook only. Write-only.'}
+        events: {type: array, minItems: 1, items: {type: string}}
+        active: {type: boolean, default: true}
+    OutboundDelivery:
+      type: object
+      required: [id, destination, kind, event, status, attempts, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        destination: {type: string}
+        kind: {type: string}
+        event: {type: string}
+        status: {type: string, enum: [queued, sent, dead, blocked]}
+        attempts: {type: integer}
+        last_status: {type: [integer, 'null']}
+        last_error: {type: [string, 'null']}
+        created_at: {type: string, format: date-time}
+        sent_at: {type: [string, 'null'], format: date-time}
     ProgressRag:
       description: '0.15.432. The setting dashboard.progress_rag: one entry per figure, in the order spi, progress_gap, velocity.'
       type: object
