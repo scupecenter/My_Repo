@@ -1351,6 +1351,7 @@
     "tab_security": "Security",
     "section_workflow_editor": "Workflow editor",
     "section_workflow_columns": "Columns",
+    "section_workflow_sequence": "Sequence",
     "section_workflow_freeze": "Structural freeze",
     "section_workflow_idle": "Idle-task alert",
     "section_workflow_board": "Board WIP limits",
@@ -5398,6 +5399,11 @@
       "structure_decision": "Your structure proposal was decided"
     }
   },
+  "snapshotSchedule": {
+    "title": "Weekly snapshot day",
+    "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
+    "weekday": "Day of the week"
+  },
   "healthBands": {
     "title": "Health index bands",
     "note": "The score from which the health index is green and the score from which it is amber. Below amber it is red. The change colours the live index from the save on; the stored weekly and month-end snapshots are not rewritten. Own save, reason and audit row.",
@@ -6738,6 +6744,14 @@
     "rewire": "Rewire: remove the direct links that the new task replaces",
     "place_after": "Place after",
     "gate_after": "Gate after milestone",
+    "seq_title": "Sequence of tasks",
+    "seq_note": "Which tasks wait for others. Strict (default): a task waits for its predecessors and for the gate before its milestone. Open: dates can be entered in any order. Each workflow version has a mode, used as the default for new sites.",
+    "seq_version": "Version",
+    "seq_status": "Status",
+    "seq_live": "live",
+    "seq_edit": "Change the mode of a draft version (Review and publish in the editor)",
+    "seq_historical": "Historical load settings",
+    "seq_site_note": "Each site has its own lock switch (audited, with a reason and the unlock right). It overrides the mode of the version.",
     "lock_mode": "Sequence lock mode for new sites",
     "lock_mode_hint": "Strict (default): a task waits for its predecessors and for the gate before its milestone. Open: dates can be entered in any order. This is the default offered when a site is created; the lock switch of each site still decides, with its own right and reason.",
     "lock_strict": "Strict (locks on)",

@@ -474,6 +474,9 @@ let dashState = {
   updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+/** The weekday of the weekly dashboard snapshot (contract 0.15.430): the setting dashboard.snapshot_weekday, default 4 (Thursday), version 0 until the first save. */
+let snapState = { version: 0, weekday: 4, updated_at: null as string | null, updated_by: null as null };
+const snapView = () => ({ ...snapState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
@@ -596,6 +599,20 @@ export const settingsHandlers = [
     const b = (await request.json()) as { targets: typeof dashState.targets; thresholds: typeof dashState.thresholds; tabs: typeof dashState.tabs };
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
+  }),
+  // ------------------------------------------------------------------ weekly snapshot day (contract 0.15.430, settings review gap 3)
+  http.get(`${B}/settings/dashboard/snapshot-schedule`, () => { const g = guard(); if (g) return g; return HttpResponse.json(snapView(), tag(snapState.version)); }),
+  http.put(`${B}/settings/dashboard/snapshot-schedule`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, snapState.version); if (p) return p;
+    const b = (await request.json()) as { weekday?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weekday) || b.weekday! < 0 || b.weekday! > 6) errs.push({ path: '/weekday', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    snapState = { ...snapState, version: snapState.version + 1, weekday: b.weekday!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(snapView(), tag(snapState.version));
   }),
   // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
   http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),

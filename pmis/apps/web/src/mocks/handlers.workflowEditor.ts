@@ -23,6 +23,8 @@ interface Mig { id: string; site_id: string; site_code: string; from_version: nu
 let migrations: Mig[] = [];
 type SlaWeightMock = { counts: boolean; value: number; group: string | null; sla: Record<string, unknown> | null };
 const slaW = new Map<string, SlaWeightMock>();
+/** Test hook: set the lock mode of the live (published) version. */
+export const setLiveLockModeMock = (m: 'strict' | 'open') => { for (const v of state) if (v.status === 'published') { v.lock_mode = m; v.etag += 1; } };
 export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; slaW.clear(); resetSiteColumnsMock(); };
 /** Until someone drafts a version, the reads fall through to the settings mock that the matrix and the rules screens already use. */
 const untouched = () => state.length === 1 && state[0]!.etag === 1;
@@ -82,7 +84,7 @@ export const workflowEditorHandlers = [
     if (untouched()) return undefined;
     const g = guard(); if (g) return g;
     const cur = Math.max(...state.filter((x) => x.status === 'published').map((x) => x.version));
-    return HttpResponse.json({ items: [...state].sort((a, b) => b.version - a.version).map((v) => ({ version: v.version, status: v.status, is_current: v.version === cur && v.status === 'published', light_revision: 0, parent_version: v.parent, site_count: v.version === 1 ? 12 : 0, reason: v.reason, version_etag: v.etag })) });
+    return HttpResponse.json({ items: [...state].sort((a, b) => b.version - a.version).map((v) => ({ version: v.version, status: v.status, is_current: v.version === cur && v.status === 'published', light_revision: 0, parent_version: v.parent, site_count: v.version === 1 ? 12 : 0, reason: v.reason, version_etag: v.etag, lock_mode: v.lock_mode ?? 'strict' })) });
   }),
   http.post(`${B}/workflow/versions`, async ({ request }) => {
     const g = guard(); if (g) return g;
