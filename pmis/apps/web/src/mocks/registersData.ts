@@ -187,6 +187,26 @@ export const lessonsLearned: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
+// C4 (migration 0597): Tools & Equipment, with the custodian and the next calibration or inspection due date.
+export const toolsEquipment: RegisterDefinition = {
+  register_key: 'tools_equipment', name_en: 'Tools & Equipment', name_ar: 'الأدوات والمعدات', module_key: 'tools_equipment', site_scoped: true, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('equipment_no', 'Equipment No.', 'رقم المعدة', 'text', 'Equipment', { required: true, in_list: true }),
+    F('name', 'Name', 'الاسم', 'text', 'Equipment', { required: true, in_list: true }),
+    F('category', 'Category', 'الفئة', 'list', 'Equipment', { required: true, in_list: true, options: ['TestInstrument', 'HandTool', 'PowerTool', 'Lifting', 'Safety', 'Climbing', 'Other'] }),
+    F('manufacturer', 'Manufacturer', 'الشركة المصنعة', 'text', 'Equipment'),
+    F('model', 'Model', 'الطراز', 'text', 'Equipment'),
+    F('serial_no', 'Serial No.', 'الرقم التسلسلي', 'text', 'Equipment', { in_list: true }),
+    F('equipment_status', 'Status', 'الحالة', 'list', 'Equipment', { in_list: true, options: ['InUse', 'InStore', 'UnderRepair', 'Lost', 'Retired'] }),
+    F('custodian', 'Custodian', 'المسؤول عن العهدة', 'user', 'Custody', { in_list: true }),
+    F('custody_date', 'Custody Since', 'تاريخ التسليم', 'date', 'Custody'),
+    F('due_kind', 'Due For', 'الاستحقاق لـ', 'list', 'Calibration and inspection', { in_list: true, options: ['Calibration', 'Inspection'] }),
+    F('last_checked_date', 'Last Calibrated or Inspected', 'تاريخ آخر معايرة أو فحص', 'date', 'Calibration and inspection'),
+    F('next_due_date', 'Next Due Date', 'تاريخ الاستحقاق القادم', 'date', 'Calibration and inspection', { in_list: true }),
+    F('certificate_no', 'Certificate No.', 'رقم الشهادة', 'text', 'Calibration and inspection'),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
 // Owner approval 2026-11-26 (migration 0183): Incidents & Security, one register for safety incidents, near-misses and security events.
 export const incidents: RegisterDefinition = {
   register_key: 'incidents', name_en: 'Incidents & Security', name_ar: 'الحوادث والأمن', module_key: 'incidents', site_scoped: true, multiple_per_site: true, approval_levels: 2,
@@ -245,7 +265,7 @@ export const REGISTER_DEFS: RegisterDefinition[] = [
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
-  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices, deliverables,
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices, deliverables, toolsEquipment,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
 // 0.15.240: intake triage on the Issue Log and the Change Control Log (RegisterDefinition.triage_enabled)
@@ -260,6 +280,7 @@ export const TEMPLATE_OF_REGISTER: Record<string, string> = {
   invoices: 'TPL-INVOICES',
   deliverables: 'TPL-DELIVERABLES',
   incidents: 'TPL-INCIDENTS',
+  tools_equipment: 'TPL-TOOLS-EQUIPMENT',
 };
 
 export type MockRecord = {
