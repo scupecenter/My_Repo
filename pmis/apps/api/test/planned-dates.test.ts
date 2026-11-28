@@ -15,6 +15,12 @@ beforeAll(async () => {
   app = await startApp();
   db = await superDb();
   site = await makeSite(db, 7, { prefix: `PD${TAG}` });
+  // makeSite makes no tasks: one open task per active task definition of the site's workflow
+  await db.query(
+    `INSERT INTO task_instances (site_id, region_id, task_def_id, state, current_level, levels_required, level_opened_at, level_round, updated_at)
+     SELECT $1, 7, td.id, 'open'::"TaskState", 1, 3, now(), 1, now() FROM task_definitions td WHERE td.workflow_id = (SELECT workflow_version_id FROM sites WHERE id = $1) AND td.is_active`,
+    [site.id],
+  );
 });
 afterAll(async () => {
   await db.query(`DELETE FROM settings WHERE key = 'plan.rules'`);

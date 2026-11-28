@@ -24991,8 +24991,8 @@ components:
         basis: {type: string, enum: [max, min]}
         cascade: {type: boolean}
         version: {type: integer}
-        updated_at: {type: string, format: date-time, nullable: true}
-        updated_by: {type: string, format: uuid, nullable: true}
+        updated_at: {type: [string, 'null'], format: date-time}
+        updated_by: {type: [string, 'null'], format: uuid}
     PlannedDates:
       type: object
       required: [rules, items]
@@ -25007,15 +25007,15 @@ components:
               task_id: {type: string, format: uuid}
               task_code: {type: string}
               name_en: {type: string}
-              name_ar: {type: string, nullable: true}
+              name_ar: {type: [string, 'null']}
               state: {type: string}
-              planned_date: {type: string, format: date, nullable: true}
-              proposed_date: {type: string, format: date, nullable: true}
-              slip_days: {type: integer, nullable: true, description: 'Proposed minus planned, in calendar days; null without a planned date.'}
-              reason: {type: string, nullable: true, enum: [no_predecessor, predecessor_undated, no_rule, has_actual, closed]}
-              basis_task_code: {type: string, nullable: true}
-              basis_kind: {type: string, nullable: true, enum: [actual, planned, proposed]}
-              working_days: {type: integer, nullable: true}
+              planned_date: {type: [string, 'null'], format: date}
+              proposed_date: {type: [string, 'null'], format: date}
+              slip_days: {type: [integer, 'null'], description: 'Proposed minus planned, in calendar days; null without a planned date.'}
+              reason: {type: [string, 'null'], enum: [no_predecessor, predecessor_undated, no_rule, has_actual, closed, null]}
+              basis_task_code: {type: [string, 'null']}
+              basis_kind: {type: [string, 'null'], enum: [actual, planned, proposed, null]}
+              working_days: {type: [integer, 'null']}
     TableDisplaySetting:
       type: object
       required: [defaults, version]
