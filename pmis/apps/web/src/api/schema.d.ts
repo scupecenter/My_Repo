@@ -6272,6 +6272,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/duplicate-rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How a record that is in an upload file twice is treated (imports.duplicate_rows)
+         * @description 0.15.345 (migration 0432). Every signed-in user may read it. `default` is `first` (the first row of the record wins and the later rows are refused as `duplicate_in_file`, as before) or `last` (the later row wins and the earlier row is set aside as `overridden_by_later_row`, listed in the batch review and the error report, never lost). `registers` overrides the default per register key. Covers the register templates; master, sites, stream, list-values and holiday templates are not covered (the first row wins there). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDuplicateRowsSettings"];
+        /**
+         * Change how a duplicate row in a file is treated (reason, If-Match, audited)
+         * @description 0.15.345. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). A register key that does not exist is 422 (`unknown_register`), a reason and If-Match are required. Saving the values in force is 409 `invalid_transition`. Audited as `imp_duplicate_policy_update` with the values before and after.
+         */
+        put: operations["setDuplicateRowsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/template-change-notice": {
         parameters: {
             query?: never;
@@ -9880,6 +9904,85 @@ export interface paths {
          */
         put: operations["putRegionVendor"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/reorder-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Items with a reorder limit and whether the available stock is at or under it (contract 0.15.342) */
+        get: operations["listReorderLimits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/reorder-limits/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the reorder limit of an item (System Admin or a delegate of warehouse.items.edit for all regions)
+         * @description `reorder_level` null clears the limit. `If-Match` is optional (the first setting has no version); a stale version answers 412. Audited with a reason.
+         */
+        put: operations["putReorderLimit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/rma": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Supplier returns (RMA), newest first (contract 0.15.342) */
+        get: operations["listWarehouseRma"];
+        put?: never;
+        /**
+         * Record a supplier return (needs the warehouse create right). Tracking only, no stock effect
+         * @description The stock leaves quarantine through the existing "returned to supplier" quarantine exit (`POST /warehouse/quarantine-exits`); this records what the supplier does with it. `movement_id`, when given, must be such an exit. The number (`RMA-00001`...) is never reused.
+         */
+        post: operations["createWarehouseRma"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/rma/{rma_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rma_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a supplier return on (sent, then replaced, credited or rejected, then closed) */
+        post: operations["setWarehouseRmaStatus"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14137,6 +14240,10 @@ export interface components {
             capture_date?: string | null;
             /** @description A photo without an EXIF date: accepted and flagged for the reviewer. */
             unknown_capture_date?: boolean;
+            /** @description 0.15.377: this version is the signed copy (set by the person who uploaded it with the form field `signed`); absent when never marked. */
+            signed?: boolean;
+            /** @description 0.15.377: this version is the stamped copy (form field `stamped`); absent when never marked. */
+            stamped?: boolean;
             /**
              * Format: uuid
              * @description The file that replaced this version; null for the current version (and for a withdrawn file).
@@ -14166,6 +14273,12 @@ export interface components {
             doc_code: string;
             name_en: string;
             name_ar?: string | null;
+            /** @description 0.15.377: the document type needs a signed copy (setting documents.marks). */
+            needs_signature?: boolean;
+            /** @description 0.15.377: the document type needs a stamped copy. */
+            needs_stamp?: boolean;
+            /** @description 0.15.377: the type needs a copy and no current version carries the markers yet. Informs only; nothing is blocked. */
+            awaiting_signed_copy?: boolean;
             /** @enum {string} */
             kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
@@ -16009,6 +16122,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0432: of the `error` rows, those set aside because a later row of the same record in the file won (`overridden_by_later_row`, setting `imports.duplicate_rows` = last). Counted inside `error`; 0 while the setting is `first`. */
+                overridden?: number;
                 /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
                 duplicate?: number;
             };
@@ -17120,7 +17235,7 @@ export interface components {
             id: string;
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
             /** @description Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}. */
             params: {
                 [key: string]: unknown;
@@ -17147,7 +17262,7 @@ export interface components {
         AlertRuleInput: {
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold" | "advance_unsettled" | "invoice_due_soon";
             params: {
                 [key: string]: unknown;
             };
@@ -18584,6 +18699,29 @@ export interface components {
                 items: components["schemas"]["TaskSummary"][];
             }[];
         };
+        /** @description 0.15.345. The setting `imports.duplicate_rows`. */
+        DuplicateRowsSettings: {
+            /** @enum {string} */
+            default: "first" | "last";
+            /** @description Register key to mode; a register not listed uses `default`. */
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        DuplicateRowsSettingsInput: {
+            /** @enum {string} */
+            default: "first" | "last";
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            reason: string;
+        };
         /** @description 0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background. */
         ImportsSettings: {
             async_rows: number;
@@ -19041,11 +19179,11 @@ export interface components {
         /** @description 0.15.312. One operational limit. */
         OpsLimitItem: {
             /** @enum {string} */
-            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries";
+            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries" | "login.ip_attempts" | "login.ip_window_seconds" | "login.ip_base_seconds" | "login.ip_max_seconds" | "login.identifier_attempts";
             /** @enum {string} */
             group: "sessions" | "rows" | "exports";
             /** @enum {string} */
-            unit: "hours" | "seconds" | "rows" | "sites" | "entries";
+            unit: "hours" | "seconds" | "rows" | "sites" | "entries" | "attempts";
             default: number;
             min: number;
             max: number;
@@ -20129,6 +20267,44 @@ export interface components {
             pending_lines?: number;
             /** @description Only on GET /warehouse/dispatch-status/{site_id}. */
             lines?: components["schemas"]["SiteDispatchLine"][];
+        };
+        /** @description 0.15.342. The reorder limit of an item and the available stock against it. */
+        ReorderLimit: {
+            /** Format: uuid */
+            item_id: string;
+            item_code: string;
+            item_name: string;
+            uom: string | null;
+            reorder_level: number;
+            reorder_qty: number | null;
+            available: number;
+            below_reorder: boolean;
+            version: number;
+        };
+        /** @description 0.15.342. A supplier return (RMA): tracking only, no stock effect. */
+        WarehouseRma: {
+            /** Format: uuid */
+            id: string;
+            rma_no: string;
+            /** Format: uuid */
+            item_id: string;
+            item_code: string;
+            item_name: string;
+            qty: number;
+            supplier: string;
+            /** @enum {string} */
+            status: "sent" | "replaced" | "credited" | "rejected" | "closed";
+            reason: string;
+            /** Format: uuid */
+            movement_id?: string | null;
+            /** Format: date */
+            sent_on: string;
+            /** Format: date */
+            resolved_on?: string | null;
+            resolution_note?: string | null;
+            version: number;
+            /** Format: date-time */
+            created_at?: string;
         };
         RegionVendor: {
             region_id: components["schemas"]["RegionId"];
@@ -34046,6 +34222,62 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
+    getDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateRowsSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getTemplateChangeNotice: {
         parameters: {
             query?: never;
@@ -40360,6 +40592,176 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegionVendor"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listReorderLimits: {
+        parameters: {
+            query?: {
+                /** @description Only the items at or under their level. */
+                below?: "true";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items that have a limit. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReorderLimit"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putReorderLimit: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    reorder_level: number | null;
+                    reorder_qty?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listWarehouseRma: {
+        parameters: {
+            query?: {
+                status?: "sent" | "replaced" | "credited" | "rejected" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 500 supplier returns. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseRma"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createWarehouseRma: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    item_id: string;
+                    qty: number;
+                    supplier: string;
+                    reason: string;
+                    /** Format: uuid */
+                    movement_id?: string | null;
+                    /** Format: date */
+                    sent_on?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setWarehouseRmaStatus: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                rma_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "replaced" | "credited" | "rejected" | "closed";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];

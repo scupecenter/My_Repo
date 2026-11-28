@@ -11,7 +11,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { applyContext, type RequestContext } from '../logs/context';
-import { makeQuarantine, quarantineFiles } from './data-reset-files';
+import { makeQuarantine, quarantineFiles, thumbKeysFor } from './data-reset-files';
 import { MaintenanceService } from './maintenance.service';
 
 type Json = Record<string, unknown>;
@@ -255,6 +255,9 @@ export class DataResetService {
       const qdir = typeof claim.quarantine_dir === 'string' ? claim.quarantine_dir : '';
       if (keys.length === 0 || !qdir) return;
       const results = await quarantineFiles(this.config.storage.localDir, qdir, keys);
+      // the derived thumbnails of those files go to the same quarantine (not recorded as rows: they are not in the database)
+      const thumbs = await thumbKeysFor(this.config.storage.localDir, keys).catch(() => [] as string[]);
+      if (thumbs.length > 0) await quarantineFiles(this.config.storage.localDir, qdir, thumbs).catch(() => undefined);
       for (let i = 0; i < results.length; i += 500) {
         const chunk = results.slice(i, i + 500);
         await this.side(rc, () => this.one(Prisma.sql`SELECT admin_data_reset_files_record(${id}::uuid, ${JSON.stringify(chunk)}::jsonb) AS r`));
