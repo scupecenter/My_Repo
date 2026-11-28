@@ -103,6 +103,30 @@ export function useSetProgressRag() {
   });
 }
 
+/** 0.15.474 (phase 5): how the dashboard forecast takes the weekly pace, mean or linear. Kept in the setting dashboard.forecast_method. */
+export type ForecastMethod = S["ForecastMethod"];
+
+export const useForecastMethod = () =>
+  useQuery({
+    queryKey: ["forecastMethod"],
+    queryFn: () =>
+      api.get<ForecastMethod>("/settings/dashboard/forecast-method"),
+  });
+
+export function useSetForecastMethod() {
+  const qc = useQueryClient();
+  return useMutation<
+    ForecastMethod,
+    ApiError,
+    { version: number; body: { method: "mean" | "linear"; reason: string } }
+  >({
+    mutationFn: ({ version, body }) =>
+      api.put("/settings/dashboard/forecast-method", { version, body }),
+    onSettled: () =>
+      void qc.invalidateQueries({ queryKey: ["forecastMethod"] }),
+  });
+}
+
 /** 0.15.470 (F4 follow-up 1): which Project Status items read the Deliverables register. Kept in the setting dashboard.ps_deliverables. */
 export type PsDeliverables = S["PsDeliverables"];
 export type PsDeliverablesItemInput = S["PsDeliverablesItemInput"];
