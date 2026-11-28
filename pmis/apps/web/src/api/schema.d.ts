@@ -4674,6 +4674,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalogue of the links between registers
+         * @description 0.15.586 (migration 0713). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+         */
+        get: operations["listRegisterLinkCatalogue"];
+        /**
+         * Save the catalogue (the whole list)
+         * @description 0.15.586 (migration 0713). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+         */
+        put: operations["saveRegisterLinkCatalogue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/register-rules": {
         parameters: {
             query?: never;
@@ -14021,6 +14045,25 @@ export interface components {
             message?: string;
             /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
             conflicts?: string[];
+        };
+        RegisterLinkEntry: {
+            from_register: string;
+            field: string;
+            to_register: string;
+            /** @description Read only. */
+            target_record_type?: string | null;
+            /** @description Read only: the state a record must have to be picked or accepted. */
+            target_state?: string;
+            same_site?: boolean;
+            /** @description Check the id in entry (D60). */
+            enforce?: boolean;
+            /** @description Declared and active (register_links.is_active). */
+            enabled?: boolean;
+        };
+        RegisterLinkCatalogue: {
+            links: components["schemas"]["RegisterLinkEntry"][];
+            version: number;
+            can_edit: boolean;
         };
         RegisterState: {
             register_key: string;
@@ -32701,6 +32744,60 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveRegisterLinkCatalogue: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    links: components["schemas"]["RegisterLinkEntry"][];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The saved catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinkCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listRegisterRules: {
