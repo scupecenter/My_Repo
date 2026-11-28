@@ -124,3 +124,4 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON issue_task_map FROM pmis_app;  -- 017
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON document_texts FROM pmis_app;  -- 0255: the file text only through document_text_put (owner pmis_definer)
 
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON push_subscriptions FROM pmis_app;  -- 0256: browsers are written only through the push_* functions
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON notification_user_prefs, notification_decisions FROM pmis_app;  -- 0583: personal notification choices and decisions only through the notif_my_* functions (owner pmis_definer)

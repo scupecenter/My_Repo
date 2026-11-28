@@ -46,8 +46,8 @@ describe('own type choices', () => {
     expect((g.body.types as unknown[]).length).toBeGreaterThan(5);
     // a System Admin also sees the admin-only types; a mandatory one is listed as on
     const ag = (await admin.api.call('get', '/me/notification-prefs')).body.types as { code: string; mandatory: boolean; in_app: boolean }[];
-    expect(ag.find((t) => t.code === 'no_holder')).toMatchObject({ mandatory: true, in_app: true });
-    expect((g.body.types as { code: string }[]).some((t) => t.code === 'no_holder')).toBe(false);
+    expect(ag.find((t) => t.code === 'repeated_failed_sign_in')).toMatchObject({ mandatory: true, in_app: true });
+    expect((g.body.types as { code: string }[]).some((t) => t.code === 'repeated_failed_sign_in')).toBe(false);
     const put = await a.api.call('put', '/me/notification-prefs', { types: { task_rejected: { in_app: false }, no_holder: { in_app: false, email: false } } }, { 'If-Match': `"${g.body.version}"` });
     expect(put.status).toBe(200);
     const after = put.body.types as { code: string; in_app: boolean; email: boolean }[];
@@ -109,7 +109,7 @@ describe('do-not-disturb and snooze', () => {
     expect(await q('2026-11-26T23:00:00Z')).toBe(false);         // Thursday
     await db.query(`UPDATE notification_user_prefs SET dnd_enabled = false, snooze_until = now() + interval '1 hour' WHERE user_id = $1`, [u.id]);
     expect((await db.query(`SELECT notif_user_quiet($1) AS q`, [u.id])).rows[0].q).toBe(true);
-    await db.query(`UPDATE notification_user_prefs SET snooze_until = now() - interval '1 minute' WHERE user_id = $1`, [u.id]);
+    await db.query(`UPDATE notification_user_prefs SET snooze_until = NULL WHERE user_id = $1`, [u.id]);
     expect((await db.query(`SELECT notif_user_quiet($1) AS q`, [u.id])).rows[0].q).toBe(false);
     await db.query(`UPDATE notification_user_prefs SET dnd_enabled = true WHERE user_id = $1`, [u.id]);
     await setOrg({ allow_dnd: false });

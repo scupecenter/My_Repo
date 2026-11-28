@@ -152,14 +152,14 @@ BEGIN
   END IF;
 END $$;
 
--- 4: the decisions are purged by the hourly step of B1 (patched in place, idempotent).
+-- 4: the decisions are purged by the hourly step of B1 (patched in place, idempotent). Placed BEFORE B1's delete so that GET DIAGNOSTICS still counts the notices.
 DO $$
 DECLARE def text; anchor text := 'DELETE FROM public.notifications WHERE created_at < p_now - retain * interval ''1 day'';';
 BEGIN
   def := pg_get_functiondef('public.notif_policy_tick(timestamptz)'::regprocedure);
   IF position('notification_decisions' IN def) = 0 THEN
     IF position(anchor IN def) = 0 THEN RAISE EXCEPTION 'notif_policy_tick: the retention anchor (0530) was not found'; END IF;
-    EXECUTE replace(def, anchor, anchor || ' DELETE FROM public.notification_decisions WHERE created_at < p_now - coalesce((public.notif_personal_cfg() ->> ''decision_retention_days'')::integer, 30) * interval ''1 day'';');
+    EXECUTE replace(def, anchor, 'DELETE FROM public.notification_decisions WHERE created_at < p_now - coalesce((public.notif_personal_cfg() ->> ''decision_retention_days'')::integer, 30) * interval ''1 day''; ' || anchor);
   END IF;
 END $$;
 
@@ -329,6 +329,7 @@ BEGIN
   GRANT SELECT, INSERT, UPDATE, DELETE ON notification_user_prefs, notification_decisions TO pmis_definer;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     GRANT SELECT ON notification_user_prefs, notification_decisions TO pmis_app;
+    REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON notification_user_prefs, notification_decisions FROM pmis_app;
     GRANT EXECUTE ON FUNCTION notif_my_prefs(), notif_my_prefs_set(jsonb, jsonb, integer), notif_my_snooze(timestamptz), notif_my_test(), notif_my_decisions(integer),
       notif_personal_get(), notif_personal_set(jsonb, integer, text) TO pmis_app;
   END IF;

@@ -3226,6 +3226,7 @@
     "t_approval_reminder": "تذكير بالاعتماد",
     "t_approval_escalated": "تم تصعيد الاعتماد",
     "t_task_idle": "مهمة بلا نشاط",
+    "t_test_notification": "إشعار تجريبي",
     "t_level_has_no_holder": "مستوى بلا مسؤول",
     "p_sla_escalation": "تصعيد اتفاقية مستوى الخدمة: {{x}}",
     "p_reminder": "تذكير: {{x}}"

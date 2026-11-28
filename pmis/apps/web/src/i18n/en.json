@@ -3218,6 +3218,7 @@
     "t_approval_reminder": "Approval reminder",
     "t_approval_escalated": "Approval escalated",
     "t_task_idle": "Task idle",
+    "t_test_notification": "Test notification",
     "t_level_has_no_holder": "Level has no holder",
     "p_sla_escalation": "SLA escalation: {{x}}",
     "p_reminder": "Reminder: {{x}}"
