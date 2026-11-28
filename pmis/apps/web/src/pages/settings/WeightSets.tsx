@@ -18,6 +18,7 @@ import { tripoliToday } from "@/lib/today";
 import { sumOf, weightIssues } from "@/lib/weights";
 import { FieldErr } from "./Calendar";
 import { QueryError, QueryFallback } from "@/components/States";
+import { MissingArabicHint } from '@/components/MissingArabicHint';
 import { DateInput } from '@/components/DateInput';
 
 const CODES: WeightSetCode[] = [
@@ -353,14 +354,17 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
                       value={a.name_en}
                       onChange={(e) => setAct(ai, { name_en: e.target.value })}
                     />
-                    <input
-                      className="input min-w-40 flex-1"
-                      dir="rtl"
-                      aria-label={t("wtSet.name_ar")}
-                      data-testid={`weights-name-ar-${a.code}`}
-                      value={a.name_ar ?? ""}
-                      onChange={(e) => setAct(ai, { name_ar: e.target.value })}
-                    />
+                    <span className="min-w-40 flex-1">
+                      <input
+                        className="input w-full"
+                        dir="rtl"
+                        aria-label={t("wtSet.name_ar")}
+                        data-testid={`weights-name-ar-${a.code}`}
+                        value={a.name_ar ?? ""}
+                        onChange={(e) => setAct(ai, { name_ar: e.target.value })}
+                      />
+                      <MissingArabicHint en={a.name_en} ar={a.name_ar} testid={`weights-name-ar-warn-${a.code}`} />
+                    </span>
                     <input
                       type="number"
                       min={0}
@@ -404,16 +408,19 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
                               setItem(ai, ii, { name_en: e.target.value })
                             }
                           />
-                          <input
-                            className="input min-w-32 flex-1"
-                            dir="rtl"
-                            aria-label={t("wtSet.name_ar")}
-                            data-testid={`weights-item-name-ar-${it.code}`}
-                            value={it.name_ar ?? ""}
-                            onChange={(e) =>
-                              setItem(ai, ii, { name_ar: e.target.value })
-                            }
-                          />
+                          <span className="min-w-32 flex-1">
+                            <input
+                              className="input w-full"
+                              dir="rtl"
+                              aria-label={t("wtSet.name_ar")}
+                              data-testid={`weights-item-name-ar-${it.code}`}
+                              value={it.name_ar ?? ""}
+                              onChange={(e) =>
+                                setItem(ai, ii, { name_ar: e.target.value })
+                              }
+                            />
+                            <MissingArabicHint en={it.name_en} ar={it.name_ar} testid={`weights-item-name-ar-warn-${it.code}`} />
+                          </span>
                           <input
                             className="input w-24"
                             aria-label={t("wtSet.unit")}
