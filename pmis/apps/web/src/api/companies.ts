@@ -51,3 +51,58 @@ export const useSaveCompanyDocumentTypes = () => {
     onSettled: () => { void qc.invalidateQueries({ queryKey: ['company-document-types'] }); void qc.invalidateQueries({ queryKey: ['company-compliance'] }); },
   });
 };
+
+/** Companies K4 (contract 0.15.626, migration 0746): the onboarding checklist, the bulk status change, and the import of the three company templates. */
+export type CompanyOnboardingStatus = components['schemas']['CompanyOnboardingStatus'];
+export type CompanyOnboardingItem = components['schemas']['CompanyOnboardingItem'];
+export type CompanyOnboardingItems = components['schemas']['CompanyOnboardingItems'];
+export type CompanyOnboardingProgress = components['schemas']['CompanyOnboardingProgress'];
+export type CompanyImportResult = components['schemas']['CompanyImportResult'];
+export type OnboardingState = CompanyOnboardingStatus['status'];
+export const COMPANY_TEMPLATES = [
+  { id: 'TPL-COMPANY-CONTACTS', key: 'contacts' },
+  { id: 'TPL-COMPANY-DOCUMENTS', key: 'documents' },
+  { id: 'TPL-COMPANY-ONBOARDING', key: 'onboarding' },
+] as const;
+
+const invOnb = (qc: ReturnType<typeof useQueryClient>) => {
+  void qc.invalidateQueries({ queryKey: ['company'] });
+  void qc.invalidateQueries({ queryKey: ['company-onboarding'] });
+};
+
+export const useCompanyOnboarding = (party: string) => useQuery({ queryKey: ['company', party, 'onboarding'], queryFn: () => api.get<{ items: CompanyOnboardingStatus[] }>(`/companies/${party}/onboarding`).then((r) => r.items) });
+export const useAllCompanyOnboarding = (enabled = true) => useQuery({ queryKey: ['company-onboarding', 'all'], enabled, queryFn: () => api.get<{ items: CompanyOnboardingProgress[] }>('/companies/onboarding').then((r) => r.items) });
+export const useSetCompanyOnboarding = (party: string) => {
+  const qc = useQueryClient();
+  return useMutation<{ changed: boolean }, ApiError, { item: string; status: OnboardingState; note?: string | null }>({
+    mutationFn: ({ item, ...body }) => api.put(`/companies/${party}/onboarding/${item}`, { body }),
+    onSettled: () => invOnb(qc),
+  });
+};
+export const useBulkCompanyOnboarding = () => {
+  const qc = useQueryClient();
+  return useMutation<{ companies: number; changed: number; unchanged: number }, ApiError, { party_ids: string[]; item: string; status: OnboardingState }>({
+    mutationFn: (body) => api.post('/companies/onboarding-bulk', { idempotencyKey: crypto.randomUUID(), body }),
+    onSettled: () => invOnb(qc),
+  });
+};
+export const useImportCompanyTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation<CompanyImportResult, ApiError, { file: File }>({
+    mutationFn: ({ file }) => { const fd = new FormData(); fd.append('file', file); return api.post('/companies/import', { idempotencyKey: crypto.randomUUID(), body: fd }); },
+    onSettled: () => { invOnb(qc); void qc.invalidateQueries({ queryKey: ['company-compliance'] }); },
+  });
+};
+/** The company template, blank, or filled with the companies picked (the export of the list's bulk bar). */
+export const downloadCompanyTemplate = (templateId: string, parties?: string[]) =>
+  downloadFile(`/templates/${templateId}/download`, parties && parties.length ? { party_ids: parties.join(',') } : { prefill: 'true' });
+export const downloadBlankCompanyTemplate = (templateId: string) => downloadFile(`/templates/${templateId}/download`);
+
+export const useCompanyOnboardingItems = () => useQuery({ queryKey: ['company-onboarding-items'], queryFn: () => api.get<CompanyOnboardingItems>('/settings/company-onboarding-items') });
+export const useSaveCompanyOnboardingItems = () => {
+  const qc = useQueryClient();
+  return useMutation<CompanyOnboardingItems, ApiError, { version: number; body: { reason: string; items: Partial<CompanyOnboardingItem>[] } }>({
+    mutationFn: ({ version, body }) => api.put('/settings/company-onboarding-items', { body, version }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['company-onboarding-items'] }); invOnb(qc); },
+  });
+};

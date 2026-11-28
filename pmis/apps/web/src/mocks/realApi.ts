@@ -815,6 +815,14 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/companies/:id/documents'],
   ['patch', '/companies/:id/documents/:doc_id'],
   ['get', '/companies/:id/documents/:doc_id/file'],
+  // Contract 0.15.626 (migration 0746, Companies K4): the onboarding checklist, the bulk change and the import of the company templates.
+  ['get', '/settings/company-onboarding-items'],
+  ['put', '/settings/company-onboarding-items'],
+  ['get', '/companies/onboarding'],
+  ['post', '/companies/onboarding-bulk'],
+  ['post', '/companies/import'],
+  ['get', '/companies/:id/onboarding'],
+  ['put', '/companies/:id/onboarding/:item'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

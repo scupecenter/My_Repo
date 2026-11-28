@@ -5985,6 +5985,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/company-onboarding-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The onboarding checklist items of the companies (label EN/AR, the company types each applies to)
+         * @description 0.15.626 (migration 0746, Companies K4). Needs the Settings screen (`admin.settings` view). The ETag is the version of the whole list. An item applies to nobody until its company types are set.
+         */
+        get: operations["getCompanyOnboardingItems"];
+        /**
+         * Save the checklist items (reason, If-Match, audited)
+         * @description 0.15.626. System Admin, or a delegation of `admin.settings` edit for all regions. An item is added or changed, hidden with `is_active` false, and never deleted. Audited as `company_onboarding_items_update`.
+         *     Field errors: `invalid`, `duplicate`, `unknown_type`.
+         */
+        put: operations["setCompanyOnboardingItems"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The onboarding progress of every active company (the chip of the company list)
+         * @description 0.15.626 (Companies K4). Needs the Contractors or Procurement view. `status` is `none` (no item applies), `not_started`, `in_progress` or `approved` (every applicable item approved).
+         */
+        get: operations["listCompanyOnboarding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/onboarding-bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set one checklist item to one status for many companies
+         * @description 0.15.626 (Companies K4). An edit right on Contractors or Procurement. At most 200 companies; all or nothing (422 `errors[]` at `/parties/<n>` with `not_found`, `not_applicable`, `unknown_item`). Audited per company as `company_onboarding_set`. Safe to retry with the same Idempotency-Key.
+         */
+        post: operations["bulkCompanyOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a filled company template (contacts, documents or onboarding checklist)
+         * @description 0.15.626 (Companies K4). The templates `TPL-COMPANY-CONTACTS`, `TPL-COMPANY-DOCUMENTS` and `TPL-COMPANY-ONBOARDING` only; any other file is 422 `template_rejected`
+         *     (`not_xlsx`, `tpl_missing`, `wrong_template`, `outdated_version`, `checksum_mismatch`, `size_or_rows_exceeded`). Applied at once and all or nothing through the doors of the screens
+         *     (rights and audit per row); one refused row refuses the file (`errors[]` at `/rows/<line>/<field>`). A blank cell changes nothing; a company is found by its name.
+         *     An edit right on Contractors or Procurement.
+         */
+        post: operations["importCompanyTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The onboarding checklist of one company
+         * @description 0.15.626 (Companies K4). Needs the Contractors or Procurement view. The items that apply to the company type, plus any item that was already given a status.
+         */
+        get: operations["getCompanyOnboarding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/onboarding/{item}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the status of one checklist item
+         * @description 0.15.626 (Companies K4). An edit right on Contractors or Procurement. Approved records who approved and when; any other status clears them. 422 `not_applicable` when the item does not apply to the company type. Audited as `company_onboarding_set`.
+         */
+        put: operations["setCompanyOnboardingStatus"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/companies/compliance": {
         parameters: {
             query?: never;
@@ -17191,10 +17319,10 @@ export interface components {
             kind: "data_import" | "assignment_import" | "config_import" | "master";
             module_key?: components["schemas"]["ModuleKey"];
             /**
-             * @description A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar). `daily_plan` (0.15.407): the Daily Plan (`TPL-DAILY-PLAN`), downloaded here and uploaded with `POST /daily-plans/import`.
+             * @description A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar). `daily_plan` (0.15.407): the Daily Plan (`TPL-DAILY-PLAN`), downloaded here and uploaded with `POST /daily-plans/import`. `company_contacts`, `company_documents`, `company_onboarding` (0.15.626): the company templates, uploaded with `POST /companies/import`.
              * @enum {string}
              */
-            template_kind?: "register" | "stream" | "master" | "sites" | "list_values" | "holidays" | "daily_plan";
+            template_kind?: "register" | "stream" | "master" | "sites" | "list_values" | "holidays" | "daily_plan" | "company_contacts" | "company_documents" | "company_onboarding";
             /** @description The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER. */
             register_key?: string | null;
             /** @description The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE. */
@@ -18162,6 +18290,78 @@ export interface components {
             expiring: number;
             missing: number;
             valid: number;
+        };
+        CompanyOnboardingItem: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            required_for: string[];
+            is_active: boolean;
+        };
+        CompanyOnboardingItems: {
+            items: components["schemas"]["CompanyOnboardingItem"][];
+            party_types: string[];
+            version: number;
+            can_edit: boolean;
+        };
+        CompanyOnboardingItemsInput: {
+            reason: string;
+            items: {
+                code: string;
+                label_en: string;
+                label_ar?: string | null;
+                required_for?: string[];
+                is_active?: boolean;
+            }[];
+        };
+        CompanyOnboardingStatus: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            status: "not_started" | "in_progress" | "approved";
+            /** Format: uuid */
+            approver_id?: string | null;
+            approver_name?: string | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            note?: string | null;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        CompanyOnboardingSetInput: {
+            /** @enum {string} */
+            status: "not_started" | "in_progress" | "approved";
+            note?: string | null;
+        };
+        CompanyOnboardingBulkInput: {
+            party_ids: string[];
+            item: string;
+            /** @enum {string} */
+            status: "not_started" | "in_progress" | "approved";
+            note?: string | null;
+        };
+        CompanyOnboardingProgress: {
+            /** Format: uuid */
+            party_id: string;
+            total: number;
+            approved: number;
+            in_progress: number;
+            /** @enum {string} */
+            status: "none" | "not_started" | "in_progress" | "approved";
+        };
+        CompanyImportResult: {
+            /** Format: uuid */
+            id: string;
+            rows: number;
+            added: number;
+            updated: number;
+            unchanged: number;
+            template_id: string;
+            template_version: number;
+            source?: string;
+            file_name?: string;
+            status: string;
         };
         CompanyContact: {
             /** Format: uuid */
@@ -35612,6 +35812,221 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getCompanyOnboardingItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOnboardingItems"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setCompanyOnboardingItems: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyOnboardingItemsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOnboardingItems"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listCompanyOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One row per active company. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CompanyOnboardingProgress"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    bulkCompanyOnboarding: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyOnboardingBulkInput"];
+            };
+        };
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        companies: number;
+                        changed: number;
+                        unchanged: number;
+                        item: string;
+                        status: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    importCompanyTemplate: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Applied. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyImportResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getCompanyOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The checklist. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CompanyOnboardingStatus"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setCompanyOnboardingStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company (external party) id. */
+                id: string;
+                /** @description The item code. */
+                item: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyOnboardingSetInput"];
+            };
+        };
+        responses: {
+            /** @description Saved; `changed` is false when nothing differed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        party_id: string;
+                        item: string;
+                        /** @enum {string} */
+                        status: "not_started" | "in_progress" | "approved";
+                        changed: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listCompanyCompliance: {

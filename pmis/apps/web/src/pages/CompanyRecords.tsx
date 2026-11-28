@@ -2,8 +2,9 @@ import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useContractorCompanies } from '@/api/registers';
 import { CompanyComplianceChip, CompanyContactsDocuments } from '@/components/CompanyContactsDocuments';
+import { CompanyOnboarding } from '@/components/CompanyOnboarding';
 
-/** /companies/:id (Companies K3): the contacts and the documents of a company. The full company page (K1/K2) takes these as tabs. */
+/** /companies/:id (Companies K3): the contacts, the documents and the onboarding checklist of a company. The full company page (K1/K2) takes these as tabs. */
 export function CompanyRecords() {
   const { t } = useTranslation();
   const { id = '' } = useParams();
@@ -13,6 +14,7 @@ export function CompanyRecords() {
     <main className="space-y-4 p-4" data-testid="page-company-records">
       <h1 className="flex items-center gap-3 text-xl font-bold">{name}<CompanyComplianceChip party={id} /></h1>
       <CompanyContactsDocuments party={id} canEdit />
+      <CompanyOnboarding party={id} canEdit />
     </main>
   );
 }

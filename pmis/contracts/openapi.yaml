@@ -285,6 +285,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.626 (2026-11-28): Companies K4, onboarding checklist, bulk status and the company templates (migration 0746, mirror `db/sql/745_company_onboarding_templates.sql`). Additive. New tables `company_onboarding_items` (Settings: label EN/AR, the company types it applies to, seeded empty, hide not delete) and `company_onboarding` (Not started, In progress or Approved per company and item, who approved and when, a note). `GET/PUT /settings/company-onboarding-items` (reason, If-Match, audited `company_onboarding_items_update`). `GET /companies/{id}/onboarding` and `PUT /companies/{id}/onboarding/{item}` (one step, audited `company_onboarding_set`; no workflow engine). `GET /companies/onboarding` gives the progress of every active company for the list. `POST /companies/onboarding-bulk` sets one item to one status for up to 200 companies, all or nothing (errors at `/parties/<n>`). Three templates join the catalogue and the Data hub: `TPL-COMPANY-CONTACTS`, `TPL-COMPANY-DOCUMENTS` and `TPL-COMPANY-ONBOARDING` (`Template.template_kind` lists `company_contacts`, `company_documents`, `company_onboarding`). `GET /templates/{id}/download` gives them blank, or filled with `prefill=true` or `party_ids` (the companies picked in the list: this is the export of the bulk bar). `POST /companies/import` (`importCompanyTemplate`) applies a filled file at once, all or nothing, through the doors of K3 and of the checklist (rights and audit per row, errors at `/rows/<line>/<field>`, a blank cell changes nothing, a company is found by name; other files are 422 `template_rejected`). Files are never part of a template. The manual entries, notes and custom factors of a company (K5) are not covered yet: their tables do not exist. The tables are KEEP in the data reset plan. No grant, role or permission change.
     - 0.15.625 (2026-11-28): Companies K3, contacts and documents with expiry (migration 0745, mirror `db/sql/744_company_contacts_documents.sql`). Additive. New tables `company_contacts`, `company_documents` and `company_document_types`, hung on the company (external_parties). `GET/PUT /settings/company-document-types` (the one list of document types: label EN/AR, required for company types, alert lead days, hide not delete; reason, If-Match, audited `company_doc_types_update`). `GET/POST /companies/{id}/contacts` and `PATCH /companies/{id}/contacts/{contact_id}` (name, role, phone, email, one primary; hide not delete; audited `company_contact_save`). `GET/POST /companies/{id}/documents`, `PATCH /companies/{id}/documents/{doc_id}` and `GET /companies/{id}/documents/{doc_id}/file` (type, number, issue and expiry date, notes, one file through the same store, scan and encryption as every document; the download is audited and covered by the uploaded files download lock). `GET /companies/compliance` and `GET /companies/{id}/compliance` give expired, expiring and missing required documents per company (information only). The daily job alerts once per document and stage (due, expired) to the contractor alert roles, like the safety certificate. Needs the Contractors or Procurement view to read, an edit right on either to write. The tables are KEEP in the data reset plan. No grant, role or permission change.
     - 0.15.586 (2026-11-28): Settings > Register links on the D60 table (migration 0713, mirror `db/sql/712_register_link_catalogue.sql`). Additive. `GET /settings/register-links` (`listRegisterLinkCatalogue`, every signed-in user) lists every declared link of `register_links`, switched-off ones included, with the version; `PUT /settings/register-links` (`saveRegisterLinkCatalogue`, System Admin, reason, If-Match, audited) switches a link on or off, sets `enforce` and `same_site`, and declares a new link; a link is switched off, never removed, and its register, field and target never change. New column `register_links.rev` (version). The picker, the check and the orphan report stay D60 (`GET /registers/{key}/links`, `GET /registers/{key}/link-options/{field}`).
     - 0.15.564 (2026-11-28): the missing photo indicator (D6, no migration, no table). Additive and read only. `DocumentSlot` gains `photo_min_count` and `photos_missing`, from the `photo_rules.min_count` of the document type (set in Settings > Documents) and the current image files of the slot. They inform only; nothing is blocked. No new right: the slots are shown to whoever can already see the task.
@@ -9440,6 +9441,180 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/company-onboarding-items:
+    get:
+      tags: [settings]
+      operationId: getCompanyOnboardingItems
+      summary: The onboarding checklist items of the companies (label EN/AR, the company types each applies to)
+      description: 0.15.626 (migration 0746, Companies K4). Needs the Settings screen (`admin.settings` view). The ETag is the version of the whole list. An item applies to nobody until its company types are set.
+      responses:
+        '200':
+          description: The items.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyOnboardingItems'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setCompanyOnboardingItems
+      summary: Save the checklist items (reason, If-Match, audited)
+      description: |
+        0.15.626. System Admin, or a delegation of `admin.settings` edit for all regions. An item is added or changed, hidden with `is_active` false, and never deleted. Audited as `company_onboarding_items_update`.
+        Field errors: `invalid`, `duplicate`, `unknown_type`.
+      x-db-path: admin_save_company_onboarding_items
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyOnboardingItemsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyOnboardingItems'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /companies/onboarding:
+    get:
+      tags: [registers]
+      operationId: listCompanyOnboarding
+      summary: The onboarding progress of every active company (the chip of the company list)
+      description: 0.15.626 (Companies K4). Needs the Contractors or Procurement view. `status` is `none` (no item applies), `not_started`, `in_progress` or `approved` (every applicable item approved).
+      responses:
+        '200':
+          description: One row per active company.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/CompanyOnboardingProgress'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /companies/onboarding-bulk:
+    post:
+      tags: [registers]
+      operationId: bulkCompanyOnboarding
+      summary: Set one checklist item to one status for many companies
+      description: 0.15.626 (Companies K4). An edit right on Contractors or Procurement. At most 200 companies; all or nothing (422 `errors[]` at `/parties/<n>` with `not_found`, `not_applicable`, `unknown_item`). Audited per company as `company_onboarding_set`. Safe to retry with the same Idempotency-Key.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyOnboardingBulkInput'}
+      responses:
+        '200':
+          description: Done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [companies, changed, unchanged, item, status]
+                properties:
+                  companies: {type: integer}
+                  changed: {type: integer}
+                  unchanged: {type: integer}
+                  item: {type: string}
+                  status: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /companies/import:
+    post:
+      tags: [registers]
+      operationId: importCompanyTemplate
+      summary: Apply a filled company template (contacts, documents or onboarding checklist)
+      description: |
+        0.15.626 (Companies K4). The templates `TPL-COMPANY-CONTACTS`, `TPL-COMPANY-DOCUMENTS` and `TPL-COMPANY-ONBOARDING` only; any other file is 422 `template_rejected`
+        (`not_xlsx`, `tpl_missing`, `wrong_template`, `outdated_version`, `checksum_mismatch`, `size_or_rows_exceeded`). Applied at once and all or nothing through the doors of the screens
+        (rights and audit per row); one refused row refuses the file (`errors[]` at `/rows/<line>/<field>`). A blank cell changes nothing; a company is found by its name.
+        An edit right on Contractors or Procurement.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202':
+          description: Applied.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyImportResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /companies/{id}/onboarding:
+    get:
+      tags: [registers]
+      operationId: getCompanyOnboarding
+      summary: The onboarding checklist of one company
+      description: 0.15.626 (Companies K4). Needs the Contractors or Procurement view. The items that apply to the company type, plus any item that was already given a status.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      responses:
+        '200':
+          description: The checklist.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/CompanyOnboardingStatus'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /companies/{id}/onboarding/{item}:
+    put:
+      tags: [registers]
+      operationId: setCompanyOnboardingStatus
+      summary: Set the status of one checklist item
+      description: 0.15.626 (Companies K4). An edit right on Contractors or Procurement. Approved records who approved and when; any other status clears them. 422 `not_applicable` when the item does not apply to the company type. Audited as `company_onboarding_set`.
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: The company (external party) id.}
+      - {name: item, in: path, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9_]{1,40}$'}, description: The item code.}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyOnboardingSetInput'}
+      responses:
+        '200':
+          description: Saved; `changed` is false when nothing differed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [party_id, item, status, changed]
+                properties:
+                  party_id: {type: string, format: uuid}
+                  item: {type: string}
+                  status: {type: string, enum: [not_started, in_progress, approved]}
+                  changed: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /companies/compliance:
     get:
       tags: [registers]
@@ -24548,7 +24723,7 @@ components:
         name_ar: { type: [string, 'null'] }
         kind: { type: string, enum: [data_import, assignment_import, config_import, master] }
         module_key: { $ref: '#/components/schemas/ModuleKey' }
-        template_kind: { type: string, enum: [register, stream, master, sites, list_values, holidays, daily_plan], description: 'A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar). `daily_plan` (0.15.407): the Daily Plan (`TPL-DAILY-PLAN`), downloaded here and uploaded with `POST /daily-plans/import`.' }
+        template_kind: { type: string, enum: [register, stream, master, sites, list_values, holidays, daily_plan, company_contacts, company_documents, company_onboarding], description: 'A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar). `daily_plan` (0.15.407): the Daily Plan (`TPL-DAILY-PLAN`), downloaded here and uploaded with `POST /daily-plans/import`. `company_contacts`, `company_documents`, `company_onboarding` (0.15.626): the company templates, uploaded with `POST /companies/import`.' }
         register_key: { type: [string, 'null'], description: 'The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER.' }
         stream: { type: [string, 'null'], description: 'The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE.' }
         current_version: { type: integer, minimum: 1, description: 'Shown as "v3". Exactly one version is current; older versions are rejected on upload. A new version is issued by the database when the register''s fields or custom fields change.' }
@@ -25343,6 +25518,90 @@ components:
         expiring: {type: integer}
         missing: {type: integer}
         valid: {type: integer}
+    CompanyOnboardingItem:
+      type: object
+      required: [code, label_en, required_for, is_active]
+      properties:
+        code: {type: string}
+        label_en: {type: string}
+        label_ar: {type: [string, 'null']}
+        required_for: {type: array, items: {type: string}}
+        is_active: {type: boolean}
+    CompanyOnboardingItems:
+      type: object
+      required: [items, party_types, version, can_edit]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/CompanyOnboardingItem'}}
+        party_types: {type: array, items: {type: string}}
+        version: {type: integer}
+        can_edit: {type: boolean}
+    CompanyOnboardingItemsInput:
+      type: object
+      required: [items, reason]
+      properties:
+        reason: {type: string, minLength: 3, maxLength: 1000}
+        items:
+          type: array
+          maxItems: 40
+          items:
+            type: object
+            required: [code, label_en]
+            properties:
+              code: {type: string, pattern: '^[a-z][a-z0-9_]{1,40}$'}
+              label_en: {type: string, minLength: 1, maxLength: 80}
+              label_ar: {type: [string, 'null'], maxLength: 80}
+              required_for: {type: array, items: {type: string}}
+              is_active: {type: boolean}
+    CompanyOnboardingStatus:
+      type: object
+      required: [code, label_en, status]
+      properties:
+        code: {type: string}
+        label_en: {type: string}
+        label_ar: {type: [string, 'null']}
+        status: {type: string, enum: [not_started, in_progress, approved]}
+        approver_id: {type: [string, 'null'], format: uuid}
+        approver_name: {type: [string, 'null']}
+        decided_at: {type: [string, 'null'], format: date-time}
+        note: {type: [string, 'null']}
+        updated_at: {type: [string, 'null'], format: date-time}
+    CompanyOnboardingSetInput:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [not_started, in_progress, approved]}
+        note: {type: [string, 'null'], maxLength: 1000}
+    CompanyOnboardingBulkInput:
+      type: object
+      required: [party_ids, item, status]
+      properties:
+        party_ids: {type: array, minItems: 1, maxItems: 200, items: {type: string, format: uuid}}
+        item: {type: string, pattern: '^[a-z][a-z0-9_]{1,40}$'}
+        status: {type: string, enum: [not_started, in_progress, approved]}
+        note: {type: [string, 'null'], maxLength: 1000}
+    CompanyOnboardingProgress:
+      type: object
+      required: [party_id, total, approved, in_progress, status]
+      properties:
+        party_id: {type: string, format: uuid}
+        total: {type: integer}
+        approved: {type: integer}
+        in_progress: {type: integer}
+        status: {type: string, enum: [none, not_started, in_progress, approved]}
+    CompanyImportResult:
+      type: object
+      required: [id, rows, added, updated, unchanged, template_id, template_version, status]
+      properties:
+        id: {type: string, format: uuid}
+        rows: {type: integer}
+        added: {type: integer}
+        updated: {type: integer}
+        unchanged: {type: integer}
+        template_id: {type: string}
+        template_version: {type: integer}
+        source: {type: string}
+        file_name: {type: string}
+        status: {type: string}
     CompanyContact:
       type: object
       required: [id, party_id, name, role, phone, email, is_primary, is_active, version, updated_at]
