@@ -32,3 +32,11 @@ Photos are picked with the checkbox on each card or row ("Select loaded" picks e
 - audited: `document_zip_start` and `document_zip_download` with entity `media_export`, the item count and size;
 - only the person who started a job can read it and download it (7 days);
 - a file that waits for the virus scan is left out and listed in the index with a note, like the document zip.
+
+## Notices (migration 0472, contract 0.15.534)
+Three notices go through the existing notification mechanism (the bell; e-mail and the personal choices follow the notification policy). Nothing is added to the engine and no table is created.
+- New photo on a followed site: people who follow a site (the existing Follow button, table `watches`) are told when a photo is added, except the person who uploaded it, and only if they can still read it (the region scope for a site document, the register's module for a register slot). The same gallery rules apply: the document kinds, registers and excluded codes of the setting, images only. Kind `followed_change`.
+- Photos below the minimum: the hourly notification step counts photo slots (document type kind photo, mandatory) that still have fewer photos than `min_files` after `min_photos_after_hours`. The record owner (the ball in court of the task, or the creator of the register record) and the Team Leads of the region get one notice per site. The same site is told again only after `min_photos_repeat_days`. Kind `system`.
+- Export ready: the person who asked is told when a media export finishes; the link opens the gallery and downloads the finished export once. Kind `system`.
+Settings > Documents > Media > Notices: `notify_new_photo`, `notify_min_photos`, `notify_export_ready` (default on), `min_photos_after_hours` (1 to 720, default 24), `min_photos_repeat_days` (1 to 90, default 7). Saved with a reason, a step-up and audit like the other keys. Links open the gallery filtered by the site code (`?q=`).
+Connections: search and filters (the link), permissions (the recipient is checked at write time), audit (the settings change), export (the third notice), data-reset plan (no new table), Settings.
