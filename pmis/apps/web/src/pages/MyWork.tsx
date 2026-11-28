@@ -1,5 +1,6 @@
 import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -110,7 +111,8 @@ export function MyWork() {
           <h1 className="text-2xl font-bold">{t('myWork.title')}</h1>
           <p className="text-mute">{t('myWork.hello', { name: me.data?.user.display_name.split(' ')[0] ?? '' })}</p>
         </div>
-        <button type="button" className="btn ms-auto" data-testid="my-work-ics" onClick={() => { void downloadFile('/me/tasks.ics').catch(() => undefined); }}><CalendarDays size={16} />{t('myWork.ics')}</button>
+        <span className="ms-auto"><ScreenSettingsLink screen="my_work" /></span>
+        <button type="button" className="btn" data-testid="my-work-ics" onClick={() => { void downloadFile('/me/tasks.ics').catch(() => undefined); }}><CalendarDays size={16} />{t('myWork.ics')}</button>
         <Link to="/approvals" data-testid="my-work-go-approvals" className="btn btn-accent"><Inbox size={16} />{t('myWork.go_approvals')}<span className="chip bg-card text-ink">{doNow.data?.items.length ?? 0}</span></Link>
       </div>
       <MyWorkCalendar late={late.data?.items ?? []} doNow={doNow.data?.items ?? []} onOpen={setOpen} />
@@ -133,7 +135,7 @@ export function MyWork() {
         filter={<UnifiedFilter screen="tasks-board" value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree) })} onClearAll={clearAll} />}
         extra={<PastedChip search={late.data?.search ?? doNow.data?.search ?? waiting.data?.search} />}
         count={<TableCount testid="my-work-count" noun="tasks" total={screenTotal} filtered={filtered} active={active} onClear={clearAll} />}
-        columns={<ColumnMenu api={tbl} label={label} />}
+        columns={<ColumnMenu density={false} api={tbl} label={label} />}
         layout={switcher}
         exporter={<ExportCsvButton testid="my-work-export" name="my-work" head={['#', t('approvals.bucket'), label('site'), t('grid.code'), label('task'), label('sla')]}
           rows={() => { let i = 0; return BUCKETS.flatMap(([k]) => (qs[k].data?.items ?? []).map((x) => [++i, t(`myWork.${k}`), x.site_code, x.task_code, (i18n.language === 'ar' && x.name_ar) || x.name_en, x.sla?.colour ?? ''])); }} />} />
