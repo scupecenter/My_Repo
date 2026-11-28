@@ -19,11 +19,13 @@ afterAll(async () => {
   await app?.close();
 });
 
+// is_active is read from the first published version: other suites switch document types off and on in the shared database.
 describe('photo fields of decision 32', () => {
   it('seeds one active photo type per place, optional, minimum 1, placed on the register', async () => {
     const r = await db.query(
-      `SELECT dt.code, dt.kind::text AS kind, dt.is_active, dt.is_mandatory, dt.min_files, p.register_key, p.record_type
+      `SELECT dt.code, dt.kind::text AS kind, v.is_active, dt.is_mandatory, dt.min_files, p.register_key, p.record_type
          FROM document_types dt JOIN document_type_placements p ON p.doc_type_id = dt.id
+         JOIN document_type_versions v ON v.doc_type_id = dt.id AND v.version_no = 1
         WHERE dt.code LIKE 'PHOTO\\_%' ORDER BY dt.code`,
     );
     const by = Object.fromEntries(r.rows.map((x) => [x.code as string, x]));
