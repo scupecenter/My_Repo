@@ -20833,6 +20833,8 @@ export interface components {
             } | null;
             /** @description The mean delay days over the parties that have any delay, one decimal; null when nobody is delayed. */
             avg_delay_days: number | null;
+            /** @description 0.15.591: the days late of all the parties together (snags past their target date plus issue delay days), the SLA penalty basis. Never an amount. */
+            late_days_total: number;
             /** @description The share of snags not overdue (the on-time rectification rate), one decimal; null when there are no snags. */
             on_time_pct: number | null;
             /** @description The share of failed quality inspections (the rejection / NCR rate), one decimal; null when there are no inspections. */

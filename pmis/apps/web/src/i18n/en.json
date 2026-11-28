@@ -3791,6 +3791,8 @@
       "scorecard_level_red": "Red",
       "scorecard_level_insufficient": "Insufficient data",
       "scorecard_on_time": "Snags on time",
+      "scorecard_late_days": "Days late",
+      "scorecard_late_days_hint": "Snags past their target date plus issue delay days, all contractors together",
       "scorecard_avg_delay": "Avg delay",
       "days": "days",
       "scorecard_rejection": "Rejection (quality fail / NCR)",

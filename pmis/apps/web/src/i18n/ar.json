@@ -3799,6 +3799,8 @@
       "scorecard_level_red": "أحمر",
       "scorecard_level_insufficient": "بيانات غير كافية",
       "scorecard_on_time": "إنجاز الملاحظات في الموعد",
+      "scorecard_late_days": "أيام التأخير",
+      "scorecard_late_days_hint": "الملاحظات المتجاوزة لتاريخها المستهدف مضافاً إليها أيام تأخير البلاغات، لكل المقاولين معاً",
       "scorecard_avg_delay": "متوسط التأخير",
       "days": "يوم",
       "scorecard_rejection": "الرفض (فشل الجودة / NCR)",

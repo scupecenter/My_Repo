@@ -100,6 +100,8 @@ export interface ScorecardItem {
   issues_open: number;
   snags: { total: number; open: number; overdue: number; returned: number };
   quality: { total: number; failed: number };
+  /** 0.15.591: the days late of the party (snags past their target date plus issue delay days); no amounts here. */
+  penalty?: { late_days: { total: number } };
   level: ScorecardLevel;
 }
 
@@ -114,6 +116,8 @@ export interface ScorecardSummary {
   quality_fail_pct: number | null;
   snags: { total: number; open: number; overdue: number; returned: number };
   quality: { total: number; failed: number };
+  /** 0.15.591: the days late of all the parties together (SLA penalty basis); never an amount. */
+  late_days_total: number;
   /** The five worst parties (the report order is worst first): no amounts, the party and its worst figures only. */
   worst: {
     party_id: string;
@@ -137,7 +141,9 @@ export function scorecardSummary(items: ScorecardItem[]): ScorecardSummary {
   const quality = { total: 0, failed: 0 };
   let delaySum = 0;
   let delayed = 0;
+  let lateDays = 0;
   for (const it of items) {
+    lateDays += it.penalty?.late_days.total ?? 0;
     by_level[it.level] += 1;
     snags.total += it.snags.total;
     snags.open += it.snags.open;
@@ -158,6 +164,7 @@ export function scorecardSummary(items: ScorecardItem[]): ScorecardSummary {
     avg_delay_days: delayed > 0 ? Math.round((delaySum * 10) / delayed) / 10 : null,
     on_time_pct: pct(snags.total - snags.overdue, snags.total),
     quality_fail_pct: pct(quality.failed, quality.total),
+    late_days_total: lateDays,
     snags,
     quality,
     worst: items.slice(0, 5).map((it) => ({
