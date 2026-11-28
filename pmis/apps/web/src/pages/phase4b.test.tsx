@@ -250,7 +250,8 @@ describe('Floating inbox panel (appearance: inbox_panel, inbox_anchor)', () => {
     if (!screen.queryByTestId('bell-panel')) await u.click(screen.getByTestId('topbar-bell'));
     const panel = await screen.findByTestId('bell-panel');
     expect(panel).toHaveAttribute('data-anchor', 'end-top');
-    expect(screen.queryByRole('dialog', { hidden: false })?.getAttribute('aria-modal')).not.toBe('true');
+    // (the non-blocking first-use tour card, Item 12, may also be a dialog on first use: none of them may be modal)
+    expect(screen.queryAllByRole('dialog', { hidden: false }).filter((d) => d.getAttribute('aria-modal') === 'true')).toEqual([]);
     const grip = within(panel).getByTestId('bell-drag');
     grip.focus();
     await u.keyboard('{ArrowLeft}{ArrowDown}');
