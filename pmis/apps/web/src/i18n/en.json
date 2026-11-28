@@ -3518,6 +3518,32 @@
       "draft_factor": "Draft",
       "draft_note": "A factor marked draft is not yet approved by the owner."
     },
+    "siteHealth": {
+      "title": "Site health",
+      "hint": "One score from 0 to 100 and a colour per site, worst first. It combines tasks on time, documents, open snags and delay periods. Click a site for the numbers behind its score.",
+      "filter_hint": "Show only {{band}} sites. Click again to clear.",
+      "unscored": "{{n}} not scored",
+      "unscored_hint": "Sites with no task, document, snag or delay data yet.",
+      "search": "Search site",
+      "empty": "No site matches.",
+      "col_site": "Site",
+      "col_score": "Score",
+      "shown": "Showing {{n}} of {{total}}",
+      "excluded": "no data, weight shared",
+      "weight_count": "weight {{w}}, {{n}} items",
+      "factor": {
+        "tasks": "Tasks",
+        "docs": "Documents",
+        "snags": "Snags",
+        "delay": "Delay"
+      },
+      "factor_hint": {
+        "tasks": "Share of task SLA clocks inside the limit: finished on time plus open tasks not past their due date.",
+        "docs": "Share of mandatory document slots of approved tasks that are approved.",
+        "snags": "100 minus 30 per open critical snag, 15 per open major and 5 per other open snag.",
+        "delay": "100 minus 10 per delay-period day in the last 30 days."
+      }
+    },
     "phase": {
       "manual": "typed (override)",
       "title": "Phase scope",
@@ -5492,6 +5518,11 @@
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
     "weekday": "Day of the week"
+  },
+  "siteHealthWeights": {
+    "title": "Site health weights",
+    "note": "How much the four factors count in a site's health score. A factor with no data for a site is left out and its weight is shared by the others. The colours use the health index bands above. Own save, reason and audit row; the score is live, so a change applies at once.",
+    "invalid": "Each weight is a whole number from 0 to 100 and at least one must be above 0."
   },
   "healthBands": {
     "title": "Health index bands",

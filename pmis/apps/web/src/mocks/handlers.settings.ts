@@ -461,6 +461,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_contractors', label_en: 'Contractor and supplier scorecard: levels, delay and quality', label_ar: 'بطاقة أداء المقاولين والموردين: المستويات والتأخير والجودة' },
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
+    { code: 'site_health', label_en: 'Site health: one score and colour per site', label_ar: 'صحة المواقع: درجة ولون لكل موقع' },
     { code: 'ops_phase', label_en: 'Phase scope: sites per project phase, progress and derived targets', label_ar: 'نطاق المراحل: المواقع لكل مرحلة والتقدم والمستهدفات المشتقة' },
     { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
     { code: 'ops_finance', label_en: 'Restricted financial summary: advances and disbursed against completion', label_ar: 'ملخص مالي مقيّد: السلف والمنصرف مقابل الإنجاز' },
@@ -496,6 +497,9 @@ const fcView = () => ({ ...fcState });
 /** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
 let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
 const bandsView = () => ({ ...bandsState });
+
+/** Site health weights (contract 0.15.591): the setting dashboard.site_health_weights, default 40, 20, 25, 15, version 0 until the first save. */
+let shwState = { version: 0, tasks: 40, docs: 20, snags: 25, delay: 15, updated_at: null as string | null, updated_by: null as null };
 
 /** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
@@ -680,6 +684,20 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     bandsState = { ...bandsState, version: bandsState.version + 1, green: b.green!, amber: b.amber!, updated_at: new Date().toISOString() };
     return HttpResponse.json(bandsView(), tag(bandsState.version));
+  }),
+  http.get(`${B}/settings/dashboard/site-health-weights`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ ...shwState }, tag(shwState.version)); }),
+  http.put(`${B}/settings/dashboard/site-health-weights`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, shwState.version); if (p) return p;
+    const b = (await request.json()) as Record<string, number | string>;
+    const errs: { path: string; code: string }[] = [];
+    for (const k of ['tasks', 'docs', 'snags', 'delay']) if (!Number.isInteger(b[k]) || (b[k] as number) < 0 || (b[k] as number) > 100) errs.push({ path: `/${k}`, code: 'invalid' });
+    if (!errs.length && ['tasks', 'docs', 'snags', 'delay'].every((k) => b[k] === 0)) errs.push({ path: '/tasks', code: 'all_zero' });
+    if (String(b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    shwState = { ...shwState, version: shwState.version + 1, tasks: b.tasks as number, docs: b.docs as number, snags: b.snags as number, delay: b.delay as number, updated_at: new Date().toISOString() };
+    return HttpResponse.json({ ...shwState }, tag(shwState.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),
