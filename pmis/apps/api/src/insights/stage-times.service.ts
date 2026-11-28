@@ -24,6 +24,16 @@ export class StageTimesService {
     return this.call(Prisma.sql`SELECT stage_times_report(${region}::integer) AS j`);
   }
 
+  /** 0.15.483 (migration 0624): two sites side by side. */
+  compare(q: Record<string, unknown>): Promise<unknown> {
+    const a = oneParam(q, "a");
+    const b = oneParam(q, "b");
+    if (!a || !UUID.test(a)) throw problems.validation([{ path: "/a", code: "invalid", message: "A site id." }]);
+    if (!b || !UUID.test(b)) throw problems.validation([{ path: "/b", code: "invalid", message: "A site id." }]);
+    if (a.toLowerCase() === b.toLowerCase()) throw problems.validation([{ path: "/b", code: "invalid", message: "Two different sites." }]);
+    return this.call(Prisma.sql`SELECT site_compare(${a}::uuid, ${b}::uuid) AS j`);
+  }
+
   private async call(sql: Prisma.Sql): Promise<unknown> {
     try {
       const rows = await this.db.tx.$queryRaw<{ j: unknown }[]>(sql);

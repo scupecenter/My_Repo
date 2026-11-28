@@ -102,3 +102,4 @@ export function useStatusOps() {
 // ---------------------------------------------------------------------------------------------------------------- time in stage (0.15.482)
 export const useSiteStageTimes = (siteId: string) => useQuery({ queryKey: ['stage-times', 'site', siteId], queryFn: () => api.get<import('./types').SiteStageTimes>(`/sites/${siteId}/stage-times`) });
 export const useStageTimesReport = (region: string) => useQuery({ queryKey: ['stage-times', 'report', region], queryFn: () => api.get<import('./types').StageTimesReport>('/reports/stage-times', { query: { region_id: region || undefined } }) });
+export const useSiteCompare = (a: string, b: string) => useQuery({ queryKey: ['stage-times', 'compare', a, b], enabled: !!a && !!b && a !== b, queryFn: () => api.get<import('./types').SiteCompare>('/reports/site-compare', { query: { a, b } }) });

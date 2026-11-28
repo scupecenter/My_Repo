@@ -11919,6 +11919,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/site-compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Two sites side by side (0.15.483)
+         * @description 0.15.483 (migration 0624). Needs `view` on `sites`; a site outside the caller's regions answers 404 for the pair. The same site twice is 422. Per site the identity, the task counts and the worst delay, and the stages of `getSiteStageTimes` merged by code with the days of each side and the difference (b minus a). Nothing is written.
+         */
+        get: operations["getSiteCompare"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/workload": {
         parameters: {
             query?: never;
@@ -23411,6 +23431,45 @@ export interface components {
                 tasks: number;
                 done: number;
                 rank?: number | null;
+            }[];
+        };
+        SiteCompareSide: {
+            /** Format: uuid */
+            id: string;
+            site_code: string;
+            name?: string | null;
+            name_ar?: string | null;
+            region_id: number;
+            status: string;
+            current_milestone?: string | null;
+            delivery_scenario?: string | null;
+            project_phase?: string | null;
+            tasks: {
+                applicable: number;
+                approved: number;
+                open: number;
+                overdue: number;
+                worst_delay_days: number;
+            };
+        };
+        SiteCompare: {
+            /** Format: date */
+            as_of: string;
+            a: components["schemas"]["SiteCompareSide"];
+            b: components["schemas"]["SiteCompareSide"];
+            stages: {
+                code: string;
+                seq: number;
+                name_en: string;
+                name_ar?: string | null;
+                a_state?: string | null;
+                a_days?: number | null;
+                a_finished?: string | null;
+                b_state?: string | null;
+                b_days?: number | null;
+                b_finished?: string | null;
+                /** @description b minus a; set when both sides have days. */
+                diff_days?: number | null;
             }[];
         };
         StageTimesReport: {
@@ -46118,6 +46177,33 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSiteCompare: {
+        parameters: {
+            query: {
+                a: string;
+                b: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The comparison. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteCompare"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };

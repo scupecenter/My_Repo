@@ -283,3 +283,4 @@ export type DashboardTargetPolicy = S['DashboardTargetPolicy'];
 
 export type SiteStageTimes = S['SiteStageTimes'];
 export type StageTimesReport = S['StageTimesReport'];
+export type SiteCompare = S['SiteCompare'];

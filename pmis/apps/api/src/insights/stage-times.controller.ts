@@ -15,4 +15,9 @@ export class StageTimesController {
   report(@Query() q: Record<string, unknown>) {
     return this.svc.report(q);
   }
+
+  @Get("reports/site-compare")
+  compare(@Query() q: Record<string, unknown>) {
+    return this.svc.compare(q);
+  }
 }
