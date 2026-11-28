@@ -1,7 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { superDb, startApp } from './helpers';
+import { superDbDocs, startApp } from './helpers';
 import { Actor, plainAdmin } from './wf-helpers';
 
 /**
@@ -13,8 +13,8 @@ let db: PgClient;
 let admin: Actor;
 
 beforeAll(async () => {
-  app = await startApp();
-  db = await superDb();
+  app = await startApp({ databaseUrl: process.env.TEST_DATABASE_URL_DOCS as string });
+  db = await superDbDocs();
   admin = await plainAdmin(app, db);
 });
 afterAll(async () => {
