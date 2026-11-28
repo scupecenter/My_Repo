@@ -15,6 +15,11 @@ export const OPS_LIMIT_DEFAULTS = {
   'prefill.max_sites': 5000,
   'export.max_rows': 100_000,
   'idempotency.max_entries': 5000,
+  'login.ip_attempts': 10,
+  'login.ip_window_seconds': 900,
+  'login.ip_base_seconds': 2,
+  'login.ip_max_seconds': 60,
+  'login.identifier_attempts': 5,
 } as const;
 
 export type OpsLimitKey = keyof typeof OPS_LIMIT_DEFAULTS;
@@ -46,4 +51,10 @@ export function applyLimits(values: Record<string, unknown>, explicit: string[])
 
 export function resetLimits(): void {
   current = {};
+}
+
+/** The sign-in rate-limit numbers (migration 0563). The longest wait is never shorter than the first wait, whatever is stored. */
+export function loginLimits(): { perIp: number; windowMs: number; baseSeconds: number; maxSeconds: number; perIdentifier: number } {
+  const base = limit('login.ip_base_seconds');
+  return { perIp: limit('login.ip_attempts'), windowMs: limit('login.ip_window_seconds') * 1000, baseSeconds: base, maxSeconds: Math.max(limit('login.ip_max_seconds'), base), perIdentifier: limit('login.identifier_attempts') };
 }

@@ -2,7 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
@@ -153,13 +153,20 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
   const ctx = { refs: record?.refs, files: (recSlots.data?.items ?? []).flatMap((sl) => sl.files.filter((f) => !f.superseded_by).map((f) => ({ id: f.id, name: f.original_name }))) };
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
-  const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
+  // A10: a shortage row of the dashboard opens a new Procurement record with the site, the request type and a remark that names the item; nothing is saved until the person submits
+  const [shortageSp] = useSearchParams();
+  const fromShortage = !record && rawDef.register_key === 'procurement' && shortageSp.get('from') === 'shortage';
+  const [data, setData] = useState<Data>(() => {
+    const base = record?.data ?? defaultsFor(rawDef.register_key, rawDef);
+    const remark = shortageSp.get('remark');
+    return fromShortage && remark ? { ...base, remark: remark.slice(0, 500) } : base;
+  });
   // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement picks it, GECOL and HLC show it read-only)
   const hasContractor = ['procurement', 'gecol', 'hlc', 'issues', 'quality'].includes(rawDef.register_key);
   const [party, setParty] = useState<string>(record?.external_party?.id ?? '');
   const companies = useContractorCompanies(rawDef.register_key === 'procurement');
-  const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
-  const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
+  const [site, setSite] = useState<SiteSel>(fromShortage && shortageSp.get('site') ? { id: shortageSp.get('site') as string, code: shortageSp.get('site_code') ?? '' } : record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
+  const [rtype, setRtype] = useState<string>(record?.record_type ?? (fromShortage ? 'pr' : ''));
   // 0.15.103: the columns prefilled from the admin's defaults on a new record; a column leaves the set when the person edits it
   const [prefilled, setPrefilled] = useState<Set<string>>(() => (record ? new Set() : new Set(Object.keys(columnDefaults(rawDef)))));
   const [dirty, setDirty] = useState(false);
