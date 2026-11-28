@@ -57,10 +57,12 @@ export class NotificationPersonalService {
   }
 
   mine(_auth: AuthContext): Promise<Json> {
+    void _auth; // the request context already carries the caller; kept for a uniform service signature
     return this.run<Json>(Prisma.sql`SELECT notif_my_prefs() AS r`);
   }
 
   save(_auth: AuthContext, version: number | null, raw: unknown): Promise<Json> {
+    void _auth; // the request context already carries the caller; kept for a uniform service signature
     const b = parse(prefsSchema, raw);
     const types = b.types === undefined ? null : JSON.stringify(b.types);
     const dnd = b.dnd === undefined ? null : JSON.stringify(b.dnd);
@@ -68,23 +70,28 @@ export class NotificationPersonalService {
   }
 
   snooze(_auth: AuthContext, raw: unknown): Promise<Json> {
+    void _auth; // the request context already carries the caller; kept for a uniform service signature
     const b = parse(snoozeSchema, raw);
     return this.run<Json>(Prisma.sql`SELECT notif_my_snooze(${b.until}::timestamptz) AS r`);
   }
 
   test(_auth: AuthContext): Promise<Json> {
+    void _auth; // the request context already carries the caller; kept for a uniform service signature
     return this.run<Json>(Prisma.sql`SELECT notif_my_test() AS r`);
   }
 
   decisions(_auth: AuthContext): Promise<Json> {
+    void _auth; // the request context already carries the caller; kept for a uniform service signature
     return this.run<Json>(Prisma.sql`SELECT notif_my_decisions(50) AS r`);
   }
 
   org(_auth: AuthContext): Promise<Json> {
+    void _auth; // the request context already carries the caller; kept for a uniform service signature
     return this.run<Json>(Prisma.sql`SELECT notif_personal_get() AS r`);
   }
 
   saveOrg(_auth: AuthContext, version: number | null, raw: unknown): Promise<Json> {
+    void _auth; // the request context already carries the caller; kept for a uniform service signature
     const { reason, ...cfg } = parse(orgSchema, raw);
     return this.run<Json>(Prisma.sql`SELECT notif_personal_set(${JSON.stringify(cfg)}::jsonb, ${version}::integer, ${reason}::text) AS r`);
   }
