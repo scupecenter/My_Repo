@@ -141,6 +141,7 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
       regions: REGIONS.filter((r) => scope === null || scope.includes(r.id)).map((r) => ({ id: r.id, name_en: r.name_en, name_ar: r.name_ar })),
       clusters: ['CL-TR-01', 'CL-TR-02', 'CL-BN-01'], scenarios: [...SCENARIOS], streams: STREAMS.map((s) => ({ code: s.code, name_en: s.name_en, name_ar: s.name_ar })),
       views: VIEWS.map((v) => ({ code: v.code, name_en: v.name_en, name_ar: v.name_ar })),
+      phases: ['Phase 1', 'Phase 2'],
     },
     headline: {
       sites_total: total, sites_cancelled: region ? 1 : 3,
@@ -157,10 +158,10 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
         manual_items_planned: measuredManual.filter((c) => opts.plan?.(c.code, ref) !== undefined).length,
         partial_index: { value: 0.912, coverage_pct: 42, actual_pct: 58.3, planned_pct: 63.9 }, central_line: centralLine,
         activities: [
-          { code: 'A1', name_en: 'Survey & Engineering', name_ar: 'المسح والهندسة', weight: 12, progress_pct: 82, measured: true, items: [] },
+          { code: 'A1', name_en: 'Survey & Engineering', name_ar: 'المسح والهندسة', weight: 12, progress_pct: 82, measured: true, items: [{ code: 'A1.1', name_en: 'Site survey', name_ar: 'المسح الميداني', weight: 50, progress_pct: 90, measured: true, done: 18, applicable: 20 }, { code: 'A1.2', name_en: 'Design approval', name_ar: 'اعتماد التصميم', weight: 50, progress_pct: 74, measured: true, done: 15, applicable: 20 }] },
           { code: 'A2', name_en: 'Site Acquisition & Permits', name_ar: 'استحواذ الموقع والتصاريح', weight: 8, progress_pct: 74, measured: true, items: [] },
           { code: 'A3', name_en: 'Procurement & Supply', name_ar: 'المشتريات والتوريد', weight: 5, progress_pct: 0, measured: false, items: [] },
-          { code: 'A4', name_en: 'Civil Work & Site Readiness', name_ar: 'الأعمال المدنية وجاهزية الموقع', weight: 25, progress_pct: 58, measured: true, items: [] },
+          { code: 'A4', name_en: 'Civil Work & Site Readiness', name_ar: 'الأعمال المدنية وجاهزية الموقع', weight: 25, progress_pct: 58, measured: true, items: [{ code: 'A4.1', name_en: 'Foundation', name_ar: 'الأساسات', weight: 40, progress_pct: 70, measured: true, done: 14, applicable: 20 }, { code: 'A4.2', name_en: 'Tower erection', name_ar: 'نصب البرج', weight: 40, progress_pct: 52, measured: true, done: 10, applicable: 20 }, { code: 'A4.3', name_en: 'Shelter and fence', name_ar: 'الغرفة والسياج', weight: 20, progress_pct: 41, measured: true, done: 8, applicable: 20 }] },
           { code: 'A5', name_en: 'TE Installation', name_ar: 'تركيب TE', weight: 20, progress_pct: 36, measured: true, items: [] },
           { code: 'A6', name_en: 'Integration & On-Air', name_ar: 'التكامل والتشغيل', weight: 12, progress_pct: 29, measured: true, items: [] },
           { code: 'A7', name_en: 'Testing & Acceptance', name_ar: 'الاختبار والقبول', weight: 13, progress_pct: 14, measured: true, items: [] },
