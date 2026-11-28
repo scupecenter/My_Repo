@@ -16,7 +16,7 @@ const putBody = z.object({
 export interface OpsLimitItem {
   key: string;
   group: 'sessions' | 'rows' | 'exports';
-  unit: 'hours' | 'seconds' | 'rows' | 'sites' | 'entries';
+  unit: 'hours' | 'seconds' | 'rows' | 'sites' | 'entries' | 'attempts';
   default: number;
   min: number;
   max: number;

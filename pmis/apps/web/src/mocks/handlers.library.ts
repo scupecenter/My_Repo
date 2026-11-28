@@ -29,7 +29,7 @@ const canGenerate = () => { const v = viewer(); return !!v && (v.key === 'pm' ||
 
 interface Row extends LibraryArchiveRow { site_i: number }
 interface Gen extends LibraryGeneratedDocument { html: string }
-interface State { rows: Row[]; gen: Gen[]; tpls: LibraryFormTemplate[]; seq: Record<string, number>; setting: LibraryArchiveSetting }
+interface State { rows: Row[]; gen: Gen[]; tpls: LibraryFormTemplate[]; seq: Record<string, number>; setting: LibraryArchiveSetting; marks: { types: Record<string, { signature: boolean; stamp: boolean }>; version: number } }
 
 const SEED_HTML = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Site survey report</title><style>body{font-family:Cairo,sans-serif}td{border:1px solid #888;padding:4px}</style></head>'
   + '<body><h1>Site survey report {{doc.ref_no}}</h1><table><tr><td>Site ID</td><td>{{site.id}}</td></tr><tr><td>Site name</td><td>{{site.name}}</td></tr><tr><td>Region</td><td>{{site.region_name}}</td></tr>'
@@ -63,7 +63,7 @@ function seed(): State {
     approved_by: { id: 'u-1001', display_name: 'Demo User 01', employee_id: '1001' }, approved_at: '2026-11-20T09:00:00.000Z', retired_at: null, updated_at: '2026-11-20T09:00:00.000Z',
   };
   for (const r of rows) if (r.doc_type_id === tpl.doc_type_id) r.form_id = tpl.id;
-  return { rows, gen: [], tpls: [tpl], seq: {}, setting: { hidden: [], order: [], default_columns: [...ARCHIVE_COLUMNS], zip_limit: 500, version: 0 } };
+  return { rows, gen: [], tpls: [tpl], seq: {}, setting: { hidden: [], order: [], default_columns: [...ARCHIVE_COLUMNS], zip_limit: 500, version: 0 }, marks: { types: {}, version: 0 } };
 }
 let S: State = seed();
 const HTML: Record<string, string> = { 'f0000000-0000-4000-8000-000000000001': SEED_HTML };
@@ -245,6 +245,20 @@ export const libraryHandlers = [
       Object.assign(t, { status: 'retired', retired_at: NOW, updated_at: NOW });
     } else return undefined;
     return HttpResponse.json(t);
+  }),
+  http.get(`${B}/settings/document-marks`, () => {
+    const g = guard(); if (g) return g;
+    return HttpResponse.json(S.marks);
+  }),
+  http.put(`${B}/settings/document-marks/:code`, async ({ request, params }) => {
+    const g = guard(); if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'admin path: System Admin or a delegation covering document_types.edit required');
+    const b = await request.json() as { signature: boolean; stamp: boolean; reason?: string };
+    if (!b.reason || b.reason.trim().length < 3) return problem(422, 'validation_failed', 'A reason is required.', { errors: [{ path: '/reason', code: 'required', message: 'A reason of at least 3 characters is required.' }] });
+    const types = { ...S.marks.types };
+    if (b.signature || b.stamp) types[String(params.code)] = { signature: b.signature, stamp: b.stamp }; else delete types[String(params.code)];
+    S.marks = { types, version: S.marks.version + 1 };
+    return HttpResponse.json(S.marks);
   }),
   http.get(`${B}/settings/library-archive`, () => {
     const g = guard(); if (g) return g;

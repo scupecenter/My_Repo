@@ -4309,6 +4309,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/finance-hub/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Finance hub landing page, in one call (0.15.361)
+         * @description 0.15.361. Read-only summary cards over the two separate registers `financial_advances` and `invoices` - open advances (count, overdue count, and the open balance total where `fin_amounts_visible` shows the caller amounts - null otherwise), and open invoices (count by state, aging buckets over the received date, count past due). Each card is null when the caller cannot view that register's module, and every row counted is a row the register screen would show the caller (same module and region visibility, latest version only). The thresholds come from the `finance_hub` section of ui.features.
+         */
+        get: operations["getFinanceHubSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules": {
         parameters: {
             query?: never;
@@ -6246,6 +6266,30 @@ export interface paths {
          * @description 0.15.62. Any System Admin acting without delegation, a reason and a step-up, while the request is `files_pending` (409 `invalid_transition` otherwise). Moves the keys still `pending` into the same quarantine directory with the same rules; a key already moved, missing or refused is never tried again. Audited (`data_reset_files_retry`).
          */
         post: operations["retryDataResetFiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/duplicate-rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How a record that is in an upload file twice is treated (imports.duplicate_rows)
+         * @description 0.15.345 (migration 0432). Every signed-in user may read it. `default` is `first` (the first row of the record wins and the later rows are refused as `duplicate_in_file`, as before) or `last` (the later row wins and the earlier row is set aside as `overridden_by_later_row`, listed in the batch review and the error report, never lost). `registers` overrides the default per register key. Covers the register templates; master, sites, stream, list-values and holiday templates are not covered (the first row wins there). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDuplicateRowsSettings"];
+        /**
+         * Change how a duplicate row in a file is treated (reason, If-Match, audited)
+         * @description 0.15.345. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). A register key that does not exist is 422 (`unknown_register`), a reason and If-Match are required. Saving the values in force is 409 `invalid_transition`. Audited as `imp_duplicate_policy_update` with the values before and after.
+         */
+        put: operations["setDuplicateRowsSettings"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -9926,6 +9970,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/document-marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document types that need a signed copy and a stamped copy
+         * @description 0.15.377 (migration 0555). Every signed-in user. `types` holds only the document codes that need at least one; none by default.
+         */
+        get: operations["getDocumentMarksSetting"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/document-marks/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set whether one document type needs a signed copy and a stamped copy
+         * @description 0.15.377: System Admin or a delegate of document types (edit), password re-check and a reason; audited. Both false removes the entry. Hide, never delete: a deactivated type keeps its flags.
+         */
+        put: operations["setDocumentTypeMarks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/warehouse/dispatch-status": {
         parameters: {
             query?: never;
@@ -9998,6 +10082,85 @@ export interface paths {
          */
         put: operations["putRegionVendor"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/reorder-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Items with a reorder limit and whether the available stock is at or under it (contract 0.15.342) */
+        get: operations["listReorderLimits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/reorder-limits/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the reorder limit of an item (System Admin or a delegate of warehouse.items.edit for all regions)
+         * @description `reorder_level` null clears the limit. `If-Match` is optional (the first setting has no version); a stale version answers 412. Audited with a reason.
+         */
+        put: operations["putReorderLimit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/rma": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Supplier returns (RMA), newest first (contract 0.15.342) */
+        get: operations["listWarehouseRma"];
+        put?: never;
+        /**
+         * Record a supplier return (needs the warehouse create right). Tracking only, no stock effect
+         * @description The stock leaves quarantine through the existing "returned to supplier" quarantine exit (`POST /warehouse/quarantine-exits`); this records what the supplier does with it. `movement_id`, when given, must be such an exit. The number (`RMA-00001`...) is never reused.
+         */
+        post: operations["createWarehouseRma"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/rma/{rma_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rma_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a supplier return on (sent, then replaced, credited or rejected, then closed) */
+        post: operations["setWarehouseRmaStatus"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14356,6 +14519,19 @@ export interface components {
             uploaded_at: string;
             /** Format: date */
             approved_date?: string | null;
+            /** @description 0.15.377: this version is the signed copy (set by the person who uploaded it with the form field `signed`); absent when never marked. */
+            signed?: boolean;
+            /** @description 0.15.377: this version is the stamped copy (form field `stamped`); absent when never marked. */
+            stamped?: boolean;
+        };
+        DocumentMarksSetting: {
+            types: {
+                [key: string]: {
+                    signature: boolean;
+                    stamp: boolean;
+                };
+            };
+            version: number;
         };
         DocumentSlot: {
             /** Format: uuid */
@@ -14363,6 +14539,12 @@ export interface components {
             doc_code: string;
             name_en: string;
             name_ar?: string | null;
+            /** @description 0.15.377: the document type needs a signed copy (setting documents.marks). */
+            needs_signature?: boolean;
+            /** @description 0.15.377: the document type needs a stamped copy. */
+            needs_stamp?: boolean;
+            /** @description 0.15.377: the type needs a copy and no current version carries the markers yet. Informs only; nothing is blocked. */
+            awaiting_signed_copy?: boolean;
             /** @enum {string} */
             kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
@@ -16206,6 +16388,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0432: of the `error` rows, those set aside because a later row of the same record in the file won (`overridden_by_later_row`, setting `imports.duplicate_rows` = last). Counted inside `error`; 0 while the setting is `first`. */
+                overridden?: number;
                 /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
                 duplicate?: number;
             };
@@ -17217,6 +17401,49 @@ export interface components {
             /** Format: date-time */
             at: string;
         };
+        /** @description 0.15.361. The Finance hub: which widgets of the page show, after how many days a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets. */
+        UiFinanceHub: {
+            widgets: {
+                advances: boolean;
+                invoices: boolean;
+                quick_links: boolean;
+                templates: boolean;
+            };
+            settle_warn_days: number;
+            aging_days: number[];
+        };
+        FinanceHubSummary: {
+            /** @description Null when the caller cannot view the financial_advances module. */
+            advances: {
+                /** @description Latest advances whose state is not settled, closed or cancelled. */
+                open_count: number;
+                /** @description Disbursed and unsettled for more than settle_warn_days. */
+                overdue_count: number;
+                /** @description Total open balance of the advances the caller may see amounts of (fin_amounts_visible); null when the rule shows the caller no amounts. */
+                open_amount: number | null;
+                /** @example LYD */
+                currency?: string;
+            } | null;
+            /** @description Null when the caller cannot view the invoices module. */
+            invoices: {
+                /** @description Latest invoices whose state is not Paid or Cancelled. */
+                open_count: number;
+                /** @description Open invoices per state (Received, UnderReview, Approved, Disputed); a state with none is listed with 0. */
+                by_state: {
+                    [key: string]: number;
+                };
+                aging: {
+                    /** @description Received up to aging_days[0] days ago. */
+                    first: number;
+                    /** @description Received aging_days[0]+1 to aging_days[1] days ago. */
+                    second: number;
+                    /** @description Received more than aging_days[1] days ago. */
+                    third: number;
+                };
+                /** @description Due date past, not Paid or Cancelled. */
+                overdue_count: number;
+            } | null;
+        };
         DataHubSummary: {
             batches: {
                 count: number;
@@ -17249,6 +17476,7 @@ export interface components {
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
+            finance_hub: components["schemas"]["UiFinanceHub"];
             panel: components["schemas"]["UiPanel"];
             unsaved_guard: components["schemas"]["UiUnsavedGuard"];
         };
@@ -17257,6 +17485,7 @@ export interface components {
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
+            finance_hub?: components["schemas"]["UiFinanceHub"];
             panel?: components["schemas"]["UiPanel"];
             unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
         };
@@ -18742,6 +18971,29 @@ export interface components {
                 items: components["schemas"]["TaskSummary"][];
             }[];
         };
+        /** @description 0.15.345. The setting `imports.duplicate_rows`. */
+        DuplicateRowsSettings: {
+            /** @enum {string} */
+            default: "first" | "last";
+            /** @description Register key to mode; a register not listed uses `default`. */
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        DuplicateRowsSettingsInput: {
+            /** @enum {string} */
+            default: "first" | "last";
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            reason: string;
+        };
         /** @description 0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background. */
         ImportsSettings: {
             async_rows: number;
@@ -18843,6 +19095,16 @@ export interface components {
              * @enum {string}
              */
             contrast?: "standard" | "high";
+            /**
+             * @description 0.15.369 (0526): the notification panel as an overlay (default), a floating window or docked at the inline-end edge.
+             * @enum {string}
+             */
+            inbox_panel?: "overlay" | "floating" | "docked";
+            /**
+             * @description 0.15.369 (0526): the corner of the floating panel (inline sides, so it mirrors in RTL).
+             * @enum {string}
+             */
+            inbox_anchor?: "end-top" | "end-bottom" | "start-top" | "start-bottom";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
@@ -19189,11 +19451,11 @@ export interface components {
         /** @description 0.15.312. One operational limit. */
         OpsLimitItem: {
             /** @enum {string} */
-            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries";
+            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries" | "login.ip_attempts" | "login.ip_window_seconds" | "login.ip_base_seconds" | "login.ip_max_seconds" | "login.identifier_attempts";
             /** @enum {string} */
             group: "sessions" | "rows" | "exports";
             /** @enum {string} */
-            unit: "hours" | "seconds" | "rows" | "sites" | "entries";
+            unit: "hours" | "seconds" | "rows" | "sites" | "entries" | "attempts";
             default: number;
             min: number;
             max: number;
@@ -20277,6 +20539,44 @@ export interface components {
             pending_lines?: number;
             /** @description Only on GET /warehouse/dispatch-status/{site_id}. */
             lines?: components["schemas"]["SiteDispatchLine"][];
+        };
+        /** @description 0.15.342. The reorder limit of an item and the available stock against it. */
+        ReorderLimit: {
+            /** Format: uuid */
+            item_id: string;
+            item_code: string;
+            item_name: string;
+            uom: string | null;
+            reorder_level: number;
+            reorder_qty: number | null;
+            available: number;
+            below_reorder: boolean;
+            version: number;
+        };
+        /** @description 0.15.342. A supplier return (RMA): tracking only, no stock effect. */
+        WarehouseRma: {
+            /** Format: uuid */
+            id: string;
+            rma_no: string;
+            /** Format: uuid */
+            item_id: string;
+            item_code: string;
+            item_name: string;
+            qty: number;
+            supplier: string;
+            /** @enum {string} */
+            status: "sent" | "replaced" | "credited" | "rejected" | "closed";
+            reason: string;
+            /** Format: uuid */
+            movement_id?: string | null;
+            /** Format: date */
+            sent_on: string;
+            /** Format: date */
+            resolved_on?: string | null;
+            resolution_note?: string | null;
+            version: number;
+            /** Format: date-time */
+            created_at?: string;
         };
         RegionVendor: {
             region_id: components["schemas"]["RegionId"];
@@ -30623,6 +30923,27 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getFinanceHubSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceHubSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listExportSchedules: {
         parameters: {
             query?: never;
@@ -34171,6 +34492,62 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateRowsSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getTemplateChangeNotice: {
@@ -40644,6 +41021,59 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getDocumentMarksSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentMarksSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDocumentTypeMarks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    signature: boolean;
+                    stamp: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentMarksSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listSiteDispatch: {
         parameters: {
             query?: {
@@ -40754,6 +41184,176 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegionVendor"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listReorderLimits: {
+        parameters: {
+            query?: {
+                /** @description Only the items at or under their level. */
+                below?: "true";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items that have a limit. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReorderLimit"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putReorderLimit: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    reorder_level: number | null;
+                    reorder_qty?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listWarehouseRma: {
+        parameters: {
+            query?: {
+                status?: "sent" | "replaced" | "credited" | "rejected" | "closed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 500 supplier returns. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseRma"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createWarehouseRma: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    item_id: string;
+                    qty: number;
+                    supplier: string;
+                    reason: string;
+                    /** Format: uuid */
+                    movement_id?: string | null;
+                    /** Format: date */
+                    sent_on?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setWarehouseRmaStatus: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                rma_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "replaced" | "credited" | "rejected" | "closed";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
