@@ -330,3 +330,74 @@ export function actionsSummary(rows: ActionDueRow[]): ActionsSummary {
   }
   return { open, overdue: late.length, no_due_date: none, overdue_aging: bucketAges(late) };
 }
+
+/** Phase scope (0.15.367): one registered phase with its site counts. Counts only; every figure is derived from the sites. */
+export interface PhaseScopeRow {
+  phase: string | null;
+  sites: number;
+  completed: number;
+  in_progress: number;
+  not_started: number;
+  on_hold: number;
+  on_air: number;
+}
+
+export interface PhaseScopeOut extends PhaseScopeRow {
+  /** On-air sites over the sites of the phase, in percent (one decimal); null when the phase has no site. */
+  progress_pct: number | null;
+  /** The target of the phase: all its registered sites. Derived, never typed. */
+  target_sites: number;
+}
+
+const PHASE_NONE = null;
+
+/**
+ * Phase scope: the registered, not cancelled sites per project phase (the sites table field project_phase), with the share on air.
+ * Sites with no phase are one row with phase null. Rows are ordered by phase name (natural order, "C" collation like the registers), no phase last.
+ */
+export function phaseScope(rows: PhaseScopeRow[]): { phases: PhaseScopeOut[]; total: PhaseScopeOut } {
+  const phases: PhaseScopeOut[] = rows
+    .map((r) => ({
+      ...r,
+      progress_pct: r.sites > 0 ? Math.round((r.on_air / r.sites) * 1000) / 10 : null,
+      target_sites: r.sites,
+    }))
+    .sort((a, b) =>
+      a.phase === PHASE_NONE ? 1 : b.phase === PHASE_NONE ? -1 : a.phase!.localeCompare(b.phase!, "en", { numeric: true }),
+    );
+  const sum = (k: keyof PhaseScopeRow) => phases.reduce((n, r) => n + (r[k] as number), 0);
+  const sites = sum("sites");
+  const on_air = sum("on_air");
+  return {
+    phases,
+    total: {
+      phase: PHASE_NONE,
+      sites,
+      completed: sum("completed"),
+      in_progress: sum("in_progress"),
+      not_started: sum("not_started"),
+      on_hold: sum("on_hold"),
+      on_air,
+      progress_pct: sites > 0 ? Math.round((on_air / sites) * 1000) / 10 : null,
+      target_sites: sites,
+    },
+  };
+}
+
+/**
+ * The monthly On-Air target derived from the scope: the sites not yet on air spread over the months left to the latest planned date of the
+ * On-Air task in scope (30-day months, at least one). Null when no site of the scope has a planned date or nothing is left to do.
+ * A planned end already past asks for everything this month.
+ */
+export function autoMonthlyOnAir(remaining: number, plannedEnd: string | null, today: string): { value: number | null; months_left: number | null } {
+  if (!plannedEnd || remaining <= 0) return { value: null, months_left: null };
+  const days = Math.round((Date.parse(`${plannedEnd}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  const months = Math.max(1, Math.ceil(days / 30));
+  return { value: Math.ceil(remaining / months), months_left: months };
+}
+
+/** The target in force: a typed number counts only while the manual override is on and the number is a positive whole. */
+export function targetInForce(override: boolean, manual: number | null, derived: number | null): { value: number | null; source: "derived" | "manual" } {
+  if (override && manual !== null && manual > 0) return { value: manual, source: "manual" };
+  return { value: derived, source: "derived" };
+}

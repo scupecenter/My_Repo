@@ -4,10 +4,12 @@ import ExcelJS from 'exceljs';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { ProblemException, problems } from '../common/problem';
-import { boolParam, oneParam } from '../common/query';
+import { boolParam, isCalendarDate, oneParam } from '../common/query';
+import { importMaxRows } from './upload.interceptor';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { SitesService } from '../sites/sites.service';
+import { writeStructureSheet, type StructureField } from './structure-sheet';
 import { limit } from '../ops/ops-limits';
 
 /** One column of a template (the JSON that tpl_columns() stores with every version). */
@@ -157,6 +159,14 @@ export class TemplatesService {
     }
     // 0105 (F17): the values of a list, only for those who may edit the lists (fields)
     if (t.kind === 'list_values') return this.access.hasGrant(auth, 'fields', 'edit');
+    // 0564 (3b): the Daily Plan, for those who see it (view on Daily Plan or on Sites in a region; the database decides what a row may change)
+    if (t.kind === 'daily_plan') {
+      for (const m of ['daily_plan', 'sites']) {
+        const regs = await this.access.regions(m, 'view');
+        if (regs === null || regs.length > 0) return true;
+      }
+      return false;
+    }
     // 0145 (B12): the holidays, only for those who may change the calendar
     if (t.kind === 'holidays') return this.access.isAdmin('calendars', 'edit');
     return false;
@@ -224,6 +234,7 @@ export class TemplatesService {
     if (t.kind === 'sites') return this.downloadNewSites(auth, t);
     if (t.kind === 'list_values') return this.downloadListValues(auth, t, q);
     if (t.kind === 'holidays') return this.downloadHolidays(auth, t);
+    if (t.kind === 'daily_plan') return this.downloadDailyPlan(auth, t, q);
     if (t.kind !== 'register' || !t.register_key || !t.module_key) throw problems.notFound('This template cannot be downloaded yet.');
     const regs = await this.access.requireRegions(t.module_key, 'view');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
@@ -259,7 +270,13 @@ export class TemplatesService {
 
     const me = await this.db.tx.$queryRaw<{ employee_id: string | null; display_name: string }[]>(Prisma.sql`SELECT employee_id, display_name FROM users WHERE id = ${auth.user.id}::uuid`);
     const issuedAt = new Date();
-    const buffer = await this.build(t, cols, rows, { prefill, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt });
+    // 0560: who may edit the columns gets the Structure sheet, written from the live definition at the moment of the download
+    let structure: StructureField[] | undefined;
+    if (await this.access.isAdmin('fields', 'edit')) {
+      const sj = await this.db.tx.$queryRaw<{ r: { fields: StructureField[] } }[]>(Prisma.sql`SELECT reg_fields_admin_json(${t.register_key}::text) AS r`);
+      structure = sj[0]?.r.fields;
+    }
+    const buffer = await this.build(t, cols, rows, { prefill, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt, structure });
 
     // migration 0045: pmis_app writes no log row itself; the ip and the device come from the request context
     void ip;
@@ -309,6 +326,35 @@ export class TemplatesService {
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
         ${JSON.stringify({ version: t.current_version, prefill: list !== undefined, rows: rows.length, kind: t.kind, list: list ?? null })}::jsonb, NULL)`);
     return { buffer, fileName: `${t.template_id}${list ? `_${list}` : ''}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
+  }
+
+  /**
+   * 0564 (3b): TPL-DAILY-PLAN. Blank, or with `date` (and optional `region_id`) filled with the plan of that day as the actor sees it: one row per site, the
+   * value now shown in each column. Site name and Region are grey (never read). The import is POST /daily-plans/import.
+   */
+  private async downloadDailyPlan(auth: AuthContext, t: TemplateRow, q: Record<string, unknown>): Promise<{ buffer: Buffer; fileName: string }> {
+    if (!(await this.usable(t, auth))) throw problems.notFound('This template does not exist.');
+    if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
+    const date = oneParam(q, 'date');
+    let rows: Record<string, unknown>[] = [];
+    if (date !== undefined) {
+      if (!isCalendarDate(date)) throw problems.validation([{ path: '/date', code: 'invalid', message: 'A date YYYY-MM-DD.' }]);
+      const rid = oneParam(q, 'region_id');
+      if (rid !== undefined && !/^[1-9][0-9]{0,2}$/.test(rid)) throw problems.validation([{ path: '/region_id', code: 'invalid', message: 'region_id is a region number.' }]);
+      const day = await this.db.tx.$queryRaw<{ j: { rows: { site_code: string; values: Record<string, string | null>; reason: string | null; remark: string | null; frozen: boolean }[] } }[]>(Prisma.sql`
+        SELECT daily_plan_json(${date}::date, ${rid === undefined ? null : [Number(rid)]}::integer[]) AS j`);
+      rows = (day[0]?.j.rows ?? []).slice(0, importMaxRows()).map((r) => ({
+        plan_date: date, site_code: r.site_code, site_name: r.values.site_name, region: r.values.region,
+        tower_owner: r.values.tower_owner, owner_id: r.values.owner_id, latitude: r.values.latitude, longitude: r.values.longitude, site_type: r.values.site_type,
+        sow: r.values.sow, contractor: r.values.contractor, aat_se: r.values.aat_se, access_valid: r.values.access_valid, planned_work: r.values.planned_work,
+        actual_work: r.values.actual_work, reason: r.reason, remark: r.remark, remove: '',
+      }));
+    }
+    const issuedAt = new Date();
+    const buffer = await this.build(t, t.columns, rows, { prefill: date !== undefined, employeeId: null, issuedAt });
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
+        ${JSON.stringify({ version: t.current_version, prefill: date !== undefined, rows: rows.length, kind: t.kind, date: date ?? null })}::jsonb, NULL)`);
+    return { buffer, fileName: `${t.template_id}${date ? `_${date}` : ''}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
   /** 0145 (B12, ADR 0011): the empty TPL-HOLIDAYS workbook, for a System Admin or a delegate of the calendar. */
@@ -601,7 +647,7 @@ export class TemplatesService {
     return s;
   }
 
-  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }): Promise<Buffer> {
+  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void; structure?: StructureField[] }): Promise<Buffer> {
     return this.buildBook(t, [{ sheet: DATA_SHEET, cols, rows }], meta, []);
   }
 
@@ -667,7 +713,7 @@ export class TemplatesService {
 
   /** The approved-template workbook: the data sheet(s), an instructions sheet, a Columns sheet for the Site Register templates, the hidden lists and the hidden `_tpl`. */
   async buildBook(
-    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }, extraKv: [string, string | number][],
+    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void; structure?: StructureField[] }, extraKv: [string, string | number][],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'GSDN Workspace';
@@ -681,6 +727,7 @@ export class TemplatesService {
     });
     const ins = wb.addWorksheet('Instructions', { properties: { tabColor: { argb: 'FF2E7D90' } } });
     const colsSheet = isSite ? wb.addWorksheet('Columns') : null;
+    if (meta.structure) writeStructureSheet(wb, meta.structure);   // 0560: the Structure sheet of a register template (System Admin or fields.edit only)
     const lists = wb.addWorksheet(LISTS_SHEET);
     const tpl = wb.addWorksheet(TPL_SHEET);
 

@@ -30,12 +30,13 @@ import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage, RegisterRecordPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { DataHubPage } from '@/pages/DataHub';
+import { FinanceHubPage } from '@/pages/FinanceHub';
 import { TemplatesPage } from '@/pages/Templates';
 import { LibraryForms } from '@/pages/library/Forms';
 import { LibraryTemplates } from '@/pages/library/Templates';
 import { ArchiveList, LibraryArchive } from '@/pages/library/Archive';
+import { LibraryMedia } from '@/pages/library/Media';
 import { ReconciliationPage } from '@/pages/Reconciliation';
-import { TemplateMappingPage } from '@/pages/TemplateMapping';
 import { AsBuiltItems } from '@/pages/AsBuiltItems';
 import { MenuGroup } from './pages/MenuGroup';
 import { Warehouse } from '@/pages/Warehouse';
@@ -73,6 +74,12 @@ export function SettingsAlias() {
   const { pathname, search, hash } = useLocation();
   const rest = pathname.replace(/^\/settings\/?/, '');
   return <Navigate to={{ pathname: rest ? `/admin/settings/${rest}` : '/admin/settings/all', search, hash }} replace />;
+}
+
+/** The template mapping screen now lives in Settings > Data > Mapping (one home for settings); the old address keeps working. */
+export function MappingRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: '/admin/settings/data/mapping', search }} replace />;
 }
 
 function Soon() {
@@ -127,16 +134,18 @@ function gated(session: Session) {
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="data-hub" element={<DataHubPage />} />
+        <Route path="finance-hub" element={<FinanceHubPage />} />
         <Route path="templates" element={<TemplatesPage />} />
         {/* W5: Library (Forms and Archive) */}
         <Route path="library" element={<Navigate to="/library/forms" replace />} />
         <Route path="library/forms" element={<LibraryForms />} />
         <Route path="library/templates" element={<LibraryTemplates />} />
         <Route path="library/archive" element={<LibraryArchive />} />
+        <Route path="library/media" element={<LibraryMedia />} />
         <Route path="library/archive/:docCode" element={<ArchiveList />} />
         <Route path="templates/batches/:batchId" element={<RegisterBatch />} />
         <Route path="templates/master-import" element={<ReconciliationPage />} />
-        <Route path="templates/mapping" element={<TemplateMappingPage />} />
+        <Route path="templates/mapping" element={<MappingRedirect />} />
         <Route path="absence" element={<Absence />} />
         <Route path="messages" element={<Messages />} />
         <Route path="messages/:threadId" element={<Messages />} />

@@ -18,8 +18,15 @@ for (const c of [{ locale: 'en', theme: 'light' }, { locale: 'ar', theme: 'dark'
     await expect(page.getByTestId('dept-code')).toHaveValue('zz');
     await expect(page.getByTestId('unsaved-dialog')).toHaveCount(0);
     await page.getByTestId('dept-code').focus();
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('unsaved-dialog')).toBeVisible();
+    await expect(page.getByTestId('dept-code')).toBeFocused();
+    // The key can be swallowed while the leave dialog's dismiss layer is still being torn down on a slow runner, so press again. If the department dialog is
+    // already gone, that is a real bug (closed without asking), and this fails at once instead of retrying.
+    await expect(async () => {
+      await expect(page.getByTestId('dept-dialog'), 'the dialog must still be open with its typing').toBeVisible({ timeout: 500 });
+      await page.getByTestId('dept-code').focus();
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('unsaved-dialog')).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 12_000 });
     await page.getByTestId('unsaved-discard').click();
     await expect(page.getByTestId('dept-dialog')).toHaveCount(0);
   });

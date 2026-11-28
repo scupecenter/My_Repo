@@ -9,6 +9,7 @@ import { useMasterRuns } from '@/api/masterImport';
 import { useRecycleBin } from '@/api/recycleBin';
 import { useBatches, useTemplates } from '@/api/registers';
 import { useExports } from '@/api/admin';
+import { useStructureProposals } from '@/api/structureProposals';
 import { batchPath } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
@@ -51,6 +52,8 @@ export function DataHubPage() {
   const master = useMasterRuns();
   const reset = useDataReset(admin && w.admin);
   const bin = useRecycleBin();
+  const structure = useStructureProposals(admin && w.admin);
+  const structPending = (structure.data ?? []).filter((p) => p.status === 'pending').length;
   const nameOf = (x: { name_en: string; name_ar?: string | null }) => (i18n.language === 'ar' && x.name_ar) || x.name_en;
   const tplName = (id: string) => { const x = templates.data?.find((y) => y.template_id === id); return x ? nameOf(x) : id; };
   const s = summary.data;
@@ -123,6 +126,7 @@ export function DataHubPage() {
             <div className="flex flex-wrap gap-2">
               <Link to="/admin/settings/data/reset" className="btn px-2 py-1 text-sm" data-testid="hub-link-data-reset">{(() => { const I = ICONS.dataReset; return <I {...ICON_PROPS} size={16} />; })()}{t('nav.data_reset')}{reset.data?.request ? ` (${reset.data.request.status})` : ''}</Link>
               <Link to="/admin/settings/registers/recycle" className="btn px-2 py-1 text-sm" data-testid="hub-link-recycle-bin">{(() => { const I = ICONS.recycleBin; return <I {...ICON_PROPS} size={16} />; })()}{t('nav.recycle_bin')}{binCount ? ` (${binCount})` : ''}</Link>
+              <Link to="/admin/settings/data/structure" className="btn px-2 py-1 text-sm" data-testid="hub-link-structure">{(() => { const I = ICONS.template; return <I {...ICON_PROPS} size={16} />; })()}{t('settings.section_data_structure')}{structPending ? ` (${structPending})` : ''}</Link>
             </div>
             <p className="text-xs text-mute">{t('dhub.admin_note')}</p>
           </Widget>
