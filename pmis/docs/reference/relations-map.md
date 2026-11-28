@@ -67,6 +67,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Issues | Task | text field filled by a task picker | `blocked_gate_or_task` (the task code) | chosen |
 | Register decisions, task approvals, snags | Notifications | `x_notify_watchers`, policy in setting `notifications.policy` | `notifications` | derived |
 
+**Declared links (0409, D60 phase 1).** Every register link field is declared once in `register_links` (register, field, target register, target record type, same site, label fields, `enforce`). `record_related()` reads the declaration, `GET /registers/{key}/links` and `GET /registers/{key}/link-options/{field}` serve the web (generic `RecordLinkSelect`, used for any declared field without a hand-coded picker), and a link with `enforce = true` is checked in entry (the id is a current approved record of the target that the caller can see, of the same site when `same_site`). The links above are declared with the check off (declared only, so no old row is refused); `register_link_orphans()` reports the ids that point nowhere, to decide when to switch a link on. A new link is one row. Phase 2 (0410) adds the filters `data_in` and `data_not_like` and the label tokens (`a|b`, `field>key`, `@party`), so the generic picker replaces the hand-coded order and advance pickers in the drawer (the Dismantle order and RN pickers, the risk picker and the supplier picker stay: they filter by part, by status or read another table).
+
 ## 4. Gaps and proposals
 
 1. **Warehouse receipt to Procurement order.** A PL / OPEN receipt (stock coming in) names no order, so what arrived against a PO is not visible in
