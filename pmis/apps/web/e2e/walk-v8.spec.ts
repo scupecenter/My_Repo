@@ -6,8 +6,26 @@ test.skip(!process.env.WALK, 'real-stack run only');
 
 type Reg = { register_key: string; name_en: string; fields: { code: string; type: string; in_list?: boolean; options?: { value: string; colour?: string | null }[]; list?: { code?: string } | null }[] };
 
+/** The session's current CSRF token (every answer rotates it, so read it right before each write). */
+async function freshCsrf(request: APIRequestContext): Promise<string> {
+  const s = await (await request.get('/api/v1/auth/session')).json();
+  return s.csrf_token;
+}
+
+/** Colour a catalogue value when it has none. */
+async function ensureColour(request: APIRequestContext, listCode: string, value: string) {
+  const cat = await (await request.get(`/api/v1/list-catalogues/${listCode}`)).json();
+  const v = (cat.values ?? []).find((x: { code: string }) => x.code === value);
+  if (!v || v.colour) return;
+  const patch = await request.patch(`/api/v1/list-catalogues/${listCode}/values/${v.id}`, {
+    headers: { 'X-CSRF-Token': await freshCsrf(request), 'If-Match': `"${v.version}"` },
+    data: { colour: '#0e7490', reason: 'walk setup' },
+  });
+  expect(patch.ok(), `colour setup PATCH: ${patch.status()}`).toBeTruthy();
+}
+
 /** The first register with a visible list field whose value at least one record holds; a colour is set on that option when it has none. */
-async function pickColouredCell(request: APIRequestContext, csrf: string): Promise<{ key: string; field: string; recordId: string; value: string }> {
+async function pickColouredCell(request: APIRequestContext): Promise<{ key: string; field: string; recordId: string; value: string }> {
   const regs: { items: Reg[] } = await (await request.get('/api/v1/registers')).json();
   for (const r of regs.items) {
     const f = (r.fields ?? []).find((x) => x.type === 'list' && x.in_list && (x.options ?? []).length > 0);
@@ -17,19 +35,20 @@ async function pickColouredCell(request: APIRequestContext, csrf: string): Promi
     const hit = items.find((x) => typeof x.data[f.code] === 'string' && (f.options ?? []).some((o) => o.value === x.data[f.code]));
     if (!hit) continue;
     const value = String(hit.data[f.code]);
-    const opt = (f.options ?? []).find((o) => o.value === value)!;
-    if (!opt.colour && f.list?.code) {
-      const cat = await (await request.get(`/api/v1/list-catalogues/${f.list.code}`)).json();
-      const v = (cat.values ?? []).find((x: { code: string }) => x.code === value);
-      if (v) {
-        const patch = await request.patch(`/api/v1/list-catalogues/${f.list.code}/values/${v.id}`, {
-          headers: { 'X-CSRF-Token': csrf, 'If-Match': String(v.version ?? cat.version) },
-          data: { colour: '#0e7490' },
-        });
-        expect(patch.ok(), `colour setup PATCH: ${patch.status()}`).toBeTruthy();
-      }
-    }
+    if (f.list?.code) await ensureColour(request, f.list.code, value);
     return { key: r.register_key, field: f.code, recordId: hit.id, value };
+  }
+  // No record holds a list value yet (a fresh walk stack): give the first financial advance a kind and use it.
+  const recs = await (await request.get('/api/v1/registers/financial_advances/records?limit=5')).json();
+  for (const rec of (recs.items ?? []) as { id: string }[]) {
+    const detail = await (await request.get(`/api/v1/registers/financial_advances/records/${rec.id}`)).json();
+    const patch = await request.patch(`/api/v1/registers/financial_advances/records/${rec.id}`, {
+      headers: { 'X-CSRF-Token': await freshCsrf(request), 'If-Match': `"${detail.version}"` },
+      data: { data: { advance_kind: 'Daily allowance' } },
+    });
+    if (!patch.ok()) continue;
+    await ensureColour(request, 'AdvanceKind', 'Daily allowance');
+    return { key: 'financial_advances', field: 'advance_kind', recordId: rec.id, value: 'Daily allowance' };
   }
   throw new Error('no register with a list value in a record found');
 }
@@ -38,8 +57,7 @@ test('walk: value colours on and off from the Layout panel', async ({ page, requ
   test.setTimeout(240000);
   const login = await request.post('/api/v1/auth/local/login', { data: { identifier: '9001', password: 'Walk-Admin-Pass-2026' } });
   expect(login.ok()).toBeTruthy();
-  const { csrf_token } = await login.json();
-  const target = await pickColouredCell(request, csrf_token);
+  const target = await pickColouredCell(request);
 
   await page.goto('/login');
   await page.getByTestId('login-identifier').fill('9001');
