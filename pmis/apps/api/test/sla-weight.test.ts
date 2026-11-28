@@ -266,3 +266,29 @@ describe("weights in a draft and the publish check", () => {
     expect(r.body.outcome).toBe("deleted");
   });
 });
+
+describe("the lock mode of a version (0491: strict by default, stored on the version)", () => {
+  it("is strict everywhere, refused in a published version, set in a draft by the publish right and copied to the next draft", async () => {
+    const list = await admin.api.call("get", BASE);
+    const items = list.body.items as { version: number; status: string; lock_mode?: string }[];
+    expect(items.every((x) => x.lock_mode === "strict")).toBe(true);
+    let draft = items.find((x) => x.status === "draft")?.version;
+    const pubV = Math.max(...items.filter((x) => x.status === "published").map((x) => x.version));
+    const pub = await read(pubV);
+    const body = { lock_mode: "open", reason: REASON };
+    expect((await admin.api.call("put", `${BASE}/${pubV}/lock-mode`, body, hdr(pub.tag))).status).toBe(409);
+    if (!draft) {
+      const r = await admin.api.call("post", BASE, { parent_version: pubV, reason: REASON });
+      expect(r.status).toBe(201);
+      draft = r.body.version as number;
+    }
+    const d = await read(draft);
+    expect((await admin.api.call("put", `${BASE}/${draft}/lock-mode`, { lock_mode: "wild", reason: REASON }, hdr(d.tag))).status).toBe(422);
+    expect((await plain.api.call("put", `${BASE}/${draft}/lock-mode`, body, hdr(d.tag))).status).toBe(403);
+    const ok = await admin.api.call("put", `${BASE}/${draft}/lock-mode`, body, hdr(d.tag));
+    expect(ok.status).toBe(200);
+    expect((await admin.api.call("get", `${BASE}/${draft}`)).body.lock_mode).toBe("open");
+    const d2 = await read(draft);
+    expect((await admin.api.call("put", `${BASE}/${draft}/lock-mode`, body, hdr(d2.tag))).status).toBe(409);
+  });
+});

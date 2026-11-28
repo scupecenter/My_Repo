@@ -1,4 +1,6 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { TargetPolicyPanel } from "./TargetPolicyPanel";
+import { useDashboardTargetPolicy } from "@/api/settings";
 import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -48,6 +50,7 @@ export function DashboardSettings() {
   const toast = useToast();
   const q = useDashboardSettings();
   const set = useSetDashboardSettings();
+  const policy = useDashboardTargetPolicy();
   const [draft, setDraft] = useState<ReturnType<typeof fromSettings> | null>(
     null,
   );
@@ -107,36 +110,44 @@ export function DashboardSettings() {
         {draft && <span className="chip ms-2">{t("scopeMatch.unsaved")}</span>}
       </p>
 
-      <fieldset
-        className="space-y-2 rounded-md border border-line p-3"
-        data-testid="dsettings-targets"
-      >
-        <legend className="px-1 text-sm font-semibold">
-          {t("dashSettings.targets")}
-        </legend>
-        <label className="block text-sm">
-          {t("dashSettings.sites_per_batch")}
-          <input
-            type="number"
-            min={0}
-            className="input mt-1 w-32"
-            data-testid="dsettings-sites-per-batch"
-            value={cur.targets.sites_per_batch ?? ""}
-            onChange={(e) => setTarget("sites_per_batch", e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          {t("dashSettings.monthly_on_air")}
-          <input
-            type="number"
-            min={0}
-            className="input mt-1 w-32"
-            data-testid="dsettings-monthly-on-air"
-            value={cur.targets.monthly_on_air ?? ""}
-            onChange={(e) => setTarget("monthly_on_air", e.target.value)}
-          />
-        </label>
-      </fieldset>
+      <TargetPolicyPanel />
+
+      {policy.data?.manual_override ? (
+        <fieldset
+          className="space-y-2 rounded-md border border-line p-3"
+          data-testid="dsettings-targets"
+        >
+          <legend className="px-1 text-sm font-semibold">
+            {t("dashSettings.targets")}
+          </legend>
+          <label className="block text-sm">
+            {t("dashSettings.sites_per_batch")}
+            <input
+              type="number"
+              min={0}
+              className="input mt-1 w-32"
+              data-testid="dsettings-sites-per-batch"
+              value={cur.targets.sites_per_batch ?? ""}
+              onChange={(e) => setTarget("sites_per_batch", e.target.value)}
+            />
+          </label>
+          <label className="block text-sm">
+            {t("dashSettings.monthly_on_air")}
+            <input
+              type="number"
+              min={0}
+              className="input mt-1 w-32"
+              data-testid="dsettings-monthly-on-air"
+              value={cur.targets.monthly_on_air ?? ""}
+              onChange={(e) => setTarget("monthly_on_air", e.target.value)}
+            />
+          </label>
+        </fieldset>
+      ) : (
+        <p className="rounded-md border border-line p-3 text-sm text-mute" data-testid="dsettings-targets-derived">
+          {t("dashSettings.targets_derived")}
+        </p>
+      )}
 
       <SnapshotSchedule />
 

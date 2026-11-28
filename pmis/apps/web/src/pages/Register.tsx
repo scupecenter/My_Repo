@@ -14,6 +14,7 @@ import {
   Unlock,
   Warehouse as WarehouseIcon,
   Ruler,
+  FileSpreadsheet,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -882,6 +883,16 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                             `/admin/settings/registers/columns?register=${key}`,
                           ),
                       },
+                      {
+                        id: "col-structure",
+                        label: t("struct.edit_link"),
+                        icon: <FileSpreadsheet size={16} />,
+                        testid: "register-structure-edit",
+                        onSelect: () =>
+                          nav(
+                            `/admin/settings/registers/columns?register=${key}&tab=structure`,
+                          ),
+                      },
                     ]
                   : []),
                 {
@@ -1107,7 +1118,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                       key={r.id}
                       role="listitem"
                       tabIndex={0}
-                      aria-selected={on || cur}
+                      aria-current={on || cur ? 'true' : undefined}
                       onKeyDown={(e) => {
                         if (
                           (e.key === "Enter" || e.key === " ") &&
