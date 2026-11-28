@@ -133,6 +133,7 @@ describe('Settings, Screens, Login page: GET and PUT /settings/login-page', () =
     expect(back.status).toBe(200);
     expect((await pub()).body).toEqual({ announcement: null, animation: true, default_locale: null, support_links: [], ...CARD });
   });
+});
 
 describe('card display fields (0658)', () => {
   it('are written with the page, validated, kept when a body omits them, and shown by the public door', async () => {
