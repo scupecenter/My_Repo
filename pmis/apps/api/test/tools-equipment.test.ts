@@ -10,7 +10,7 @@ let app: NestExpressApplication;
 let db: PgClient;
 let t: Team;
 
-const OK = { equipment_no: 'EQ-001', name: 'Total station', category: 'Survey', next_due_date: '2027-03-01' };
+const OK = { equipment_no: 'EQ-001', name: 'Total station', category: 'TestInstrument', next_due_date: '2027-03-01' };
 
 beforeAll(async () => {
   app = await startApp();
