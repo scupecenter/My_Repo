@@ -1321,6 +1321,7 @@
   },
   "settings": {
     "audited": "Saved and audited with your reason.",
+    "section_sla_planned": "Planned dates",
     "tab_calendar": "Calendar",
     "tab_sla": "SLA and time",
     "tab_weights": "Weights",
@@ -5541,6 +5542,34 @@
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
     "weekday": "Day of the week"
+  },
+  "planRules": {
+    "title": "Planned dates",
+    "note": "How a planned date is proposed for a task: the latest date of its predecessors plus the working days of its SLA rule on the work calendar. Nothing changes until the engineer confirms on the site page.",
+    "enabled": "Propose planned dates",
+    "basis": "Working days to add",
+    "basis_max": "SLA maximum days",
+    "basis_min": "SLA minimum days",
+    "cascade": "A late predecessor moves the tasks after it (cascade)"
+  },
+  "planned": {
+    "open": "Proposed planned dates",
+    "hint": "Planned dates proposed from the predecessors and the work calendars. Review and confirm.",
+    "title": "Proposed planned dates",
+    "note": "Start is the latest predecessor date; the proposal adds the {{basis}} on the work calendar. Tick the tasks to update.",
+    "task": "Task",
+    "current": "Planned now",
+    "proposed": "Proposed",
+    "basis": "Based on",
+    "none": "none",
+    "wd": "working days",
+    "pick": "Select {{code}}",
+    "confirm": "Confirm {{count}}",
+    "done_one": "{{count}} planned date updated.",
+    "done_other": "{{count}} planned dates updated.",
+    "kind_actual": "(actual)",
+    "kind_planned": "(planned)",
+    "kind_proposed": "(proposed)"
   },
   "healthBands": {
     "title": "Health index bands",

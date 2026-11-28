@@ -717,6 +717,10 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.102 (migration 0196): the interface features setting
   ['get', '/settings/ui-features'],
   ['put', '/settings/ui-features'],
+  ['get', '/settings/plan-rules'],
+  ['put', '/settings/plan-rules'],
+  ['get', '/sites/:id/planned-dates'],
+  ['post', '/sites/:id/planned-dates/apply'],
   ['get', '/settings/idle-task-alert'],
   ['put', '/settings/idle-task-alert'],
   ['get', '/settings/notification-policy/catalogue'],

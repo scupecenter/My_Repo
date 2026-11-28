@@ -35,6 +35,20 @@ export class SettingsScreensController {
     return r;
   }
 
+  @Get('plan-rules')
+  async planRules(@Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.planRules();
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('plan-rules')
+  async setPlanRules(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.setPlanRules(ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
   @Get('table-display')
   async tableDisplay(@Res({ passthrough: true }) res: Response) {
     const r = await this.screens.tableDisplay();

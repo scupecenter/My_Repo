@@ -76,6 +76,19 @@ export class SettingsScreensService {
     return this.one(Prisma.sql`SELECT admin_set_idle_task_alert(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
   }
 
+  // ------------------------------------------------------------------ planned-date rules (A4, migration 0603)
+  /** GET /settings/plan-rules */
+  planRules(): Promise<{ version: number }> {
+    return this.one(Prisma.sql`SELECT plan_rules_json() AS j`);
+  }
+
+  /** PUT /settings/plan-rules (If-Match) */
+  setPlanRules(ifMatch: string | undefined, raw: unknown): Promise<{ version: number }> {
+    const version = parseIfMatch(ifMatch);
+    const { reason, rest } = split(raw);
+    return this.one(Prisma.sql`SELECT admin_save_plan_rules(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
+  }
+
   // ------------------------------------------------------------------ table display (W8, migration 0148)
   /** GET /settings/table-display (every signed-in user: every site-data table starts from these defaults) */
   tableDisplay(): Promise<{ version: number }> {

@@ -548,6 +548,36 @@ export class SitesService {
     return rows[0];
   }
 
+  /** A4 (migration 0603): GET /sites/{id}/planned-dates. Computed on read, nothing is stored. */
+  async plannedDates(auth: AuthContext, id: string): Promise<{ rules: Record<string, unknown>; items: Record<string, unknown>[] }> {
+    const regions = await this.access.requireRegions('sites', 'view');
+    const site = await this.siteRow(regions, id);
+    if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
+    const rules = await this.db.tx.$queryRaw<{ j: Record<string, unknown> }[]>(Prisma.sql`SELECT plan_rules_json() AS j`);
+    const items = await this.db.tx.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+      SELECT q.task_id::text AS task_id, q.task_code, q.state, q.planned_date::text AS planned_date, q.proposed_date::text AS proposed_date, q.slip_days,
+        q.reason, q.basis_task_code, q.basis_kind, q.working_days, td.name_en, td.name_ar
+      FROM plan_proposals(${id}::uuid) q JOIN task_instances ti ON ti.id = q.task_id JOIN task_definitions td ON td.id = ti.task_def_id
+      ORDER BY q.proposed_date NULLS LAST, q.task_code`);
+    return { rules: rules[0]!.j, items };
+  }
+
+  /** A4: POST /sites/{id}/planned-dates/apply. The engineer confirms the chosen tasks; the database checks edit on sites in the region and audits each change. */
+  async applyPlannedDates(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
+    const regions = await this.access.requireRegions('sites', 'view');
+    const site = await this.siteRow(regions, id);
+    if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
+    const b = parse(z.object({ task_ids: z.array(uuidSchema).min(1).max(500) }).strict(), raw);
+    try {
+      const r = await this.db.tx.$queryRaw<{ j: Record<string, unknown> }[]>(Prisma.sql`SELECT plan_apply(${id}::uuid, ${b.task_ids}::uuid[]) AS j`);
+      return r[0]!.j;
+    } catch (e) {
+      const p = mapDbError(e);
+      if (p) throw p;
+      throw e;
+    }
+  }
+
   async get(auth: AuthContext, id: string): Promise<Record<string, unknown>> {
     const regions = await this.access.requireRegions('sites', 'view');
     const site = await this.siteRow(regions, id);

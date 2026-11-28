@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Calendar } from './Calendar';
+import { PlanRules } from './PlanRules';
 import { DocumentLibrary } from './DocumentLibrary';
 import { FormTemplates } from './FormTemplates';
 import { WebPushSettings } from './WebPushSettings';
@@ -70,7 +71,7 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 /** The tabs of Administration > Settings (F19, and the dashboard tab of F20). Tabs with sections show a sub-navigation inside the tab. */
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Settings merge (owner approved 2026-11-25): Calendar + SLA rules + Weights all feed the SLA clock
-  { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
+  { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }, { key: 'planned' }] },
   { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'sequence' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }, { key: 'simulate', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'custom' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
@@ -249,6 +250,7 @@ export function SettingsRoutes() {
           <Route path="rules" element={<SlaRules />} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="weights" element={<WeightSets />} />
+          <Route path="planned" element={<PlanRules />} />
         </Route>
         <Route path="registers" element={<TabFrame tab="registers" />}>
           <Route index element={<Navigate to="columns" replace />} />
