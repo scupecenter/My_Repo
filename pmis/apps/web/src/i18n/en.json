@@ -151,8 +151,7 @@
     "link_adv_all": "All advance records",
     "link_adv_open": "Advances",
     "link_adv_expenses": "Expenses",
-    "link_adv_settlements": "Settlements",
-    "link_adv_triage": "Advances waiting for triage",
+    "link_adv_settlements": "Settlements", "link_adv_triage": "Advances waiting for triage",
     "link_inv_all": "All invoices",
     "link_inv_triage": "Invoices waiting for triage",
     "templates_title": "Templates",
@@ -309,6 +308,38 @@
     "invoices": "Invoices",
     "deliverables": "Deliverables",
     "incidents": "Incidents & Security"
+  },
+  "fup": {
+    "title": "Follow-up",
+    "subtitle": "Hello {{name}}, here is everything waiting for you.",
+    "open": "Follow-up hub",
+    "approvals": "Approvals waiting for me",
+    "assigned": "Tasks assigned to me",
+    "reminders": "Reminders",
+    "checklist": "Complete my profile",
+    "progress": "{{done}} of {{total}} done",
+    "none_approvals": "No approvals are waiting for you.",
+    "none_assigned": "Nothing is assigned to you right now.",
+    "none_reminders": "No unread reminders.",
+    "open_approvals": "Open Approvals",
+    "open_my_work": "Open My Work",
+    "open_inbox": "Open the inbox",
+    "go": "Fix",
+    "done": "(done)",
+    "todo": "(not done)",
+    "check_phone": "Add a phone number",
+    "check_phone_hint": "Opens My profile, Phone",
+    "check_appearance": "Choose how the app looks",
+    "check_appearance_hint": "Opens My profile, Appearance",
+    "check_notifications": "Choose which notifications reach you",
+    "check_notifications_hint": "Opens My profile, Notifications",
+    "check_push": "Turn on push on this browser",
+    "check_push_hint": "Opens My profile, Push",
+    "check_two_factor": "Turn on two-factor sign-in",
+    "check_two_factor_hint": "Opens My profile, Two-factor",
+    "hide_note": "Do not want this list?",
+    "hide_link": "Hide it in Appearance",
+    "note": "This page only gathers what other screens already show. Nothing here changes data."
   },
   "top": {
     "search": "Search or jump to…",
@@ -4150,10 +4181,10 @@
       "menu_style": "Side menu",
       "accent": "Accent colour",
       "contrast": "Contrast",
+      "followup_checklist": "Follow-up hub checklist",
       "inbox_panel": "Notification panel",
       "inbox_anchor": "Floating panel corner",
-      "more_menu": "More menu",
-      "followup_checklist": "Follow-up hub checklist"
+      "more_menu": "More menu"
     },
     "opt": {
       "density": {
@@ -4199,6 +4230,10 @@
         "standard": "Standard",
         "high": "High"
       },
+      "followup_checklist": {
+        "show": "Show (default)",
+        "hide": "Hide"
+      },
       "inbox_panel": {
         "overlay": "Overlay (default)",
         "floating": "Floating window",
@@ -4213,14 +4248,14 @@
       "more_menu": {
         "list": "List (default)",
         "grid": "Icon grid with search"
-      },
-      "followup_checklist": {
-        "show": "Show (default)",
-        "hide": "Hide"
       }
     }
   },
   "nav_side": {
+    "mode": "Menu mode",
+    "mode_pinned": "Pinned (always open)",
+    "mode_autohide": "Auto-hide (opens on hover)",
+    "mode_hint": "Auto-hide shrinks the menu to an icon rail. It opens when you point at it, focus it, press Ctrl+B, or touch it, and closes when you leave or press Esc.",
     "palette_hidden": "Also find the screens I hid from the menu when I search (Ctrl+K)",
     "fixed_first": "Dashboard is always the first entry of the menu and cannot be hidden.",
     "title": "Sidebar",
@@ -5390,6 +5425,16 @@
       "structure_decision": "Your structure proposal was decided"
     }
   },
+  "progressRag": {
+    "title": "Progress figure colours",
+    "note": "Green and amber for the progress vs plan index (SPI), the progress against plan in points and the weekly velocity of the progress curve. Higher is better. Nothing is coloured until a row is turned on and saved, so the dashboard looks exactly as before. The suggested numbers are not stored until you save. Own save, reason and audit row.",
+    "enabled": "Colour this figure",
+    "green": "Green from",
+    "amber": "Amber from",
+    "suggest": "Suggested: {{green}} / {{amber}}",
+    "range": "Numbers from {{min}} to {{max}}.",
+    "order": "Green must not be below amber."
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",
@@ -5474,6 +5519,10 @@
     "receipt_no_order": "No order (stock without an order)",
     "receipt_order_hint": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
     "advance_none": "Choose the advance",
+    "link_none": "Choose {{target}} record",
+    "link_hint_procurement_order_id": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
+    "link_hint_procurement_record_id": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
+    "link_hint_advance_id": "Only approved advances of this site that are disbursed or being settled are listed.",
     "advance_hint": "Only approved advances of this site that are disbursed or being settled are listed.",
     "supplier_none": "No company (type the name below)",
     "supplier_hint": "Optional. Picking a company links the invoice to the Contractors list and fills the supplier name when it is empty.",
@@ -6661,6 +6710,38 @@
     "impact_retry": "Try again",
     "closing": "This task closes the milestone",
     "closing_chip": "Closing task"
+  },
+  "studioLists": {
+    "back_to_lists": "Back to the lists",
+    "title": "Workflow lists",
+    "tab_tasks": "Tasks",
+    "tab_milestones": "Milestones",
+    "tab_gates": "Phase gates",
+    "all_ms": "All milestones",
+    "status": "Status",
+    "st_active": "Active",
+    "st_inactive": "Hidden",
+    "st_all": "All",
+    "only_edited": "Only rows changed in this draft",
+    "order": "Order",
+    "code": "Code",
+    "weight": "Weight %",
+    "tasks_n": "Tasks",
+    "after_ms": "After milestone",
+    "no_rule": "This task has no SLA rule or does not count in the weight: use the form (pen) to set it.",
+    "open_form": "Open the full form of {{code}}",
+    "up": "Move {{code}} up",
+    "down": "Move {{code}} down",
+    "unsaved_one": "1 change waiting, not saved yet",
+    "unsaved_other": "{{count}} changes waiting, not saved yet",
+    "discard": "Discard changes",
+    "save_all": "Save all changes",
+    "save_title": "Save {{count}} changes to this draft",
+    "save_hint": "One reason covers all the changes. They are saved one after the other; a refusal stops the rest and keeps them on the screen.",
+    "partial": "Saving stopped after {{done}} writes. The rest is still waiting here.",
+    "bad_row": "Check {{code}}: the English name is empty or the SLA minimum is above the maximum.",
+    "save_first": "Save or discard the changes waiting in the lists first.",
+    "hint": "Click a cell to edit it. Enter keeps the change, Escape cancels it. The pen opens the full form for conditions, links and documents."
   },
   "handoverWarn": {
     "title": "Open items on this site",
@@ -8304,12 +8385,7 @@
     "kind_invoice_due_soon_help": "Fires once per invoice and due date for every approved invoice that is not paid or cancelled and is due within the days (7 when empty) or already late. Placeholders: {{record}}, {{due}}, {{days}}.",
     "days_hub": "Hub value",
     "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}.",
-    "col_locked": "Locked",
-    "kpi": "KPI",
-    "op": "Comparison",
-    "op_above": "above",
-    "op_below": "below",
-    "value": "Threshold",
+    "col_locked": "Locked", "kpi": "KPI", "op": "Comparison", "op_above": "above", "op_below": "below", "value": "Threshold",
     "locked": "Locked (no edits until unlocked)",
     "kind_kpi_threshold": "KPI crosses a threshold",
     "kind_kpi_threshold_help": "Fires when the live KPI of the dashboard crosses the rule's own threshold. Placeholders: {{kpi}}, {{value}}, {{threshold}}."
@@ -8515,36 +8591,25 @@
     "use_video": "Upload video",
     "annotate": "Annotate"
   },
-  "fup": {
-    "title": "Follow-up",
-    "subtitle": "Hello {{name}}, here is everything waiting for you.",
-    "open": "Follow-up hub",
-    "approvals": "Approvals waiting for me",
-    "assigned": "Tasks assigned to me",
-    "reminders": "Reminders",
-    "checklist": "Complete my profile",
-    "progress": "{{done}} of {{total}} done",
-    "none_approvals": "No approvals are waiting for you.",
-    "none_assigned": "Nothing is assigned to you right now.",
-    "none_reminders": "No unread reminders.",
-    "open_approvals": "Open Approvals",
-    "open_my_work": "Open My Work",
-    "open_inbox": "Open the inbox",
-    "go": "Fix",
-    "done": "(done)",
-    "todo": "(not done)",
-    "check_phone": "Add a phone number",
-    "check_phone_hint": "Opens My profile, Phone",
-    "check_appearance": "Choose how the app looks",
-    "check_appearance_hint": "Opens My profile, Appearance",
-    "check_notifications": "Choose which notifications reach you",
-    "check_notifications_hint": "Opens My profile, Notifications",
-    "check_push": "Turn on push on this browser",
-    "check_push_hint": "Opens My profile, Push",
-    "check_two_factor": "Turn on two-factor sign-in",
-    "check_two_factor_hint": "Opens My profile, Two-factor",
-    "hide_note": "Do not want this list?",
-    "hide_link": "Hide it in Appearance",
-    "note": "This page only gathers what other screens already show. Nothing here changes data."
+  "history": {
+    "empty": "No changes recorded yet.",
+    "restore": "Restore",
+    "title_item": "History of {{code}}",
+    "title_plan": "History of the plan, {{region}}, {{date}}",
+    "open": "History",
+    "restored": "Restored the earlier values."
+  },
+  "dpTriage": {
+    "pending": "Waiting for review",
+    "accepted": "Accepted",
+    "deferred": "Deferred",
+    "claim": "Claim",
+    "release": "Release",
+    "accept": "Accept",
+    "defer": "Defer",
+    "claimed_by": "Claimed by {{name}}",
+    "note": "Note",
+    "title": "Review of the plan, {{region}}, {{date}}",
+    "done": "Saved."
   }
 }

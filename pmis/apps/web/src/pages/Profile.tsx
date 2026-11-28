@@ -300,6 +300,7 @@ function SidebarSection({ p }: { p: MyProfile }) {
   const tidy = (n: UiNav): UiNav => {
     const o: UiNav = {};
     if (n.badge_style) o.badge_style = n.badge_style;
+    if (n.mode === 'autohide') o.mode = 'autohide'; // pinned is the default: not stored
     if (n.hidden?.length) o.hidden = n.hidden;
     if (n.order?.length) o.order = n.order;
     if (n.pins?.length) o.pins = n.pins;
@@ -358,6 +359,13 @@ function SidebarSection({ p }: { p: MyProfile }) {
       <p className="text-sm text-mute">{t('nav_side.subtitle')}</p>
       <UnsavedGuard scope="inline" dirty={dirty} label={t('nav_side.title')} onSave={() => new Promise<boolean>((res) => { if (!dirty) { res(false); return; } save.mutate({ version: p.version, patch: { ui_prefs: { sidebar: tidy(draft) } } }, { onSuccess: () => { toast(t('profile.saved')); res(true); }, onError: () => res(false) }); })} />
       <form onSubmit={submit} className="space-y-3" noValidate data-testid="profile-sidebar-form">
+        <label className="block text-sm font-semibold">{t('nav_side.mode')}
+          <select className="input mt-1 font-normal" data-testid="pf-sb-mode" value={draft.mode ?? 'pinned'} onChange={(e) => setDraft({ ...draft, mode: e.target.value === 'autohide' ? 'autohide' : undefined })} aria-describedby="pf-sb-mode-hint">
+            <option value="pinned">{t('nav_side.mode_pinned')}</option>
+            <option value="autohide">{t('nav_side.mode_autohide')}</option>
+          </select>
+          <span id="pf-sb-mode-hint" className="mt-1 block text-xs font-normal text-mute">{t('nav_side.mode_hint')}</span>
+        </label>
         <label className="block text-sm font-semibold">{t('nav_side.badges')}
           <select className="input mt-1 font-normal" data-testid="pf-sb-badge" value={draft.badge_style ?? 'full'} onChange={(e) => setDraft({ ...draft, badge_style: e.target.value === 'full' ? undefined : (e.target.value as UiNav['badge_style']) })}>
             {BADGE_STYLES.map((b) => <option key={b} value={b}>{t(`nav_side.badge_${b}`)}</option>)}
