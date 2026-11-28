@@ -400,6 +400,7 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | register_sections | KEEP | Register form sections. |
 | register_task_sources | KEEP | Register to task date sources. |
 | register_column_locks | KEEP | Column locks of register fields (configuration, not records). |
+| structure_proposals | KEEP | Proposals to change the structure of a register through a modified template (configuration history, not records). |
 | task_field_sources | KEEP | Task fields fed by registers. |
 | permit_types | KEEP | Permit types. |
 | snag_types | KEEP | Snag types and photo rules. |
@@ -591,3 +592,24 @@ After a reset of the sites part, the owner's Master cannot be applied as it was 
 - **mail_outbox** stays a log in every scope, also with the `notifications` part (queued mails of deleted notifications may still be sent).
 - **Invitations** (`user_invitations`) stay with the `roles` part: an open invitation may name a group or role assignment that the part removed; it
   should be revoked and sent again after such a reset (not automated).
+
+## Archive before delete (migration 0371, contract 0.15.266)
+
+A request can ask for an archive of what the reset deletes. The choice is made with the request and never changes: `none` (as before), `download` (the run needs the archive made and downloaded once; kept 7 days at most) or `keep_90` (the run needs the archive made; kept 90 days, any number of downloads). It is shown to the approver. It is not part of `scope_hash`: the hash variants (backup choice, narrowing) stay as they are.
+
+- **Make:** the System Admin who requested or approved the request makes the archive while the request is approved (`POST /settings/data-reset/requests/{id}/archive`, step-up). The build is a zip with `records.xlsx` (one sheet per register on the current template, only the records the reset deletes, every state), the stored files (`files/`) and `manifest.csv`. A failed build leaves everything as it was; make it again.
+- **Gate:** `POST .../run` is refused with 409 `archive_required` until the archive is ready (mode `download`: and downloaded once).
+- **Download:** a System Admin with a step-up (`GET .../archive/download`). Every download is an audit row and a security-log entry (`project_data_reset`, step `archive_download`).
+- **Restore:** upload the Excel file again through the template of each register. The rows enter the normal approval path (L1, then L2) as new data. The archive does not restore users, settings or anything outside the registers.
+- **Expiry:** an archive past its keep date is removed (the stored file, then the row is marked `purged`) the next time the reset page is read.
+- **Storage:** the archive is a stored object (encrypted) in the document store, not in the quarantine directory. The archive row survives the reset (`data_reset_archives` is KEEP in `data_reset_plan()`).
+
+## Waiting period after the approval (contract 0.15.268, migration 0372)
+
+The approval does not open the run at once. Settings > Data > Data reset has a setting "Waiting period after approval", next to the request expiry and the backup age: immediately (0), 30 minutes, 24 hours (the default) or a custom number of hours or days (up to 30 days). A request takes the value as it is when the request is made, the approver sees it in the approval dialog, and it cannot change afterwards (the guard `data_reset_rows_guard`).
+
+- The approval sets `run_after` (approval plus the wait). The request then stays open for the usual request expiry counted from `run_after`, so a long wait does not expire it.
+- Until `run_after` the run is refused with 409 `cooloff_active`; the Run button is disabled and the request card shows a live countdown.
+- Either System Admin can cancel while the request waits (the cancel door is open to any System Admin in `requested` and `approved`).
+- Both admins (the requester and the approver) get an in-app notice at the approval and another shortly before the wait ends (an hour before, or half way for a short wait). `data_reset_cooloff_notify()` sends it; the API calls it with the state of the page and from a one-minute timer when jobs are on. It is safe to call by hand.
+- The setting can be changed only while no request is open, as the other two.

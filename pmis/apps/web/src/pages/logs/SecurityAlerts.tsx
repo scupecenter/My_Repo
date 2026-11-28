@@ -9,7 +9,6 @@ import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { QuickFilter } from '@/components/TableKit';
 import { useToast } from '@/components/Toast';
-import { AlertRules } from './AlertRules';
 
 const SEV = { info: 'bg-card2 text-mute', low: 'bg-card2', medium: 'bg-waitBg text-waitInk', high: 'bg-lateBg text-lateInk', critical: 'bg-lateBg text-lateInk font-bold' } as const;
 
@@ -23,8 +22,7 @@ export function SecurityAlerts() {
   if (q.isError) return <ErrorState onRetry={() => void q.refetch()} />;
   return (
     <div data-testid="page-security-alerts" className="space-y-3">
-      <PageHeader title={t('nav.logs.alerts')} subtitle={t('logs.alerts_subtitle')} />
-      <AlertRules />
+      <PageHeader title={t('nav.logs.alerts')} subtitle={t('logs.alerts_subtitle')} settings="security_alerts" />
       <div className="flex flex-wrap gap-2" role="group" aria-label={t('logs.a_status')}>
         {['open', 'acknowledged', ''].map((s) => <QuickFilter key={s} on={status === s} onClick={() => setStatus(s)} testid={`alerts-filter-${s || 'all'}`}>{t(`logs.a_${s || 'all'}`)}</QuickFilter>)}
       </div>
