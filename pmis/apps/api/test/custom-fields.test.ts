@@ -262,12 +262,17 @@ describe("POST and PATCH /custom-fields (admin_save_field)", () => {
     ).toBe(422);
   });
   it("edits with If-Match, bumps the version, audits before and after, and refuses a stale version and a missing header", async () => {
+    // The field is a Site field in the shared database, and the other suites create sites in parallel: while it is active and required, a site insert there fails
+    // with 'field "w_..." is required' (the flaky site-batch-async count). The database ignores the requirement of a field that is switched off, so the field is
+    // switched off for the PATCH that sets it (the PATCH accepts it) and switched on, not required, right after it.
+    version = (await db.query(`UPDATE field_definitions SET is_active = false WHERE id = $1 RETURNING version`, [created])).rows[0].version;
     const res = await admin.api.call(
       "patch",
       `/custom-fields/${created}`,
       { label_en: "Renamed", required: true, reason: R },
       { "If-Match": `"${version}"` },
     );
+    await db.query(`UPDATE field_definitions SET required = false, is_active = true WHERE id = $1`, [created]);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       label_en: "Renamed",
@@ -295,10 +300,7 @@ describe("POST and PATCH /custom-fields (admin_save_field)", () => {
     );
     expect(a.rows[0].before.label_en).toBe("Written field");
     expect(a.rows[0].after.label_en).toBe("Renamed");
-    version = res.body.version;
-    // The field is a Site field in the shared database: while it is required, every other suite that inserts a site (the probe of the New sites check, makeSite)
-    // fails with 'field "w_..." is required'. Switch the requirement off again now; the right of the PATCH was proven above.
-    version = (await db.query(`UPDATE field_definitions SET required = false WHERE id = $1 RETURNING version`, [created])).rows[0].version;
+    version = (await db.query(`SELECT version FROM field_definitions WHERE id = $1`, [created])).rows[0].version;
   });
   it("does not change entity, code or type on update, and never deletes: deactivating hides it from a plain user", async () => {
     const bad = await admin.api.call(
