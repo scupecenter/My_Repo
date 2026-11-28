@@ -52,6 +52,17 @@ export function RegisterRulesPanel() {
               </div>
             );
           })}
+          {Object.keys(r.other ?? {}).length > 0 && (
+            <details className="rounded-md border border-line p-2" data-testid={`regrules-other-${r.register_key}`}>
+              <summary className="cursor-pointer text-sm font-semibold">{t('regrules.other_title', { count: Object.keys(r.other ?? {}).length })}</summary>
+              <p className="mt-1 text-xs text-mute">{t('regrules.other_note')}</p>
+              <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
+                {Object.entries(r.other ?? {}).map(([k, v]) => (
+                  <div key={k} className="contents"><dt dir="ltr"><bdi>{k}</bdi></dt><dd dir="ltr"><bdi>{typeof v === 'string' ? v : JSON.stringify(v)}</bdi></dd></div>
+                ))}
+              </dl>
+            </details>
+          )}
         </div>
       ))}
       <FormDialog inline open={!!chg} onClose={close} testid="register-rules-dialog" title={chg ? t('regrules.change_title', { rule: (ar && chg.spec.label_ar) || chg.spec.label_en }) : ''} error={err} busy={set.isPending} onSubmit={(reason) => void submit(reason)} />
