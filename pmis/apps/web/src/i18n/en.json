@@ -4243,7 +4243,9 @@
         "list": "List (default)",
         "grid": "Icon grid with search"
       }
-    }
+    },
+    "celebrate_label": "Celebrate when a site reaches On-Air",
+    "celebrate_note": "A short celebration on the screen when the site you have open reaches On-Air. It never plays on first load. With reduced motion only the message shows. Saved in this browser."
   },
   "nav_side": {
     "mode": "Menu mode",
@@ -8132,6 +8134,9 @@
     "preview": "Preview of a dialog opening",
     "replay": "Replay",
     "link_display": "Tables (Display) settings"
+  },
+  "celebrate": {
+    "message": "Site {{code}} is On-Air"
   },
   "seq": {
     "title": "Numbering sequences",
