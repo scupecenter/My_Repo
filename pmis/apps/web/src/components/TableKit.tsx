@@ -41,6 +41,7 @@ import {
   cleanDisplay,
   isDensity,
 } from "@/lib/tablePrefs";
+import { cleanRules, type FormatRule } from "@/lib/condFormat";
 import { Tip } from "./Tip";
 
 export const SEL_W = 36;
@@ -99,9 +100,12 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
     setDensity: (d: Density) => set((p) => ({ ...p, density: d })),
     setDisplay: (d: Partial<DisplayOpts>) => set((p) => ({ ...p, display: { ...p.display, ...d } })),
     /** Back to the defaults of Settings > Display (the columns keep their order and widths) */
-    resetDisplay: () => set((p) => ({ order: p.order, hidden: p.hidden, width: p.width, ...(p.unpinned ? { unpinned: true } : {}) })),
+    resetDisplay: () => set((p) => ({ order: p.order, hidden: p.hidden, width: p.width, ...(p.unpinned ? { unpinned: true } : {}), ...(p.rules ? { rules: p.rules } : {}) })),
+    /** the person's conditional formatting rules (Layout panel); an empty list removes them */
+    rules: prefs.rules,
+    setRules: (rules: FormatRule[]) => set((p) => { const rest: Prefs = { ...p }; delete rest.rules; return rules.length ? { ...rest, rules } : rest; }),
     reset: () =>
-      set(() => ({ order: [], hidden: [], width: {} })),
+      set((p) => ({ order: [], hidden: [], width: {}, ...(p.rules ? { rules: p.rules } : {}) })),
     /** Applies the columns of a saved view (P10): unknown or forbidden columns are dropped by reconcile. */
     apply: (c: Partial<Prefs>) =>
       set(() => ({
@@ -110,6 +114,7 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
         width: c.width ?? {},
         ...(isDensity(c.density) ? { density: c.density } : {}),
         ...(cleanDisplay(c.display) ? { display: cleanDisplay(c.display) } : {}),
+        ...(cleanRules(c.rules) ? { rules: cleanRules(c.rules) } : {}),
       })),
   };
 }

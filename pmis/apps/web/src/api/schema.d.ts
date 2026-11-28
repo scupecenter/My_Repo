@@ -23144,6 +23144,20 @@ export interface components {
                 zebra?: boolean;
                 groupbar?: boolean;
             };
+            /** @description 0.15.590: the conditional formatting rules of the view (display only: a condition on one column and a colour for the cell or the row). A rule on a column the reader may not see is removed from what that reader gets and counted in `stripped_columns`. */
+            rules?: {
+                id: string;
+                /** @description A column id of the screen (`f:<code>` for a register field). */
+                col: string;
+                /** @enum {string} */
+                op: "gt" | "gte" | "lt" | "lte" | "eq" | "ne" | "contains" | "empty" | "notempty" | "days_past" | "days_ahead";
+                /** @description Absent for `empty` and `notempty`; the number of days for `days_past` and `days_ahead`. */
+                value?: string | number;
+                /** @enum {string} */
+                tone: "red" | "amber" | "green" | "blue" | "grey";
+                /** @enum {string} */
+                scope: "cell" | "row";
+            }[];
         };
         SavedViewSort: {
             id: string;
