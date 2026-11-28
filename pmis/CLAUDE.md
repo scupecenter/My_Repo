@@ -237,3 +237,4 @@ Rollout
 - Never invent business rules. If the spec is silent, add the question to `docs/spec/open-questions.md` and use a configurable default.
 - Use only synthetic data (fictional names) until the product owner releases real data. Never commit secrets.
 - **Keep `CHANGELOG.md` current.** Every PR that changes a decision, the spec, the schema, the contract, the design or the forms adds a dated entry at the top under the right heading (قرارات, إضافة, تعديل, أمان, مفتوح).
+- **No PR is complete without its docs.** A change that adds or alters a feature updates, in the same PR or in a docs PR before the batch closes: the README feature list, HANDOVER, the plan or spec under `docs/`, `docs/reference/relations-map.md` when links change, SECURITY.md when security changes, the in-app guide, and the OpenAPI contract. The product name in text is "Telecom Site Delivery Workspace".

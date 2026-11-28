@@ -27,7 +27,7 @@ The system models the standard telecom site-delivery pipeline:
 - **Regional, row-level security**: every query is filtered by the user's regions and role directly in the database.
 - **Document management**: typed, versioned documents with per-type rules (formats, sizes, photo evidence requirements), immutable file history, withdraw-not-delete semantics, and encrypted, virus-scanned file storage.
 - **Generic register framework**: typed records with validation, child lists, file references, list catalogues, and governed import/export templates — new registers are defined by configuration, not new code.
-- **Bilingual UI (English/Arabic) with full RTL support**, light and dark themes, and switchable view modes (list, wide, board, map) with saved views.
+- **Bilingual UI (English/Arabic) with full RTL support**, light and dark themes, and switchable view modes (list, wide table, board, feed, map, calendar, chart) chosen from one View menu, remembered per user and register, with saved views.
 - **Dashboards and reporting**: operational KPIs, workload, status updates, and scheduled exports.
 - **Collaboration**: inbox, approvals queue, messages, announcements, and notifications.
 - **Auditability**: a full audit log of data and configuration changes.
