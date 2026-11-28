@@ -180,6 +180,20 @@ describe('Delay periods P2 (Q182, Q184)', () => {
   const TASK = '00000000-0000-4000-8000-0000000000b2';
   const panel = (locale: 'en' | 'ar' = 'en') => renderApp(<DelayPeriodsPanel taskId={TASK} />, { locale });
 
+  it('A6: a late task shows a suggested period; it only fills the form, nothing is saved by itself', async () => {
+    await signIn('engineer');
+    const u = userEvent.setup();
+    renderApp(<DelayPeriodsPanel taskId="00000000-0000-4000-8000-0000000000b3" />, { locale: 'en' });
+    const box = await screen.findByTestId('delayp-suggestion');
+    expect(box).toHaveTextContent('The planned date has passed. Suggested delay period: 2026-09-21 to 2026-10-02.');
+    expect(box).toHaveTextContent('GECOL');
+    expect(screen.getByTestId('delayp-none')).toBeInTheDocument();
+    await u.click(screen.getByTestId('delayp-suggest-use'));
+    expect(screen.getByTestId('delayp-from')).toHaveValue('2026-09-21');
+    expect(screen.getByTestId('delayp-party')).toHaveValue('gecol');
+    expect(screen.getByTestId('delayp-none')).toBeInTheDocument();
+  });
+
   it('L1 proposes (with evidence); L2 must name the contractor to approve; the proposer does not decide', async () => {
     await signIn('engineer');
     const u = userEvent.setup();

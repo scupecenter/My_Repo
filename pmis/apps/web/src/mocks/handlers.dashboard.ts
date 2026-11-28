@@ -409,6 +409,8 @@ export const dashboardHandlers = [
     const id = params.id as string;
     return HttpResponse.json({ task_id: id, due_date: '2026-09-20', can_edit: canEdit(), can_decide: canEdit(), can_propose: canPropose(), me: me().id, parties: PARTIES,
       external_parties: [{ id: '00000000-0000-4000-8000-0000000000c1', name: 'A&T Global', type: 'te_vendor' }, { id: '00000000-0000-4000-8000-0000000000c2', name: 'Sahara Civil Works', type: 'cw_contractor' }],
+      // A6: the task ending b3 is late on its planned date (a GECOL task, C1), so the list carries a suggestion
+      suggestion: canPropose() && id.endsWith('b3') && !(S().periods[id] ?? []).length ? { from_date: '2026-09-21', to_date: '2026-10-02', party: 'gecol', basis: 'planned_date' } : null,
       items: S().periods[id] ?? [] });
   }),
   http.post(`${B}/tasks/:id/delay-periods`, async ({ params, request }) => {

@@ -24071,6 +24071,17 @@ export interface components {
             can_decide?: boolean;
             /** @description 0.12.7: may propose (L1 too). */
             can_propose?: boolean;
+            /** @description 0.15.782 (A6): a suggested delay period, computed on read, never stored or written by itself. Present for a caller who may propose, while the task is running and its planned date has passed or its SLA colour is red, and no proposed or approved period covers today. `from_date` is the day after the planned date (or after the last counting period), `to_date` is today, `party` is guessed from the task group (C1, C2: gecol; C3, C4: hlc; otherwise null). */
+            suggestion?: {
+                /** Format: date */
+                from_date: string;
+                /** Format: date */
+                to_date: string;
+                /** @enum {string|null} */
+                party: "gecol" | "hlc" | null;
+                /** @enum {string} */
+                basis: "planned_date" | "sla" | "planned_date_and_sla";
+            } | null;
             /**
              * Format: uuid
              * @description 0.12.7: the caller, so a screen can hide the decision of their own proposal.

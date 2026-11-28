@@ -101,3 +101,5 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 ## 7. Next
 
 There is no fixed list here any more. Open work is in the open pull requests and in the `open` (مفتوح) lines of the newest `CHANGELOG.md` entries. Still planned for a later phase: the CPE / end-user installation module and the mobile app.
+
+- 2026-11-28 (A6, no migration, contract 0.15.782): `GET /tasks/{id}/delay-periods` carries `suggestion`, a delay period computed on read (dates prefilled, party guessed from the task group C1/C2 gecol, C3/C4 hlc); the task drawer panel offers it as a fill-the-form button. Source: `delay-periods.service.ts` `suggestDelay`.

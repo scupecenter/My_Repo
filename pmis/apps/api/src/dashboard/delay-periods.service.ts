@@ -76,6 +76,22 @@ export class DelayPeriodsService {
     }));
   }
 
+  /**
+   * A6: a suggested delay period, computed on read, never stored and never written by itself. It exists while the task is still running and its planned date has
+   * passed or its SLA colour is red; its dates start on the day after the planned date (or after the last period that already counts, proposed or approved)
+   * and end today; the party is guessed from the task group (GECOL tasks C1 and C2, HLC tasks C3 and C4, otherwise none). One per task: nothing is suggested while
+   * a proposed or approved period already covers today, and a voided or rejected period does not count. The person proposes it through the usual form.
+   */
+  private async suggestion(taskId: string, items: Json[]): Promise<Json | null> {
+    const r = await this.db.tx.$queryRaw<{ planned: string | null; code: string; today: string; state: string; colour: string | null }[]>`
+      SELECT t.planned_date::text AS planned, td.code AS code, cal_today()::text AS today, t.state::text AS state,
+        (SELECT sla_colour(cal_workdays_between(t.sla_start_date, cal_today(), sr.calendar_id), sr.min_working_days, sr.max_working_days)
+           FROM sla_rules sr WHERE sr.id = t.sla_rule_id AND t.sla_start_date IS NOT NULL) AS colour
+      FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id WHERE t.id = ${taskId}::uuid`;
+    const x = r[0];
+    return x ? suggestDelay(x, items) : null;
+  }
+
   async list(_auth: AuthContext, rawTask: string): Promise<Json> {
     const t = await this.task(rawTask);
     const can = await this.db.tx.$queryRaw<{ ok: boolean; prop: boolean; me: string | null }[]>`
@@ -83,11 +99,13 @@ export class DelayPeriodsService {
     const parties = await this.db.tx.$queryRaw<{ id: string; name: string; type: string }[]>`
       SELECT id::text AS id, name, type::text AS type FROM external_parties ORDER BY name LIMIT 500`;
     const c = can[0];
+    const items = await this.rows(t.id);
     return {
       task_id: t.id, due_date: t.due_date,
+      suggestion: c?.prop === true ? await this.suggestion(t.id, items) : null,
       // can_edit (0.11.0) = can_decide: approve, reject and void; can_propose (0.12.7): L1 too
       can_edit: c?.ok === true, can_decide: c?.ok === true, can_propose: c?.prop === true, me: c?.me ?? null,
-      parties: [...DELAY_PARTIES], external_parties: parties, items: await this.rows(t.id),
+      parties: [...DELAY_PARTIES], external_parties: parties, items,
     };
   }
 
@@ -120,4 +138,22 @@ export class DelayPeriodsService {
     await this.db.tx.$queryRaw(Prisma.sql`SELECT delay_period_void(${pid}::uuid, ${b.reason}::text)`);
     return (await this.rows(t.id)).find((x) => x.id === pid) as Json;
   }
+}
+
+/**
+ * A6: the pure rule of the suggestion (unit tested). `x` is the task as read: state, planned date, today (the calendar's today) and the SLA colour.
+ * Periods that are voided or rejected do not count; the suggestion starts after the last one that does.
+ */
+export function suggestDelay(x: { planned: string | null; code: string; today: string; state: string; colour: string | null }, items: Json[]): Json | null {
+  if (!['open', 'entry', 'in_review', 'in_approval'].includes(x.state)) return null;
+  const passed = x.planned !== null && x.planned < x.today;
+  const red = x.colour === 'red';
+  if (!passed && !red) return null;
+  const next = (d: string) => { const n = new Date(`${d}T00:00:00Z`); n.setUTCDate(n.getUTCDate() + 1); return n.toISOString().slice(0, 10); };
+  const live = items.filter((p) => p.voided !== true && p.status !== 'rejected');
+  let from = passed ? next(x.planned as string) : x.today;
+  for (const p of live) if (typeof p.to_date === 'string' && next(p.to_date) > from) from = next(p.to_date);
+  if (from > x.today) return null;
+  const party = x.code === 'C1' || x.code === 'C2' ? 'gecol' : x.code === 'C3' || x.code === 'C4' ? 'hlc' : null;
+  return { from_date: from, to_date: x.today, party, basis: passed && red ? 'planned_date_and_sla' : passed ? 'planned_date' : 'sla' };
 }

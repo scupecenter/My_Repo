@@ -4636,6 +4636,12 @@
     "without_plan": "{{n}} weighted items have no plan yet; Planned and the index stay not available until every measured item has one."
   },
   "delayp": {
+    "suggest_planned_date": "The planned date has passed. Suggested delay period: {{from}} to {{to}}.",
+    "suggest_sla": "The SLA is red. Suggested delay period: {{from}} to {{to}}.",
+    "suggest_planned_date_and_sla": "The planned date has passed and the SLA is red. Suggested delay period: {{from}} to {{to}}.",
+    "suggest_party": "Party guessed from the task group: {{party}}.",
+    "suggest_only": "This is only a suggestion. Nothing is saved until you fill in the reason and add the period.",
+    "suggest_use": "Fill the form with the suggestion",
     "tab": "Delay",
     "title": "Delay attribution periods",
     "hint": "A proposed period has no effect. Once approved, the working days after the due date that fall in it go to its party. Days under a suspension are left out.",
