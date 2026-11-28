@@ -16,3 +16,7 @@ The daily run puts a small set of rules in place the first time it runs, if a Sy
 - A weekly data-completeness rule. Once a week, for each region with active sites that have missing data (a delivery scenario not set, or a task with no actual date while a later task already has one), the people who work on the sites of that region get one notification with the count and a link to the sites with data gaps.
 
 These are ordinary rules. You can edit them, change the days or the audience, or switch them off in the Automation centre; once switched off they are not switched on again. You can also create your own "Data gaps in sites" rule with a minimum number of sites.
+
+## Closed record with an open linked record
+
+The rule kind "Closed record with an open linked record" checks the register links declared in Settings. Once a week, for each link that has at least the minimum number of approved records whose linked record (in the other register) is still open, neither approved nor voided, the audience of the rule gets one notification with the count. Leave the register and field empty to check every link. It only sends a notification; no record is changed.

@@ -59,4 +59,13 @@ describe('alert defaults (0625)', () => {
     expect(res.body.catalogue.kinds.some((k: { kind: string }) => k.kind === 'data_gaps')).toBe(true);
     expect(res.body.catalogue.templates.some((t: { kind: string }) => t.kind === 'data_gaps')).toBe(true);
   });
+
+  it('validates link_conflict params like link_orphans and counts conflicts per declared link', async () => {
+    const ok = (await db.query(`SELECT alert_rule_params_errs('link_conflict', '{"min_rows": 2}'::jsonb) AS e`)).rows[0].e as unknown[];
+    expect(ok).toHaveLength(0);
+    const bad = (await db.query(`SELECT alert_rule_params_errs('link_conflict', '{"min_rows": 0}'::jsonb) AS e`)).rows[0].e as unknown[];
+    expect(bad.length).toBeGreaterThan(0);
+    const rows = (await db.query(`SELECT conflict_rows, rows_with_value FROM register_link_conflicts()`)).rows as { conflict_rows: string; rows_with_value: string }[];
+    for (const r of rows) expect(Number(r.conflict_rows)).toBeLessThanOrEqual(Number(r.rows_with_value));
+  });
 });

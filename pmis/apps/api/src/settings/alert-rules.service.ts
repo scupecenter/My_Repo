@@ -50,6 +50,9 @@ interface RuleRow {
  * The closed list lives here (no table); `params` and `audience` are exactly what admin_alert_rule_save accepts.
  */
 const TEMPLATES = [
+  { id: 'links-conflict', kind: 'link_conflict', params: { min_rows: 1 }, audience: { type: 'system_admin' }, link: '/admin/settings/alerts/rules',
+    title_en: 'Closed records with open links: {{register}}', title_ar: 'سجلات مغلقة مرتبطة بسجلات مفتوحة: {{register}}',
+    body_en: '{{count}} approved row(s) of {{register}} point to a record that is still open ({{field}}).', body_ar: '{{count}} صف معتمد في {{register}} يشير إلى سجل لا يزال مفتوحاً ({{field}}).' },
   { id: 'data-completeness', kind: 'data_gaps', params: { min_sites: 1 }, audience: { type: 'module', module: 'sites' }, link: '/sites?data_gaps=with',
     title_en: 'Data to complete: {{region}}', title_ar: 'بيانات تحتاج استكمالاً: {{region}}',
     body_en: '{{count}} site(s) in {{region}} have missing data for the week of {{week}}. Open the sites with data gaps and complete them.', body_ar: '{{count}} موقعاً في {{region}} ينقصها بيانات لأسبوع {{week}}. افتح المواقع ذات النواقص واستكملها.' },
@@ -97,6 +100,7 @@ export class AlertRulesService {
           { kind: 'invoice_due_soon', params: ['days'] },
           { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] },
           { kind: 'data_gaps', params: ['min_sites'] },
+          { kind: 'link_conflict', params: ['register_key', 'field_code', 'min_rows'] },
         ],
         kpis,
         audiences: ['system_admin', 'module'],
