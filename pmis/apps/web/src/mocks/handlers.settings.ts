@@ -285,6 +285,7 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'login.ip_base_seconds', group: 'sessions', unit: 'seconds', default: 2, min: 1, max: 60 },
   { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
   { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
+  { key: 'media.thumbnails_per_minute', group: 'media', unit: 'per_minute', default: 120, min: 0, max: 6000 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
@@ -464,6 +465,12 @@ let dashState = {
   updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+/** The weekday of the weekly dashboard snapshot (contract 0.15.430): the setting dashboard.snapshot_weekday, default 4 (Thursday), version 0 until the first save. */
+let snapState = { version: 0, weekday: 4, updated_at: null as string | null, updated_by: null as null };
+const snapView = () => ({ ...snapState });
+/** The health index bands (contract 0.15.435): the setting dashboard.health_bands, default 85 and 70, version 0 until the first save. */
+let bandsState = { version: 0, green: 85, amber: 70, updated_at: null as string | null, updated_by: null as null };
+const bandsView = () => ({ ...bandsState });
 
 /** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
@@ -583,6 +590,36 @@ export const settingsHandlers = [
     const b = (await request.json()) as { targets: typeof dashState.targets; thresholds: typeof dashState.thresholds; tabs: typeof dashState.tabs };
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
+  }),
+  // ------------------------------------------------------------------ weekly snapshot day (contract 0.15.430, settings review gap 3)
+  http.get(`${B}/settings/dashboard/snapshot-schedule`, () => { const g = guard(); if (g) return g; return HttpResponse.json(snapView(), tag(snapState.version)); }),
+  http.put(`${B}/settings/dashboard/snapshot-schedule`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, snapState.version); if (p) return p;
+    const b = (await request.json()) as { weekday?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.weekday) || b.weekday! < 0 || b.weekday! > 6) errs.push({ path: '/weekday', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    snapState = { ...snapState, version: snapState.version + 1, weekday: b.weekday!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(snapView(), tag(snapState.version));
+  }),
+  // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
+  http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
+  http.put(`${B}/settings/dashboard/health-bands`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, bandsState.version); if (p) return p;
+    const b = (await request.json()) as { green?: number; amber?: number; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!Number.isInteger(b.green) || b.green! < 1 || b.green! > 100) errs.push({ path: '/green', code: 'invalid' });
+    if (!Number.isInteger(b.amber) || b.amber! < 0 || b.amber! > 99) errs.push({ path: '/amber', code: 'invalid' });
+    if (!errs.length && b.green! <= b.amber!) errs.push({ path: '/green', code: 'invalid_order' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    bandsState = { ...bandsState, version: bandsState.version + 1, green: b.green!, amber: b.amber!, updated_at: new Date().toISOString() };
+    return HttpResponse.json(bandsView(), tag(bandsState.version));
   }),
   // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),

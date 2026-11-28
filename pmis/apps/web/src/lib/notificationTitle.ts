@@ -11,6 +11,7 @@ const EXACT: Record<string, string> = {
   "Approval reminder": "t_approval_reminder",
   "Approval escalated": "t_approval_escalated",
   "Task idle": "t_task_idle",
+  "Test notification": "t_test_notification",
   "Level has no holder": "t_level_has_no_holder",
   "No holder for a task level": "t_no_holder_for_a_task_level",
   "No holder for a register level": "t_no_holder_for_a_register_level",

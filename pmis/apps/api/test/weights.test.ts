@@ -25,6 +25,8 @@ const sum = (xs: number[]): number => Math.round(xs.reduce((a, b) => a + b, 0) *
 beforeAll(async () => {
   app = await startApp();
   db = await superDb();
+  // 0541 seeds a draft calibrated Project Status set; this suite drafts and publishes its own sets, so it starts from no draft.
+  await db.query(`DELETE FROM weight_sets WHERE status = 'draft'`);
   admin = await plainAdmin(app, db, true);
   noStepUp = await plainAdmin(app, db, false);
   viewer = await actor(app, db, { grants: [['admin.settings', 'view']] });

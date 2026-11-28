@@ -418,13 +418,15 @@ describe('Financial Advances', () => {
 describe('milestones and gates do not change with the MOB tasks', () => {
   it('the MOB tasks count toward no milestone and sit in no gate condition', async () => {
     const rows = await q<{ code: string; counts_toward_milestone: boolean; has_documents: boolean }>(
-      db, `SELECT code, counts_toward_milestone, has_documents FROM task_definitions WHERE code LIKE 'MOB-%'`);
+      db, `SELECT code, counts_toward_milestone, has_documents FROM task_definitions WHERE code LIKE 'MOB-%'
+        AND workflow_id = (SELECT id FROM workflow_definitions WHERE version = 1)`);
     expect(rows.map((r) => r.code).sort()).toEqual(['MOB-1', 'MOB-2', 'MOB-5']);
     expect(rows.every((r) => !r.counts_toward_milestone && !r.has_documents)).toBe(true);
     const gates = await q<{ n: string }>(db, `SELECT count(*) AS n FROM phase_gate_rules WHERE conditions::text ILIKE '%MOB%'`);
     expect(Number(gates[0]!.n)).toBe(0);
     const sla = await q<{ code: string; min_working_days: number; max_working_days: number; start_ref: string }>(
-      db, `SELECT td.code, r.min_working_days, r.max_working_days, r.start_ref FROM sla_rules r JOIN task_definitions td ON td.id = r.task_def_id WHERE td.code LIKE 'MOB-%' ORDER BY td.code`);
+      db, `SELECT td.code, r.min_working_days, r.max_working_days, r.start_ref FROM sla_rules r JOIN task_definitions td ON td.id = r.task_def_id WHERE td.code LIKE 'MOB-%'
+        AND td.workflow_id = (SELECT id FROM workflow_definitions WHERE version = 1) ORDER BY td.code`);
     expect(sla.map((s) => [s.min_working_days, s.max_working_days, s.start_ref])).toEqual([[2, 3, 'REC:procurement'], [2, 3, 'REC:procurement'], [2, 3, 'REC:procurement']]);
   });
 

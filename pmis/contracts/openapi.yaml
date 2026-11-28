@@ -35,6 +35,7 @@ info:
     - 0.15.406 (2026-11-27): hardening layer 2, no migration. `POST /registers/car_dispatcher/records/{record_id}/extend` and `POST /registers/financial_advances/records/{record_id}/top-up` now need `If-Match` (the version of the booking or advance read; 428 `precondition_required`, 412 `precondition_failed`) and a recent step-up (401 `step_up_required`), with the same mechanisms as the other financial actions. The check runs after the rights and the body checks. Clients that call these two endpoints must send If-Match.
     - 0.15.407 (2026-11-27): the Daily Plan template, hardening layer 3b (migration 0564, mirror `db/sql/563_daily_plan_template.sql`). Additive. (1) `Template.template_kind` lists `daily_plan`: `TPL-DAILY-PLAN`, downloaded with `GET /templates/TPL-DAILY-PLAN/download` (blank, or with `date` and `region_id` filled with the plan as the caller sees it). (2) `POST /daily-plans/import` (`importDailyPlan`): the template only, applied at once and all or nothing through the doors of the screen (`dp_add_site`, `dp_save_row`, `dp_remove_site`), so rights, region, lock and audit apply per row; one refused row refuses the file (`errors[]` at `/rows/<line>/<field>`); other files are 422 `template_rejected`. The editable parts are the manual values, Reason, Remark, sites added or removed by hand; Site name and Region are ignored. The Permits sub-streams and Procurement-HLC are covered by the existing templates (round-trip tests added).
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
+    - 0.15.269 (2026-11-27): progress calculation standards (owner approval 2026-11-27; migrations 0540-0545; PR #458). Additive. (1) Register and LOE measure rules for weight items (0540): an item can be measured by a register record's state or as level-of-effort (excluded from plan figures). (2) Draft calibrated weight set v2 (0541, DRAFT, never auto-published). (3) Task estimated man-days and planned duration with a suggested weight in the editor (0542; `PUT /workflow/versions/{version}/tasks/{task_code}/estimate`; advice only, never auto-applied). (4) Partial credit for in-progress tasks, OFF by default (0543; `GET`/`PUT /settings/partial-credit`, System Admin). (5) Warehouse-linked central equipment items measured from central warehouse movements (0544). (6) Per-region forecast completion date on the dashboard regions card and project-status rows (0545; `DashboardRegion.forecast_date`, rows `forecast_date`). The Arabic names of all 45 weight items are backfilled (0546) and remain editable on draft sets in the weight-set editor.
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
     - 0.15.322 (2026-11-27): the upload policy of the imports, Enforce or Accept incomplete (owner decision D49 part 3, 2026-11-27; migration 0492, mirror `db/sql/491_upload_policy.sql`). Additive; the default is `enforce`, which is today's behaviour. (1) `GET /settings/imports/upload-policy` (every signed-in user) and `PUT /settings/imports/upload-policy` (a System Admin or an all-regions delegate of `settings` edit, a reason, If-Match, audited `imports_upload_policy_update` with before and after): the setting `imports.upload_policy`, `enforce` or `accept_incomplete`. (2) `POST /master-import/runs/{run_id}/apply` reads it. With `accept_incomplete` (and no historical-load option, which opens its sites itself) the sites of the file are opened first through the same door as `POST /sites/workflow-locks`: the unlock right of each region (403 `action_forbidden` otherwise), a step-up (401 `step_up_required`), an audit row per site; the tasks approved on an open site while a lock would have held them are flagged `lock_bypassed` (Admin override). Sites that a `create_sites` apply creates are not in the file yet and keep their locks. No right, role or grant changes. (3) `SiteImportStatus` (`GET /master-import/runs/{run_id}/sites`, `GET /import-batches/{batch_id}/sites`) gains `data_gap_items`: the items of `site_data_gaps` of each site, the per-row missing-data indicator. The third mode (valid rows only) is not part of this change.
     - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
@@ -42,6 +43,7 @@ info:
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
     - 0.15.369 (2026-11-27): the floating Inbox panel joins the appearance profile as two dimensions, `inbox_panel` (overlay, floating, docked) and `inbox_anchor` (end-top, end-bottom, start-top, start-bottom), in `UiPrefs` (migration 0526, mirror `db/sql/525_inbox_panel_mode.sql`). Additive: the same personal door, organization defaults and lock apply; no new route.
     - 0.15.530 (2026-11-28): the More menu joins the appearance profile as one dimension, `more_menu` (`list` default, `grid` = icon tiles with a search box), in `UiPrefs` (migration 0581, mirror `db/sql/580_more_menu_mode.sql`). Additive: the same personal door, organization default, personal-choice lock and audit as every other dimension; no table, column or permission change.
+    - 0.15.531 (2026-11-28): personal notification settings on top of the applied policy (migration 0583, mirror `db/sql/582`): `GET/PUT /me/notification-prefs` (per type bell and e-mail choices, scheduled do-not-disturb, ETag), `POST /me/notification-prefs/snooze`, `POST /me/notification-prefs/test`, `GET /me/notification-prefs/decisions`, and the org switches `GET/PUT /admin/notification-personal` (System Admin). Quiet time holds e-mail and push, never the bell; a mandatory type is never held. Additive.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
     - 0.15.249 (2026-11-27): kpi_threshold alert rules with editable thresholds, and enable/lock on every alert rule (owner approval 2026-11-27 relayed by Main; migration 0348, mirror `db/sql/347_kpi_threshold_alerts.sql`; CHANGELOG KpiThresholdAlerts). Additive. The generic alert rules (0.15.242) gain the third closed kind `kpi_threshold` `{kpi, op, value}`: the KPI is one of the dashboard settings catalogue, `op` is `above` or `below`, and `value` is the rule's own editable threshold (0..100000, in the unit of the KPI), independent of the dashboard green/amber bands. The daily job computes the live KPI values system-wide (the same queries the dashboard uses, no caller scope) and hands them to the database; a rule whose KPI crosses its threshold fires one in-app notification per recipient, deduped by (rule, day, kpi), with the placeholders {{kpi}}, {{value}} and {{threshold}} filled at fire time and the link defaulting to /dashboard. `AlertRule` and `AlertRuleInput` gain `locked`: while locked, a rule takes no edit and cannot be disabled - the only accepted save is the unlock itself (every other field unchanged), audited as `alert_rule_update`; a locked rule still fires. The alert-rules catalogue of `GET /settings/alert-rules` gains the KPI list the form offers. No new endpoint, grant, role or permission change.
     - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
@@ -63,6 +65,7 @@ info:
     - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
     - 0.15.226 (2026-11-27): the Deliverables register is enabled (migration 0326; Q71): site-scoped, linked to a task and a gate of the site, with the document and acceptance reference rules. Additive: `deliverables` joins `RegisterKey` and `ExportPartKey` (not in the Master sheet); no new endpoint.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
+    - 0.15.405 (2026-11-27): thumbnail rate limit (SEC-2 of the phase 1 security review; migration 0571, mirror `db/sql/570_thumbnail_limit.sql`; depends on 0.15.312). Additive. One more operational limit in `GET` and `PUT /settings/ops-limits`: key `media.thumbnails_per_minute`, group `media`, unit `per_minute`, default 120, range 0 to 6000, 0 = no limit. `GET /media/items/{kind}/{id}/thumbnail` answers 429 `rate_limited` with `Retry-After` when a person asks for more thumbnails to be made in a minute than the limit; a thumbnail already made is always served and never counted. No permission change, no data changed.
     - 0.15.300 (2026-11-27): Content-Security-Policy report endpoint (SEC-3 of the phase 1 security review; no migration; CHANGELOG CspReport). Additive. New public `POST /csp-report`: browsers post violation reports of the policy nginx sends (report-only by default). Answers 204 with no body, accepts `application/csp-report` and `application/reports+json`, 16 KB at most, 429 above 30 per minute per address. It reads nothing from the database and changes nothing; it logs a short sanitised line. No permission change.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
@@ -125,6 +128,8 @@ info:
     - 0.15.365 (2026-11-27): two financial alert kinds for the generic alert rules (D59; migration 0408, mirror `db/sql/407_finance_alert_kinds.sql`): `advance_unsettled` (current approved advances still disbursed or in settlement for at least `days` days; `days` defaults to the Finance hub value `settle_warn_days`, else 30) and `invoice_due_soon` (approved invoices not Paid or Cancelled with a due date within `days` days, default 7, or past). The kind enum of the alert-rule schemas and the catalogue list grow; no new route, notifications only, same audience and dedupe journal. The advance page also gets buttons that create an expense or a settlement draft filled from the advance (web only, through the existing register create route).
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.371 (2026-11-27): weight item measure rule checked (migration 0552, mirror `db/sql/551_weight_rule_check.sql`; Settings review gap 1). Additive, no new path. `PUT /settings/weight-sets/{id}`: a measure rule that looks like JSON but does not parse is 422 `validation_failed` (it was 500). Publish and preview: `weight_set_errors` adds `measure_rule_invalid` (path `/activities/{n}/items`) for a rule that is not an object, has an unknown method (none, tasks, register), names no task, names a task code that is in no workflow, has a plan outside MS1 to MS10, or has a `central` that is not true/false.
+    - 0.15.435 (2026-11-28): the health index bands are editable (Settings review gap 8, approved by the owner 2026-11-27; migration 0574, mirror `db/sql/573_health_bands.sql`). Additive. (1) `GET /settings/dashboard/health-bands` (`getHealthBands`, needs `dashboard.view`) and `PUT /settings/dashboard/health-bands` (`setHealthBands`, `admin.settings` edit for all regions, reason, If-Match, audited as `health_bands_update` with before and after): the existing setting `dashboard.health_bands` (green from this score, amber from this score, red below; default 85 and 70). Whole numbers: green 1 to 100, amber 0 to 99, green above amber (422 `invalid`, `invalid_order`). The bands colour the live health index from the save on; the stored weekly and month-end snapshots are not rewritten. No new table.
+    - 0.15.430 (2026-11-28): the weekday of the weekly dashboard snapshot is editable (Settings review gap 3, approved by the owner 2026-11-27; migration 0570, mirror `db/sql/569_snapshot_weekday.sql`). Additive. `GET /settings/dashboard/snapshot-schedule` (`getSnapshotSchedule`, needs `dashboard.view`) and `PUT /settings/dashboard/snapshot-schedule` (`setSnapshotSchedule`, `admin.settings` edit for all regions, reason, If-Match, audited as `snapshot_weekday_update` with before and after): the existing setting `dashboard.snapshot_weekday` (0 = Sunday to 6 = Saturday, Africa/Tripoli dates, default 4 = Thursday). The nightly job reads the same setting as before. `dashboard.snapshot_every_days` is NOT exposed: it has been unused since migration 0046 (only the weekday drives the weekly snapshot, and a month-end snapshot is taken on the last day of each month), so a field for it would change nothing. A change applies from the next snapshot; stored snapshots are never moved or rewritten. No new table.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.376 (2026-11-27): the daily delay log (migration 0554). Additive, data only. The Issues register gets the type value `Daily Delay` (list IssueCategory), the optional date field `delay_date`, and four more values of the list BlockerReason (Weather, Permit Pending, Delivery Delay, Safety Stop); no endpoint or schema changes. The delay reasons are edited in Settings > Registers > Lists and show in the dashboard issue breakdown (`by_category`, `by_reason`) and in the register export.
@@ -400,6 +405,185 @@ tags:
     description: "Saved views of the list screens, shared with roles, groups, users or everyone (Q117), and the caller's server-side drafts (Q115)."
 
 paths:
+  /me/notification-prefs:
+    get:
+      tags: [notifications]
+      operationId: getMyNotificationPrefs
+      summary: The caller's notification choices, do-not-disturb and snooze
+      description: 0.15.531. Lists every notification type of the catalogue with the caller's bell and e-mail choice (default on; a mandatory type is always on). The ETag is the version.
+      responses:
+        '200':
+          description: The choices.
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPrefs'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [notifications]
+      operationId: setMyNotificationPrefs
+      summary: Save the caller's type choices and do-not-disturb
+      description: 0.15.531. Send `If-Match`. `types` replaces the whole set of choices (a type left out is on). A mandatory type is ignored. `dnd.start` and `dnd.end` are minutes of the day; a window that ends before it starts crosses midnight. 403 when the administrator switched personal settings off.
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                types:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      in_app: { type: boolean }
+                      email: { type: boolean }
+                dnd:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    enabled: { type: boolean }
+                    start: { type: integer, minimum: 0, maximum: 1439 }
+                    end: { type: integer, minimum: 0, maximum: 1439 }
+                    days: { type: array, maxItems: 7, items: { type: integer, minimum: 0, maximum: 6 } }
+                    timezone: { type: [string, 'null'], maxLength: 64 }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPrefs'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /me/notification-prefs/snooze:
+    post:
+      tags: [notifications]
+      operationId: snoozeMyNotifications
+      summary: Hold the caller's e-mail and push until a time
+      description: 0.15.531. `until` is within 14 days from now; null clears the snooze. The bell still receives notices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [until]
+              properties:
+                until: { type: [string, 'null'], format: date-time }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPrefs'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /me/notification-prefs/test:
+    post:
+      tags: [notifications]
+      operationId: testMyNotification
+      summary: Send the caller a test notice
+      description: 0.15.531. Writes one notice of kind `system` to the caller's bell. 429 when another test was sent in the last 30 seconds.
+      responses:
+        '200':
+          description: Sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notification_id, quiet_now]
+                properties:
+                  notification_id: { type: string, format: uuid }
+                  quiet_now: { type: boolean }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /me/notification-prefs/decisions:
+    get:
+      tags: [notifications]
+      operationId: listMyNotificationDecisions
+      summary: Notices the caller's own settings stopped or held (newest first, up to 50)
+      description: 0.15.531. Reasons are `type_off` (the caller turned the type off), `duplicate` (the same unread notice inside the dedupe window) and `quiet_mail` (an e-mail not sent in quiet time).
+      responses:
+        '200':
+          description: The decisions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, kind, channel, reason, created_at]
+                      properties:
+                        id: { type: integer }
+                        kind: { type: string }
+                        channel: { type: string }
+                        reason: { type: string, enum: [type_off, duplicate, quiet_mail] }
+                        title: { type: [string, 'null'] }
+                        link: { type: [string, 'null'] }
+                        created_at: { type: string, format: date-time }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /admin/notification-personal:
+    get:
+      tags: [notifications]
+      operationId: getNotificationPersonalSettings
+      summary: Org switches of the personal notification layer (System Admin)
+      description: 0.15.531. Whether people may choose their own types, do-not-disturb and snooze, the dedupe window and how long decisions are kept. The ETag is the version.
+      responses:
+        '200':
+          description: The settings.
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPersonalSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [notifications]
+      operationId: setNotificationPersonalSettings
+      summary: Change the org switches (audited, reason required)
+      description: 0.15.531. Send `If-Match`. `dedupe_minutes` 0 turns the cross-transaction dedupe off.
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                allow_personal: { type: boolean }
+                allow_dnd: { type: boolean }
+                dedupe_minutes: { type: integer, minimum: 0, maximum: 1440 }
+                decision_retention_days: { type: integer, minimum: 1, maximum: 365 }
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPersonalSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /me/push:
     get:
       tags: [notifications]
@@ -5820,6 +6004,38 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/estimate:
+    put:
+      operationId: putTaskEstimate
+      tags: [workflow]
+      summary: Estimated man-days and planned duration of a task (draft)
+      description: '0.15.269 (migration 0542, admin_wf_task_estimate): the estimated man-days and an optional planned duration (days) of a task, editable on a draft only. They feed the suggested weight shown in the editor; the suggestion is advice and is never auto-applied. Null clears the value. Needs weights.edit, a step-up and If-Match.'
+      x-db-path: admin_wf_task_estimate (app_actor_is_admin('weights', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [est_man_days, reason]
+              properties:
+                est_man_days: { type: [number, 'null'], minimum: 0, maximum: 100000 }
+                planned_duration_days: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
+                reason: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'The updated task of the draft version' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/tasks/{task_code}/closing:
     put:
       tags: [workflow]
@@ -8131,6 +8347,56 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/partial-credit:
+    get:
+      tags: [settings]
+      operationId: getPartialCredit
+      summary: Partial credit for in-progress tasks
+      description: '0.15.269 (migration 0543): the setting `progress.partial_credit`. When on, an applicable task that is not yet approved earns current_level/levels_required of its item fraction in the project-status calculation. System Admin only.'
+      x-db-path: progress_partial_credit_json
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartialCreditSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [settings]
+      operationId: putPartialCredit
+      summary: Set partial credit for in-progress tasks
+      description: '0.15.269 (migration 0543, `admin_save_progress_partial_credit`): System Admin only, a reason and If-Match (the setting version). Audited.'
+      x-db-path: admin_save_progress_partial_credit
+      parameters:
+        - { $ref: '#/components/parameters/IfMatch' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled, reason]
+              properties:
+                enabled: { type: boolean }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartialCreditSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /settings/alert-rules/{id}:
     put:
       tags: [settings]
@@ -10329,6 +10595,7 @@ paths:
             image/jpeg: {schema: {type: string, format: binary}}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
   /settings/identity/logo:
     put:
       tags:
@@ -12288,6 +12555,106 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard/health-bands:
+    get:
+      tags: [settings]
+      operationId: getHealthBands
+      summary: The health index bands, green and amber (0.15.435)
+      description: |
+        0.15.435. The setting `dashboard.health_bands`: the score from which the health index is green, the score from which it is amber, red below. Default 85 and 70.
+        `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+      responses:
+        '200':
+          description: The bands.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthBands'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setHealthBands
+      summary: Save the health index bands (reason, If-Match, audited)
+      description: |
+        0.15.435. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field errors (422 `validation_failed`):
+        `invalid` (`green` is a whole number from 1 to 100, `amber` from 0 to 99) and `invalid_order` (green must be above amber). One audit row with before and after values and the reason.
+        The stored weekly and month-end snapshots are not rewritten.
+      x-db-path: admin_save_health_bands
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/HealthBandsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthBands'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard/snapshot-schedule:
+    get:
+      tags: [settings]
+      operationId: getSnapshotSchedule
+      summary: The weekday of the weekly dashboard snapshot (0.15.430)
+      description: |
+        0.15.430. The setting `dashboard.snapshot_weekday`: the weekday (0 = Sunday ... 6 = Saturday, on the Africa/Tripoli date) on which the nightly job takes the weekly
+        dashboard snapshot. Default 4 (Thursday). `version` is 0 until the first save and moves on every save (the ETag). Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+        The month-end snapshot is separate: it is taken on the last day of each month and has no setting.
+      responses:
+        '200':
+          description: The weekday.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SnapshotSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setSnapshotSchedule
+      summary: Save the weekday of the weekly dashboard snapshot (reason, If-Match, audited)
+      description: |
+        0.15.430. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). Field error (422 `validation_failed`): `invalid`
+        (`weekday` is a whole number from 0 to 6). One audit row with before and after values and the reason. Applies from the next snapshot; stored snapshots are not moved.
+      x-db-path: admin_save_snapshot_weekday
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/SnapshotScheduleInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SnapshotSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
@@ -19226,6 +19593,50 @@ components:
         decide_note: {type: [string, 'null']}
         applied_at: {type: [string, 'null'], format: date-time}
         version: {type: integer}
+    NotificationPrefs:
+      type: object
+      required: [version, types, dnd, snooze_until, quiet_now, org]
+      properties:
+        version: { type: integer }
+        types:
+          type: array
+          items:
+            type: object
+            required: [code, kind, category, mandatory, in_app, email]
+            properties:
+              code: { type: string }
+              kind: { type: string }
+              category: { type: string }
+              mandatory: { type: boolean }
+              in_app: { type: boolean }
+              email: { type: boolean }
+        dnd:
+          type: object
+          required: [enabled, start, end, days, effective_timezone]
+          properties:
+            enabled: { type: boolean }
+            start: { type: integer }
+            end: { type: integer }
+            days: { type: array, items: { type: integer } }
+            timezone: { type: [string, 'null'] }
+            effective_timezone: { type: string }
+        snooze_until: { type: [string, 'null'], format: date-time }
+        quiet_now: { type: boolean }
+        org:
+          type: object
+          properties:
+            allow_personal: { type: boolean }
+            allow_dnd: { type: boolean }
+            dedupe_minutes: { type: integer }
+    NotificationPersonalSettings:
+      type: object
+      required: [allow_personal, allow_dnd, dedupe_minutes, decision_retention_days, version]
+      properties:
+        allow_personal: { type: boolean }
+        allow_dnd: { type: boolean }
+        dedupe_minutes: { type: integer }
+        decision_retention_days: { type: integer }
+        version: { type: integer }
     MyPush:
       type: object
       additionalProperties: false
@@ -21469,6 +21880,8 @@ components:
         name_ar: { type: [string, 'null'] }
         stage_code: { type: string }
         stream_code: { type: [string, 'null'] }
+        workflow_version: { type: integer, description: '0.15.269: the workflow version the site runs on. The milestone/gate date rule (automatic milestone dates; gates take the milestone date only) applies from version 2.' }
+        is_milestone_task: { type: boolean, description: '0.15.269: the task is the milestone task of its stage (its code is the stage code). On workflow version 2+ its actual date is the date of its last linked task, set automatically and never typed.' }
         state: { $ref: '#/components/schemas/TaskState' }
         current_level: { type: integer }
         levels_required: { type: integer }
@@ -26265,9 +26678,9 @@ components:
       description: '0.15.312. One operational limit.'
       required: [key, group, unit, default, min, max, value, is_default]
       properties:
-        key: { type: string, enum: [session.idle_hours, session.absolute_hours, stepup.seconds, assignments.max_rows, import.max_rows, master_import.max_rows, register_import.max_rows, prefill.max_rows, prefill.max_sites, export.max_rows, idempotency.max_entries, login.ip_attempts, login.ip_window_seconds, login.ip_base_seconds, login.ip_max_seconds, login.identifier_attempts] }
-        group: { type: string, enum: [sessions, rows, exports] }
-        unit: { type: string, enum: [hours, seconds, rows, sites, entries, attempts] }
+        key: { type: string, enum: [session.idle_hours, session.absolute_hours, stepup.seconds, assignments.max_rows, import.max_rows, master_import.max_rows, register_import.max_rows, prefill.max_rows, prefill.max_sites, export.max_rows, idempotency.max_entries, login.ip_attempts, login.ip_window_seconds, login.ip_base_seconds, login.ip_max_seconds, login.identifier_attempts, media.thumbnails_per_minute] }
+        group: { type: string, enum: [sessions, rows, exports, media] }
+        unit: { type: string, enum: [hours, seconds, rows, sites, entries, attempts, per_minute] }
         default: { type: integer }
         min: { type: integer }
         max: { type: integer }
@@ -26870,6 +27283,39 @@ components:
           minimum: 1
           maximum: 30
           description: '0.15.29 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value.'
+    HealthBandsInput:
+      type: object
+      required: [green, amber]
+      additionalProperties: false
+      properties:
+        green: { type: integer, minimum: 1, maximum: 100, description: 'Green from this score.' }
+        amber: { type: integer, minimum: 0, maximum: 99, description: 'Amber from this score, red below. Must be below green.' }
+    HealthBands:
+      description: '0.15.435. The setting dashboard.health_bands (default 85 and 70).'
+      allOf:
+      - $ref: '#/components/schemas/HealthBandsInput'
+      - type: object
+        required: [version]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    SnapshotScheduleInput:
+      type: object
+      required: [weekday]
+      additionalProperties: false
+      properties:
+        weekday: { type: integer, minimum: 0, maximum: 6, description: 'The weekday of the weekly snapshot: 0 = Sunday ... 6 = Saturday.' }
+    SnapshotSchedule:
+      description: '0.15.430. The setting dashboard.snapshot_weekday (default 4, Thursday).'
+      allOf:
+      - $ref: '#/components/schemas/SnapshotScheduleInput'
+      - type: object
+        required: [version]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     DashboardSettings:
       description: '0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order.'
       allOf:
@@ -29250,6 +29696,7 @@ components:
               label: { type: string }
               progress_pct: { type: number }
               planned_pct: { type: [number, 'null'] }
+              forecast_date: { type: [string, 'null'], format: date, description: '0.15.269 (migration 0545): the forecast completion date of the row; null when it cannot be forecast.' }
               activities: { type: object, additionalProperties: { type: number }, description: 'Activity code to progress %.' }
     ProjectStatusSnapshot:
       type: object
@@ -29274,6 +29721,14 @@ components:
       type: string
       enum: [A, B]
       description: '0.12.7 (Q116): A = progress rings (default), B = flat segmented track.'
+    PartialCreditSettings:
+      type: object
+      required: [enabled, version, updated_at, updated_by]
+      properties:
+        enabled: { type: boolean, description: 'Off by default.' }
+        version: { type: integer }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     PartialPlanIndex:
       description: '0.12.7 (Q177): Actual / Planned over the items that have a plan, with the share of the weight they cover.'
       type: object
@@ -29949,6 +30404,7 @@ components:
             completed: {type: integer}
             cancelled: {type: integer}
         progress_pct: {type: number}
+        forecast_date: {type: [string, 'null'], format: date, description: '0.15.269 (migration 0545): the forecast completion date of the region from its remaining work and recent rate; null when it cannot be forecast.'}
         health_score: {type: [number, 'null']}
         by_milestone: {type: object, additionalProperties: {type: integer}, description: 'Sites that reached each milestone, by code.'}
     DashboardExtras:
