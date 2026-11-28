@@ -106,7 +106,7 @@ export class ContractorPerformanceService {
     await this.access.requireModuleView(auth, 'contractors');
     const j = await this.thresholdsJson();
     // the daily rates are money: only an editor of the setting and a reader of the money registers see them
-    if (!j.can_edit && !(await this.access.hasGrant(auth, 'financial_advances', 'view'))) { const { penalty: _p, ...rest } = j.thresholds; j.thresholds = rest; }
+    if (!j.can_edit && !(await this.access.hasGrant(auth, 'financial_advances', 'view'))) { const rest = { ...j.thresholds }; delete rest.penalty; j.thresholds = rest; }
     return this.dto(j);
   }
 
@@ -188,7 +188,7 @@ export class ContractorPerformanceService {
     });
     const worst = (a: { level: Level }, b: { level: Level }) => RANK[b.level] - RANK[a.level];
     items.sort((a, b) => worst(a, b) || b.delay_days - a.delay_days || a.name.localeCompare(b.name));
-    const { penalty: _hidden, ...open } = t;
+    const open = { ...t }; delete open.penalty;
     return { as_of: new Date().toISOString(), thresholds: showAmounts ? t : open, items };
   }
 }
