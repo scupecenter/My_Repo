@@ -30,10 +30,10 @@ function Card({ task, column, onMove, onOpen }: { task: TaskSummary; column: Tas
   const { t, i18n } = useTranslation();
   const name = (i18n.language === 'ar' && task.name_ar) || task.name_en;
   return (
-    <li draggable data-testid={`board-task-${task.id}`} data-column={column}
+    <li draggable data-ctx data-testid={`board-task-${task.id}`} data-column={column}
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move'; }}
       className="rounded-md border border-line bg-card p-2 text-sm">
-      <button type="button" className="block w-full text-start" data-testid={`board-task-open-${task.id}`} onClick={() => onOpen(task.id)}>
+      <button type="button" data-ctx-open className="block w-full text-start" data-testid={`board-task-open-${task.id}`} onClick={() => onOpen(task.id)}>
         <b className="mono" dir="ltr">{task.site_code}</b> {task.task_code} · {name}
       </button>
       <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">
