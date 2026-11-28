@@ -605,6 +605,17 @@ export const settingsHandlers = [
     snapState = { ...snapState, version: snapState.version + 1, weekday: b.weekday!, updated_at: new Date().toISOString() };
     return HttpResponse.json(snapView(), tag(snapState.version));
   }),
+  // ------------------------------------------------------------------ change log of the dashboard and goals settings (contract 0.15.433, settings review gap 6)
+  http.get(`${B}/settings/change-log`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const scope = new URL(request.url).searchParams.get('scope');
+    if (scope !== 'dashboard' && scope !== 'goals') return fields({ path: '/scope', code: 'invalid' });
+    return HttpResponse.json({
+      scope,
+      items: [{ id: 2, at: '2026-11-27T10:00:00Z', action: scope === 'goals' ? 'goals_update' : 'dashboard_settings_update', setting: scope === 'goals' ? 'dashboard.goals' : 'dashboard.settings',
+        reason: 'Quarterly review', actor: { id: '00000000-0000-0000-0000-000000000001', display_name: 'Admin', employee_id: '0001' }, changes: [{ field: 'target', before: 10, after: 12 }] }],
+    });
+  }),
   // ------------------------------------------------------------------ health index bands (contract 0.15.435, settings review gap 8)
   http.get(`${B}/settings/dashboard/health-bands`, () => { const g = guard(); if (g) return g; return HttpResponse.json(bandsView(), tag(bandsState.version)); }),
   http.put(`${B}/settings/dashboard/health-bands`, async ({ request }) => {

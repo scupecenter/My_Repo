@@ -621,6 +621,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/dashboard/snapshot-schedule'],
   ['get', '/settings/dashboard/health-bands'],
   ['put', '/settings/dashboard/health-bands'],
+  ['get', '/settings/change-log'],
   ['get', '/settings/goals'],
   ['put', '/settings/goals'],
   ['get', '/goals/progress'],

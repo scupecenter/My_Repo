@@ -5383,6 +5383,12 @@
       "structure_decision": "Your structure proposal was decided"
     }
   },
+  "changeLog": {
+    "title": "Change log",
+    "note": "Who changed these settings, when, why and what. Read only: it lists the audit rows the saves already write, newest first (the last 50).",
+    "empty": "No change has been saved yet.",
+    "reason": "Reason"
+  },
   "snapshotSchedule": {
     "title": "Weekly snapshot day",
     "note": "The weekday on which the nightly job takes the weekly dashboard snapshot (Tripoli dates). The month-end snapshot is taken on the last day of each month and has no setting. A change applies from the next snapshot; stored snapshots are never moved or rewritten. Own save, reason and audit row.",

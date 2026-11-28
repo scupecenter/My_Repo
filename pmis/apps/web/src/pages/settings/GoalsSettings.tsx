@@ -1,3 +1,4 @@
+import { SettingsChangeLog } from "./SettingsChangeLog";
 import { MissingArabicHint } from '@/components/MissingArabicHint';
 import { Plus, Trash2 } from "lucide-react";
 import { UnsavedGuard } from '@/lib/unsavedGuard';
@@ -181,6 +182,7 @@ export function GoalsSettings() {
           )
         }
       />
+      <SettingsChangeLog scope="goals" />
     </section>
   );
 }

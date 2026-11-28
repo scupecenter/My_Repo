@@ -281,4 +281,27 @@ describe("F20 dashboard settings (contract 0.15.24)", () => {
       await admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 4, reason: "test reset to the default" }, { "If-Match": now.headers.etag as string });
     }
   });
+
+  it("settings change log (contract 0.15.433): read only, scope rule, rights, shows the audited saves", async () => {
+    const admin = await plainAdmin(app, db);
+    const g: Team = await team(app, db, "gecol", "gecol", 7);
+    expect((await g.entry.api.call("get", "/settings/change-log?scope=dashboard")).status).toBe(403);
+    const bad = await admin.api.call("get", "/settings/change-log?scope=sites");
+    expect(bad.status).toBe(422);
+    const cur = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
+    const saved = await admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 2, reason: "Change log test" }, { "If-Match": cur.headers.etag as string });
+    expect(saved.status).toBe(200);
+    try {
+      const r = await admin.api.call("get", "/settings/change-log?scope=dashboard");
+      expect(r.status).toBe(200);
+      const hit = r.body.items.find((i: { reason: string }) => i.reason === "Change log test");
+      expect(hit.setting).toBe("dashboard.snapshot_weekday");
+      expect(hit.changes.some((c: { field: string }) => c.field === "weekday")).toBe(true);
+      const goals = await admin.api.call("get", "/settings/change-log?scope=goals");
+      expect(goals.body.items.some((i: { reason: string }) => i.reason === "Change log test")).toBe(false);
+    } finally {
+      const now = await admin.api.call("get", "/settings/dashboard/snapshot-schedule");
+      await admin.api.call("put", "/settings/dashboard/snapshot-schedule", { weekday: 4, reason: "test reset to the default" }, { "If-Match": now.headers.etag as string });
+    }
+  });
 });

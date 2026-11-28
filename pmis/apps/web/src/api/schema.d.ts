@@ -8242,6 +8242,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/change-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Change log of the Dashboard settings or the Goals settings (0.15.433)
+         * @description 0.15.433. Read only. The audit rows the saves of those settings already write, newest first: who, when, the reason and the fields that changed (before and after).
+         *     Needs `admin.settings` view (403 `module_forbidden` otherwise). 422 `validation_failed` (`invalid`) for a `scope` other than dashboard or goals.
+         */
+        get: operations["getSettingsChangeLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/goals": {
         parameters: {
             query?: never;
@@ -20404,6 +20425,30 @@ export interface components {
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        /** @description 0.15.433. The change log of the Dashboard settings or the Goals settings. */
+        SettingsChangeLog: {
+            /** @enum {string} */
+            scope: "dashboard" | "goals";
+            items: {
+                id: number;
+                /** Format: date-time */
+                at: string;
+                action: string;
+                setting: string;
+                reason?: string | null;
+                actor?: {
+                    /** Format: uuid */
+                    id: string;
+                    display_name: string;
+                    employee_id?: string | null;
+                } | null;
+                changes: {
+                    field: string;
+                    before?: unknown;
+                    after?: unknown;
+                }[];
+            }[];
         };
         /** @description 0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order. */
         DashboardSettings: components["schemas"]["DashboardSettingsInput"] & {
@@ -38372,6 +38417,32 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getSettingsChangeLog: {
+        parameters: {
+            query: {
+                scope: "dashboard" | "goals";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The change log. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsChangeLog"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getGoals: {

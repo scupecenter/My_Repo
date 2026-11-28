@@ -79,3 +79,13 @@ export function useSetHealthBands() {
     },
   });
 }
+
+/** 0.15.433 (settings review gap 6): the read-only change log of the Dashboard settings or the Goals settings. */
+export type SettingsChangeLog = S["SettingsChangeLog"];
+
+export const useSettingsChangeLog = (scope: "dashboard" | "goals") =>
+  useQuery({
+    queryKey: ["settingsChangeLog", scope],
+    queryFn: () =>
+      api.get<SettingsChangeLog>("/settings/change-log", { query: { scope, limit: 50 } }),
+  });
