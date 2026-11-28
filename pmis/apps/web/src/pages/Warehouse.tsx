@@ -20,8 +20,9 @@ import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { DateInput } from '@/components/DateInput';
+import { ReorderLimits, SupplierReturns } from './WarehouseLogistics';
 
-type Tab = 'items' | 'movements' | 'stock' | 'dispatch' | 'gaps';
+type Tab = 'items' | 'movements' | 'stock' | 'reorder' | 'rma' | 'dispatch' | 'gaps';
 type Dlg = { mode: 'new' } | { mode: 'edit' | 'off' | 'del'; item: WarehouseItem } | null;
 type Rule = NonNullable<WarehouseItem['need_rules']>[number];
 type Form = { code: string; name_en: string; name_ar: string; uom: string; category: string; serial_tracked: boolean; code_source: string; rules: Rule[] };
@@ -441,12 +442,12 @@ export function Warehouse() {
         <Link className="btn ms-auto" data-testid="wh-register-link" to="/registers/warehouse">{t('wh.open_register')}</Link>
       </div>
       <div role="tablist" className="mb-3 flex gap-1 border-b border-line">
-        {(['items', 'movements', 'stock', 'dispatch', 'gaps'] as const).map((k) => (
+        {(['items', 'movements', 'stock', 'reorder', 'rma', 'dispatch', 'gaps'] as const).map((k) => (
           <button key={k} role="tab" aria-selected={tab === k} data-testid={`wh-tab-${k}`} onClick={() => setTab(k)}
             className={`px-3 py-2 text-sm ${tab === k ? 'border-b-2 border-accent font-semibold' : 'text-mute'}`}>{t(`wh.tab_${k}`)}</button>
         ))}
       </div>
-      {tab === 'items' && <Items />}{tab === 'movements' && <Movements />}{tab === 'stock' && <Stock />}{tab === 'dispatch' && <Dispatch />}{tab === 'gaps' && <Gaps />}
+      {tab === 'items' && <Items />}{tab === 'movements' && <Movements />}{tab === 'stock' && <Stock />}{tab === 'reorder' && <ReorderLimits />}{tab === 'rma' && <SupplierReturns />}{tab === 'dispatch' && <Dispatch />}{tab === 'gaps' && <Gaps />}
     </div>
   );
 }

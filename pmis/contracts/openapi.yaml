@@ -52,14 +52,17 @@ info:
     - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (owner approval 2026-11-27, item 18 of the 2026-11-27 batch; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
     - 0.15.245 (2026-11-27): pin a saved view as a personal card on the home dashboard (owner request 2026-11-27, item 16 of the 2026-11-27 batch; migration 0344; CHANGELOG HomeViewPins). Additive. `POST /saved-views/{view_id}/pin` and `POST /saved-views/{view_id}/unpin` manage the caller's pins (at most 12, position kept; a view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`) and `GET /me/home-pins` (`HomeViewPin`) lists them in order (inactive views drop out). The card shows each pin with a counter the screen's own list endpoint computes for the caller, so the counts stay inside the caller's permissions; the dashboard settings catalogue gains the card `pinned_views` (Settings > Dashboard, shown by default). Personal display preference: no grant, role, permission, visibility or audit change.
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
+    - 0.15.267 (2026-11-27): `POST /custom-fields` and `PATCH /custom-fields/{field_id}` now have an implementation (migration 0405, mirror `db/sql/404_custom_fields_door.sql`; the function `admin_save_field`, additive, no table). System Admin or an all-regions delegate of the custom fields, step-up, reason, If-Match on PATCH, audited (`custom_field_create`, `custom_field_update`). Entity, code, type and task are set at create only. Options are switched off, never removed; nothing is deleted (`is_active=false`). `visible_to_role_ids` and `editable_by_role_ids` write the field rules for every active role.
     - 0.15.265 (2026-11-27): the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27; migration 0370, mirror `db/sql/369_data_reset_narrow.sql`). Additive and backward compatible: a request without `narrow` is the whole part as before. `POST /settings/data-reset/requests` takes optional `narrow` (`DataResetNarrow`: `regions`, `batches`, `from`, `to`; every given key must match): the register entities that match go, the others stay with everything that hangs off them (every version of a record, steps, documents and files, comments, drafts, links). The unit is the entity; `from`/`to` are the days the entity was first created (inclusive, Africa/Tripoli); `batches` are import batches the record came from. Only parts whose data follows one register record can be narrowed (`DataResetPart.narrowable`); a narrowing needs chosen parts (not everything) and any other part is 422. A part the chosen one takes along (procurement takes car_dispatcher and financial_advances) loses only the entities linked to the selected procurement records. The narrowing is stored in `DataResetScope.narrow` and bound into `scope_hash`/`approved_scope_hash`: an approver who saw another narrowing is 409 `scope_changed`. `GET /settings/data-reset/plan` takes `regions`, `batches`, `from`, `to` (the dry run of the narrowed scope, `DataResetPlan.narrow`). New `GET /settings/data-reset/narrow-options?part=` lists the regions and the recent import batches of the part for the picker. System Admin only, no delegation.
     - 0.15.312 (2026-11-27): operational limits in Settings (review item 5, owner decision 35; migration 0402, mirror `db/sql/401_ops_limits.sql`). Additive; every default is the number the code used before, so nothing changes until a System Admin changes a value. New paths `GET` and `PUT /settings/ops-limits` (`getOpsLimits`, `setOpsLimits`, schemas `OpsLimits`, `OpsLimitItem`, `OpsLimitsInput`). Every signed-in user reads the catalogue and the values in force; only a System Admin changes them (a `settings` delegate does not), with a reason, a step-up and `If-Match`, audited `ops_limits_update` with the stored values before and after. Eleven limits: session idle hours (8) and absolute hours (12), step-up seconds (300, it also honours the earlier setting `stepup_max_age_seconds` until a value is saved here), and the row or entry caps of the assignments request (2000), imports (2000), Master import (5000), register import (5000), template prefill rows and sites (5000), log export (100000) and the idempotency store (5000). A key that is left out of `values` returns to its default. 422 for an unknown key, a non-integer, a value outside its range or an absolute session shorter than the idle limit.
+    - 0.15.404 (2026-11-27): the sign-in rate-limit numbers join the operational limits (migration 0563, mirror `db/sql/562_login_limits.sql`; follow-up of 0.15.312). Additive. `OpsLimitItem.key` gains `login.ip_attempts` (10), `login.ip_window_seconds` (900), `login.ip_base_seconds` (2), `login.ip_max_seconds` (60) and `login.identifier_attempts` (5), all in the group `sessions`; `OpsLimitItem.unit` gains `attempts`. Every default is the number the code used before. `PUT /settings/ops-limits` has one new rule: `login.ip_max_seconds` cannot be shorter than `login.ip_base_seconds` (422, item path `/values/login.ip_max_seconds`). Sign-in, the invitation links, the two-factor and re-check attempts read the numbers through the same cache, so a change applies within 30 seconds.
     - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
     - 0.15.226 (2026-11-27): the Deliverables register is enabled (migration 0326; Q71): site-scoped, linked to a task and a gate of the site, with the document and acceptance reference rules. Additive: `deliverables` joins `RegisterKey` and `ExportPartKey` (not in the Master sheet); no new endpoint.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
     - 0.15.300 (2026-11-27): Content-Security-Policy report endpoint (SEC-3 of the phase 1 security review; no migration; CHANGELOG CspReport). Additive. New public `POST /csp-report`: browsers post violation reports of the policy nginx sends (report-only by default). Answers 204 with no body, accepts `application/csp-report` and `application/reports+json`, 16 KB at most, 429 above 30 per minute per address. It reads nothing from the database and changes nothing; it logs a short sanitised line. No permission change.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
+    - 0.15.342 (2026-11-27): logistics depth, phase 3 (migration 0413, mirror `db/sql/412_logistics_rma.sql`). Additive. Reorder limits: `GET /warehouse/reorder-limits` (optional `below=true`) and `PUT /warehouse/reorder-limits/{item_id}` (System Admin or a delegate of warehouse.items.edit for all regions, a reason, audited; null level clears). Supplier returns (RMA): `GET /warehouse/rma`, `POST /warehouse/rma` (needs the warehouse create right) and `POST /warehouse/rma/{rma_id}/status`; tracking only, the stock still leaves quarantine through the existing returned-to-supplier exit. New schemas `ReorderLimit` and `WarehouseRma`. No permission change.
     - 0.15.244 (2026-11-27): list-value colours reach the register fields (item 15 of the improvement research, owner request 2026-11-27; no migration; CHANGELOG ListCellDisplay). Additive. `RegisterField.options[]` (and the child-list column options) gain the optional `colour` of the list value as set in Settings, Lists (#RRGGBB; absent when none). Display only: no permission, visibility, validation or stored-data change; a value keeps storing its code.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 improvement research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
     - 0.15.203 (2026-11-27): the dashboard follow-up sections, quality snags and NCR (owner approval 2026-11-26, dashboard proposals item 6; migration 0304). Additive and read only. `GET /dashboard/ops` gains the section `quality` (`DashboardOpsQuality`): the open snags and NCRs of the in-scope sites, the average closure age of each, and the first-time acceptance rate (the decided inspections whose result is Pass). The section needs the quality view and answers available false without it. The dashboard settings catalogue gains the card `ops_quality`. No grant, role or permission change.
@@ -114,6 +117,7 @@ info:
 
     - 0.15.83 (2026-11-26): the evidence dot of the Site Master wide table (owner request 2026-11-26). Additive, read only, no migration. Each cell of `GET /site-master/{menu}/rows` may carry `docs` (`state` red when a document still has to be uploaded, yellow when all are uploaded but not all approved, green when all are approved; the counts `need`, `approved`, `pending`, `missing`, `rejected`, `expired`), computed from the mandatory document slots of the task behind the cell. Nothing is written and no permission changes. Each register record (`RegisterRecord`) may carry the same `docs`, computed from the mandatory slots of its logical record (`register_entity_id`).
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
+    - 0.15.365 (2026-11-27): two financial alert kinds for the generic alert rules (D59; migration 0408, mirror `db/sql/407_finance_alert_kinds.sql`): `advance_unsettled` (current approved advances still disbursed or in settlement for at least `days` days; `days` defaults to the Finance hub value `settle_warn_days`, else 30) and `invoice_due_soon` (approved invoices not Paid or Cancelled with a due date within `days` days, default 7, or past). The kind enum of the alert-rule schemas and the catalogue list grow; no new route, notifications only, same audience and dedupe journal. The advance page also gets buttons that create an expense or a settlement draft filled from the advance (web only, through the existing register create route).
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
@@ -15261,6 +15265,145 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/reorder-limits:
+    get:
+      tags: [warehouse]
+      operationId: listReorderLimits
+      summary: Items with a reorder limit and whether the available stock is at or under it (contract 0.15.342)
+      parameters:
+      - {name: below, in: query, required: false, schema: {type: string, enum: ['true']}, description: 'Only the items at or under their level.'}
+      responses:
+        '200':
+          description: The items that have a limit.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/ReorderLimit'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /warehouse/reorder-limits/{item_id}:
+    parameters:
+    - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      tags: [warehouse]
+      operationId: putReorderLimit
+      summary: Set or clear the reorder limit of an item (System Admin or a delegate of warehouse.items.edit for all regions)
+      description: '`reorder_level` null clears the limit. `If-Match` is optional (the first setting has no version); a stale version answers 412. Audited with a reason.'
+      x-db-path: admin_save_reorder_limit
+      parameters:
+      - {name: If-Match, in: header, required: false, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [reorder_level]
+                properties:
+                  reorder_level: {type: [number, 'null'], minimum: 0}
+                  reorder_qty: {type: [number, 'null'], exclusiveMinimum: 0}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/rma:
+    get:
+      tags: [warehouse]
+      operationId: listWarehouseRma
+      summary: Supplier returns (RMA), newest first (contract 0.15.342)
+      parameters:
+      - {name: status, in: query, required: false, schema: {type: string, enum: [sent, replaced, credited, rejected, closed]}}
+      responses:
+        '200':
+          description: Up to 500 supplier returns.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/WarehouseRma'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [warehouse]
+      operationId: createWarehouseRma
+      summary: Record a supplier return (needs the warehouse create right). Tracking only, no stock effect
+      description: 'The stock leaves quarantine through the existing "returned to supplier" quarantine exit (`POST /warehouse/quarantine-exits`); this records what the supplier does with it. `movement_id`, when given, must be such an exit. The number (`RMA-00001`...) is never reused.'
+      x-db-path: wh_rma_create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [item_id, qty, supplier, reason]
+              properties:
+                item_id: {type: string, format: uuid}
+                qty: {type: number, exclusiveMinimum: 0}
+                supplier: {type: string, minLength: 1, maxLength: 200}
+                reason: {type: string, minLength: 3, maxLength: 1000}
+                movement_id: {type: [string, 'null'], format: uuid}
+                sent_on: {type: string, format: date}
+      responses:
+        '201':
+          description: Recorded.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/rma/{rma_id}/status:
+    parameters:
+    - {name: rma_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [warehouse]
+      operationId: setWarehouseRmaStatus
+      summary: Move a supplier return on (sent, then replaced, credited or rejected, then closed)
+      x-db-path: wh_rma_set_status
+      parameters:
+      - {name: If-Match, in: header, required: false, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: {type: string, enum: [replaced, credited, rejected, closed]}
+                note: {type: string, maxLength: 1000}
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /warehouse/config-gaps:
     get:
       tags: [warehouse]
@@ -16521,6 +16664,7 @@ paths:
     post:
       tags: [custom-fields]
       operationId: createCustomField
+      x-step-up: true
       summary: Add a field to a site, task, milestone, gate or register
       description: A change regenerates the affected templates; old versions are then rejected on upload.
       x-db-path: admin_save_field
@@ -16563,6 +16707,7 @@ paths:
     patch:
       tags: [custom-fields]
       operationId: updateCustomField
+      x-step-up: true
       summary: Edit or deactivate (never deleted)
       x-db-path: admin_save_field
       parameters:
@@ -23734,7 +23879,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon] }
         params: { type: object, additionalProperties: true, description: 'Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}.' }
         audience: { type: object, additionalProperties: true, description: '{"type":"system_admin"} or {"type":"module","module":"<module key>"}.' }
         title_en: { type: string, maxLength: 200 }
@@ -23752,7 +23897,7 @@ components:
       required: [code, kind, params, audience, title_en, title_ar, body_en, body_ar]
       properties:
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold, advance_unsettled, invoice_due_soon] }
         params: { type: object, additionalProperties: true }
         audience: { type: object, additionalProperties: true }
         title_en: { type: string, maxLength: 200 }
@@ -25661,9 +25806,9 @@ components:
       description: '0.15.312. One operational limit.'
       required: [key, group, unit, default, min, max, value, is_default]
       properties:
-        key: { type: string, enum: [session.idle_hours, session.absolute_hours, stepup.seconds, assignments.max_rows, import.max_rows, master_import.max_rows, register_import.max_rows, prefill.max_rows, prefill.max_sites, export.max_rows, idempotency.max_entries] }
+        key: { type: string, enum: [session.idle_hours, session.absolute_hours, stepup.seconds, assignments.max_rows, import.max_rows, master_import.max_rows, register_import.max_rows, prefill.max_rows, prefill.max_sites, export.max_rows, idempotency.max_entries, login.ip_attempts, login.ip_window_seconds, login.ip_base_seconds, login.ip_max_seconds, login.identifier_attempts] }
         group: { type: string, enum: [sessions, rows, exports] }
-        unit: { type: string, enum: [hours, seconds, rows, sites, entries] }
+        unit: { type: string, enum: [hours, seconds, rows, sites, entries, attempts] }
         default: { type: integer }
         min: { type: integer }
         max: { type: integer }
@@ -26816,6 +26961,40 @@ components:
         short_lines: { type: integer }
         pending_lines: { type: integer }
         lines: { type: array, items: { $ref: '#/components/schemas/SiteDispatchLine' }, description: 'Only on GET /warehouse/dispatch-status/{site_id}.' }
+    ReorderLimit:
+      type: object
+      description: '0.15.342. The reorder limit of an item and the available stock against it.'
+      required: [item_id, item_code, item_name, uom, reorder_level, reorder_qty, available, below_reorder, version]
+      properties:
+        item_id: {type: string, format: uuid}
+        item_code: {type: string}
+        item_name: {type: string}
+        uom: {type: [string, 'null']}
+        reorder_level: {type: number}
+        reorder_qty: {type: [number, 'null']}
+        available: {type: number}
+        below_reorder: {type: boolean}
+        version: {type: integer}
+    WarehouseRma:
+      type: object
+      description: '0.15.342. A supplier return (RMA): tracking only, no stock effect.'
+      required: [id, rma_no, item_id, item_code, item_name, qty, supplier, status, reason, sent_on, version]
+      properties:
+        id: {type: string, format: uuid}
+        rma_no: {type: string}
+        item_id: {type: string, format: uuid}
+        item_code: {type: string}
+        item_name: {type: string}
+        qty: {type: number}
+        supplier: {type: string}
+        status: {type: string, enum: [sent, replaced, credited, rejected, closed]}
+        reason: {type: string}
+        movement_id: {type: [string, 'null'], format: uuid}
+        sent_on: {type: string, format: date}
+        resolved_on: {type: [string, 'null'], format: date}
+        resolution_note: {type: [string, 'null']}
+        version: {type: integer}
+        created_at: {type: string, format: date-time}
     RegionVendor:
       type: object
       required: [region_id, wl_vendor, version]

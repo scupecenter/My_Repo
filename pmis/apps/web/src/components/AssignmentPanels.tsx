@@ -7,6 +7,8 @@ import { registerErrorMessage } from '@/lib/registerErrors';
 import { PeoplePicker } from './PeoplePicker';
 import { useToast } from './Toast';
 import { DateInput } from '@/components/DateInput';
+import { useCreateRecord } from '@/api/registers';
+import { localToday } from '@/lib/dailyPlan';
 
 export type Member = { user_id: string; member_role: 'supervisor' | 'executor'; is_lead?: boolean };
 
@@ -114,6 +116,30 @@ export function TopUp({ record, onDone }: { record: RegisterRecord; onDone: (id:
       <label className="text-sm text-mute">{t('fleet.top_up_amount')}<input type="number" min={0} className="input mono" data-testid="reg-topup-amount" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
       <label className="text-sm text-mute">{t('fleet.period_to')}<DateInput className="input mono" data-testid="reg-topup-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
     </ChildAction>
+  );
+}
+
+/** D59: a new expense or settlement filled from this advance (the advance, the site, today, and the balance to return). The draft goes through the register's own create path as the caller. */
+export function AdvanceChildren({ record, onDone }: { record: RegisterRecord; onDone: (id: string) => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const create = useCreateRecord('financial_advances');
+  const d = record.data as { balance?: number | null; amounts_hidden?: boolean };
+  const go = (type: 'expense' | 'settlement') => {
+    const data: Record<string, unknown> = { advance_id: record.entity_id };
+    if (type === 'expense') data.expense_date = localToday();
+    else if (d.amounts_hidden !== true && typeof d.balance === 'number' && d.balance > 0) data.returned_amount = d.balance;
+    create.mutate({ site_id: record.site_id ?? undefined, record_type: type, data } as never, { onSuccess: (r) => { toast(t('fleet.child_created')); onDone(r.id); } });
+  };
+  return (
+    <div className="space-y-1 rounded-md bg-card2 p-3" data-testid="reg-advance-children">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn" data-testid="reg-advance-new-expense" disabled={create.isPending} onClick={() => go('expense')}>{t('fleet.new_expense')}</button>
+        <button type="button" className="btn" data-testid="reg-advance-new-settlement" disabled={create.isPending} onClick={() => go('settlement')}>{t('fleet.new_settlement')}</button>
+      </div>
+      <p className="text-sm text-mute">{t('fleet.child_hint')}</p>
+      {create.isError && <p role="alert" data-testid="reg-advance-children-error" className="text-sm text-lateInk">{registerErrorMessage(t, create.error)}</p>}
+    </div>
   );
 }
 
