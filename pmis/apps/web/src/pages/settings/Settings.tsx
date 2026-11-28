@@ -50,6 +50,9 @@ import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
 import { AlertRules } from './AlertRules';
+import { AlertSettingsPanel } from './AlertSettings';
+import { PEOPLE_TABS, peopleTabAllowed } from '@/components/PeopleAdmin';
+import { TemplateMappingPanel } from '../TemplateMapping';
 import { LoginPageSettings } from './LoginPage';
 import { DataHubSettings } from './DataHubSettings';
 import { FinanceHubSettings } from './FinanceHubSettings';
@@ -68,13 +71,15 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }, { key: 'search', adminOnly: true }] },
-  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
+  { key: 'data', sections: [{ key: 'imports' }, { key: 'mapping' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'alerts' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
   { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'finance-hub' }] },
+  // People and access: Users, Assignments, Roles, Permission profiles, Groups, Delegation and the Responsibility Matrix stay their own screens; Settings lists them so there is one place to start
+  { key: 'access', sections: [] },
   { key: 'identity', sections: [] },
 ];
 
@@ -171,6 +176,27 @@ function SettingsIndex() {
   );
 }
 
+/** Settings > Access: the People screens (Users, Roles, ...) listed with what each one holds. Each opens only for people who may open it. */
+function AccessHub() {
+  const { t } = useTranslation();
+  const me = useMe(true);
+  return (
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="settings-access">
+      {PEOPLE_TABS.filter((p) => !p.grant).map((p) => {
+        const ok = peopleTabAllowed(me.data, p);
+        const n = p.key.slice(6);
+        return (
+          <div key={p.key} className="card space-y-2 p-4" data-testid={`settings-access-${n}`}>
+            <h2 className="font-bold">{t(p.key === 'admin.roles' ? 'nav.admin.roles' : p.label)}</h2>
+            <p className="text-xs text-mute">{t(`settings.access_${n}`)}</p>
+            {ok ? <NavLink to={p.to} data-testid={`settings-access-open-${n}`} className="btn px-2 py-1 text-xs">{t('settings.access_open')}</NavLink> : <p className="text-xs text-mute">{t('settings.access_no')}</p>}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 /** Mounted at `admin/settings/*`. */
 export function SettingsRoutes() {
   return (
@@ -178,6 +204,7 @@ export function SettingsRoutes() {
       <Route element={<Layout />}>
         <Route index element={<Navigate to="sla" replace />} />
         <Route path="all" element={<SettingsIndex />} />
+        <Route path="access" element={<AccessHub />} />
         <Route path="identity" element={<Identity />} />
         <Route path="screens" element={<TabFrame tab="screens" />}>
           <Route index element={<Navigate to="dashboard" replace />} />
@@ -239,6 +266,7 @@ export function SettingsRoutes() {
         <Route path="data" element={<TabFrame tab="data" />}>
           <Route index element={<Navigate to="imports" replace />} />
           <Route path="imports" element={<><Imports /><TemplateNoticeCard /><DuplicateRowsCard /></>} />
+          <Route path="mapping" element={<TemplateMappingPanel />} />
           <Route path="historical" element={<HistoricalWaiver />} />
           <Route path="counts" element={<GecolHlcCounts />} />
           <Route path="export" element={<ExportSchedulesScreen />} />
@@ -251,6 +279,7 @@ export function SettingsRoutes() {
           <Route path="dlp" element={<Dlp />} />
           <Route path="locks" element={<SecurityLocks />} />
           <Route path="limits" element={<OpsLimits />} />
+          <Route path="alerts" element={<AlertSettingsPanel />} />
           <Route path="support" element={<SupportAccess />} />
           <Route path="newdevice" element={<NewDeviceCode />} />
           <Route path="passkeys" element={<Passkeys />} />
