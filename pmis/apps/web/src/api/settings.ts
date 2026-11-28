@@ -592,6 +592,10 @@ export const useSaveIssueTaskMap = () => {
 export const useIssueStoppedRows = () => useQuery({ queryKey: ['issueStoppedRows'], queryFn: () => api.get<IssueStoppedRowList>('/issues/stopped-rows') });
 export const useAlertRules = () => useQuery({ queryKey: ['alertRules'], queryFn: () => api.get<AlertRulesResponse>('/settings/alert-rules') });
 export const useAlertRuleRuns = () => useQuery({ queryKey: ['alertRuleRuns'], queryFn: () => api.get<{ runs: AlertRuleRun[] }>('/settings/alert-rules/runs') });
+export interface AlertRuleDryRun { rule_id: string; would_fire: number; notifications: number; targets: { period_key: string; target: string }[] }
+export interface AlertRuleLog { runs: { run_at: string; fired: number }[]; fires: { fired_at: string; period_key: string; target: string }[] }
+export const getAlertRuleDryRun = (id: string) => api.get<AlertRuleDryRun>(`/settings/alert-rules/${id}/dry-run`);
+export const getAlertRuleLog = (id: string) => api.get<AlertRuleLog>(`/settings/alert-rules/${id}/log`);
 export const useCreateAlertRule = () => {
   const qc = useQueryClient();
   return useMutation<AlertRuleSaved, ApiError, AlertRuleInput & { reason: string }>({

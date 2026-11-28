@@ -1716,6 +1716,14 @@ export const settingsHandlers = [
       { register_key: 'financial_advances', field_code: 'advance_id', target_register: 'financial_advances', rows_with_value: 5, orphan_rows: 0, examples: [] },
     ] });
   }),
+  http.get(`${B}/settings/alert-rules/:id/dry-run`, ({ params }) => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({ rule_id: String(params.id), would_fire: 2, notifications: 5, targets: [{ period_key: 'week:2026-11-22', target: 'issues.risk_entity_id' }, { period_key: 'week:2026-11-22', target: 'invoices.advance_id' }] });
+  }),
+  http.get(`${B}/settings/alert-rules/:id/log`, () => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({ runs: [{ run_at: '2026-11-28T03:00:00Z', fired: 2 }], fires: [{ fired_at: '2026-11-28T03:00:00Z', period_key: 'week:2026-11-22', target: 'issues.risk_entity_id' }] });
+  }),
   http.get(`${B}/settings/alert-rules/runs`, () => {
     const g = needAdmin(); if (g) return g;
     return HttpResponse.json({ runs: [

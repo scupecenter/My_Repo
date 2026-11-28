@@ -21,6 +21,16 @@ export class AlertRulesController {
     return this.svc.linkOrphans();
   }
 
+  @Get(':id/dry-run')
+  dryRun(@Param('id') id: string) {
+    return this.svc.dryRun(id);
+  }
+
+  @Get(':id/log')
+  log(@Param('id') id: string) {
+    return this.svc.log(id);
+  }
+
   @Post()
   create(@Body() body: unknown) {
     return this.svc.create(body);

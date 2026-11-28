@@ -1,12 +1,43 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { useAlertRuleRuns, useAlertRules, useCreateAlertRule } from '@/api/settings';
+import { getAlertRuleDryRun, getAlertRuleLog, useAlertRuleRuns, useAlertRules, useCreateAlertRule } from '@/api/settings';
+import type { AlertRuleDryRun, AlertRuleLog } from '@/api/settings';
 import type { AlertRule, AlertRuleTemplate } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { QueryFallback } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { fmtDateTime } from '@/lib/time';
+
+/** Preview (dry run) and log of one rule: read only, nothing is sent. */
+function RuleProbe({ id, code }: { id: string; code: string }) {
+  const { t, i18n } = useTranslation();
+  const [dry, setDry] = useState<AlertRuleDryRun | null>(null);
+  const [log, setLog] = useState<AlertRuleLog | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+  const go = async (what: 'dry' | 'log') => {
+    setBusy(true); setErr(false);
+    try { if (what === 'dry') setDry(await getAlertRuleDryRun(id)); else setLog(await getAlertRuleLog(id)); } catch { setErr(true); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex flex-wrap gap-2">
+        <button className="btn" disabled={busy} title={t('automation.dry_tip')} data-testid={`au-dry-${code}`} onClick={() => void go('dry')}>{t('automation.dry')}</button>
+        <button className="btn" disabled={busy} title={t('automation.log_tip')} data-testid={`au-log-${code}`} onClick={() => void go('log')}>{t('automation.log')}</button>
+      </div>
+      {err && <p className="text-xs text-danger" role="alert">{t('automation.probe_failed')}</p>}
+      {dry && <p className="text-xs" data-testid={`au-dry-out-${code}`}>{t('automation.dry_result', { count: dry.would_fire, n: dry.notifications })}{dry.targets.length > 0 ? ` ${dry.targets.map((x) => x.target).join(', ')}` : ''}</p>}
+      {log && (
+        <div className="text-xs" data-testid={`au-log-out-${code}`}>
+          {log.fires.length === 0 ? <p className="text-mute">{t('automation.log_empty')}</p> : (
+            <ul className="list-disc ps-4">{log.fires.slice(0, 8).map((f) => <li key={`${f.period_key}-${f.target}`}>{fmtDateTime(f.fired_at, i18n.language)} · {f.target}</li>)}</ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Settings, Alerts, Automation (admin only): the "when ... do" view over the alert rules (contract 0.15.473, migration 0614). It adds no engine: a
@@ -71,6 +102,7 @@ export function AutomationCentre() {
                 <p className="mt-2 text-xs text-mute" data-testid={`au-last-${r.code}`}>
                   {run ? t('automation.last_run', { at: fmtDateTime(run.run_at, i18n.language), count: run.fired }) : t('automation.never_run')}
                 </p>
+                <RuleProbe id={r.id} code={r.code} />
               </li>
             );
           })}

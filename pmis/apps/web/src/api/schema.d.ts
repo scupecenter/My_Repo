@@ -5464,6 +5464,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/alert-rules/{id}/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What an alert rule would send now, nothing is sent (0.15.486)
+         * @description 0.15.486 (migration 0627): System Admin. Evaluates the rule as the daily run would today inside a sub-transaction that is always rolled back, so nothing is sent and no journal row stays. Works for a switched-off rule too. Targets already notified in the current period are not counted again.
+         */
+        get: operations["getAlertRuleDryRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/alert-rules/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The log of one alert rule (0.15.486)
+         * @description 0.15.486 (migration 0627): System Admin. The last 50 runs and the last 50 firings of the rule, newest first.
+         */
+        get: operations["getAlertRuleLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/alert-rules/runs": {
         parameters: {
             query?: never;
@@ -34320,6 +34360,74 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getAlertRuleDryRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        rule_id: string;
+                        would_fire: number;
+                        notifications: number;
+                        targets: {
+                            period_key: string;
+                            target: string;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getAlertRuleLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The log. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runs: {
+                            /** Format: date-time */
+                            run_at: string;
+                            fired: number;
+                        }[];
+                        fires: {
+                            /** Format: date-time */
+                            fired_at: string;
+                            period_key: string;
+                            target: string;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Forbidden"];
         };
     };
     getAlertRuleRuns: {

@@ -20,3 +20,7 @@ These are ordinary rules. You can edit them, change the days or the audience, or
 ## Closed record with an open linked record
 
 The rule kind "Closed record with an open linked record" checks the register links declared in Settings. Once a week, for each link that has at least the minimum number of approved records whose linked record (in the other register) is still open, neither approved nor voided, the audience of the rule gets one notification with the count. Leave the register and field empty to check every link. It only sends a notification; no record is changed.
+
+## Preview and log of a rule
+
+Each rule card has two buttons. "Preview now" shows what the rule would send today (how many items and how many notifications, with the targets) and sends nothing; it also works for a rule that is switched off. "Log" shows the last times the rule fired. Both are for System Admins and only read.

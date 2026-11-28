@@ -76,4 +76,34 @@ describe('alert rule runs (0614)', () => {
     await expect(db.query('SELECT alert_rule_runs_json(5) AS j')).rejects.toThrow();
     await db.query('ROLLBACK');
   });
+
+  it('dry run: shows what a rule would send and leaves nothing behind (no journal row, no notification)', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const made = await save({ ...rule(`${PREFIX}-dry`), enabled: false }, 'a rule for the dry run');
+    const ruleId = made.rows[0].j.id as string;
+    const notesBefore = (await db.query(`SELECT count(*)::int AS n FROM notifications WHERE kind = 'alert_rule'`)).rows[0].n as number;
+    const dry = (await db.query('SELECT alert_rule_dry_run_json($1::uuid) AS j', [ruleId])).rows[0].j as { rule_id: string; would_fire: number; notifications: number; targets: unknown[] };
+    expect(dry.rule_id).toBe(ruleId);
+    expect(dry.would_fire).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(dry.targets)).toBe(true);
+    expect((await db.query('SELECT count(*)::int AS n FROM alert_rule_fires WHERE rule_id = $1', [ruleId])).rows[0].n).toBe(0);
+    expect((await db.query(`SELECT enabled FROM alert_rules WHERE id = $1`, [ruleId])).rows[0].enabled).toBe(false);
+    expect((await db.query(`SELECT count(*)::int AS n FROM notifications WHERE kind = 'alert_rule'`)).rows[0].n).toBe(notesBefore);
+    const log = (await db.query('SELECT alert_rule_log_json($1::uuid, 10) AS j', [ruleId])).rows[0].j as { runs: unknown[]; fires: unknown[] };
+    expect(log.fires).toEqual([]);
+    await db.query('ROLLBACK');
+  });
+
+  it('dry run and log are for System Admins only', async () => {
+    const plain = await makeUser(db, { status: 'active' });
+    await db.query('BEGIN');
+    await beginAs(db, plain.id);
+    await expect(db.query('SELECT alert_rule_dry_run_json($1::uuid) AS j', ['00000000-0000-4000-8000-000000000001'])).rejects.toThrow();
+    await db.query('ROLLBACK');
+    await db.query('BEGIN');
+    await beginAs(db, plain.id);
+    await expect(db.query('SELECT alert_rule_log_json($1::uuid, 5) AS j', ['00000000-0000-4000-8000-000000000001'])).rejects.toThrow();
+    await db.query('ROLLBACK');
+  });
 });
