@@ -4813,6 +4813,9 @@
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
   "regrules": {
+    "other_title_one": "Other rules ({{count}}, read only)",
+    "other_title_other": "Other rules ({{count}}, read only)",
+    "other_note": "These keys are set by the system (scopes and their maps, field lists, levels). They are shown so nothing is hidden; they cannot be changed here.",
     "title": "Register rules",
     "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
     "saved": "Rule saved",
