@@ -29,7 +29,7 @@ export function SiteGantt({ site, today }: { site: SiteDetail; today?: string })
             const lo = dep ? Math.min(pos(m, dep.fromDay), pos(m, dep.toDay)) : 0;
             const hi = dep ? Math.max(pos(m, dep.fromDay), pos(m, dep.toDay)) : 0;
             return (
-              <li key={r.code} className="flex items-center gap-2 text-sm" data-testid={`gantt-row-${r.code}`}>
+              <li key={r.code} data-ctx data-ctx-value={nm(r.node)} className="flex items-center gap-2 text-sm" data-testid={`gantt-row-${r.code}`}>
                 <span className="w-40 shrink-0 truncate">{nm(r.node)}</span>
                 <span className="relative h-5 flex-1 rounded bg-card2" dir="ltr">
                   {dep && (

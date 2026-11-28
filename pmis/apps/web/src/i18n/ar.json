@@ -8322,7 +8322,17 @@
     "select": "تحديد",
     "unselect": "إلغاء التحديد",
     "copy": "نسخ الصف",
-    "copied": "تم نسخ الصف"
+    "copied": "تم نسخ الصف",
+    "copy_link": "نسخ الرابط",
+    "link_copied": "تم نسخ الرابط",
+    "copy_value": "نسخ القيمة",
+    "value_copied": "تم نسخ القيمة",
+    "act_edit": "تعديل",
+    "act_assign": "إسناد",
+    "act_status": "تغيير الحالة",
+    "act_duplicate": "تكرار",
+    "act_delete": "حذف",
+    "confirm_delete": "تأكيد الحذف"
   },
   "records": {
     "pin": "تثبيت",
