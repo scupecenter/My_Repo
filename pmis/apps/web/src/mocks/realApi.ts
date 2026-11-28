@@ -406,6 +406,8 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
   ['get', '/settings/imports'],
   ['put', '/settings/imports'],
+  ['get', '/settings/duplicate-rows'],
+  ['put', '/settings/duplicate-rows'],
   // Contract 0.15.322 (migration 0492; apps/api: settings): the upload policy of the imports (D49 part 3).
   ['get', '/settings/imports/upload-policy'],
   ['put', '/settings/imports/upload-policy'],
