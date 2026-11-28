@@ -1751,6 +1751,15 @@
     "end_task_layout_submitted_date": "تاريخ تقديم المخطط"
   },
   "wtSet": {
+    "diffTitle": "الفروق مع المجموعة السارية",
+    "diffNone": "لا يختلف أي بند عن المجموعة السارية.",
+    "diff_added": "مضاف",
+    "diff_removed": "محذوف",
+    "diff_changed": "معدّل",
+    "diffField_name": "الاسم",
+    "diffField_weight": "الوزن",
+    "diffField_unit": "الوحدة",
+    "diffField_measure_rule": "قاعدة القياس",
     "rule": {
       "method": "طريقة احتساب البند",
       "m_off": "لا يُحتسب تلقائيًا",
