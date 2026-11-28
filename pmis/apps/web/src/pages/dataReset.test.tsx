@@ -319,6 +319,20 @@ describe('Settings, data reset', () => {
 });
 
 describe('Settings, data reset, categories (owner request 2026-11-28)', () => {
+  it('master data: its own block, off by default, not in select-all, shown as its own line with the dependencies on the confirm screen', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-scope-custom'));
+    await screen.findByTestId('dr-cats');
+    expect(screen.getByTestId('dr-cat-master-master_vehicles')).not.toBeChecked();
+    await u.click(screen.getByTestId('dr-cat-all'));
+    for (const c of ['master_warehouse_items', 'master_vehicles', 'master_contractors']) expect(screen.getByTestId(`dr-cat-master-${c}`)).not.toBeChecked();
+    await u.click(screen.getByTestId('dr-cat-all'));
+    await u.click(screen.getByTestId('dr-cat-master-master_contractors'));
+    expect(screen.getByTestId('dr-cat-master')).toHaveTextContent('every project part');
+  });
+
   it('categories tick the existing parts, the audit log is a locked row, the confirm screen shows rows per category, and the result is a dialog closed only by Close', async () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();

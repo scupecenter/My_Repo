@@ -47,7 +47,10 @@ const TABLES: DataResetState['plan']['tables'] = [
 
 type P = [code: string, group: DataResetPart['group'], en: string, ar: string, deps: string[], rows: number];
 const CATALOGUE: P[] = [
-  ['sites', 'project', 'Sites, tasks, milestones, gates and baselines', 'المواقع ومهامها ومعالمها وبواباتها والخطط الأساسية', [], 560],
+  ['sites', 'project', 'Sites, tasks, milestones, gates and baselines', 'المواقع ومهامها ومعالمها وبواباتها والخطط الأساسية', ['master_contractors'], 560],
+  ['master_warehouse_items', 'registers', 'Master data: Warehouse item catalogue (items, rules, supplier returns)', 'البيانات الأساسية: دليل أصناف المخزن (الأصناف والقواعد ومرتجعات الموردين)', [], 12],
+  ['master_vehicles', 'registers', 'Master data: Vehicles register', 'البيانات الأساسية: سجل المركبات', [], 3],
+  ['master_contractors', 'registers', 'Master data: Contractors (companies, teams, contracts)', 'البيانات الأساسية: المقاولون (الشركات والفرق والعقود)', [], 7],
   ['documents', 'project', 'Documents and generated forms (Library)', 'المستندات والنماذج المولّدة (المكتبة)', ['sites'], 33],
   ['imports', 'project', 'Imports, upload batches and exports', 'الاستيرادات ودفعات الرفع والتصديرات', ['sites'], 9],
   ['notifications', 'project', 'Notifications, inbox and follows', 'الإشعارات وصندوق الوارد والمتابعات', [], 87],
@@ -74,7 +77,7 @@ const narrowOf = (q: URLSearchParams): Narrow | null => {
   if (q.get('to')) n.to = q.get('to')!;
   return Object.keys(n).length ? n : null;
 };
-const EVERYTHING = CATALOGUE.filter((c) => c[1] !== 'identity').map((c) => c[0]).sort();
+const EVERYTHING = CATALOGUE.filter((c) => c[1] !== 'identity' && !c[0].startsWith('master_')).map((c) => c[0]).sort();
 const hashOf = (parts: string[]) => [...parts].sort().join(',').split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(16).padStart(8, '0').repeat(8);
 function scopeOf(requested: string[] | null, narrow: Narrow | null = null): DataResetScope {
   const parts = requested ? closureOf(requested, CATALOGUE.map(([code, , , , deps]) => ({ code, depends_on: deps }))) : EVERYTHING;
@@ -90,7 +93,7 @@ function planOf(requested: string[] | null, narrow: Narrow | null = null): DataR
     delete_rows: tables.reduce((n, t) => n + (t.table === 'users' ? 0 : t.delete), 0), keep_rows: tables.reduce((n, t) => n + t.keep, 0),
     accounts_to_deactivate: sel.has('users') ? 23 : 0, error: null,
     parts: CATALOGUE.map(([code, group, label_en, label_ar, deps, rows]) => ({
-      code, group, narrowable: NARROWABLE.includes(code), kind: group === 'identity' ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
+      code, group, narrowable: NARROWABLE.includes(code), kind: group === 'identity' || code.startsWith('master_') ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
       dependents: CATALOGUE.filter((c) => c[4].includes(code)).map((c) => c[0]), rows, tables: {}, requested: req.has(code), selected: sel.has(code),
       added: sel.has(code) && !req.has(code) })),
   };

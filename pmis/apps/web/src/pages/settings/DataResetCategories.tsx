@@ -17,8 +17,11 @@ export const CATEGORIES: { id: CategoryId; parts: string[] }[] = [
   { id: 'invoices_payments', parts: ['invoices'] },
   { id: 'alerts_notifications', parts: ['notifications'] },
 ];
-/** The registers dropdown offers every part of the registers group, and Site Master (the `sites` part). */
-export const registerParts = (catalogue: readonly DataResetPart[]) => catalogue.filter((p) => (p.group === 'registers' && p.code !== 'invoices') || p.code === 'sites');
+/** Master data parts (migration 0710): off by default, never in select-all, listed in their own block. */
+export const MASTER_CODES = ['master_warehouse_items', 'master_vehicles', 'master_contractors'] as const;
+const isMaster = (code: string) => (MASTER_CODES as readonly string[]).includes(code);
+/** The registers dropdown offers every part of the registers group (not the master data parts), and Site Master (the `sites` part). */
+export const registerParts = (catalogue: readonly DataResetPart[]) => catalogue.filter((p) => (p.group === 'registers' && p.code !== 'invoices' && !isMaster(p.code)) || p.code === 'sites');
 const REGISTER_CODES_NOT = new Set(['invoices']);
 const inCategory = (c: { parts: string[] }, catalogue: readonly DataResetPart[]) => c.parts.filter((x) => catalogue.some((p) => p.code === x));
 const partLabel = (p: Pick<DataResetPart, 'label_en' | 'label_ar'> | undefined, code: string, lang: string) => (p ? (lang === 'ar' ? p.label_ar : p.label_en) : code);
@@ -30,6 +33,7 @@ export function CategoryPicker({ catalogue, chosen, setChosen }: { catalogue: Da
   const regs = registerParts(catalogue);
   const toggleMany = (codes: string[], on: boolean) => setChosen(on ? [...new Set([...chosen, ...codes])] : chosen.filter((c) => !codes.includes(c)));
   const regsChosen = regs.filter((p) => chosen.includes(p.code));
+  const masters = catalogue.filter((p) => isMaster(p.code));
   // Select all: every category and every register of the dropdown (never the audit log; master data parts are not in the dropdown, so they stay off unless ticked)
   const allCodes = [...new Set([...regs.map((p) => p.code), ...CATEGORIES.flatMap((c) => inCategory(c, catalogue))])];
   const allOn = allCodes.length > 0 && allCodes.every((x) => chosen.includes(x));
@@ -53,6 +57,20 @@ export function CategoryPicker({ catalogue, chosen, setChosen }: { catalogue: Da
           ))}
         </div>
       </details>
+      {masters.length > 0 && (
+        <div className="rounded-md border border-lateInk/40 bg-card p-2" data-testid="dr-cat-master">
+          <p className="text-sm font-semibold">{t('dr.cat_master')}</p>
+          <p className="text-xs text-mute">{t('dr.cat_master_hint')}</p>
+          <div className="mt-1 space-y-1">
+            {masters.map((p) => (
+              <label key={p.code} className="flex items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-1" data-testid={`dr-cat-master-${p.code}`} checked={chosen.includes(p.code)} onChange={(e) => toggleMany([p.code], e.target.checked)} />
+                <span>{partLabel(p, p.code, lang)}{p.code === 'master_contractors' ? <span className="block text-xs text-lateInk">{t('dr.cat_master_contractors_warn')}</span> : null}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       {CATEGORIES.map((c) => {
         const codes = inCategory(c, catalogue);
         if (codes.length === 0) return null;
@@ -81,6 +99,8 @@ export function categoryRows(parts: PartRows, scopeParts: readonly string[], cat
   const out: { key: string; label: string; rows: number; codes: string[] }[] = [];
   const regs = registerParts(catalogue).filter((p) => inScope.has(p.code));
   if (regs.length > 0) { regs.forEach((p) => used.add(p.code)); out.push({ key: 'registers', label: 'registers', rows: regs.reduce((n, p) => n + (rows.get(p.code) ?? 0), 0), codes: regs.map((p) => p.code) }); }
+  const mst = MASTER_CODES.filter((x) => inScope.has(x) && catalogue.some((p) => p.code === x));
+  if (mst.length > 0) { mst.forEach((x) => used.add(x)); out.push({ key: 'master', label: 'master', rows: mst.reduce((n, x) => n + (rows.get(x) ?? 0), 0), codes: [...mst] }); }
   for (const c of CATEGORIES) {
     const codes = c.parts.filter((x) => inScope.has(x));
     if (codes.length === 0) continue;
