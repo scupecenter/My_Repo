@@ -300,6 +300,8 @@ describe("item 9 rules: restricted financial summary (0.15.206)", () => {
     expect(r.advances.total).toBe(0);
     expect(r.amounts.disbursed).toBe(0);
     expect(r.achievement.completion_pct).toBeNull();
+  });
+});
 
 describe('phase scope (0.15.367)', () => {
   const row = (phase: string | null, sites: number, on_air: number) => ({ phase, sites, completed: 0, in_progress: sites - on_air, not_started: 0, on_hold: 0, on_air });
