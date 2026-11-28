@@ -1695,6 +1695,23 @@
     "end_task_layout_submitted_date": "Layout Submitted Date"
   },
   "wtSet": {
+    "rule": {
+      "method": "How the item is counted",
+      "m_off": "Not counted automatically",
+      "m_none": "Manual or project-wide (no tasks)",
+      "m_tasks": "Count approved tasks of the workflow",
+      "m_register": "Count records of a register",
+      "filter": "Find a task by code or name",
+      "plan": "Measured against the plan of milestone",
+      "plan_none": "No plan (counted only)",
+      "register": "Register key",
+      "central": "Project-wide item (one value for the project)",
+      "legacy": "This rule is not in the structured form and is ignored by the dashboard. Pick a method above to rebuild it. Stored text:",
+      "no_tasks": "Pick at least one task.",
+      "unknown_task": "This task code is not in the workflow in force: it would count nothing.",
+      "bad_plan": "The plan must be a milestone MS1 to MS10.",
+      "no_register": "Enter the register key."
+    },
     "set": "Set",
     "note": "Weights must add up to 100% at every level before a set can be published. Create a draft, edit, preview and publish it.",
     "base": "Copy from",
