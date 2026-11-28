@@ -8,7 +8,7 @@ import { problems } from '../common/problem';
 import { boolParam, oneParam, Query } from '../common/query';
 import { DbService } from '../db/db.service';
 import { applyContext } from '../logs/context';
-import { FilterCatalogService } from '../views/filter-catalog.service';
+import { FilterCatalogService, phaseParam } from '../views/filter-catalog.service';
 import { DashboardCacheService } from './dashboard-cache.service';
 import { z } from 'zod';
 import { parse } from '../common/zod';
@@ -24,6 +24,8 @@ export interface DashboardParams {
   stream?: string;
   /** a view of workflow_views (CW, TE, OM), Q126 */
   view?: string;
+  /** 0.15.368: the project phases the quick filter keeps (values of sites.project_phase) */
+  project_phase?: string[];
   exclude_overrides?: boolean;
 }
 
@@ -64,6 +66,8 @@ export function dashboardParams(q: Query): DashboardParams {
     if (!/^[A-Z][A-Z0-9_]{1,30}$/.test(view)) throw problems.validation([{ path: '/view', code: 'invalid', message: 'view is a view code such as CW.' }]);
     p.view = view;
   }
+  const phases = phaseParam(q);
+  if (phases !== undefined) p.project_phase = phases;
   p.exclude_overrides = boolParam(q, 'exclude_overrides');
   return p;
 }
@@ -91,12 +95,45 @@ export class DashboardService {
   async withSiteSet<T>(q: Query, fn: () => Promise<T>): Promise<T> {
     const ids = await this.filterCatalog.siteSet(q);
     if (ids === null) return fn();
+    return this.withSites(ids, fn);
+  }
+
+  /** Like withSiteSet, with an explicit set of site ids (0.15.368: Project Status runs the engine once per phase set for `group_by=phase`). */
+  async withSites<T>(ids: string[], fn: () => Promise<T>): Promise<T> {
     await this.db.tx.$queryRaw(Prisma.sql`SELECT set_config('pmis.dash_sites', ${ids.length ? ids.join(',') : 'none'}::text, true)`);
     try {
       return await fn();
     } finally {
       await this.db.tx.$queryRaw(Prisma.sql`SELECT set_config('pmis.dash_sites', '', true)`);
     }
+  }
+
+  /**
+   * 0.15.368: the registered, not cancelled sites of each project phase of the caller's dashboard regions, narrowed by the request's filter tree
+   * and quick filters like every dashboard figure, for `group_by=phase` of Project Status. Sites without a phase are in no set.
+   */
+  async phaseSiteSets(q: Query): Promise<{ phase: string; ids: string[] }[]> {
+    const regions = await this.access.regions('dashboard', 'view');
+    const base = await this.filterCatalog.siteSet(q);
+    const phases = await this.db.tx.$queryRaw<{ phase: string }[]>(Prisma.sql`
+      SELECT DISTINCT nullif(btrim(s.project_phase), '') AS phase FROM sites s
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND s.project_phase IS NOT NULL AND nullif(btrim(s.project_phase), '') IS NOT NULL
+      ${regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`}
+      ORDER BY 1 LIMIT 100`);
+    const out: { phase: string; ids: string[] }[] = [];
+    for (const { phase } of phases) {
+      const rows = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT s.id::text AS id FROM sites s
+        WHERE s.is_active AND s.overall_status <> 'cancelled' AND nullif(btrim(s.project_phase), '') = ${phase}
+        ${regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`}`);
+      let ids = rows.map((r) => r.id);
+      if (base !== null) {
+        const keep = new Set(base);
+        ids = ids.filter((id) => keep.has(id));
+      }
+      out.push({ phase, ids });
+    }
+    return out;
   }
 
   /** The default of exclude_overrides is the setting `dashboard.exclude_overrides` (Project Status leaves out admin overrides unless told otherwise). */
@@ -131,7 +168,7 @@ export class DashboardService {
     // and the site set of the filter tree. The rights checks above run on every request, before the cache is asked.
     const issueRegions = await this.access.regions('issues', 'view');
     const siteIds = await this.filterCatalog.siteSet(q);
-    const key = createHash('sha256').update(JSON.stringify([regions, issueRegions, p.ref_date ?? null, p.region_id ?? null, p.cluster_code ?? null, p.scenario ?? null, p.stream ?? null, p.view ?? null, excl, siteIds === null ? null : [...siteIds].sort()])).digest('hex');
+    const key = createHash('sha256').update(JSON.stringify([regions, issueRegions, p.ref_date ?? null, p.region_id ?? null, p.cluster_code ?? null, p.scenario ?? null, p.stream ?? null, p.view ?? null, p.project_phase ?? null, excl, siteIds === null ? null : [...siteIds].sort()])).digest('hex');
     const { value: r, computedAt } = await this.cache.getOrLoad(key, async () => {
       const rows = await this.withSiteSet(q, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
       SELECT dash_overview(${p.ref_date ?? null}::date, ${p.region_id ?? null}::int, ${p.cluster_code ?? null}::text, ${p.scenario ?? null}::text, ${p.stream ?? null}::text, ${excl}::boolean, ${p.view ?? null}::text) AS r`));
@@ -269,10 +306,16 @@ export class DashboardService {
     const views = await this.db.tx.$queryRaw<{ code: string; name_en: string; name_ar: string | null; sort_order: number }[]>`
       SELECT DISTINCT ON (v.code) v.code, v.name_en, v.name_ar, v.sort_order FROM workflow_views v JOIN workflow_definitions wd ON wd.id = v.workflow_id
       WHERE wd.status = 'published' ORDER BY v.code, wd.version DESC`;
+    const phases = await this.db.tx.$queryRaw<{ phase: string }[]>(Prisma.sql`
+      SELECT DISTINCT nullif(btrim(s.project_phase), '') AS phase FROM sites s
+      WHERE s.is_active AND s.project_phase IS NOT NULL AND nullif(btrim(s.project_phase), '') IS NOT NULL
+      ${regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`} ORDER BY 1 LIMIT 200`);
     return {
       regions: regs,
       clusters: clusters.map((c) => c.cluster_code),
       scenarios: [...SCENARIOS],
+      // 0.15.368: the phase values the quick filter offers (the registered sites the caller can see)
+      phases: phases.map((r) => r.phase),
       streams: [...streams.sort((a, b) => a.sort_order - b.sort_order).map(({ code, name_en, name_ar }) => ({ code, name_en, name_ar })), { code: 'DISMANTLE', name_en: 'Dismantle', name_ar: 'الفك' }],
       views: views.sort((a, b) => a.sort_order - b.sort_order).map(({ code, name_en, name_ar }) => ({ code, name_en, name_ar })),
     };

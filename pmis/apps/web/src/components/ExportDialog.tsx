@@ -101,3 +101,15 @@ export function ExportViewButton({ source, filters, columns, sort, testid }: { s
     })}><Download size={16} />{t('export.view')}</button>
   );
 }
+
+/** D5 (0.15.461): "Site pack" starts a zip of this site (one workbook per part you may export, only the columns you may read). The file lands in the export log like any export. */
+export function SitePackButton({ siteId, testid }: { siteId: string; testid: string }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const start = useStartExport();
+  return (
+    <button className="btn" data-testid={testid} title={t('export.pack_hint')} aria-label={t('export.pack')} disabled={start.isPending} onClick={() => start.mutate({ site_pack: { site_id: siteId } }, {
+      onSuccess: () => toast(t('export.pack_started')), onError: (e) => toast(exportError(e, t, (k) => k), 'err'),
+    })}><Download size={16} />{t('export.pack')}</button>
+  );
+}
