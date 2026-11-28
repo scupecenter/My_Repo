@@ -19064,6 +19064,49 @@ paths:
                       items: {$ref: '#/components/schemas/ProjectStatusSnapshot'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /project-status/agile-trend:
+    get:
+      tags: [project-status]
+      operationId: getProjectStatusAgileTrend
+      summary: The counts behind the agile indicators, per saved weekly snapshot (burn-up, cumulative flow, velocity, cone of uncertainty)
+      description: |
+        One row per snapshot date, read from the frozen per-site snapshots and never recomputed: the number of sites, the sites by overall status, and the Project Status item counts (done, applicable, planned) summed over the sites. Counts are unweighted; the weighted completion percentage stays in the snapshots of `/project-status/snapshots`. A caller limited to some regions sees the sites of those regions only. Needs `dashboard` view.
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: from
+        in: query
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        schema: {type: string, format: date}
+      responses:
+        '200':
+          description: The rows, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [taken_on, sites, by_status, items_done, items_applicable, items_planned]
+                      properties:
+                        taken_on: {type: string, format: date}
+                        sites: {type: integer}
+                        by_status:
+                          type: object
+                          additionalProperties: {type: integer}
+                        items_done: {type: number}
+                        items_applicable: {type: number}
+                        items_planned: {type: number}
+                        weight_set_id: {type: string, format: uuid, nullable: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /project-status/manual-items:
     get:
       tags: [project-status]

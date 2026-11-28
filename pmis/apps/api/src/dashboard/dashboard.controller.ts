@@ -63,6 +63,11 @@ export class DashboardController {
     return this.ps.snapshots(auth, q);
   }
 
+  @Get('project-status/agile-trend')
+  agileTrend(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.ps.agileTrend(auth, q);
+  }
+
   @Get('project-status/manual-items')
   manualItems() {
     return this.ps.manualItems();

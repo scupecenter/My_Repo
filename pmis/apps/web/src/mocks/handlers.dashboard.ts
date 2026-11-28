@@ -309,6 +309,20 @@ export const dashboardHandlers = [
     });
   }),
 
+  // the counts behind the agile indicators (burn-up, cumulative flow, velocity, cone): synthetic weekly series, scope grows once
+  http.get(`${B}/project-status/agile-trend`, () => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const start = new Date('2026-08-20T00:00:00Z').getTime();
+    const done = [120, 150, 190, 240, 290, 345, 400, 460, 520, 585, 650, 710, 775, 840];
+    const items = done.map((d, i) => {
+      const done_sites = Math.floor(i / 3), active = 20 + i, left = Math.max(0, 60 - done_sites - active);
+      return { taken_on: new Date(start + i * 7 * 86_400_000).toISOString().slice(0, 10), sites: 60, by_status: { not_started: left, in_progress: active, completed: done_sites },
+        items_done: d, items_applicable: i < 6 ? 1500 : 1560, items_planned: Math.round(d * 1.12), weight_set_id: 'ws-project-status-1' };
+    });
+    return HttpResponse.json({ items });
+  }),
+
   // ---------------------------------------------------------------- 0.7.2: the saved weekly snapshots (frozen values; the S-curve card, dashboard proposals item 2)
   http.get(`${B}/project-status/snapshots`, () => {
     const g = guard(); if (g) return g;
