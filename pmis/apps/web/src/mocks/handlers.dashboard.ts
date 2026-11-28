@@ -346,6 +346,27 @@ export const dashboardHandlers = [
     });
   }),
 
+  // ---------------------------------------------------------------- 0.15.368: Project Status (the dashboard's by-phase grouping; only group_by=phase is modelled)
+  http.get(`${B}/project-status`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const q = new URL(request.url).searchParams;
+    const by = q.get('group_by') ?? 'none';
+    if (by !== 'phase') return fields('/group_by', 'invalid');
+    return HttpResponse.json({
+      meta: { as_of: new Date().toISOString(), workflow_versions: [1], override_flagged_count: 0, overrides_excluded: true, weight_set: { id: 'ws-project-status-1', code: 'project_status', version: 3, effective_from: '2026-08-01', is_active: true } },
+      scope: { kind: 'project' },
+      weight_set: { id: 'ws-project-status-1', code: 'project_status', version: 3, effective_from: '2026-08-01', is_active: true },
+      progress_pct: 45, planned_pct: 52, progress_vs_plan_index: 0.865, spi: 0.865, partial_index: null, plan_coverage_pct: 42, central_items_hidden: 0, central_line: null,
+      sites_in_scope: 12,
+      activities: [],
+      rows: [
+        { key: 'Phase 1', label: 'Phase 1', progress_pct: 61.4, planned_pct: 66, activities: [] },
+        { key: 'Phase 2', label: 'Phase 2', progress_pct: 23.8, planned_pct: 30, activities: [] },
+      ],
+    });
+  }),
+
   // ---------------------------------------------------------------- 0.7.2: the saved weekly snapshots (frozen values; the S-curve card, dashboard proposals item 2)
   http.get(`${B}/project-status/snapshots`, () => {
     const g = guard(); if (g) return g;
