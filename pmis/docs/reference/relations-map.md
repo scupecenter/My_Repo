@@ -50,6 +50,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Register records, task instances, task delay periods, contractor teams and contracts | Contractor company (`external_parties`) | foreign key | `external_party_id`, `party_id` | chosen |
 | Procurement, snags, quality inspections, issues | Contractor company | foreign key (0182, `_idfk`) | `party_id`, `responsible_party_id` | chosen |
 | Daily plans, rows and columns | Entity locks (`entity_locks`, `entity_column_locks`) | lock table (0565, used by 0566) | `entity_kind`, `target_id` | set with a reason; checked by `dp_for_change` |
+| Warehouse items and movements | Entity locks (`entity_locks`, `entity_column_locks`) | lock table (0565) | `entity_kind`, `target_id` | set with a reason; System Admins exempt |
 | Procurement | Contractor team (`external_teams`) | foreign key (0182, `_idfk`) | `team_id` | chosen |
 | Quality inspection | Snag | foreign key (0182, `_idfk`, ON DELETE SET NULL) | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
