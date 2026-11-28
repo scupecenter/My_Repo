@@ -254,6 +254,18 @@ describe('home pins (0.15.245, migration 0344, item 16)', () => {
     const ann = await actor(app, db, { grants: SITES_VIEW });
     const ben = await actor(app, db, { grants: SITES_VIEW });
 
+    // 0655: a default view per screen: personal, one per screen, the read check applies.
+    const dv = await create(ann, { screen_key: 'sites', name: nm('DefA'), filters: {} });
+    const dv2 = await create(ann, { screen_key: 'sites', name: nm('DefB'), filters: {} });
+    expect((await ann.api.call('post', `/saved-views/${dv.body.id}/set-default`)).body).toEqual({ view_id: dv.body.id, screen_key: 'sites', is_default: true });
+    expect((await ann.api.call('post', `/saved-views/${dv2.body.id}/set-default`)).status).toBe(200);
+    const defs = await ann.api.call('get', '/me/default-views');
+    expect(defs.body.items).toEqual([{ screen_key: 'sites', view_id: dv2.body.id, name: nm('DefB') }]);
+    expect((await ben.api.call('get', '/me/default-views')).body.items).toEqual([]);
+    expect((await ben.api.call('post', `/saved-views/${dv2.body.id}/set-default`)).status).toBe(404);
+    expect((await ann.api.call('post', `/saved-views/${dv2.body.id}/clear-default`)).body).toMatchObject({ is_default: false, screen_key: 'sites' });
+    expect((await ann.api.call('get', '/me/default-views')).body.items).toEqual([]);
+
     // A private view of ann's: ben may not pin it (404, like a read).
     const priv = await create(ann, { screen_key: 'sites', name: nm('PinPriv'), filters: {} });
     expect(priv.status).toBe(201);
