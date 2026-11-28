@@ -8,6 +8,7 @@ import { useRegions } from '@/api/sites';
 import { api } from '@/api/client';
 import type { SiteTasks, TaskDetail } from '@/api/types';
 import { BoardGrid } from './Board';
+import type { CardSize } from '@/lib/tablePrefs';
 import { intentFor } from './TasksBoard';
 import { TaskDrawer, type DrawerIntent } from './TaskDrawer';
 import { useToast } from './Toast';
@@ -23,13 +24,14 @@ export type Swimlane = (typeof SWIMLANES)[number];
 const STATUS_TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
 const SLA_TONE: Record<string, string> = { green: 'bg-doneBg text-doneInk', amber: 'bg-waitBg text-waitInk', red: 'bg-lateBg text-lateInk' };
 
-function Card({ c, region, column, onOpenAction }: { c: SiteBoardCard; region: string; column: string; onOpenAction: (c: SiteBoardCard, column: string) => void }) {
+function Card({ c, region, column, size, onOpenAction }: { c: SiteBoardCard; region: string; column: string; size: CardSize; onOpenAction: (c: SiteBoardCard, column: string) => void }) {
   const { t, i18n } = useTranslation();
   const name = (i18n.language === 'ar' && c.name_ar) || c.name;
+  const pad = size === 'sm' ? 'p-1 text-xs' : size === 'lg' ? 'p-3 text-base' : 'p-2 text-sm';
   return (
     <div draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: c.id, column })); e.dataTransfer.effectAllowed = 'move'; }}>
     <Link to={`/sites/${c.id}`} data-testid={`board-site-${c.site_code}`} data-ageing={c.ageing_wd}
-        className="block rounded-md border border-line bg-card p-2 text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        className={`block rounded-md border border-line bg-card ${pad} hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}
         aria-label={t('board.site_card', { code: c.site_code, name, days: c.ageing_wd })}>
         <div className="flex items-baseline gap-2"><b className="mono" dir="ltr">{c.site_code}</b><span className="truncate">{name}</span></div>
         <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-mute">
@@ -52,7 +54,7 @@ function Card({ c, region, column, onOpenAction }: { c: SiteBoardCard; region: s
 
 /** `query` holds the filters of the Site Master list (the F3 tree as `filter`), so the board and the list show the same sites. The swimlane is
  *  chosen in the screen's Layout panel (decision V1); the board only draws it. */
-export function SitesBoard({ query, swimlane }: { query: Record<string, string | undefined>; swimlane: Swimlane }) {
+export function SitesBoard({ query, swimlane, size = 'md' }: { query: Record<string, string | undefined>; swimlane: Swimlane; /** V6: the card size (Display option of the screen) */ size?: CardSize }) {
   const { t, i18n } = useTranslation();
   const regions = useRegions();
   const q = useSitesBoard({ ...query, swimlane });
@@ -109,7 +111,7 @@ export function SitesBoard({ query, swimlane }: { query: Record<string, string |
         </div>
       )}
       {b && (
-        <BoardGrid onDropTo={onDropTo} testid="sites-board-scroll" emptyTestid="sites-board-empty" empty={t('board.empty')} total={b.total} showLanes={swimlane !== 'none'}
+        <BoardGrid onDropTo={onDropTo} size={size} testid="sites-board-scroll" emptyTestid="sites-board-empty" empty={t('board.empty')} total={b.total} showLanes={swimlane !== 'none'}
           columns={b.columns.map((c) => ({ key: c.key, name: colName(c), count: c.count, wip: c.wip_limit !== null ? { limit: c.wip_limit, over: !!c.over_wip, text: c.over_wip ? t('board.wip_over', { count: c.count, limit: c.wip_limit }) : t('board.wip_limit', { limit: c.wip_limit }) } : null }))}
           lanes={b.lanes.map((l) => ({ key: l.key, name: laneName(l), count: l.count }))}
           label={(c, l) => `${c.name} · ${l.name}`}
@@ -117,7 +119,7 @@ export function SitesBoard({ query, swimlane }: { query: Record<string, string |
             const x = b.cells.find((y) => y.column === col && y.lane === lane);
             return x ? { cards: x.cards, more: x.more ? <Link className="mt-1 block text-xs text-accentText underline" to={moreLink(col)} data-testid={`board-more-${col}-${lane}`}>{t('board.more', { count: x.count - x.cards.length })}</Link> : undefined } : undefined;
           }}
-          cardKey={(x) => x.id} card={(x) => { const col = b.cells.find((y) => y.cards.some((z) => z.id === x.id))?.column ?? ''; return <Card c={x} region={rname(x.region_id)} column={col} onOpenAction={(cc, from) => void moveCard(cc.id, cc.site_code, from, nextOf(from))} />; }} />
+          cardKey={(x) => x.id} card={(x) => { const col = b.cells.find((y) => y.cards.some((z) => z.id === x.id))?.column ?? ''; return <Card c={x} region={rname(x.region_id)} column={col} size={size} onOpenAction={(cc, from) => void moveCard(cc.id, cc.site_code, from, nextOf(from))} />; }} />
       )}
       <TaskDrawer taskId={open?.id ?? null} intent={open?.intent} onClose={() => { setOpen(null); void qc.invalidateQueries({ queryKey: ['boards', 'sites'] }); }} />
     </section>

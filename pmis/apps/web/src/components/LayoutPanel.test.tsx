@@ -11,7 +11,7 @@ const OPTIONS: ViewOption[] = ['list', 'wide', 'board'].map((id) => ({ id, label
 function tableStub(): TableApi {
   return {
     prefs: { order: [], hidden: [], width: {} },
-    display: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true, colors: true },
+    display: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true, groupbar: true, colors: true, card: 'md' },
     setDisplay: vi.fn(),
     setDensity: vi.fn(),
     setPinned: vi.fn(),
@@ -96,6 +96,17 @@ describe('LayoutPanel', () => {
     expect(table.setDisplay).toHaveBeenCalledWith({ colors: false });
     await u.click(screen.getByTestId('display-reset'));
     expect(table.resetDisplay).toHaveBeenCalled();
+  });
+
+  it('V6: the card-size radio sits in the options section and calls back', async () => {
+    const u = userEvent.setup();
+    const onChange = vi.fn();
+    renderApp(<LayoutPanel testid="lp" views={{ value: 'board', options: OPTIONS, onChange: () => undefined }} cards={{ value: 'md', onChange }} />);
+    await u.click(screen.getByTestId('lp'));
+    expect(await screen.findByTestId('lp-options')).toBeInTheDocument();
+    expect(screen.getByTestId('display-card-md')).toHaveAttribute('aria-checked', 'true');
+    await u.click(screen.getByTestId('display-card-sm'));
+    expect(onChange).toHaveBeenCalledWith('sm');
   });
 
   it('without views the button is just the Layout panel of the display options', async () => {

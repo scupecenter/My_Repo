@@ -7315,6 +7315,7 @@
     "display_zebra": "صفوف متناوبة الألوان",
     "display_groupbar": "ملخص المجموعة: العدد وشريط الحالة على رأس كل مجموعة",
     "display_colors": "تلوين القيم",
+    "display_card": "حجم البطاقة",
     "display_reset": "العودة إلى الافتراضي",
     "display_settings": "الافتراضي في الإعدادات",
     "size_sm": "صغير",

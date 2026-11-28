@@ -794,6 +794,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 </label>
               </>
             ) : undefined}
+            cards={view === "vertical" && layout === "board" ? { value: tbl.display.card, onChange: (v) => tbl.setDisplay({ card: v }) } : undefined}
             table={view === "vertical" && (layout === "list" || layout === "wide") ? tbl : undefined}
           />
         }
@@ -1105,6 +1106,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               onMove={moveCard}
               onRefused={(why) => toast(why, "err")}
               onPreview={setPreviewId}
+              size={tbl.display.card}
             />
           )}
           {layout === "feed" && (

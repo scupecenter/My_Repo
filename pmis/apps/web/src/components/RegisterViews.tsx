@@ -15,7 +15,7 @@ import { EmptyState } from '@/components/States';
 import { WideTable, type WideCell, type WideColumn, type WideInput, type WideTableRow } from '@/components/WideTable';
 import { isHidden, sectionIdOf, typeHides } from '@/lib/registerForms';
 import { measureBreakdown } from '@/lib/viewAnalytics';
-import type { Display } from '@/lib/tablePrefs';
+import type { Display, CardSize } from '@/lib/tablePrefs';
 
 /**
  * W2 of plan 2026-11-23-next-ui-cleanup: the view options of Site Master on every register and log. The list stays the default; the wide table,
@@ -170,7 +170,7 @@ export type RegisterLane = 'none' | 'region' | 'type';
  * the order of its list (values outside the list and "Not set" after them), or one per approval state. Swimlanes by region or by record type.
  * Read only, as the Site Master board: a card opens the record, and a record moves only through its own form and actions.
  */
-export function RegisterBoard({ def, records, by, lane, regionName, onOpen, partial, admin, onMove, onRefused, onPreview }: {
+export function RegisterBoard({ def, records, by, lane, regionName, onOpen, partial, admin, onMove, onRefused, onPreview, size = 'md' }: {
   def: RegisterDefinition; records: RegisterRecord[]; by: string; lane: RegisterLane;
   regionName: (id: number | null | undefined) => string; onOpen: (id: string) => void;
   /** the board holds only the first records of a larger filtered set */
@@ -182,6 +182,8 @@ export function RegisterBoard({ def, records, by, lane, regionName, onOpen, part
   onRefused?: (reason: string) => void;
   /** Space on a focused card */
   onPreview?: (id: string) => void;
+  /** V6 (0.15.574): the card size (Display option of the screen) */
+  size?: CardSize;
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -233,7 +235,7 @@ export function RegisterBoard({ def, records, by, lane, regionName, onOpen, part
         {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-board-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
         <span className="ms-auto text-xs text-mute" data-testid="register-board-note">{onMove && field ? t('regviews.board_drag_note') : t('regviews.board_read_only')}</span>
       </div>
-      <BoardGrid<RegisterRecord> testid="register-board-scroll" emptyTestid="register-board-empty" empty={t('registers.empty')} total={records.length} showLanes={lane !== 'none'}
+      <BoardGrid<RegisterRecord> size={size} testid="register-board-scroll" emptyTestid="register-board-empty" empty={t('registers.empty')} total={records.length} showLanes={lane !== 'none'}
         columns={columns} lanes={laneIds.map((l) => ({ key: laneKey.get(l)!, name: laneName(l), count: records.filter((r) => laneOf(r) === l).length }))}
         label={(c, l) => `${c.name} · ${l.name}`}
         {...(onMove ? {
@@ -261,7 +263,7 @@ export function RegisterBoard({ def, records, by, lane, regionName, onOpen, part
             <button type="button" onClick={() => onOpen(r.id)} data-testid={`board-record-${r.id}`} data-state={r.state}
               {...(onMove && field ? { draggable: true, onDragStart: (e: DragEvent) => { e.dataTransfer.setData('text/plain', r.id); e.dataTransfer.effectAllowed = 'move'; setDragId(r.id); }, onDragEnd: () => setDragId(null) } : {})}
               {...(onPreview ? { onKeyDown: (e: KeyboardEvent) => { if (e.key === ' ') { e.preventDefault(); onPreview(r.id); } }, onKeyUp: (e: KeyboardEvent) => { if (e.key === ' ') e.preventDefault(); } } : {})}
-              className="block w-full rounded-md border border-line bg-card p-2 text-start text-sm hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              className={`block w-full rounded-md border border-line bg-card ${size === 'sm' ? 'p-1 text-xs' : size === 'lg' ? 'p-3 text-base' : 'p-2 text-sm'} text-start hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}
               aria-label={t('regviews.card', { code: r.site_code ?? '', title: tt })}>
               <div className="flex items-baseline gap-2">{r.site_code && <b className="mono" dir="ltr">{r.site_code}</b>}<span className="truncate">{tt}</span></div>
               <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-mute">
