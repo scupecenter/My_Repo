@@ -4,7 +4,7 @@ import { SiteMasterGrid, type SiteMasterGridRow } from '@/components/SiteMasterG
 import { SiteMasterSourcePanel } from '@/components/SiteMasterSource';
 import { useRefreshSiteMasterRows, useSaveSiteMasterCell, useSiteMasterRowsPaged, useSiteMasterSections } from '@/api/siteMaster';
 import { SitesBulkEdit } from '@/components/SitesBulkEdit';
-import { CalendarDays, CalendarRange, Columns3, Download, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
+import { CalendarDays, CalendarRange, Columns3, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -16,7 +16,7 @@ import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { LocksDialog } from '@/components/WorkflowLocks';
 import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
-import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
+import { ExportViewButton } from '@/components/ExportDialog';
 import { TemplateExportMenu } from '@/components/TemplateExportMenu';
 import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { useRememberedView } from '@/lib/viewPreference';
@@ -112,7 +112,6 @@ export function Sites() {
     const codes = siteIdsDraft.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
     setSp((prev) => { const n = new URLSearchParams(prev); if (codes.length) n.set('site_code', codes.join(',')); else n.delete('site_code'); return n; }, { replace: true });
   };
-  const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
   // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
   const f = { q: sp.get('q') ?? '', region_id: sp.get('region_id') ?? '', scenario: sp.get('scenario') ?? '', overall_status: sp.get('overall_status') ?? '', stage_code: sp.get('stage_code') ?? '' };
@@ -344,7 +343,7 @@ export function Sites() {
       {/* W8: the shared table toolbar, in the same order on every site-data screen */}
       <TableToolbar testid="sites-toolbar"
         views={/* a menu keeps its own saved views (contract 0.15.49): the tree, the quick filters, the layout and the column order of the list */
-        <SavedViews screen={savedScreen}
+        <SavedViews screen={savedScreen} sharedScreen={savedScreen.startsWith('site360-')}
           value={siteMenu
             ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: asWide ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
             : { ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }}
@@ -388,13 +387,12 @@ export function Sites() {
             </label>
           ) : undefined}
           table={asBoard || asMap || asTimeline || asCalendar ? undefined : tbl} />}
-        columns={<ColumnMenu api={tbl} label={label} />}
+        columns={<ColumnMenu density={false} api={tbl} label={label} />}
         exporter={menuTpl ? <TemplateExportMenu testid="sites-tools" exportTestid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} hasTemplate
           onBlank={() => void downloadTemplate(menuTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}
           onFilled={() => { if (!nRows) { toast(t('sites.menu_template_none'), 'err'); return; } void downloadTemplate(menuTpl.template_id, { prefill: true, filters: viewFilters }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err')); }}
           onUpload={() => setUpMenu(true)} onBatches={() => nav('/templates')} /> : <ExportViewButton testid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />}
         more={<MoreMenu settings="sites" items={[
-          { id: 'export', label: t('export.open'), icon: <Download size={16} />, testid: 'sites-export', onSelect: () => setExp(true) },
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'sites-reset-cols', onSelect: tbl.reset },
         ]} />} />
       {dismantle ? (
@@ -420,7 +418,6 @@ export function Sites() {
           </div>
           {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site-master-cell-error">{errText(saveCell.error, t)}</p>}
           <div className="flex flex-wrap items-center gap-2" data-testid="site-master-toolbar">
-            <ExportViewButton testid="site-master-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />
             <Link className="btn px-2 py-1 text-xs" to="/templates" data-testid="site-master-template-link">{t('siteMaster.template_upload')}</Link>
             {canUnlock && gridSel.length > 0 && <>
               <button type="button" className="btn" data-testid="site-master-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
@@ -451,7 +448,7 @@ export function Sites() {
                 const on = picked.has(r.site_code), cur = sel === r.site_code;
                 const g = gxRow(v.start + k, { picked: on, current: cur });
                 return (
-                  <div key={r.site_id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} className={`absolute inset-x-0 border-b border-line text-sm ${g.className}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
+                  <div key={r.site_id} role="listitem" aria-current={on || cur ? 'true' : undefined} data-selected={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} className={`absolute inset-x-0 border-b border-line text-sm ${g.className}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
                     <div className="sticky start-0 z-20 h-0 w-9"><span className="absolute start-0 top-0 flex w-9 items-center justify-center bg-inherit" style={{ height: ROW }}><SelectBox checked={on} onChange={() => flip(r.site_code)} label={t('table.select_row', { code: r.site_code })} testid={`site-select-${r.site_code}`} /></span></div>
                     <Link to={`/sites/${r.site_id}`} data-testid={`site-row-${r.site_code}`} onClick={() => setParams({ sel: r.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
                       <span aria-hidden />
@@ -477,7 +474,7 @@ export function Sites() {
                 const na = real && st?.state === 'na', on = picked.has(s.site_code), cur = sel === s.site_code;
                 const g = gxRow(v.start + k, { picked: on, current: cur, muted: na });
                 return (
-                  <div key={s.id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} className={`absolute inset-x-0 border-b border-line text-sm ${g.className}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
+                  <div key={s.id} role="listitem" aria-current={on || cur ? 'true' : undefined} data-selected={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} className={`absolute inset-x-0 border-b border-line text-sm ${g.className}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
                     {/* the checkbox cell is frozen with the identity columns; it has no height of its own, so the link below fills the row */}
                     <div className="sticky start-0 z-20 h-0 w-9"><span className="absolute start-0 top-0 flex w-9 items-center justify-center bg-inherit" style={{ height: ROW }}><SelectBox checked={on} onChange={() => flip(s.site_code)} label={t('table.select_row', { code: s.site_code })} testid={`site-select-${s.site_code}`} /></span></div>
                     <Link to={linkTo(s)} data-testid={`site-row-${s.site_code}`} data-stream-state={st?.state} onClick={() => setParams({ sel: s.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
@@ -502,7 +499,6 @@ export function Sites() {
       </BulkBar>
       {bulkEdit && menu && <SitesBulkEdit menu={menu} rows={mRows.filter((r) => picked.has(r.site_code))} onRefresh={refreshRows}
         onClose={(failed) => { setBulkEdit(false); if (failed) setPicked(new Set(failed)); }} />}
-      <ExportDialog open={exp} onClose={() => setExp(false)} />
       {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : fromRows ? mRows.filter((x) => picked.has(x.site_code)).map((x) => x.site_id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
         onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
       {upMenu && menuTpl && <TemplateUploadDialog open onClose={() => setUpMenu(false)} templateId={menuTpl.template_id} templateName={`${(i18n.language === 'ar' && menuTpl.name_ar) || menuTpl.name_en} · v${menuTpl.current_version}`}

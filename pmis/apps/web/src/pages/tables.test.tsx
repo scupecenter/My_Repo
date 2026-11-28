@@ -49,7 +49,9 @@ describe('Sites list: prefs, chips, selection', () => {
     expect(screen.getByTestId('col-toggle-code')).toBeDisabled(); // identity column is pinned
     await u.click(screen.getByTestId('col-toggle-scenario'));
     await u.click(screen.getByTestId('col-later-region'));
-    await u.click(screen.getByTestId('density-compact'));
+    await u.click(screen.getByTestId('sites-view')); // P4: density lives in the Layout panel (Display), not in the Columns menu
+    expect(screen.queryByTestId('density-compact')).toBeNull();
+    await u.click(await screen.findByTestId('display-density-compact'));
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Scenario/ })).toBeNull());
     expect(screen.getByTestId('sites-scroll').parentElement).toHaveAttribute('data-density', 'compact');
     first.unmount();
@@ -130,19 +132,19 @@ describe('Task drawer: next/previous with the unsaved guard, and the grid', () =
 
     fireEvent.change(await screen.findByTestId('drawer-plan-date'), { target: { value: '2031-01-02' } }); // unsaved edit
     await u.click(screen.getByTestId('drawer-next'));
-    expect(await screen.findByTestId('drawer-discard')).toBeInTheDocument();
-    await u.click(screen.getByTestId('drawer-discard-keep'));
-    expect(screen.queryByTestId('drawer-discard')).toBeNull();
+    expect(await screen.findByTestId('unsaved-dialog')).toBeInTheDocument();
+    await u.click(screen.getByTestId('unsaved-stay'));
+    expect(screen.queryByTestId('unsaved-dialog')).toBeNull();
     expect(screen.getByTestId('drawer-position')).toHaveTextContent(/^1 of/); // still on the first task
 
     await u.click(screen.getByTestId('drawer-next'));
-    await u.click(await screen.findByTestId('drawer-discard-go'));
+    await u.click(await screen.findByTestId('unsaved-discard'));
     await waitFor(() => expect(screen.getByTestId('drawer-position')).toHaveTextContent(/^2 of/));
     await waitFor(() => expect(screen.getByTestId('task-drawer-body')).toBeInTheDocument());
     expect(screen.getByTestId('drawer-prev')).toBeEnabled();
     // a clean drawer moves without asking
     await u.click(screen.getByTestId('drawer-prev'));
-    expect(screen.queryByTestId('drawer-discard')).toBeNull();
+    expect(screen.queryByTestId('unsaved-dialog')).toBeNull();
     await waitFor(() => expect(screen.getByTestId('drawer-position')).toHaveTextContent(/^1 of/));
   });
 

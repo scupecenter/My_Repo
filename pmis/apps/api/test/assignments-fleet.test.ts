@@ -235,7 +235,15 @@ describe('the Car Dispatcher', () => {
     const done = await reserve(c, (await children(c.car, 'booking', a1))[0]!, veh);
     const denied = await c.viewerCar.api.call('post', `/registers/car_dispatcher/records/${done.id}/extend`, { to_date: '2026-11-15' });
     expect(denied.status).toBe(403);
-    const ok = await c.car.entry.api.call('post', `/registers/car_dispatcher/records/${done.id}/extend`, { to_date: '2026-11-15' });
+    // hardening layer 2 (0.15.406): If-Match and a recent step-up
+    const ext = `/registers/car_dispatcher/records/${done.id}/extend`;
+    expect((await c.car.entry.api.call('post', ext, { to_date: '2026-11-15' })).status).toBe(428);
+    expect((await c.car.entry.api.call('post', ext, { to_date: '2026-11-15' }, { 'If-Match': `"${done.version + 5}"` })).status).toBe(412);
+    const noStep = await actor(app, db, { level: 'entry', grants: G('car_dispatcher', 'view', 'create', 'edit'), regions: [R], modules: null, stepUp: false });
+    const stepRes = await noStep.api.call('post', ext, { to_date: '2026-11-15' }, { 'If-Match': `"${done.version}"` });
+    expect(stepRes.status).toBe(401);
+    expect(stepRes.body.code).toBe('step_up_required');
+    const ok = await c.car.entry.api.call('post', ext, { to_date: '2026-11-15' }, { 'If-Match': `"${done.version}"` });
     expect(ok.status).toBe(201);
     expect(ok.body.data).toMatchObject({ parent_booking_id: done.entity_id, from_date: '2026-11-13', to_date: '2026-11-15', vehicle_id: veh.entity_id });
     expect(ok.body.state).toBe('entry');
@@ -374,7 +382,9 @@ describe('Financial Advances', () => {
     // The search matches the digits anywhere in the masked record text, opaque IDs included, so a 4-digit amount can hit an unrelated
     // record by chance. What must hold: this advance is never returned for its amount, and no hit exposes an amount field.
     const hits = JSON.stringify(search.body.items);
-    expect(hits).not.toContain(ap.id);
+    // The masked record itself can carry the digits by chance (random ids, site code). Then a hit is not a leak by amount, so the id check
+    // only runs when the viewer's masked record does not contain the digits anywhere. The no-amount-field check below always runs.
+    if (!JSON.stringify(seen.body).includes(String(AMOUNT))) expect(hits).not.toContain(ap.id);
     expect(hits).not.toMatch(/"(requested|approved|disbursed)_amount"/);
     const own = await c.fin.entry.api.call('get', `${recPath('financial_advances')}?q=${AMOUNT}`);
     expect((own.body.items as unknown[]).length).toBeGreaterThan(0);
@@ -392,7 +402,14 @@ describe('Financial Advances', () => {
     const dis = await disburse(c, ap, AMOUNT);
     const denied = await c.viewerFin.api.call('post', `/registers/financial_advances/records/${dis.id}/top-up`, { requested_amount: 10 });
     expect(denied.status).toBe(403);
-    const top = await c.fin.entry.api.call('post', `/registers/financial_advances/records/${dis.id}/top-up`, { requested_amount: 10 });
+    const up = `/registers/financial_advances/records/${dis.id}/top-up`;
+    expect((await c.fin.entry.api.call('post', up, { requested_amount: 10 })).status).toBe(428);
+    expect((await c.fin.entry.api.call('post', up, { requested_amount: 10 }, { 'If-Match': `"${dis.version + 5}"` })).status).toBe(412);
+    const noStep = await actor(app, db, { level: 'entry', grants: G('financial_advances', 'view', 'create', 'edit'), regions: [R], modules: null, stepUp: false });
+    const stepRes = await noStep.api.call('post', up, { requested_amount: 10 }, { 'If-Match': `"${dis.version}"` });
+    expect(stepRes.status).toBe(401);
+    expect(stepRes.body.code).toBe('step_up_required');
+    const top = await c.fin.entry.api.call('post', up, { requested_amount: 10 }, { 'If-Match': `"${dis.version}"` });
     expect(top.status).toBe(201);
     expect(top.body.data).toMatchObject({ parent_advance_id: dis.entity_id, advance_state: 'requested' });
   });
@@ -401,13 +418,15 @@ describe('Financial Advances', () => {
 describe('milestones and gates do not change with the MOB tasks', () => {
   it('the MOB tasks count toward no milestone and sit in no gate condition', async () => {
     const rows = await q<{ code: string; counts_toward_milestone: boolean; has_documents: boolean }>(
-      db, `SELECT code, counts_toward_milestone, has_documents FROM task_definitions WHERE code LIKE 'MOB-%'`);
+      db, `SELECT code, counts_toward_milestone, has_documents FROM task_definitions WHERE code LIKE 'MOB-%'
+        AND workflow_id = (SELECT id FROM workflow_definitions WHERE version = 1)`);
     expect(rows.map((r) => r.code).sort()).toEqual(['MOB-1', 'MOB-2', 'MOB-5']);
     expect(rows.every((r) => !r.counts_toward_milestone && !r.has_documents)).toBe(true);
     const gates = await q<{ n: string }>(db, `SELECT count(*) AS n FROM phase_gate_rules WHERE conditions::text ILIKE '%MOB%'`);
     expect(Number(gates[0]!.n)).toBe(0);
     const sla = await q<{ code: string; min_working_days: number; max_working_days: number; start_ref: string }>(
-      db, `SELECT td.code, r.min_working_days, r.max_working_days, r.start_ref FROM sla_rules r JOIN task_definitions td ON td.id = r.task_def_id WHERE td.code LIKE 'MOB-%' ORDER BY td.code`);
+      db, `SELECT td.code, r.min_working_days, r.max_working_days, r.start_ref FROM sla_rules r JOIN task_definitions td ON td.id = r.task_def_id WHERE td.code LIKE 'MOB-%'
+        AND td.workflow_id = (SELECT id FROM workflow_definitions WHERE version = 1) ORDER BY td.code`);
     expect(sla.map((s) => [s.min_working_days, s.max_working_days, s.start_ref])).toEqual([[2, 3, 'REC:procurement'], [2, 3, 'REC:procurement'], [2, 3, 'REC:procurement']]);
   });
 

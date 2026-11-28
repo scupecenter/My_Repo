@@ -11,6 +11,8 @@ const B = API_BASE;
 const W = () => db().wh;
 const tag = (v: number) => ({ headers: { ETag: `"${v}"` } });
 const SEQ_EDITS = new Map<string, Record<string, unknown>>();
+const LIMITS = new Map<string, { level: number; qty: number | null; n: number }>();
+const RMAS: { id: string; rma_no: string; item_id: string; item_code: string; item_name: string; qty: number; supplier: string; status: string; reason: string; movement_id: null; sent_on: string; resolved_on: null; resolution_note: null; version: number; created_at: string }[] = [];
 const VENDORS = new Map<number, { v: string | null; n: number }>();
 const admin = () => viewer()?.key === 'pm';
 const has = (q: string, ...s: (string | null | undefined)[]) => !q || s.join(' ').toLowerCase().includes(q.toLowerCase());
@@ -141,6 +143,51 @@ export const warehouseHandlers = [
     const gaps = W().gaps.regions_without_wl_vendor.filter((r: number) => r !== id);
     W().gaps.regions_without_wl_vendor = b.wl_vendor ? gaps : [...gaps, id].sort();
     return HttpResponse.json({ region_id: id, wl_vendor: b.wl_vendor ?? null, version: (cur?.n ?? 0) + 1 });
+  }),
+  // Contract 0.15.342: reorder limits and supplier returns.
+  http.get(`${B}/warehouse/reorder-limits`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const below = new URL(request.url).searchParams.get('below') === 'true';
+    const rows = [...LIMITS.entries()].flatMap(([id, l]) => {
+      const st = W().stock.find((x) => x.item_id === id), it = W().items.find((x) => x.id === id);
+      if (!it) return [];
+      const available = st?.available ?? 0;
+      return [{ item_id: id, item_code: it.code, item_name: it.name_en, uom: null, reorder_level: l.level, reorder_qty: l.qty, available, below_reorder: available <= l.level, version: l.n }];
+    });
+    return HttpResponse.json({ items: rows.filter((r) => !below || r.below_reorder) });
+  }),
+  http.put(`${B}/warehouse/reorder-limits/:id`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as { reorder_level: number | null; reorder_qty?: number | null; reason?: string };
+    if (!b.reason || b.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required' }] });
+    const id = String(params.id), cur = LIMITS.get(id);
+    if (b.reorder_level === null) LIMITS.delete(id); else LIMITS.set(id, { level: b.reorder_level, qty: b.reorder_qty ?? null, n: (cur?.n ?? 0) + 1 });
+    return HttpResponse.json({ item_id: id, reorder_level: b.reorder_level, reorder_qty: b.reorder_qty ?? null, version: (cur?.n ?? 0) + 1 });
+  }),
+  http.get(`${B}/warehouse/rma`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const st = new URL(request.url).searchParams.get('status');
+    return HttpResponse.json({ items: RMAS.filter((r) => !st || r.status === st) });
+  }),
+  http.post(`${B}/warehouse/rma`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    const b = (await request.json()) as { item_id: string; qty: number; supplier: string; reason: string };
+    const it = W().items.find((x) => x.id === b.item_id);
+    if (!it || !(b.qty > 0) || !b.supplier?.trim() || (b.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/item_id', code: 'invalid' }] });
+    const r = { id: `00000000-0000-4000-8000-${String(RMAS.length + 1).padStart(12, '0')}`, rma_no: `RMA-${String(RMAS.length + 1).padStart(5, '0')}`, item_id: it.id, item_code: it.code, item_name: it.name_en, qty: b.qty, supplier: b.supplier.trim(), status: 'sent', reason: b.reason, movement_id: null, sent_on: '2026-11-27', resolved_on: null, resolution_note: null, version: 1, created_at: '2026-11-27T10:00:00Z' } as (typeof RMAS)[number];
+    RMAS.unshift(r);
+    return HttpResponse.json(r, { status: 201 });
+  }),
+  http.post(`${B}/warehouse/rma/:id/status`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const r = RMAS.find((x) => x.id === params.id);
+    if (!r) return problem(404, 'not_found', 'Unknown RMA');
+    const b = (await request.json()) as { status: string };
+    const ok = (r.status === 'sent' && ['replaced', 'credited', 'rejected'].includes(b.status)) || (['replaced', 'credited', 'rejected'].includes(r.status) && b.status === 'closed');
+    if (!ok) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/status', code: 'bad_transition' }] });
+    r.status = b.status; r.version += 1;
+    return HttpResponse.json(r);
   }),
   http.get(`${B}/number-sequences`, () => {
     const g = guard(); if (g) return g;
